@@ -1,0 +1,369 @@
+import axios from 'axios';
+import { format, subDays } from 'date-fns';
+
+export interface FacebookUser {
+  id: string;
+  name: string;
+  email: string;
+  accessToken: string;
+}
+
+export interface AdAccount {
+  id: string;
+  name: string;
+  account_id: string;
+  account_status: number;
+  currency: string;
+}
+
+export interface MetaAdsInsight {
+  date_start: string;
+  date_stop: string;
+  impressions: string;
+  clicks: string;
+  spend: string;
+  ctr: string;
+  cpm: string;
+  cpp: string;
+  reach: string;
+  frequency: string;
+  actions?: Array<{
+    action_type: string;
+    value: string;
+  }>;
+  cost_per_action_type?: Array<{
+    action_type: string;
+    value: string;
+  }>;
+}
+
+export interface MetaAdsCampaign {
+  id: string;
+  name: string;
+  status: string;
+  objective: string;
+  created_time: string;
+  updated_time: string;
+}
+
+class MetaAdsService {
+  private baseURL = 'https://graph.facebook.com/v18.0';
+  private user: FacebookUser | null = null;
+  private selectedAccount: AdAccount | null = null;
+  private appId = import.meta.env.VITE_FACEBOOK_APP_ID || '1829212554641028'; // Usar import.meta.env para Vite
+
+  // Verificar se o serviço está configurado
+  isConfigured(): boolean {
+    return this.isLoggedIn() && this.hasSelectedAccount();
+  }
+
+  // Inicializar Facebook SDK
+  initFacebookSDK(): Promise<void> {
+    return new Promise((resolve) => {
+      if (typeof window !== 'undefined' && window.FB) {
+        window.FB.init({
+          appId: this.appId,
+          cookie: true,
+          xfbml: true,
+          version: 'v18.0'
+        });
+        resolve();
+      } else {
+        // Aguardar SDK carregar
+        window.fbAsyncInit = () => {
+          window.FB.init({
+            appId: this.appId,
+            cookie: true,
+            xfbml: true,
+            version: 'v18.0'
+          });
+          resolve();
+        };
+      }
+    });
+  }
+
+  // Login com Facebook
+  async loginWithFacebook(): Promise<FacebookUser> {
+    return new Promise((resolve, reject) => {
+      if (!window.FB) {
+        reject(new Error('Facebook SDK não carregado. Verifique se o script está sendo carregado corretamente.'));
+        return;
+      }
+
+      // Verificar se estamos em desenvolvimento local
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      
+      if (isLocalhost) {
+        // Para desenvolvimento local, vamos usar uma abordagem diferente
+        console.log('Executando em localhost - usando configuração de desenvolvimento');
+      }
+
+      window.FB.login((response: any) => {
+        if (response.authResponse) {
+          const { accessToken, userID } = response.authResponse;
+          
+          // Buscar dados do usuário
+          window.FB.api('/me', { fields: 'name,email' }, (userInfo: any) => {
+            if (userInfo.error) {
+              reject(new Error(`Erro ao buscar dados do usuário: ${userInfo.error.message}`));
+              return;
+            }
+            
+            const user: FacebookUser = {
+              id: userID,
+              name: userInfo.name,
+              email: userInfo.email,
+              accessToken: accessToken
+            };
+            
+            this.user = user;
+            localStorage.setItem('facebookUser', JSON.stringify(user));
+            resolve(user);
+          });
+        } else {
+          if (response.status === 'not_authorized') {
+            reject(new Error('Login não autorizado. Verifique se você concedeu as permissões necessárias.'));
+          } else {
+            reject(new Error('Login cancelado pelo usuário'));
+          }
+        }
+      }, { scope: 'ads_read,ads_management' });
+    });
+  }
+
+  // Logout
+  logout() {
+    this.user = null;
+    this.selectedAccount = null;
+    localStorage.removeItem('facebookUser');
+    localStorage.removeItem('selectedAdAccount');
+    
+    if (window.FB) {
+      window.FB.logout();
+    }
+  }
+
+  // Verificar se está logado
+  isLoggedIn(): boolean {
+    if (this.user) return true;
+    
+    // Verificar localStorage
+    const savedUser = localStorage.getItem('facebookUser');
+    if (savedUser) {
+      this.user = JSON.parse(savedUser);
+      return true;
+    }
+    
+    return false;
+  }
+
+  // Buscar contas de anúncios do usuário
+  async getAdAccounts(): Promise<AdAccount[]> {
+    if (!this.user) {
+      throw new Error('Usuário não está logado. Faça login primeiro.');
+    }
+
+    try {
+      const response = await axios.get(
+        `${this.baseURL}/me/adaccounts`,
+        {
+          params: {
+            access_token: this.user.accessToken,
+            fields: 'id,name,account_id,account_status,currency'
+          }
+        }
+      );
+
+      if (response.data.error) {
+        throw new Error(`Erro da API do Facebook: ${response.data.error.message}`);
+      }
+
+      const accounts = response.data.data.filter((account: AdAccount) => 
+        account.account_status === 1 // Apenas contas ativas
+      );
+
+      if (accounts.length === 0) {
+        throw new Error('Nenhuma conta de anúncios ativa encontrada. Verifique se você tem acesso a contas de anúncios.');
+      }
+
+      return accounts;
+    } catch (error: any) {
+      if (error.response?.data?.error?.code === 190) {
+        throw new Error('Token de acesso expirado. Faça login novamente.');
+      }
+      console.error('Erro ao buscar contas de anúncios:', error.response?.data || error.message);
+      throw new Error(`Erro ao buscar contas: ${error.response?.data?.error?.message || error.message}`);
+    }
+  }
+
+  // Selecionar conta de anúncios
+  selectAdAccount(account: AdAccount) {
+    this.selectedAccount = account;
+    localStorage.setItem('selectedAdAccount', JSON.stringify(account));
+  }
+
+  // Verificar se tem conta selecionada
+  hasSelectedAccount(): boolean {
+    if (this.selectedAccount) return true;
+    
+    const savedAccount = localStorage.getItem('selectedAdAccount');
+    if (savedAccount) {
+      this.selectedAccount = JSON.parse(savedAccount);
+      return true;
+    }
+    
+    return false;
+  }
+
+  // Buscar campanhas da conta selecionada
+  async getCampaigns(): Promise<MetaAdsCampaign[]> {
+    if (!this.user || !this.selectedAccount) {
+      throw new Error('Usuário não logado ou conta não selecionada');
+    }
+
+    try {
+      const response = await axios.get(
+        `${this.baseURL}/${this.selectedAccount.id}/campaigns`,
+        {
+          params: {
+            access_token: this.user.accessToken,
+            fields: 'id,name,status,objective,created_time,updated_time',
+            limit: 100
+          }
+        }
+      );
+
+      return response.data.data;
+    } catch (error: any) {
+      console.error('Erro ao buscar campanhas:', error.response?.data || error.message);
+      throw new Error(`Erro ao buscar campanhas: ${error.response?.data?.error?.message || error.message}`);
+    }
+  }
+
+  // Buscar insights da conta selecionada
+  async getAccountInsights(dateStart: string, dateEnd: string): Promise<MetaAdsInsight[]> {
+    if (!this.user || !this.selectedAccount) {
+      throw new Error('Usuário não logado ou conta não selecionada');
+    }
+
+    try {
+      const response = await axios.get(
+        `${this.baseURL}/${this.selectedAccount.id}/insights`,
+        {
+          params: {
+            access_token: this.user.accessToken,
+            time_range: JSON.stringify({
+              since: dateStart,
+              until: dateEnd
+            }),
+            fields: [
+              'impressions',
+              'clicks',
+              'spend',
+              'ctr',
+              'cpm',
+              'cpp',
+              'reach',
+              'frequency',
+              'actions',
+              'cost_per_action_type'
+            ].join(','),
+            time_increment: 1,
+            level: 'account'
+          }
+        }
+      );
+
+      return response.data.data;
+    } catch (error: any) {
+      console.error('Erro ao buscar insights:', error.response?.data || error.message);
+      throw new Error(`Erro ao buscar insights: ${error.response?.data?.error?.message || error.message}`);
+    }
+  }
+
+  // Converter dados para formato do dashboard
+  convertToMetricData(insights: MetaAdsInsight[], month: string): any[] {
+    return insights.map(insight => {
+      const leads = insight.actions?.find(action => 
+        action.action_type === 'lead' || action.action_type === 'complete_registration'
+      )?.value || '0';
+
+      const costPerLead = insight.cost_per_action_type?.find(cost => 
+        cost.action_type === 'lead' || cost.action_type === 'complete_registration'
+      )?.value || '0';
+
+      const investment = parseFloat(insight.spend || '0');
+      const impressions = parseInt(insight.impressions || '0');
+      const clicks = parseInt(insight.clicks || '0');
+      const leadsCount = parseInt(leads);
+      const ctr = parseFloat(insight.ctr || '0');
+      const cpm = parseFloat(insight.cpm || '0');
+      const cpl = parseFloat(costPerLead || '0');
+
+      const estimatedRevenue = leadsCount * 200;
+      const roas = investment > 0 ? estimatedRevenue / investment : 0;
+      const roi = investment > 0 ? ((estimatedRevenue - investment) / investment) * 100 : 0;
+
+      return {
+        date: insight.date_start,
+        month: month,
+        service: 'Meta Ads',
+        leads: leadsCount,
+        revenue: estimatedRevenue,
+        investment: investment,
+        impressions: impressions,
+        clicks: clicks,
+        ctr: ctr,
+        cpm: cpm,
+        cpl: cpl,
+        roas: roas,
+        roi: roi,
+        appointments: Math.floor(leadsCount * 0.6),
+        sales: Math.floor(leadsCount * 0.3),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+    });
+  }
+
+  // Sincronizar dados
+  async syncMetrics(month: string, startDate: string, endDate: string) {
+    if (!this.isLoggedIn() || !this.hasSelectedAccount()) {
+      throw new Error('Usuário não logado ou conta não selecionada');
+    }
+
+    try {
+      console.log('Sincronizando dados do Meta Ads...');
+      
+      const insights = await this.getAccountInsights(startDate, endDate);
+      const metrics = this.convertToMetricData(insights, month);
+      
+      console.log(`Sincronizados ${metrics.length} registros do Meta Ads`);
+      return metrics;
+    } catch (error: any) {
+      console.error('Erro na sincronização:', error.message);
+      throw error;
+    }
+  }
+
+  // Obter usuário atual
+  getCurrentUser(): FacebookUser | null {
+    return this.user;
+  }
+
+  // Obter conta selecionada
+  getSelectedAccount(): AdAccount | null {
+    return this.selectedAccount;
+  }
+}
+
+// Declarar tipos para Facebook SDK
+declare global {
+  interface Window {
+    FB: any;
+    fbAsyncInit: () => void;
+  }
+}
+
+export const metaAdsService = new MetaAdsService();

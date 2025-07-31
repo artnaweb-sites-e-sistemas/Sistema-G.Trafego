@@ -1,0 +1,592 @@
+import { 
+  collection, 
+  doc, 
+  getDocs, 
+  addDoc, 
+  updateDoc, 
+  query, 
+  where, 
+  orderBy 
+} from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { metaAdsService } from './metaAdsService';
+
+export interface MetricData {
+  id?: string;
+  date: string;
+  month: string;
+  service: string;
+  client: string;
+  product: string;
+  audience: string;
+  leads: number;
+  revenue: number;
+  investment: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  cpm: number;
+  cpl: number;
+  roas: number;
+  roi: number;
+  appointments: number;
+  sales: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+// Dados mockados para demonstração - Métricas vinculadas ao perfil do público
+const mockData: MetricData[] = [
+  // Executivos 30-50 - Alto valor, menor volume, maior conversão
+  {
+    id: '1',
+    date: '2023-07-31',
+    month: 'Julho 2023',
+    service: 'Google Ads',
+    client: 'João Silva',
+    product: 'Pacote Básico',
+    audience: 'Executivos 30-50',
+    leads: 45,
+    revenue: 125000,
+    investment: 18000,
+    impressions: 85000,
+    clicks: 1200,
+    ctr: 1.41,
+    cpm: 21.18,
+    cpl: 400.00,
+    roas: 6.94,
+    roi: 594.44,
+    appointments: 32,
+    sales: 28,
+  },
+  {
+    id: '2',
+    date: '2023-07-30',
+    month: 'Julho 2023',
+    service: 'LinkedIn Ads',
+    client: 'João Silva',
+    product: 'Pacote Premium',
+    audience: 'Executivos 30-50',
+    leads: 28,
+    revenue: 89000,
+    investment: 12000,
+    impressions: 45000,
+    clicks: 680,
+    ctr: 1.51,
+    cpm: 26.67,
+    cpl: 428.57,
+    roas: 7.42,
+    roi: 641.67,
+    appointments: 18,
+    sales: 15,
+  },
+  
+  // Startups - Volume médio, valor médio, boa conversão
+  {
+    id: '3',
+    date: '2023-07-31',
+    month: 'Julho 2023',
+    service: 'Facebook Ads',
+    client: 'Maria Santos',
+    product: 'Consultoria Mensal',
+    audience: 'Startups',
+    leads: 89,
+    revenue: 44500,
+    investment: 9500,
+    impressions: 120000,
+    clicks: 2100,
+    ctr: 1.75,
+    cpm: 7.92,
+    cpl: 106.74,
+    roas: 4.68,
+    roi: 368.42,
+    appointments: 52,
+    sales: 38,
+  },
+  {
+    id: '4',
+    date: '2023-07-30',
+    month: 'Julho 2023',
+    service: 'Google Ads',
+    client: 'Maria Santos',
+    product: 'Gestão de Redes Sociais',
+    audience: 'Startups',
+    leads: 67,
+    revenue: 33500,
+    investment: 7800,
+    impressions: 95000,
+    clicks: 1650,
+    ctr: 1.74,
+    cpm: 8.21,
+    cpl: 116.42,
+    roas: 4.29,
+    roi: 329.49,
+    appointments: 38,
+    sales: 25,
+  },
+  
+  // Agencias de Marketing - Alto volume, valor médio, conversão estável
+  {
+    id: '5',
+    date: '2023-07-31',
+    month: 'Julho 2023',
+    service: 'Instagram Ads',
+    client: 'Pedro Costa',
+    product: 'Campanha Google Ads',
+    audience: 'Agencias de Marketing',
+    leads: 156,
+    revenue: 46800,
+    investment: 11000,
+    impressions: 180000,
+    clicks: 3200,
+    ctr: 1.78,
+    cpm: 6.11,
+    cpl: 70.51,
+    roas: 4.25,
+    roi: 325.45,
+    appointments: 89,
+    sales: 67,
+  },
+  {
+    id: '6',
+    date: '2023-07-30',
+    month: 'Julho 2023',
+    service: 'Facebook Ads',
+    client: 'Pedro Costa',
+    product: 'Website Institucional',
+    audience: 'Agencias de Marketing',
+    leads: 134,
+    revenue: 40200,
+    investment: 9200,
+    impressions: 150000,
+    clicks: 2800,
+    ctr: 1.87,
+    cpm: 6.13,
+    cpl: 68.66,
+    roas: 4.37,
+    roi: 336.96,
+    appointments: 76,
+    sales: 58,
+  },
+  
+  // E-commerce - Alto volume, valor variável, conversão otimizada
+  {
+    id: '7',
+    date: '2023-07-31',
+    month: 'Julho 2023',
+    service: 'Google Shopping',
+    client: 'Ana Oliveira',
+    product: 'E-commerce Completo',
+    audience: 'E-commerce',
+    leads: 234,
+    revenue: 117000,
+    investment: 15000,
+    impressions: 250000,
+    clicks: 4200,
+    ctr: 1.68,
+    cpm: 6.00,
+    cpl: 64.10,
+    roas: 7.80,
+    roi: 680.00,
+    appointments: 145,
+    sales: 189,
+  },
+  {
+    id: '8',
+    date: '2023-07-30',
+    month: 'Julho 2023',
+    service: 'Facebook Ads',
+    client: 'Ana Oliveira',
+    product: 'E-commerce Completo',
+    audience: 'E-commerce',
+    leads: 198,
+    revenue: 99000,
+    investment: 12500,
+    impressions: 220000,
+    clicks: 3600,
+    ctr: 1.64,
+    cpm: 5.68,
+    cpl: 63.13,
+    roas: 7.92,
+    roi: 692.00,
+    appointments: 123,
+    sales: 156,
+  },
+  
+  // Tech Companies - Volume médio-alto, alto valor, boa conversão
+  {
+    id: '9',
+    date: '2023-07-31',
+    month: 'Julho 2023',
+    service: 'LinkedIn Ads',
+    client: 'Carlos Ferreira',
+    product: 'SEO Avançado',
+    audience: 'Tech Companies',
+    leads: 78,
+    revenue: 78000,
+    investment: 14000,
+    impressions: 90000,
+    clicks: 1400,
+    ctr: 1.56,
+    cpm: 15.56,
+    cpl: 179.49,
+    roas: 5.57,
+    roi: 457.14,
+    appointments: 45,
+    sales: 39,
+  },
+  {
+    id: '10',
+    date: '2023-07-30',
+    month: 'Julho 2023',
+    service: 'Google Ads',
+    client: 'Carlos Ferreira',
+    product: 'SEO Básico',
+    audience: 'Tech Companies',
+    leads: 92,
+    revenue: 92000,
+    investment: 16000,
+    impressions: 110000,
+    clicks: 1800,
+    ctr: 1.64,
+    cpm: 14.55,
+    cpl: 173.91,
+    roas: 5.75,
+    roi: 475.00,
+    appointments: 54,
+    sales: 47,
+  },
+  
+  // Profissionais Liberais - Volume alto, valor médio, conversão estável
+  {
+    id: '11',
+    date: '2023-07-31',
+    month: 'Julho 2023',
+    service: 'Facebook Ads',
+    client: 'Lucia Mendes',
+    product: 'Consultoria Mensal',
+    audience: 'Profissionais Liberais',
+    leads: 189,
+    revenue: 56700,
+    investment: 12000,
+    impressions: 200000,
+    clicks: 3800,
+    ctr: 1.90,
+    cpm: 6.00,
+    cpl: 63.49,
+    roas: 4.73,
+    roi: 372.50,
+    appointments: 112,
+    sales: 89,
+  },
+  {
+    id: '12',
+    date: '2023-07-30',
+    month: 'Julho 2023',
+    service: 'Google Ads',
+    client: 'Lucia Mendes',
+    product: 'Website Institucional',
+    audience: 'Profissionais Liberais',
+    leads: 167,
+    revenue: 50100,
+    investment: 10500,
+    impressions: 180000,
+    clicks: 3400,
+    ctr: 1.89,
+    cpm: 5.83,
+    cpl: 62.87,
+    roas: 4.77,
+    roi: 377.14,
+    appointments: 98,
+    sales: 78,
+  },
+  
+  // Agencias Criativas - Volume médio, valor alto, conversão boa
+  {
+    id: '13',
+    date: '2023-07-31',
+    month: 'Julho 2023',
+    service: 'Instagram Ads',
+    client: 'Roberto Lima',
+    product: 'Gestão de Redes Sociais',
+    audience: 'Agencias Criativas',
+    leads: 67,
+    revenue: 67000,
+    investment: 11000,
+    impressions: 80000,
+    clicks: 1400,
+    ctr: 1.75,
+    cpm: 13.75,
+    cpl: 164.18,
+    roas: 6.09,
+    roi: 509.09,
+    appointments: 38,
+    sales: 32,
+  },
+  {
+    id: '14',
+    date: '2023-07-30',
+    month: 'Julho 2023',
+    service: 'Pinterest Ads',
+    client: 'Roberto Lima',
+    product: 'Campanha Google Ads',
+    audience: 'Agencias Criativas',
+    leads: 45,
+    revenue: 45000,
+    investment: 8500,
+    impressions: 60000,
+    clicks: 1000,
+    ctr: 1.67,
+    cpm: 14.17,
+    cpl: 188.89,
+    roas: 5.29,
+    roi: 429.41,
+    appointments: 25,
+    sales: 21,
+  }
+];
+
+export const metricsService = {
+  // Buscar métricas por mês e serviço
+  async getMetrics(month: string, client: string = 'Todos os Clientes', product: string = 'Todos os Produtos', audience: string = 'Todos os Públicos') {
+    try {
+      // Verificar se Meta Ads está configurado e tentar sincronizar
+      if (metaAdsService.isConfigured()) {
+        try {
+          const today = new Date();
+          const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+          const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+          
+          const startDate = firstDayOfMonth.toISOString().split('T')[0];
+          const endDate = lastDayOfMonth.toISOString().split('T')[0];
+          
+          const metaAdsData = await metaAdsService.syncMetrics(month, startDate, endDate);
+          
+          // Salvar no Firebase se possível
+          for (const metric of metaAdsData) {
+            try {
+              await this.addMetric(metric);
+            } catch (error) {
+              console.warn('Não foi possível salvar no Firebase, usando dados em memória');
+            }
+          }
+          
+          return metaAdsData;
+        } catch (error: any) {
+          console.warn('Erro ao sincronizar Meta Ads, usando dados mockados:', error.message);
+          // Continue para usar dados mockados
+        }
+      }
+
+      // Tentar buscar do Firebase primeiro (com tratamento de erro para índices)
+      try {
+        const metricsRef = collection(db, 'metrics');
+        let q = query(
+          metricsRef, 
+          where('month', '==', month),
+          orderBy('date', 'desc')
+        );
+
+
+
+        const snapshot = await getDocs(q);
+        const firebaseData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as MetricData[];
+
+        // Se há dados no Firebase, retorna eles
+        if (firebaseData.length > 0) {
+          return firebaseData;
+        }
+      } catch (firebaseError: any) {
+        console.warn('Erro na consulta Firebase (possível problema de índice):', firebaseError.message);
+        // Continua para usar dados mockados
+      }
+
+      // Caso contrário, retorna dados mockados
+      let filteredData = mockData.filter(item => item.month === month);
+      
+      if (client !== 'Todos os Clientes') {
+        filteredData = filteredData.filter(item => item.client === client);
+      }
+
+      if (product !== 'Todos os Produtos') {
+        filteredData = filteredData.filter(item => item.product === product);
+      }
+
+      if (audience !== 'Todos os Públicos') {
+        filteredData = filteredData.filter(item => item.audience === audience);
+      }
+
+      // Garante que todos tenham o campo service
+      filteredData = filteredData.map(item => ({
+        ...item,
+        service: item.service || 'Desconhecido'
+      }));
+
+      return filteredData;
+
+    } catch (error: any) {
+      console.warn('Erro ao acessar dados, usando dados mockados:', error.message);
+      
+      // Em caso de erro (como permissões), usar dados mockados
+      let filteredData = mockData.filter(item => item.month === month);
+      
+      if (client !== 'Todos os Clientes') {
+        filteredData = filteredData.filter(item => item.client === client);
+      }
+
+      if (product !== 'Todos os Produtos') {
+        filteredData = filteredData.filter(item => item.product === product);
+      }
+
+      if (audience !== 'Todos os Públicos') {
+        filteredData = filteredData.filter(item => item.audience === audience);
+      }
+
+      // Garante que todos tenham o campo service
+      filteredData = filteredData.map(item => ({
+        ...item,
+        service: item.service || 'Desconhecido'
+      }));
+
+      return filteredData;
+    }
+  },
+
+  // Sincronizar dados do Meta Ads
+  async syncMetaAdsData(month: string) {
+    if (!metaAdsService.isConfigured()) {
+      throw new Error('Meta Ads não está configurado. Configure primeiro no painel.');
+    }
+
+    try {
+      const today = new Date();
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      
+      const startDate = firstDayOfMonth.toISOString().split('T')[0];
+      const endDate = lastDayOfMonth.toISOString().split('T')[0];
+      
+      const metaAdsData = await metaAdsService.syncMetrics(month, startDate, endDate);
+      
+      // Salvar no Firebase
+      const savedIds = [];
+      for (const metric of metaAdsData) {
+        try {
+          const id = await this.addMetric(metric);
+          savedIds.push(id);
+        } catch (error) {
+          console.error('Erro ao salvar métrica:', error);
+        }
+      }
+      
+      return {
+        success: true,
+        message: `Sincronizados ${savedIds.length} registros do Meta Ads`,
+        data: metaAdsData
+      };
+    } catch (error: any) {
+      console.error('Erro na sincronização do Meta Ads:', error);
+      throw new Error(`Erro na sincronização: ${error.message}`);
+    }
+  },
+
+  // Adicionar nova métrica
+  async addMetric(data: Omit<MetricData, 'id'>) {
+    try {
+      const docRef = await addDoc(collection(db, 'metrics'), {
+        ...data,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      return docRef.id;
+    } catch (error) {
+      console.error('Erro ao adicionar métrica:', error);
+      throw new Error('Não foi possível adicionar a métrica. Verifique as permissões do Firebase.');
+    }
+  },
+
+  // Atualizar métrica existente
+  async updateMetric(id: string, data: Partial<MetricData>) {
+    try {
+      const docRef = doc(db, 'metrics', id);
+      await updateDoc(docRef, {
+        ...data,
+        updatedAt: new Date()
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar métrica:', error);
+      throw new Error('Não foi possível atualizar a métrica. Verifique as permissões do Firebase.');
+    }
+  },
+
+  // Calcular métricas agregadas
+  calculateAggregatedMetrics(metrics: MetricData[]) {
+    if (metrics.length === 0) {
+      return {
+        totalLeads: 0,
+        totalRevenue: 0,
+        totalInvestment: 0,
+        totalImpressions: 0,
+        totalClicks: 0,
+        avgCTR: 0,
+        avgCPM: 0,
+        avgCPL: 0,
+        totalROAS: 0,
+        totalROI: 0,
+        totalAppointments: 0,
+        totalSales: 0
+      };
+    }
+
+    const totals = metrics.reduce((acc, metric) => {
+      acc.totalLeads += metric.leads;
+      acc.totalRevenue += metric.revenue;
+      acc.totalInvestment += metric.investment;
+      acc.totalImpressions += metric.impressions;
+      acc.totalClicks += metric.clicks;
+      acc.totalAppointments += metric.appointments;
+      acc.totalSales += metric.sales;
+      return acc;
+    }, {
+      totalLeads: 0,
+      totalRevenue: 0,
+      totalInvestment: 0,
+      totalImpressions: 0,
+      totalClicks: 0,
+      totalAppointments: 0,
+      totalSales: 0
+    });
+
+    const avgCTR = totals.totalImpressions > 0 
+      ? (totals.totalClicks / totals.totalImpressions) * 100 
+      : 0;
+    
+    const avgCPM = totals.totalImpressions > 0 
+      ? (totals.totalInvestment / totals.totalImpressions) * 1000 
+      : 0;
+    
+    const avgCPL = totals.totalLeads > 0 
+      ? totals.totalInvestment / totals.totalLeads 
+      : 0;
+    
+    const totalROAS = totals.totalInvestment > 0 
+      ? totals.totalRevenue / totals.totalInvestment 
+      : 0;
+    
+    const totalROI = totals.totalInvestment > 0 
+      ? ((totals.totalRevenue - totals.totalInvestment) / totals.totalInvestment) * 100 
+      : 0;
+
+    return {
+      ...totals,
+      avgCTR: Number(avgCTR.toFixed(2)),
+      avgCPM: Number(avgCPM.toFixed(2)),
+      avgCPL: Number(avgCPL.toFixed(2)),
+      totalROAS: Number(totalROAS.toFixed(2)),
+      totalROI: Number(totalROI.toFixed(2))
+    };
+  }
+};
