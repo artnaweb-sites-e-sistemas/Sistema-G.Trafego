@@ -17,7 +17,10 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
   const [selectedAccount, setSelectedAccount] = useState<AdAccount | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [step, setStep] = useState<'login' | 'selectBusiness' | 'selectAccount' | 'connected' | 'permissionsRequired'>('login');
+  const [isSelectingAccount, setIsSelectingAccount] = useState(false);
+  const [step, setStep] = useState<'login' | 'selectBusiness' | 'selectAccount' | 'connected' | 'permissionsRequired' | 'tokenConfig'>('login');
+  const [accessToken, setAccessToken] = useState('');
+  const [tokenConfigured, setTokenConfigured] = useState(false);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [adSets, setAdSets] = useState<any[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
@@ -29,9 +32,9 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
   const [isFacebookConnected, setIsFacebookConnected] = useState(false);
 
   useEffect(() => {
-    // Verificar se já existe usuário salvo
+    // Verificar se já existe usuário salvo E se está realmente conectado
     const savedUser = localStorage.getItem('facebookUser');
-    if (savedUser) {
+    if (savedUser && metaAdsService.isConnected()) {
       try {
         const user = JSON.parse(savedUser);
         setUser(user);
@@ -46,9 +49,17 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
         console.error('Erro ao carregar usuário salvo:', error);
         localStorage.removeItem('facebookUser');
       }
+    } else {
+      console.log('Usuário não encontrado ou não está conectado, iniciando em modo manual');
+      setManualData();
     }
 
-
+    // Verificar se já existe token de acesso configurado
+    const savedToken = localStorage.getItem('facebookAccessToken');
+    if (savedToken) {
+      setTokenConfigured(true);
+      metaAdsService.setAccessToken(savedToken);
+    }
 
     // Listener para evento de login bem-sucedido
     const handleLoginSuccess = (event: CustomEvent) => {
@@ -56,15 +67,16 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
       const user = event.detail;
       setUser(user);
       metaAdsService.setUser(user);
-      setStep('selectBusiness');
-      
-      // Restaurar clientes removidos
-      metaAdsService.restoreRemovedClients();
       
       // Configurar dados do Facebook automaticamente
       setFacebookData();
       
-      loadBusinessManagers();
+      // Fechar modal e ir para dashboard
+      setTimeout(() => {
+        setIsOpen(false);
+        // Chamar callback para atualizar o dashboard
+        onConfigSaved();
+      }, 500);
     };
 
     window.addEventListener('facebookLoginSuccess', handleLoginSuccess as EventListener);
@@ -74,7 +86,30 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
     };
   }, []);
 
+  const handleConfigureToken = async () => {
+    if (!accessToken.trim()) {
+      alert('Por favor, insira o token de acesso');
+      return;
+    }
 
+    try {
+      setIsLoading(true);
+      
+      // Configurar o token
+      metaAdsService.setAccessToken(accessToken.trim());
+      setTokenConfigured(true);
+      
+      // Tentar buscar contas de anúncios
+      await loadAdAccounts();
+      
+      alert('Token configurado com sucesso!');
+    } catch (error: any) {
+      console.error('Erro ao configurar token:', error);
+      alert(`Erro ao configurar token: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const checkLoginStatus = async () => {
     try {
@@ -103,51 +138,41 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
     try {
       console.log('Iniciando login do Facebook...');
       
-      // Verificar se estamos em desenvolvimento local
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const isHttp = window.location.protocol === 'http:';
-      
-      if (isLocalhost && isHttp) {
-        alert('⚠️ ATENÇÃO: Para desenvolvimento local, o Facebook pode não permitir login via HTTP.\n\nSoluções:\n1. Use HTTPS (https://localhost:5173)\n2. Configure o app no Facebook Developers para aceitar localhost\n3. Teste em produção (https://gtrafego.artnawebsite.com.br)');
-      }
-      
       // Usar o serviço para fazer login
       const user = await metaAdsService.loginWithFacebook();
       console.log('Login bem-sucedido:', user);
       
       setUser(user);
-      setStep('selectBusiness');
       
       // Marcar que os dados são do Facebook
       setFacebookData();
       
-      // Tentar carregar Business Managers
-      await loadBusinessManagers();
+      // Fechar modal automaticamente após login bem-sucedido
+      setTimeout(() => {
+        setIsOpen(false);
+        // Chamar callback para atualizar o dashboard
+        onConfigSaved();
+      }, 500);
       
     } catch (error: any) {
       console.error('Erro no login:', error);
       
-      // Mensagem específica para erro de HTTPS
-      if (error.message.includes('HTTP') || error.message.includes('app not available')) {
-        alert('❌ Erro: O Facebook não permite login de páginas HTTP.\n\nPara resolver:\n1. Use HTTPS: https://localhost:5173\n2. Ou teste em produção: https://gtrafego.artnawebsite.com.br');
-      } else {
-        // Mostrar mensagem de erro mais amigável
-        let errorMessage = 'Erro ao fazer login com o Facebook.';
-        
-        if (error.message.includes('não autorizado')) {
-          errorMessage = 'Login não autorizado. Verifique se você concedeu as permissões necessárias.';
-        } else if (error.message.includes('cancelado')) {
-          errorMessage = 'Login cancelado pelo usuário.';
-        } else if (error.message.includes('desconhecido')) {
-          errorMessage = 'Erro desconhecido no login. Tente novamente.';
-        } else if (error.message.includes('SDK não carregado')) {
-          errorMessage = 'Facebook SDK não carregado. Recarregue a página e tente novamente.';
-        } else if (error.message.includes('dados do usuário')) {
-          errorMessage = 'Erro ao buscar dados do usuário. Tente novamente.';
-        }
-        
-        alert(errorMessage);
+      // Mostrar mensagem de erro mais amigável
+      let errorMessage = 'Erro ao fazer login com o Facebook.';
+      
+      if (error.message.includes('não autorizado')) {
+        errorMessage = 'Login não autorizado. Verifique se você concedeu as permissões necessárias.';
+      } else if (error.message.includes('cancelado')) {
+        errorMessage = 'Login cancelado pelo usuário.';
+      } else if (error.message.includes('desconhecido')) {
+        errorMessage = 'Erro desconhecido no login. Tente novamente.';
+      } else if (error.message.includes('SDK não carregado')) {
+        errorMessage = 'Facebook SDK não carregado. Recarregue a página e tente novamente.';
+      } else if (error.message.includes('dados do usuário')) {
+        errorMessage = 'Erro ao buscar dados do usuário. Tente novamente.';
       }
+      
+      alert(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -198,16 +223,16 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
       if (accounts.length > 0) {
         setStep('selectAccount');
       } else {
-        // Se não há contas, mostrar mensagem de erro
-        alert('Nenhuma conta de anúncios encontrada. Verifique se você tem permissões de anúncios.');
-        setStep('permissionsRequired');
+        // Se não há contas, mostrar opção de configurar token
+        setStep('tokenConfig');
       }
     } catch (error: any) {
       console.error('Erro ao carregar contas de anúncios:', error);
       
-      // Se for erro de permissão, mostrar tela de permissões
-      if (error.message.includes('Permissões de anúncios não concedidas')) {
-        setStep('permissionsRequired');
+      // Se for erro de permissão, mostrar opção de configurar token
+      if (error.message.includes('Token de acesso não configurado') || 
+          error.message.includes('Permissões de anúncios não concedidas')) {
+        setStep('tokenConfig');
       } else {
         alert(`Erro ao carregar contas de anúncios: ${error.message}`);
       }
@@ -219,12 +244,23 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
     await loadAdAccounts(business.id);
   };
 
-  const handleSelectAccount = (account: AdAccount) => {
+  const handleSelectAccount = async (account: AdAccount) => {
+    try {
+      setIsSelectingAccount(true);
     setSelectedAccount(account);
     metaAdsService.selectAdAccount(account);
     
-    // Carregar campanhas da conta selecionada
-    loadCampaigns();
+      // Fechar modal automaticamente após seleção
+      setTimeout(() => {
+        setIsOpen(false);
+        setIsSelectingAccount(false);
+        // Chamar callback para atualizar o dashboard
+        onConfigSaved();
+      }, 500); // 500ms para feedback visual mínimo
+    } catch (error) {
+      console.error('Erro ao selecionar conta:', error);
+      setIsSelectingAccount(false);
+    }
   };
 
   const loadCampaigns = async () => {
@@ -423,7 +459,16 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
   };
 
   const handleLogout = () => {
-    console.log('Fazendo logout...');
+    console.log('=== INICIANDO LOGOUT COMPLETO ===');
+    console.log('Estado antes do logout:', {
+      user: !!user,
+      selectedAccount: !!selectedAccount,
+      isFacebookConnected,
+      dataSource
+    });
+    
+    // Fazer logout do Facebook primeiro (isso dispara o evento)
+    metaAdsService.logout();
     
     // Limpar dados do Facebook
     setUser(null);
@@ -438,15 +483,19 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
     setIsFacebookConnected(false);
     setDataSource(null);
     
-    // Limpar dados locais
-    localStorage.removeItem('facebookUser');
-    localStorage.removeItem('selectedAdAccount');
-    
-    // Fazer logout do Facebook
-    metaAdsService.logout();
+    // Notificar mudança de origem dos dados
+    onDataSourceChange?.('manual', false);
     
     // Voltar para tela de login
     setStep('login');
+    
+    console.log('=== LOGOUT COMPLETO REALIZADO ===');
+    console.log('Estado após logout:', {
+      user: null,
+      selectedAccount: null,
+      isFacebookConnected: false,
+      dataSource: null
+    });
   };
 
   const clearFacebookData = () => {
@@ -468,6 +517,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
     // Limpar dados locais
     localStorage.removeItem('facebookUser');
     localStorage.removeItem('selectedAdAccount');
+    localStorage.removeItem('metaAdsLogoutTimestamp'); // Limpar timestamp de logout
     
     // Fazer logout do Facebook
     metaAdsService.logout();
@@ -539,7 +589,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
     }
   };
 
-  const isConnected = user && selectedAccount;
+  const isConnected = user && metaAdsService.isLoggedIn();
 
   return (
     <>
@@ -550,7 +600,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
             ? 'bg-blue-600 hover:bg-blue-700 text-white' 
             : 'bg-gray-600 hover:bg-gray-700 text-gray-300 hover:text-white'
         }`}
-        title={isConnected ? 'Meta Ads Conectado' : 'Configurar Meta Ads'}
+        title={isConnected ? 'Meta Ads Conectado - Clique para opções' : 'Configurar Meta Ads'}
       >
         <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
           <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
@@ -568,7 +618,9 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md border border-gray-700">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-white">Meta Ads Integration</h2>
+              <h2 className="text-xl font-semibold text-white">
+                {isConnected ? 'Meta Ads Conectado' : 'Meta Ads Integration'}
+              </h2>
               <button
                 onClick={() => setIsOpen(false)}
                 className="text-gray-400 hover:text-white"
@@ -577,7 +629,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
               </button>
             </div>
 
-            {step === 'login' && (
+            {!isConnected && step === 'login' && (
               <div className="space-y-4">
                 <div className="text-center">
                   <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -608,238 +660,30 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
               </div>
             )}
 
-            {step === 'selectBusiness' && (
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                    <Building className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-white font-medium">
-                      {selectedBusiness ? `${selectedBusiness.name}` : 'Business Managers'}
-                    </h3>
-                    <p className="text-gray-400 text-sm">Selecione um Business Manager</p>
-                  </div>
-                </div>
-
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {isLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <RefreshCw className="w-6 h-6 animate-spin text-blue-400" />
-                    </div>
-                  ) : businessManagers.length > 0 ? (
-                    businessManagers.map((business) => (
-                      <button
-                        key={business.id}
-                        onClick={() => handleSelectBusiness(business)}
-                        className="w-full bg-gray-700 hover:bg-gray-600 text-left p-3 rounded-lg transition-colors"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <Building className="w-5 h-5 text-blue-400" />
-                          <div>
-                            <div className="text-white font-medium">{business.name}</div>
-                            <div className="text-gray-400 text-sm">
-                              Tipo: {business.account_type}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-gray-400 mb-4">Nenhum Business Manager encontrado</p>
-                      <p className="text-gray-500 text-sm">Verifique se você tem permissões de anúncios</p>
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => setStep('login')}
-                  className="w-full bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span>Trocar Conta</span>
-                </button>
-              </div>
-            )}
-
-            {step === 'selectAccount' && (
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-white font-medium">
-                      {selectedBusiness ? `${selectedBusiness.name}` : 'Contas de Anúncios'}
-                    </h3>
-                    <p className="text-gray-400 text-sm">Selecione uma conta de anúncios</p>
-                  </div>
-                </div>
-
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {isLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <RefreshCw className="w-6 h-6 animate-spin text-blue-400" />
-                    </div>
-                  ) : adAccounts.length > 0 ? (
-                    adAccounts.map((account) => (
-                      <button
-                        key={account.id}
-                        onClick={() => handleSelectAccount(account)}
-                        className="w-full bg-gray-700 hover:bg-gray-600 text-left p-3 rounded-lg transition-colors"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <Building className="w-5 h-5 text-blue-400" />
-                          <div>
-                            <div className="text-white font-medium">{account.name}</div>
-                            <div className="text-gray-400 text-sm">
-                              ID: {account.account_id} • {account.currency}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-gray-400">Nenhuma conta de anúncios encontrada</p>
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => setStep('selectBusiness')}
-                  className="w-full bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
-                >
-                  <Building className="w-4 h-4" />
-                  <span>Voltar aos Business Managers</span>
-                </button>
-
-                <button
-                  onClick={handleLogout}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span>Trocar Conta</span>
-                </button>
-              </div>
-            )}
-
-            {step === 'permissionsRequired' && (
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-10 h-10 bg-yellow-600 rounded-full flex items-center justify-center">
-                    <Settings className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-white font-medium">Permissões Necessárias</h3>
-                    <p className="text-gray-400 text-sm">Para acessar contas de anúncios</p>
-                  </div>
-                </div>
-
-                <div className="bg-yellow-900 border border-yellow-700 rounded-lg p-4">
-                  <p className="text-yellow-300 text-sm mb-4">
-                    O login básico funcionou! Porém, para acessar dados de anúncios, você precisa solicitar 
-                    revisão do Facebook para as permissões avançadas (pages_show_list, ads_read, ads_management).
-                  </p>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-green-400" />
-                      <span className="text-green-300 text-sm">Login básico funcionando</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <XCircle className="w-4 h-4 text-red-400" />
-                      <span className="text-red-300 text-sm">Permissões avançadas precisam de App Review</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <XCircle className="w-4 h-4 text-red-400" />
-                      <span className="text-red-300 text-sm">Para desenvolvimento local, use HTTPS ou configure o app no Facebook Developers</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <button
-                    onClick={handleRequestAdsPermissions}
-                    disabled={isLoading}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors disabled:opacity-50"
-                  >
-                    {isLoading ? (
-                      <RefreshCw className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                      </svg>
-                    )}
-                    <span>{isLoading ? 'Solicitando...' : 'Fazer Login Básico'}</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      metaAdsService.restoreRemovedClients();
-                      alert('Clientes removidos foram restaurados. Recarregue a página para ver as mudanças.');
-                    }}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
-                  >
-                    Restaurar Clientes Removidos
-                  </button>
-
-                  <button
-                    onClick={() => setStep('login')}
-                    className="w-full bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
-                  >
-                    Voltar
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {step === 'connected' && (
+            {isConnected && (
               <div className="space-y-4">
                 <div className="bg-green-900 border border-green-700 rounded-lg p-4">
                   <div className="flex items-center space-x-3">
                     <CheckCircle className="w-6 h-6 text-green-400" />
                     <div>
                       <h3 className="text-green-400 font-medium">Conectado com sucesso!</h3>
-                      <p className="text-green-300 text-sm">
-                        {user?.name} • {selectedAccount?.name}
-                      </p>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <button
-                    onClick={syncData}
-                    disabled={isSyncing}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors disabled:opacity-50"
-                  >
-                    {isSyncing ? (
-                      <RefreshCw className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-5 h-5" />
-                    )}
-                    <span>Sincronizar Dados</span>
-                  </button>
-
-                  <button
-                    onClick={() => setStep('selectBusiness')}
-                    className="w-full bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
-                  >
-                    <Building className="w-4 h-4" />
-                    <span>Trocar Conta</span>
-                  </button>
-
                   <button
                     onClick={handleLogout}
-                    className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors"
                   >
-                    <LogOut className="w-4 h-4" />
-                    <span>Desconectar</span>
+                  <LogOut className="w-5 h-5" />
+                  <span>Trocar Conta</span>
                   </button>
-                </div>
               </div>
             )}
+
+
+
+
           </div>
         </div>
       )}

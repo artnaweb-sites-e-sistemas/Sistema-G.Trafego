@@ -37,7 +37,14 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
     const startDate = new Date(year, month, 1);
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     
+    // Data atual para comparação
+    const today = new Date();
+    const currentDay = today.getDate();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    
     console.log(`Gerando dados para ${selectedMonth}: ${daysInMonth} dias`);
+    console.log(`Data atual: ${currentDay}/${currentMonth + 1}/${currentYear}`);
     
     for (let i = 0; i < daysInMonth; i++) {
       const currentDate = new Date(startDate);
@@ -46,6 +53,13 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       const dayStr = currentDate.getDate().toString().padStart(2, '0');
       const monthStr = (currentDate.getMonth() + 1).toString().padStart(2, '0');
       const yearStr = currentDate.getFullYear().toString();
+      
+      // Verificar se é um dia passado, presente ou futuro
+      const isPastDay = currentDate < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const isToday = currentDate.getDate() === today.getDate() && 
+                     currentDate.getMonth() === today.getMonth() && 
+                     currentDate.getFullYear() === today.getFullYear();
+      const isFutureDay = currentDate > new Date(today.getFullYear(), today.getMonth(), today.getDate());
       
       data.push({
         date: `${dayStr}/${monthStr}/${yearStr}`,
@@ -57,7 +71,10 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
         ctr: '0,00%',
         leads: 0,
         cpl: formatCurrency(0),
-        status: 'Inativo'
+        status: 'Inativo',
+        isPastDay,
+        isToday,
+        isFutureDay
       });
     }
     
@@ -67,46 +84,99 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
     metrics.forEach(metric => {
       // Verificar se a métrica pertence ao mês selecionado
       if (metric.month === selectedMonth) {
-        const metricDate = new Date(metric.date);
+        // Corrigir problema de timezone - Meta Ads pode retornar datas com offset
+        let metricDate: Date;
+        try {
+          // Se a data está no formato YYYY-MM-DD, criar data local
+          if (/^\d{4}-\d{2}-\d{2}$/.test(metric.date)) {
+            const [year, month, day] = metric.date.split('-').map(Number);
+            metricDate = new Date(year, month - 1, day); // month - 1 porque Date usa 0-based months
+          } else {
+            metricDate = new Date(metric.date);
+          }
+        } catch (error) {
+          console.warn('Erro ao processar data da métrica:', error);
+          metricDate = new Date(metric.date);
+        }
+        
         const dayIndex = metricDate.getDate() - 1;
+        
+
         
         console.log(`Métrica encontrada para ${metric.date}: investimento ${metric.investment}`);
         
         if (dayIndex >= 0 && dayIndex < data.length) {
-          data[dayIndex] = {
-            ...data[dayIndex],
-            investment: formatCurrency(metric.investment),
-            impressions: metric.impressions,
-            clicks: metric.clicks,
-            cpm: formatCurrency(metric.cpm),
-            ctr: `${metric.ctr.toFixed(2)}%`,
-            leads: metric.leads,
-            cpl: formatCurrency(metric.cpl),
-            status: metric.investment > 0 ? 'Ativo' : 'Inativo'
-          };
+          // Verificar se é um dia futuro - se for, sempre manter como Inativo
+          if (data[dayIndex].isFutureDay) {
+            console.log(`Dia ${metricDate.getDate()} é futuro - mantendo como Inativo`);
+            data[dayIndex] = {
+              ...data[dayIndex],
+              investment: formatCurrency(0),
+              impressions: 0,
+              clicks: 0,
+              cpm: formatCurrency(0),
+              ctr: '0,00%',
+              leads: 0,
+              cpl: formatCurrency(0),
+              status: 'Inativo'
+            };
+          } else {
+            // Para dias passados ou atuais, aplicar os dados reais
+            data[dayIndex] = {
+              ...data[dayIndex],
+              investment: formatCurrency(metric.investment),
+              impressions: metric.impressions,
+              clicks: metric.clicks,
+              cpm: formatCurrency(metric.cpm),
+              ctr: `${metric.ctr.toFixed(2)}%`,
+              leads: metric.leads,
+              cpl: formatCurrency(metric.cpl),
+              status: metric.investment > 0 ? 'Ativo' : 'Inativo'
+            };
+          }
         }
       }
     });
     
-    // Se uma campanha específica está selecionada, destacar que os dados são específicos
+    // Lógica especial para o dia atual se há campanha selecionada
     if (selectedCampaign && metrics.length > 0) {
       console.log(`Exibindo dados específicos da campanha: ${selectedCampaign}`);
+      
+      // Se há campanha selecionada e é o mês atual, marcar o dia atual como ativo
+      const isCurrentMonth = month === currentMonth && year === currentYear;
+      if (isCurrentMonth) {
+        const todayIndex = currentDay - 1;
+        if (todayIndex >= 0 && todayIndex < data.length) {
+          // Se não há dados específicos para hoje, mas há campanha ativa, marcar como ativo
+          if (data[todayIndex].investment === formatCurrency(0) && data[todayIndex].isToday) {
+            data[todayIndex].status = 'Ativo';
+            data[todayIndex].investment = formatCurrency(0.01); // Valor simbólico
+            console.log(`Dia atual (${currentDay}) marcado como ativo - campanha em execução`);
+          }
+        }
+      }
     }
     
-    // Adicionar alguns dados de exemplo se não houver dados reais
+    // Adicionar alguns dados de exemplo se não houver dados reais (apenas para meses passados)
     if (metrics.length === 0) {
-      console.log('Nenhuma métrica encontrada, usando dados de exemplo');
-      // Adicionar dados de exemplo no meio do mês
-      const middleDay = Math.floor(data.length / 2);
-      if (data[middleDay]) {
-        data[middleDay].investment = formatCurrency(1.74);
-        data[middleDay].impressions = 66;
-        data[middleDay].clicks = 1;
-        data[middleDay].cpm = formatCurrency(1.74);
-        data[middleDay].ctr = '1,52%';
-        data[middleDay].leads = 0;
-        data[middleDay].cpl = formatCurrency(0);
-        data[middleDay].status = 'Ativo';
+      const isPastMonth = year < currentYear || (year === currentYear && month < currentMonth);
+      
+      if (isPastMonth) {
+        console.log('Nenhuma métrica encontrada para mês passado, usando dados de exemplo');
+        // Adicionar dados de exemplo no meio do mês
+        const middleDay = Math.floor(data.length / 2);
+        if (data[middleDay]) {
+          data[middleDay].investment = formatCurrency(1.74);
+          data[middleDay].impressions = 66;
+          data[middleDay].clicks = 1;
+          data[middleDay].cpm = formatCurrency(1.74);
+          data[middleDay].ctr = '1,52%';
+          data[middleDay].leads = 0;
+          data[middleDay].cpl = formatCurrency(0);
+          data[middleDay].status = 'Ativo';
+        }
+      } else {
+        console.log('Mês atual ou futuro sem dados - mantendo status inativo para dias futuros');
       }
     }
     

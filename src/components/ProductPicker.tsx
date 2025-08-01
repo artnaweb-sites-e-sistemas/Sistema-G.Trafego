@@ -70,7 +70,16 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
       try {
         setIsLoading(true);
         console.log('ProductPicker: Carregando campanhas do Meta Ads para BM:', selectedClient);
-        console.log('ProductPicker: Ad Account selecionada:', metaAdsService.getSelectedAccount()?.name);
+        
+        // Verificar se há uma conta selecionada
+        const selectedAccount = metaAdsService.getSelectedAccount();
+        if (!selectedAccount) {
+          console.log('ProductPicker: Nenhuma conta selecionada, aguardando...');
+          setIsLoading(false);
+          return;
+        }
+        
+        console.log('ProductPicker: Ad Account selecionada:', selectedAccount.name);
         
         // Obter datas do mês selecionado
         const getPeriodDates = (monthString: string) => {
@@ -207,17 +216,28 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
 
   // Carregar produtos quando dataSource, selectedClient ou selectedMonth mudar
   useEffect(() => {
-    console.log('ProductPicker: Cliente mudou para:', selectedClient);
+    console.log('ProductPicker: useEffect disparado');
+    console.log('ProductPicker: dataSource =', dataSource);
+    console.log('ProductPicker: selectedClient =', selectedClient);
+    console.log('ProductPicker: selectedMonth =', selectedMonth);
+    console.log('ProductPicker: isLoggedIn =', metaAdsService.isLoggedIn());
     
     // Só carregar se há cliente selecionado
-    if (selectedClient && selectedClient !== 'Todos os Clientes') {
+    if (selectedClient && selectedClient !== 'Todos os Clientes' && selectedClient !== 'Selecione um cliente') {
+      console.log('ProductPicker: Cliente válido selecionado, carregando campanhas...');
+      
       // Pequeno delay para garantir que o cache seja limpo
       const timer = setTimeout(() => {
+        console.log('ProductPicker: Executando loadMetaAdsCampaigns após delay');
         loadMetaAdsCampaigns();
-      }, 100);
+      }, 200); // Aumentado o delay para dar mais tempo para o cache ser limpo
       
-      return () => clearTimeout(timer);
+      return () => {
+        console.log('ProductPicker: Limpando timer');
+        clearTimeout(timer);
+      };
     } else {
+      console.log('ProductPicker: Cliente inválido ou não selecionado, resetando produtos');
       // Resetar produtos quando não há cliente selecionado
       setProducts([{ id: '1', name: 'Todos os Produtos', clientId: 'all' }]);
       setSelectedProduct('Todos os Produtos');
@@ -265,6 +285,27 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
       setSelectedProduct('Todos os Produtos');
     }
   }, [selectedClient, setSelectedProduct]);
+
+  // Listener para evento de Business Manager selecionada
+  useEffect(() => {
+    const handleBusinessManagerSelected = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { businessManager, clientName } = customEvent.detail;
+      console.log('ProductPicker: Business Manager selecionada:', businessManager, clientName);
+      
+      // Forçar recarregamento das campanhas após um pequeno delay
+      setTimeout(() => {
+        console.log('ProductPicker: Recarregando campanhas após seleção de BM');
+        loadMetaAdsCampaigns();
+      }, 300);
+    };
+
+    window.addEventListener('businessManagerSelected', handleBusinessManagerSelected);
+
+    return () => {
+      window.removeEventListener('businessManagerSelected', handleBusinessManagerSelected);
+    };
+  }, []);
 
   const handleProductSelect = (product: Product) => {
     console.log('Produto selecionado:', product);

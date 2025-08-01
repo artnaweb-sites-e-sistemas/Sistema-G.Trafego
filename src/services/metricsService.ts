@@ -408,6 +408,73 @@ const mockData: MetricData[] = [
     roi: 429.41,
     appointments: 25,
     sales: 21,
+  },
+  
+  // Dados para Julho 2025 - Campanha ativa (mês passado)
+  {
+    id: 'julho-2025-1',
+    date: '2025-07-31',
+    month: 'Julho 2025',
+    service: 'Meta Ads',
+    client: 'Carla Carrion',
+    product: 'Campanha Ativa',
+    audience: 'Público Alvo',
+    leads: 30,
+    revenue: 6000,
+    investment: 1800,
+    impressions: 52000,
+    clicks: 950,
+    ctr: 1.83,
+    cpm: 34.62,
+    cpl: 60.00,
+    roas: 3.33,
+    roi: 233.33,
+    appointments: 18,
+    sales: 15,
+  },
+  // Dados para Fábio Soares - Julho 2025
+  {
+    id: 'fabio-julho-2025-1',
+    date: '2025-07-31',
+    month: 'Julho 2025',
+    service: 'Meta Ads',
+    client: 'Fábio Soares - BM 1',
+    product: 'Todos os Produtos',
+    audience: 'Todos os Públicos',
+    leads: 45,
+    revenue: 8500,
+    investment: 2200,
+    impressions: 68000,
+    clicks: 1200,
+    ctr: 1.76,
+    cpm: 32.35,
+    cpl: 48.89,
+    roas: 3.86,
+    roi: 286.36,
+    appointments: 25,
+    sales: 18,
+  },
+  // Dados para Fábio Soares - Agosto 2025 (dia atual)
+  {
+    id: 'fabio-agosto-2025-1',
+    date: '2025-08-01',
+    month: 'Agosto 2025',
+    service: 'Meta Ads',
+    client: 'Fábio Soares - BM 1',
+    product: 'Todos os Produtos',
+    audience: 'Todos os Públicos',
+    leads: 12,
+    revenue: 2400,
+    investment: 650,
+    impressions: 25000,
+    clicks: 450,
+    ctr: 1.80,
+    cpm: 26.00,
+    cpl: 54.17,
+    roas: 3.69,
+    roi: 269.23,
+    appointments: 8,
+    sales: 5,
   }
 ];
 
@@ -447,6 +514,25 @@ export const metricsService = {
   clearCache(): void {
     this.cache.clear();
     console.log('Cache de métricas limpo completamente');
+  },
+
+  // Método para forçar refresh dos dados
+  forceRefresh(): void {
+    this.cache.clear();
+    console.log('Cache limpo - forçando refresh dos dados');
+  },
+
+  // Método para limpar cache por cliente específico
+  clearCacheByClient(clientName: string): void {
+    console.log(`Limpando cache de métricas para cliente: ${clientName}`);
+    
+    // Limpar todas as chaves de cache que contêm o nome do cliente
+    for (const key of this.cache.keys()) {
+      if (key.includes(clientName)) {
+        this.cache.delete(key);
+        console.log(`Cache de métricas removido: ${key}`);
+      }
+    }
   },
 
   // Buscar métricas por mês e serviço

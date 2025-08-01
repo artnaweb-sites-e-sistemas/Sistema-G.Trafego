@@ -58,15 +58,15 @@ class MetaAdsService {
   private user: FacebookUser | null = null;
   private selectedAccount: AdAccount | null = null;
   private appId = import.meta.env.VITE_FACEBOOK_APP_ID || '1793110515418498'; // Novo App ID com permissões avançadas
-
+  private accessToken: string | null = null; // Token de acesso para API de Marketing
   
   // Sistema de cache para reduzir chamadas à API
   private cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
   private readonly CACHE_TTL = {
     BUSINESS_MANAGERS: 30 * 60 * 1000, // 30 minutos
     AD_ACCOUNTS: 15 * 60 * 1000, // 15 minutos
-    CAMPAIGNS: 10 * 60 * 1000, // 10 minutos
-    AD_SETS: 10 * 60 * 1000, // 10 minutos
+    CAMPAIGNS: 2 * 60 * 1000, // 2 minutos (reduzido para atualizações mais frequentes)
+    AD_SETS: 2 * 60 * 1000, // 2 minutos (reduzido para atualizações mais frequentes)
     INSIGHTS: 5 * 60 * 1000, // 5 minutos
     USER_INFO: 60 * 60 * 1000, // 1 hora
   };
@@ -179,9 +179,23 @@ class MetaAdsService {
   }
 
   // Configurar token de acesso para API de Marketing
+  setAccessToken(token: string) {
+    this.accessToken = token;
+    localStorage.setItem('facebookAccessToken', token);
+    console.log('Token de acesso configurado');
+  }
+
+  // Obter token de acesso
+  getAccessToken(): string | null {
+    if (!this.accessToken) {
+      this.accessToken = localStorage.getItem('facebookAccessToken');
+    }
+    return this.accessToken;
+  }
+
   // Verificar se o serviço está configurado
   isConfigured(): boolean {
-    return this.isLoggedIn() && this.hasSelectedAccount();
+    return this.isLoggedIn() && (this.hasSelectedAccount() || this.getAccessToken() !== null);
   }
 
   // Inicializar Facebook SDK
@@ -282,10 +296,6 @@ class MetaAdsService {
                 
                 this.user = user;
                 localStorage.setItem('facebookUser', JSON.stringify(user));
-                
-                // Restaurar clientes removidos após login bem-sucedido
-                this.restoreRemovedClients();
-                
                 console.log('Usuário salvo:', user);
                 resolve(user);
               });
@@ -301,8 +311,7 @@ class MetaAdsService {
             }
           }, { 
             scope: 'email,public_profile,ads_read,ads_management,pages_show_list,pages_read_engagement',
-            return_scopes: true,
-            auth_type: 'rerequest'
+            return_scopes: true
           });
         }
       });
@@ -347,10 +356,6 @@ class MetaAdsService {
             
             this.user = user;
             localStorage.setItem('facebookUser', JSON.stringify(user));
-            
-            // Restaurar clientes removidos após login bem-sucedido
-            this.restoreRemovedClients();
-            
             resolve(user);
           });
         } else {
@@ -364,7 +369,8 @@ class MetaAdsService {
       }, { 
         scope: 'email,public_profile',
         return_scopes: true,
-        auth_type: 'rerequest'
+        auth_type: 'rerequest',
+        redirect_uri: 'https://gtrafego.artnawebsite.com.br/'
       });
     });
   }
@@ -373,8 +379,11 @@ class MetaAdsService {
   logout() {
     console.log('Fazendo logout do Meta Ads...');
     
-    // Limpar cache ao fazer logout
-    this.clearCache();
+    // Limpar todo o cache ao fazer logout
+    this.clearAllCache();
+    
+    // Limpar dados de localStorage relacionados ao Meta Ads
+    this.clearAllMetaAdsLocalStorage();
     
     // Fazer logout do Facebook SDK se disponível
     if (window.FB && this.user?.accessToken) {
@@ -389,22 +398,97 @@ class MetaAdsService {
     // Limpar dados do usuário
     this.user = null;
     this.selectedAccount = null;
+    this.accessToken = null;
     
     // Limpar dados locais
     localStorage.removeItem('facebookUser');
     localStorage.removeItem('selectedAdAccount');
+    localStorage.removeItem('facebookAccessToken');
     
-    console.log('Logout concluído');
+    // Adicionar timestamp de logout para evitar restauração automática
+    localStorage.setItem('metaAdsLogoutTimestamp', Date.now().toString());
+    
+    // Disparar evento para notificar componentes sobre logout
+    window.dispatchEvent(new CustomEvent('metaAdsLoggedOut', {
+      detail: { timestamp: Date.now() }
+    }));
+    
+    console.log('Logout completo do Meta Ads realizado');
+  }
+
+  // Método para limpar todo o localStorage relacionado ao Meta Ads
+  private clearAllMetaAdsLocalStorage(): void {
+    const keysToRemove = [
+      'facebookUser',
+      'selectedAdAccount',
+      'facebookAccessToken',
+      'currentSelectedClient',
+      'selectedProduct',
+      'selectedAudience',
+      'selectedCampaignId',
+      'selectedAdSetId',
+      'metaAds_campaigns',
+      'metaAds_adsets',
+      'metaAds_business_managers',
+      'metaAds_ad_accounts_by_business',
+      'metaAds_metrics',
+      'metaAds_insights',
+      'metaAds_campaign_insights',
+      'metaAds_adset_insights',
+      'metaAds_account_insights'
+    ];
+    
+    keysToRemove.forEach(key => {
+      try {
+        localStorage.removeItem(key);
+        console.log(`localStorage limpo: ${key}`);
+      } catch (error) {
+        console.error(`Erro ao limpar localStorage ${key}:`, error);
+      }
+    });
   }
 
   // Verificar se está logado
   isLoggedIn(): boolean {
-    if (this.user) return true;
+    // Verificar se há usuário em memória
+    if (this.user && this.user.accessToken) {
+      return true;
+    }
     
     // Verificar localStorage
     const savedUser = localStorage.getItem('facebookUser');
-    if (savedUser) {
-      this.user = JSON.parse(savedUser);
+    const savedToken = localStorage.getItem('facebookAccessToken');
+    
+    if (savedUser && savedToken) {
+      try {
+        this.user = JSON.parse(savedUser);
+        this.accessToken = savedToken;
+        return true;
+      } catch (error) {
+        console.error('Erro ao carregar usuário salvo:', error);
+        this.clearAllMetaAdsLocalStorage();
+        return false;
+      }
+    }
+    
+    return false;
+  }
+
+  // Verificar se está logado E conectado (mais rigoroso)
+  isConnected(): boolean {
+    // Verificar se há usuário em memória E se não foi feito logout recentemente
+    if (this.user && this.user.accessToken) {
+      // Verificar se não há flag de logout recente
+      const logoutTimestamp = localStorage.getItem('metaAdsLogoutTimestamp');
+      if (logoutTimestamp) {
+        const logoutTime = parseInt(logoutTimestamp);
+        const now = Date.now();
+        // Se o logout foi feito há menos de 5 minutos, considerar como desconectado
+        if (now - logoutTime < 5 * 60 * 1000) {
+          console.log('Logout recente detectado, considerando como desconectado');
+          return false;
+        }
+      }
       return true;
     }
     
@@ -640,14 +724,22 @@ class MetaAdsService {
     console.log('MetaAdsService.isLoggedIn():', this.isLoggedIn());
     console.log('MetaAdsService.selectedAccount:', this.selectedAccount);
     
-    // Se não está logado, tentar carregar dados salvos
+    // Verificação rigorosa de login
     if (!this.isLoggedIn()) {
-      const savedData = this.getDataFromStorage('campaigns');
-      if (savedData) {
-        console.log('Carregando campanhas do localStorage (offline)');
-        return savedData;
-      }
-      throw new Error('Usuário não logado e não há dados salvos');
+      console.log('Usuário não está logado - não buscando campanhas');
+      throw new Error('Usuário não está logado no Meta Ads');
+    }
+    
+    // Verificar se há conta selecionada
+    if (!this.selectedAccount) {
+      console.log('Nenhuma conta de anúncios selecionada');
+      throw new Error('Nenhuma conta de anúncios selecionada');
+    }
+    
+    // Verificar se o token ainda é válido
+    if (!this.user?.accessToken && !this.accessToken) {
+      console.log('Token de acesso não encontrado');
+      throw new Error('Token de acesso não encontrado');
     }
 
     if (!this.selectedAccount) {
@@ -669,7 +761,7 @@ class MetaAdsService {
             `${this.baseURL}/${this.selectedAccount!.id}/campaigns`,
             {
               params: {
-                access_token: this.user?.accessToken,
+                access_token: this.user?.accessToken || this.getAccessToken(),
                 fields: 'id,name,status,objective,created_time,updated_time,start_time,stop_time',
                 limit: 1000 // Aumentar limite para pegar mais campanhas
               }
@@ -829,7 +921,7 @@ class MetaAdsService {
         console.log(`Buscando insights da conta ${this.selectedAccount!.id}...`);
         
         // Usar token de acesso se disponível, senão usar token do usuário
-        const accessToken = this.user?.accessToken;
+        const accessToken = this.getAccessToken() || (this.user?.accessToken);
         if (!accessToken) {
           throw new Error('Token de acesso não disponível');
         }
@@ -888,8 +980,34 @@ class MetaAdsService {
       const roas = investment > 0 ? estimatedRevenue / investment : 0;
       const roi = investment > 0 ? ((estimatedRevenue - investment) / investment) * 100 : 0;
 
+      // Corrigir data: Meta Ads pode retornar datas com offset de timezone
+      let correctedDate = insight.date_start;
+      try {
+        if (insight.date_start) {
+          // Se a data está no formato YYYY-MM-DD, usar diretamente
+          if (/^\d{4}-\d{2}-\d{2}$/.test(insight.date_start)) {
+            correctedDate = insight.date_start;
+          } else {
+            // Se não, tentar converter
+            const date = new Date(insight.date_start);
+            
+            if (!isNaN(date.getTime())) {
+              // O problema é que o Meta Ads retorna datas em UTC
+              // e quando convertemos para local, há um deslocamento de timezone
+              // Vamos criar a data local diretamente para evitar o offset
+              const [year, month, day] = insight.date_start.split('-').map(Number);
+              const localDate = new Date(year, month - 1, day); // month - 1 porque Date usa 0-based months
+              correctedDate = localDate.toISOString().split('T')[0];
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Erro ao processar data:', error);
+        correctedDate = insight.date_start;
+      }
+
       return {
-        date: insight.date_start,
+        date: correctedDate,
         month: month,
         service: 'Meta Ads',
         client: client || 'Meta Ads',
@@ -1041,6 +1159,99 @@ class MetaAdsService {
     });
   }
 
+  // Método para forçar atualização dos dados (ignorar cache)
+  async forceRefreshData(type: 'campaigns' | 'adsets' | 'insights' | 'all'): Promise<void> {
+    console.log(`Forçando atualização de dados: ${type}`);
+    
+    if (type === 'all' || type === 'campaigns') {
+      this.clearCache('campaigns');
+      this.clearCache('adsets'); // Limpar também ad sets pois dependem de campanhas
+    }
+    
+    if (type === 'all' || type === 'adsets') {
+      this.clearCache('adsets');
+    }
+    
+    if (type === 'all' || type === 'insights') {
+      this.clearMetricsCache();
+    }
+    
+    // Disparar evento para notificar componentes sobre atualização
+    window.dispatchEvent(new CustomEvent('metaAdsDataRefreshed', {
+      detail: { type, timestamp: Date.now() }
+    }));
+    
+    console.log(`Dados ${type} atualizados com sucesso`);
+  }
+
+  // Forçar refresh completo de todos os dados
+  forceCompleteRefresh(): void {
+    this.clearAllCache();
+    this.clearAllMetaAdsLocalStorage();
+    console.log('Refresh completo forçado - todos os caches limpos');
+    
+    // Disparar evento para notificar componentes
+    window.dispatchEvent(new CustomEvent('metaAdsDataRefreshed', {
+      detail: { type: 'all', timestamp: Date.now() }
+    }));
+  }
+
+  // Método para verificar se há atualizações nas campanhas
+  async checkForUpdates(): Promise<boolean> {
+    if (!this.selectedAccount || !this.isLoggedIn()) {
+      return false;
+    }
+
+    try {
+      // Buscar apenas informações básicas das campanhas para verificar atualizações
+      const response = await axios.get(
+        `${this.baseURL}/${this.selectedAccount.id}/campaigns`,
+        {
+          params: {
+            access_token: this.user?.accessToken || this.getAccessToken(),
+            fields: 'id,name,updated_time',
+            limit: 10 // Apenas algumas campanhas para verificar
+          }
+        }
+      );
+
+      const currentCampaigns = response.data.data || [];
+      const cachedCampaigns = this.getFromCache<MetaAdsCampaign[]>('campaigns');
+
+      if (!cachedCampaigns || cachedCampaigns.length === 0) {
+        return true; // Se não há cache, precisa atualizar
+      }
+
+      // Verificar se há diferenças nas campanhas
+      for (const currentCampaign of currentCampaigns) {
+        const cachedCampaign = cachedCampaigns.find(c => c.id === currentCampaign.id);
+        if (!cachedCampaign || cachedCampaign.updated_time !== currentCampaign.updated_time) {
+          console.log('Atualização detectada na campanha:', currentCampaign.name);
+          return true;
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Erro ao verificar atualizações:', error);
+      return false;
+    }
+  }
+
+  // Método para sincronização inteligente
+  async smartSync(): Promise<void> {
+    console.log('Iniciando sincronização inteligente...');
+    
+    const hasUpdates = await this.checkForUpdates();
+    
+    if (hasUpdates) {
+      console.log('Atualizações detectadas - forçando refresh completo');
+      await this.forceRefreshData('all');
+    } else {
+      console.log('Nenhuma atualização detectada - cache ainda válido');
+    }
+  }
+
   clearCacheByClient(clientName: string): void {
     console.log(`Limpando cache para cliente: ${clientName}`);
     
@@ -1057,28 +1268,6 @@ class MetaAdsService {
   }
 
   // Novo método para limpar localStorage por cliente
-  // Método para restaurar clientes removidos
-  public restoreRemovedClients(): void {
-    try {
-      // Importar clientService dinamicamente
-      import('./clientService').then(({ clientService }) => {
-        const removedClients = clientService.getRemovedClients();
-        
-        // Restaurar apenas clientes do Facebook
-        removedClients.forEach((removedClient: any) => {
-          if (removedClient.source === 'facebook' && removedClient.businessManagerId) {
-            clientService.restoreClient(removedClient.id);
-            console.log(`MetaAdsService: Cliente restaurado: ${removedClient.name}`);
-          }
-        });
-      }).catch((error) => {
-        console.error('Erro ao importar clientService:', error);
-      });
-    } catch (error) {
-      console.error('Erro ao restaurar clientes removidos:', error);
-    }
-  }
-
   private clearLocalStorageByClient(clientName: string): void {
     const keysToRemove = [
       'metaAds_campaigns',

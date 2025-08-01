@@ -94,6 +94,14 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         return;
       }
 
+      // Não carregar métricas se não está conectado ao Meta Ads
+      if (dataSource === 'facebook' && !isFacebookConnected) {
+        console.log('Dashboard: Meta Ads não conectado - zerando métricas');
+        setMetrics([]);
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         console.log('Dashboard: Carregando métricas para cliente:', selectedClient);
@@ -107,7 +115,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     };
 
     loadMetrics();
-  }, [selectedMonth, selectedClient, selectedProduct, selectedAudience, selectedCampaign, refreshTrigger]);
+  }, [selectedMonth, selectedClient, selectedProduct, selectedAudience, selectedCampaign, refreshTrigger, dataSource, isFacebookConnected]);
 
   // Listener para seleção de Business Manager
   useEffect(() => {
@@ -243,6 +251,55 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
     return () => {
       window.removeEventListener('noProductsFound', handleNoProductsFound);
+    };
+  }, []);
+
+  // Listener para atualizações do Meta Ads
+  useEffect(() => {
+    const handleMetaAdsDataRefreshed = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { type, timestamp } = customEvent.detail;
+      console.log('Dados do Meta Ads atualizados:', type, timestamp);
+      
+      // Forçar refresh das métricas quando dados são atualizados
+      setRefreshTrigger(prev => prev + 1);
+      
+      console.log('Dashboard: Refresh forçado após atualização do Meta Ads');
+    };
+
+    window.addEventListener('metaAdsDataRefreshed', handleMetaAdsDataRefreshed);
+
+    return () => {
+      window.removeEventListener('metaAdsDataRefreshed', handleMetaAdsDataRefreshed);
+    };
+  }, []);
+
+  // Listener para logout do Meta Ads
+  useEffect(() => {
+    const handleMetaAdsLoggedOut = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { timestamp } = customEvent.detail;
+      console.log('Logout do Meta Ads detectado:', timestamp);
+      
+      // Limpar dados do dashboard quando Meta Ads desconecta
+      setSelectedClient('Selecione um cliente');
+      setSelectedProduct('Todos os Produtos');
+      setSelectedAudience('Todos os Públicos');
+      setSelectedCampaign('');
+      setMetrics([]);
+      setDataSource(null);
+      setIsFacebookConnected(false);
+      
+      // Forçar refresh para garantir limpeza
+      setRefreshTrigger(prev => prev + 1);
+      
+      console.log('Dashboard: Dados limpos após logout do Meta Ads');
+    };
+
+    window.addEventListener('metaAdsLoggedOut', handleMetaAdsLoggedOut);
+
+    return () => {
+      window.removeEventListener('metaAdsLoggedOut', handleMetaAdsLoggedOut);
     };
   }, []);
 

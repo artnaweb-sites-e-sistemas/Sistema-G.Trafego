@@ -83,6 +83,8 @@ const Header: React.FC<HeaderProps> = ({
       window.removeEventListener('noLinksRemaining', handleNoLinksRemaining);
     };
   }, []);
+
+
   return (
     <header className="bg-gradient-to-r from-gray-900 to-gray-800 border-b border-gray-700/50 shadow-lg">
       <div className="max-w-7xl mx-auto px-6 py-4">

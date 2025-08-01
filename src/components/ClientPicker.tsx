@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Users, ChevronDown, Search, Plus, Trash2, Facebook, X } from 'lucide-react';
 import { metaAdsService, BusinessManager } from '../services/metaAdsService';
-import { clientService } from '../services/clientService';
 
 interface Client {
   id: string;
@@ -76,9 +75,8 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
           
           console.log('Clientes do Facebook criados:', facebookClients);
           
-          // Filtrar clientes removidos e definir Business Managers como clientes
-          const filteredClients = clientService.filterRemovedClients(facebookClients);
-          setClients(filteredClients);
+          // Definir Business Managers como clientes (sem "Todos os Clientes")
+          setClients(facebookClients);
           
         } catch (error: any) {
           console.error('Erro ao carregar Business Managers:', error.message);
@@ -152,7 +150,6 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
       console.log('Invalidando cache do Meta Ads para novo cliente...');
       
       // Limpar cache de clientes anteriores
-      const previousClient = localStorage.getItem('currentSelectedClient');
       if (previousClient && previousClient !== client.name) {
         metaAdsService.clearCacheByClient(previousClient);
       }
@@ -160,6 +157,15 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
       // Limpar todo o cache de campanhas e Ad Sets para garantir dados frescos
       metaAdsService.clearCacheByType('campaigns');
       metaAdsService.clearCacheByType('adsets');
+      
+      // Limpar cache de métricas para o cliente anterior
+      if (previousClient && previousClient !== client.name) {
+        // Importar metricsService de forma síncrona
+        import('../services/metricsService').then(({ metricsService }) => {
+          metricsService.clearCacheByClient(previousClient);
+          console.log(`Cache de métricas limpo para cliente anterior: ${previousClient}`);
+        });
+      }
       
       // Limpar também localStorage relacionado
       localStorage.removeItem('selectedProduct');
@@ -214,6 +220,15 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
         }
       });
       window.dispatchEvent(event);
+      
+      console.log('ClientPicker: Evento businessManagerSelected disparado para:', client.name);
+      
+      // Forçar atualização do estado após um pequeno delay
+      setTimeout(() => {
+        console.log('ClientPicker: Forçando atualização do estado após seleção de BM');
+        // Disparar evento novamente para garantir que todos os componentes recebam
+        window.dispatchEvent(event);
+      }, 100);
     }
   };
 
@@ -254,73 +269,33 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
     console.log('ClientPicker: Seleção de cliente limpa - cliente anterior:', previousClient);
   };
 
-  const handleDeleteClient = async (clientId: string, clientName: string, event: React.MouseEvent) => {
+  const handleDeleteClient = (clientId: string, clientName: string, event: React.MouseEvent) => {
     event.stopPropagation(); // Previne que o clique propague para selecionar o cliente
     
+    // Não permitir excluir clientes do Facebook
     const client = clients.find(c => c.id === clientId);
+    if (client?.source === 'facebook') {
+      alert('Não é possível excluir Business Managers do Facebook. Elas são gerenciadas pelo Meta Ads.');
+      return;
+    }
     
     // Confirmação antes da exclusão
-    const confirmMessage = client?.source === 'facebook' 
-      ? `Tem certeza que deseja remover "${clientName}" do dashboard? (Os dados permanecerão no Facebook e serão recriados ao reconectar)`
-      : `Tem certeza que deseja excluir o cliente "${clientName}"?`;
-    
-    if (window.confirm(confirmMessage)) {
-      try {
-        // Se o cliente sendo excluído é o selecionado, limpar seleção
-        if (clientName === selectedClient) {
-          // Limpar dados relacionados do localStorage
-          localStorage.removeItem('currentSelectedClient');
-          localStorage.removeItem('selectedProduct');
-          localStorage.removeItem('selectedAudience');
-          localStorage.removeItem('selectedCampaignId');
-          localStorage.removeItem('selectedAdSetId');
-          
-          // Limpar cache do Meta Ads para o cliente
-          if (client?.source === 'facebook') {
-            metaAdsService.clearCacheByClient(clientName);
-            metaAdsService.clearCacheByType('campaigns');
-            metaAdsService.clearCacheByType('adsets');
-            metaAdsService.clearMetricsCache();
-            
-            // Limpar também cache do metricsService
-            const { metricsService } = await import('../services/metricsService');
-            metricsService.clearCache();
-          }
-          
-          // Disparar evento para zerar métricas
-          const event = new CustomEvent('clientCleared', {
-            detail: { clientName: 'Selecione um cliente' }
-          });
-          window.dispatchEvent(event);
-          
-          setSelectedClient('Selecione um cliente');
-        }
-        
-        // Registrar cliente como removido no clientService
-        if (client && client.source) {
-          clientService.removeClient({
-            id: client.id,
-            name: client.name,
-            source: client.source,
-            businessManager: client.businessManager
-          });
-        }
-        
-        // Remove o cliente da lista
-        setClients(prevClients => prevClients.filter(client => client.id !== clientId));
-        
-        // Limpa o termo de busca se estiver filtrando
-        setSearchTerm('');
-        
-        console.log(`Cliente ${clientName} (ID: ${clientId}) foi removido do dashboard com sucesso!`);
-        
-        // Em uma implementação real, aqui você faria a chamada para a API
-        // await api.deleteClient(clientId);
-        
-      } catch (error) {
-        console.error('Erro ao remover cliente:', error);
-        alert('Erro ao remover cliente. Tente novamente.');
+    if (window.confirm(`Tem certeza que deseja excluir o cliente "${clientName}"?`)) {
+      // Remove o cliente da lista
+      setClients(prevClients => prevClients.filter(client => client.id !== clientId));
+      
+      // Se o cliente sendo excluído é o selecionado, volta para "Todos os Clientes"
+      if (clientName === selectedClient) {
+        setSelectedClient('Todos os Clientes');
       }
+      
+      // Limpa o termo de busca se estiver filtrando
+      setSearchTerm('');
+      
+      console.log(`Cliente ${clientName} (ID: ${clientId}) foi excluído com sucesso!`);
+      
+      // Em uma implementação real, aqui você faria a chamada para a API
+      // await api.deleteClient(clientId);
     }
   };
 
@@ -355,23 +330,6 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
           <span className="truncate block">{getDisplayText()}</span>
         </div>
         <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-        
-        {/* Botão de deletar cliente selecionado */}
-        {selectedClient !== 'Selecione um cliente' && selectedClient !== 'Todos os Clientes' && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              const selectedClientInfo = getSelectedClientInfo();
-              if (selectedClientInfo) {
-                handleDeleteClient(selectedClientInfo.id, selectedClientInfo.name, e);
-              }
-            }}
-            className="absolute right-8 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-400 transition-colors duration-200"
-            title={getSelectedClientInfo()?.source === 'facebook' ? "Remover do dashboard" : "Excluir cliente"}
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        )}
         
         {/* Indicador de Status */}
         <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 ${
@@ -459,11 +417,11 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
                       {client.name === selectedClient && (
                         <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
                       )}
-                      {client.name !== 'Todos os Clientes' && (
+                      {client.name !== 'Todos os Clientes' && client.source !== 'facebook' && (
                         <button
                           onClick={(e) => handleDeleteClient(client.id, client.name, e)}
                           className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-all duration-200 ease-in-out"
-                          title={client.source === 'facebook' ? "Remover do dashboard" : "Excluir cliente"}
+                          title="Excluir cliente"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
