@@ -113,7 +113,7 @@ class MetaAdsService {
         console.log('Executando em localhost - usando configuração de desenvolvimento');
       }
 
-      // Solicitar todas as permissões necessárias de uma vez
+      // Primeiro fazer login com permissões básicas
       window.FB.login((response: any) => {
         console.log('Resposta do FB.login:', response);
         
@@ -151,7 +151,7 @@ class MetaAdsService {
           }
         }
       }, { 
-        scope: 'email,public_profile,ads_read,ads_management',
+        scope: 'email,public_profile',
         return_scopes: true,
         auth_type: 'rerequest',
         redirect_uri: 'https://gtrafego.artnawebsite.com.br/'
@@ -280,14 +280,6 @@ class MetaAdsService {
       throw new Error('Usuário não está logado. Faça login primeiro.');
     }
 
-    // Primeiro verificar permissões
-    const permissions = await this.checkUserPermissions();
-    console.log('Permissões atuais:', permissions);
-
-    if (!permissions.includes('ads_read')) {
-      throw new Error('Permissão ads_read não concedida. É necessário conceder permissão para acessar contas de anúncios.');
-    }
-
     try {
       console.log('Buscando contas de anúncios...');
       console.log('Access Token:', this.user.accessToken.substring(0, 20) + '...');
@@ -322,6 +314,12 @@ class MetaAdsService {
       if (error.response?.data?.error?.code === 190) {
         throw new Error('Token de acesso expirado. Faça login novamente.');
       }
+      
+      // Se o erro for sobre permissões, dar uma mensagem mais amigável
+      if (error.response?.data?.error?.code === 200) {
+        throw new Error('Permissões de anúncios não concedidas. Para acessar contas de anúncios, você precisa conceder permissões adicionais.');
+      }
+      
       console.error('Erro ao buscar contas de anúncios:', error.response?.data || error.message);
       throw new Error(`Erro ao buscar contas: ${error.response?.data?.error?.message || error.message}`);
     }
