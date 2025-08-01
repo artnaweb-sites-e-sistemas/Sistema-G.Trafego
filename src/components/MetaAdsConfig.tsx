@@ -19,30 +19,78 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
   const [step, setStep] = useState<'login' | 'selectBusiness' | 'selectAccount' | 'connected' | 'permissionsRequired'>('login');
 
   useEffect(() => {
-    // Inicializar Facebook SDK
-    metaAdsService.initFacebookSDK();
-    
-    // Verificar se já está logado
-    if (metaAdsService.isLoggedIn()) {
-      setUser(metaAdsService.getCurrentUser());
-      if (metaAdsService.hasSelectedAccount()) {
-        setSelectedAccount(metaAdsService.getSelectedAccount());
-        setStep('connected');
-      } else {
-        setStep('selectBusiness');
-        loadBusinessManagers();
+    // Verificar se já existe usuário salvo
+    const savedUser = localStorage.getItem('facebookUser');
+    if (savedUser) {
+      try {
+        const user = JSON.parse(savedUser);
+        setUser(user);
+        metaAdsService.setUser(user);
+        
+        // Verificar status atual no Facebook
+        checkLoginStatus();
+      } catch (error) {
+        console.error('Erro ao carregar usuário salvo:', error);
+        localStorage.removeItem('facebookUser');
       }
     }
+
+    // Listener para evento de login bem-sucedido
+    const handleLoginSuccess = (event: CustomEvent) => {
+      console.log('Evento de login recebido:', event.detail);
+      const user = event.detail;
+      setUser(user);
+      metaAdsService.setUser(user);
+      setStep('selectBusiness');
+      loadBusinessManagers();
+    };
+
+    window.addEventListener('facebookLoginSuccess', handleLoginSuccess as EventListener);
+
+    return () => {
+      window.removeEventListener('facebookLoginSuccess', handleLoginSuccess as EventListener);
+    };
   }, []);
+
+  const checkLoginStatus = async () => {
+    try {
+      const status = await metaAdsService.getLoginStatus();
+      console.log('Status atual do login:', status);
+      
+      if (status.status === 'connected') {
+        // Usuário está logado, tentar carregar contas
+        await loadBusinessManagers();
+      } else {
+        // Usuário não está logado, limpar dados
+        setUser(null);
+        setSelectedAccount(null);
+        setSelectedBusiness(null);
+        setBusinessManagers([]);
+        setAdAccounts([]);
+        setStep('login');
+      }
+    } catch (error) {
+      console.error('Erro ao verificar status de login:', error);
+    }
+  };
 
   const handleFacebookLogin = async () => {
     setIsLoading(true);
     try {
-      const loggedUser = await metaAdsService.loginWithFacebook();
-      setUser(loggedUser);
-      setStep('selectBusiness');
-      await loadBusinessManagers();
+      console.log('Iniciando login do Facebook...');
+      
+      // Usar a função global checkLoginState
+      if (typeof window !== 'undefined' && (window as any).checkLoginState) {
+        (window as any).checkLoginState();
+      } else {
+        // Fallback para o método anterior
+        const loggedUser = await metaAdsService.loginWithAdsPermissions();
+        setUser(loggedUser);
+        setStep('selectBusiness');
+        await loadBusinessManagers();
+      }
     } catch (error: any) {
+      console.error('Erro no login:', error);
       alert(`Erro no login: ${error.message}`);
     } finally {
       setIsLoading(false);
@@ -354,8 +402,8 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
 
                 <div className="bg-yellow-900 border border-yellow-700 rounded-lg p-4">
                   <p className="text-yellow-300 text-sm mb-4">
-                    Para acessar suas contas de anúncios, você precisa conceder permissões básicas ao app. 
-                    As permissões de anúncios avançadas requerem revisão do Facebook.
+                    O login básico funcionou! Porém, para acessar dados de anúncios, você precisa solicitar 
+                    revisão do Facebook para as permissões avançadas (pages_show_list, ads_read, ads_management).
                   </p>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
@@ -364,7 +412,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
                     </div>
                     <div className="flex items-center space-x-2">
                       <XCircle className="w-4 h-4 text-red-400" />
-                      <span className="text-red-300 text-sm">Permissões básicas necessárias</span>
+                      <span className="text-red-300 text-sm">Permissões avançadas precisam de App Review</span>
                     </div>
                   </div>
                 </div>
@@ -382,7 +430,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
                         <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                       </svg>
                     )}
-                    <span>{isLoading ? 'Solicitando...' : 'Conceder Permissões Básicas'}</span>
+                    <span>{isLoading ? 'Solicitando...' : 'Fazer Login Básico'}</span>
                   </button>
 
                   <button

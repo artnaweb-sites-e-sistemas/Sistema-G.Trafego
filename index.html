@@ -6,6 +6,90 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dashboard Analytics Moderno</title>
     <script async defer crossorigin="anonymous" src="https://connect.facebook.net/pt_BR/sdk.js"></script>
+    <script>
+      window.fbAsyncInit = function() {
+        FB.init({
+          appId      : '1829212554641028',
+          cookie     : true,
+          xfbml      : true,
+          version    : 'v18.0'
+        });
+          
+        FB.AppEvents.logPageView();
+        
+        // Verificar status de login quando a página carrega
+        FB.getLoginStatus(function(response) {
+          console.log('Status de login na inicialização:', response);
+          if (response.status === 'connected') {
+            console.log('Usuário já está logado:', response.authResponse);
+          }
+        });
+          
+      };
+
+      // Função callback para verificar estado do login
+      function checkLoginState() {
+        console.log('checkLoginState chamado');
+        FB.getLoginStatus(function(response) {
+          console.log('Resposta do checkLoginState:', response);
+          statusChangeCallback(response);
+        });
+      }
+
+      // Função para processar mudanças de status
+      function statusChangeCallback(response) {
+        console.log('statusChangeCallback chamado:', response);
+        
+        if (response.status === 'connected') {
+          console.log('Usuário conectado com sucesso!');
+          
+          // Salvar dados do usuário no localStorage
+          const userData = {
+            id: response.authResponse.userID,
+            accessToken: response.authResponse.accessToken,
+            expiresIn: response.authResponse.expiresIn,
+            signedRequest: response.authResponse.signedRequest
+          };
+          
+          // Buscar dados completos do usuário
+          FB.api('/me', { fields: 'name,email' }, function(userInfo) {
+            if (userInfo.error) {
+              console.error('Erro ao buscar dados do usuário:', userInfo.error);
+              return;
+            }
+            
+            const completeUser = {
+              ...userData,
+              name: userInfo.name,
+              email: userInfo.email
+            };
+            
+            localStorage.setItem('facebookUser', JSON.stringify(completeUser));
+            console.log('Dados do usuário salvos:', completeUser);
+            
+            // Disparar evento customizado para o React
+            window.dispatchEvent(new CustomEvent('facebookLoginSuccess', {
+              detail: completeUser
+            }));
+          });
+          
+        } else if (response.status === 'not_authorized') {
+          console.log('Usuário não autorizou o app');
+          localStorage.removeItem('facebookUser');
+        } else {
+          console.log('Usuário não está logado');
+          localStorage.removeItem('facebookUser');
+        }
+      }
+
+      (function(d, s, id){
+         var js, fjs = d.getElementsByTagName(s)[0];
+         if (d.getElementById(id)) {return;}
+         js = d.createElement(s); js.id = id;
+         js.src = "https://connect.facebook.net/pt_BR/sdk.js";
+         fjs.parentNode.insertBefore(js, fjs);
+       }(document, 'script', 'facebook-jssdk'));
+    </script>
   </head>
   <body>
     <div id="root"></div>

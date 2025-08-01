@@ -208,7 +208,7 @@ class MetaAdsService {
           }
         }
       }, { 
-        scope: 'email,public_profile,pages_show_list,pages_read_engagement',
+        scope: 'email,public_profile',
         return_scopes: true,
         auth_type: 'rerequest',
         redirect_uri: 'https://gtrafego.artnawebsite.com.br/'
@@ -240,6 +240,11 @@ class MetaAdsService {
     }
     
     return false;
+  }
+
+  // Definir usuário atual
+  setUser(user: FacebookUser) {
+    this.user = user;
   }
 
   // Verificar permissões do usuário
@@ -590,6 +595,57 @@ class MetaAdsService {
   // Obter conta selecionada
   getSelectedAccount(): AdAccount | null {
     return this.selectedAccount;
+  }
+
+  // Verificar status de login
+  async getLoginStatus(): Promise<{ status: string; authResponse?: any }> {
+    return new Promise((resolve, reject) => {
+      if (!window.FB) {
+        reject(new Error('Facebook SDK não carregado'));
+        return;
+      }
+
+      window.FB.getLoginStatus((response: any) => {
+        console.log('Status de login:', response);
+        resolve(response);
+      });
+    });
+  }
+
+  // Callback para mudança de status
+  private statusChangeCallback(response: any) {
+    console.log('Mudança de status detectada:', response);
+    
+    if (response.status === 'connected') {
+      console.log('Usuário conectado:', response.authResponse);
+      // O usuário está logado e autorizou o app
+      const { accessToken, userID } = response.authResponse;
+      
+      // Buscar dados do usuário
+      window.FB.api('/me', { fields: 'name,email' }, (userInfo: any) => {
+        if (userInfo.error) {
+          console.error('Erro ao buscar dados do usuário:', userInfo.error);
+          return;
+        }
+        
+        const user: FacebookUser = {
+          id: userID,
+          name: userInfo.name,
+          email: userInfo.email,
+          accessToken: accessToken
+        };
+        
+        this.user = user;
+        localStorage.setItem('facebookUser', JSON.stringify(user));
+        console.log('Usuário salvo:', user);
+      });
+    } else if (response.status === 'not_authorized') {
+      console.log('Usuário não autorizou o app');
+      this.logout();
+    } else {
+      console.log('Usuário não está logado');
+      this.logout();
+    }
   }
 }
 
