@@ -159,6 +159,63 @@ class MetaAdsService {
     });
   }
 
+  // Login com Facebook solicitando permissões de anúncios
+  async loginWithAdsPermissions(): Promise<FacebookUser> {
+    return new Promise((resolve, reject) => {
+      if (!window.FB) {
+        reject(new Error('Facebook SDK não carregado. Verifique se o script está sendo carregado corretamente.'));
+        return;
+      }
+
+      // Fazer logout primeiro para limpar permissões anteriores
+      window.FB.logout();
+
+      // Login solicitando permissões de anúncios
+      window.FB.login((response: any) => {
+        console.log('Resposta do FB.login com permissões de anúncios:', response);
+        
+        if (response.authResponse) {
+          const { accessToken, userID } = response.authResponse;
+          console.log('Login com permissões de anúncios bem-sucedido, userID:', userID);
+          
+          // Buscar dados do usuário
+          window.FB.api('/me', { fields: 'name,email' }, (userInfo: any) => {
+            console.log('Dados do usuário:', userInfo);
+            
+            if (userInfo.error) {
+              console.error('Erro ao buscar dados do usuário:', userInfo.error);
+              reject(new Error(`Erro ao buscar dados do usuário: ${userInfo.error.message}`));
+              return;
+            }
+            
+            const user: FacebookUser = {
+              id: userID,
+              name: userInfo.name,
+              email: userInfo.email,
+              accessToken: accessToken
+            };
+            
+            this.user = user;
+            localStorage.setItem('facebookUser', JSON.stringify(user));
+            resolve(user);
+          });
+        } else {
+          console.error('Login com permissões de anúncios falhou:', response);
+          if (response.status === 'not_authorized') {
+            reject(new Error('Login não autorizado. Verifique se você concedeu as permissões necessárias.'));
+          } else {
+            reject(new Error('Login cancelado pelo usuário'));
+          }
+        }
+      }, { 
+        scope: 'email,public_profile,ads_read,ads_management',
+        return_scopes: true,
+        auth_type: 'rerequest',
+        redirect_uri: 'https://gtrafego.artnawebsite.com.br/'
+      });
+    });
+  }
+
   // Logout
   logout() {
     this.user = null;
