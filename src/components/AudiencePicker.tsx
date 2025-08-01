@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Users, ChevronDown, Search, Plus, Trash2, Facebook } from 'lucide-react';
+import { Users, ChevronDown, Search, Plus, Trash2, Facebook, X } from 'lucide-react';
 import { metaAdsService } from '../services/metaAdsService';
 
 interface Audience {
@@ -82,7 +82,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
 
   // Carregar Ad Sets do Meta Ads
   const loadMetaAdsAdSets = async () => {
-    if (dataSource === 'facebook' && metaAdsService.isLoggedIn() && selectedProduct && selectedProduct !== 'Todos os Produtos') {
+    if (dataSource === 'facebook' && selectedProduct && selectedProduct !== 'Todos os Produtos') {
       try {
         setIsLoading(true);
         console.log('AudiencePicker: Carregando Ad Sets do Meta Ads para campanha:', selectedProduct);
@@ -148,33 +148,33 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         
         console.log('AudiencePicker: Públicos do Facebook criados:', facebookAudiences);
         
-        // Manter "Todos os Públicos" e adicionar Ad Sets do Facebook
-        const allAudiences = [
-          { id: '1', name: 'Todos os Públicos', productId: 'all', clientId: 'all' },
-          ...facebookAudiences
-        ];
-        
-        setAudiences(allAudiences);
-        
-        // Se não há público selecionado, selecionar "Todos os Públicos"
-        if (selectedAudience === 'Todos os Públicos' || !selectedAudience) {
+        // Se não há Ad Sets, mostrar apenas "Todos os Públicos"
+        if (facebookAudiences.length === 0) {
+          console.log('AudiencePicker: Nenhum Ad Set encontrado para este produto');
+          setAudiences([
+            { id: '1', name: 'Todos os Públicos', productId: 'all', clientId: 'all' }
+          ]);
           setSelectedAudience('Todos os Públicos');
+        } else {
+          // Se há Ad Sets, adicionar "Todos os Públicos" + Ad Sets
+          const allAudiences = [
+            { id: '1', name: 'Todos os Públicos', productId: 'all', clientId: 'all' },
+            ...facebookAudiences
+          ];
+          
+          setAudiences(allAudiences);
+          
+          // Se não há público selecionado, selecionar "Todos os Públicos"
+          if (selectedAudience === 'Todos os Públicos' || !selectedAudience) {
+            setSelectedAudience('Todos os Públicos');
+          }
         }
         
       } catch (error: any) {
         console.error('Erro ao carregar Ad Sets do Meta Ads:', error.message);
-        // Em caso de erro, manter públicos manuais
+        // Em caso de erro, mostrar apenas "Todos os Públicos"
         setAudiences([
-          { id: '1', name: 'Todos os Públicos', productId: 'all', clientId: 'all' },
-          { id: '2', name: 'Executivos 30-50', description: 'Profissionais de alto nível', ageRange: '30-50', interests: ['Negócios', 'Tecnologia'], location: 'São Paulo', size: 15000, productId: '2', clientId: '2', source: 'manual' },
-          { id: '3', name: 'Empreendedores', description: 'Donos de pequenas empresas', ageRange: '25-45', interests: ['Empreendedorismo', 'Marketing'], location: 'Brasil', size: 25000, productId: '3', clientId: '2', source: 'manual' },
-          { id: '4', name: 'Startups', description: 'Empresas em crescimento', ageRange: '20-40', interests: ['Inovação', 'Tecnologia'], location: 'São Paulo', size: 8000, productId: '4', clientId: '3', source: 'manual' },
-          { id: '5', name: 'Consultores', description: 'Profissionais independentes', ageRange: '28-55', interests: ['Consultoria', 'Estratégia'], location: 'Brasil', size: 12000, productId: '5', clientId: '3', source: 'manual' },
-          { id: '6', name: 'Agencias de Marketing', description: 'Agencias digitais', ageRange: '25-45', interests: ['Marketing Digital', 'Publicidade'], location: 'São Paulo', size: 5000, productId: '6', clientId: '4', source: 'manual' },
-          { id: '7', name: 'E-commerce', description: 'Lojas online', ageRange: '25-50', interests: ['E-commerce', 'Vendas'], location: 'Brasil', size: 18000, productId: '7', clientId: '5', source: 'manual' },
-          { id: '8', name: 'Tech Companies', description: 'Empresas de tecnologia', ageRange: '22-45', interests: ['Tecnologia', 'Inovação'], location: 'São Paulo', size: 10000, productId: '8', clientId: '6', source: 'manual' },
-          { id: '9', name: 'Profissionais Liberais', description: 'Advogados, médicos, etc.', ageRange: '30-60', interests: ['Profissional', 'Serviços'], location: 'Brasil', size: 30000, productId: '9', clientId: '7', source: 'manual' },
-          { id: '10', name: 'Agencias Criativas', description: 'Design e comunicação', ageRange: '23-40', interests: ['Design', 'Criatividade'], location: 'São Paulo', size: 7000, productId: '10', clientId: '8', source: 'manual' },
+          { id: '1', name: 'Todos os Públicos', productId: 'all', clientId: 'all' }
         ]);
       } finally {
         setIsLoading(false);
@@ -195,13 +195,43 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
       ]);
     } else {
       console.log('AudiencePicker: DataSource não é facebook ou usuário não está logado');
+      // Mostrar apenas "Todos os Públicos" quando não há fonte de dados
+      setAudiences([
+        { id: '1', name: 'Todos os Públicos', productId: 'all', clientId: 'all' }
+      ]);
     }
   };
 
-  // Carregar públicos quando dataSource, selectedProduct ou selectedMonth mudar
+  // Carregar público salvo do localStorage ao inicializar
   useEffect(() => {
-    loadMetaAdsAdSets();
-  }, [dataSource, selectedProduct, selectedMonth]);
+    const savedAudience = localStorage.getItem('selectedAudience');
+    const savedProduct = localStorage.getItem('selectedProduct');
+    
+    // Só restaurar público se há produto selecionado
+    if (savedAudience && savedAudience !== 'Todos os Públicos' && savedProduct && savedProduct !== 'Todos os Produtos') {
+      setSelectedAudience(savedAudience);
+      console.log('AudiencePicker: Público restaurado do localStorage:', savedAudience);
+    }
+  }, []);
+
+  // Carregar públicos quando dataSource, selectedProduct, selectedClient ou selectedMonth mudar
+  useEffect(() => {
+    console.log('AudiencePicker: Produto mudou para:', selectedProduct, 'Cliente:', selectedClient);
+    
+    // Só carregar se há produto selecionado
+    if (selectedProduct && selectedProduct !== 'Todos os Produtos') {
+      // Pequeno delay para garantir que o cache seja limpo
+      const timer = setTimeout(() => {
+        loadMetaAdsAdSets();
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    } else {
+      // Resetar públicos quando não há produto selecionado
+      setAudiences([{ id: '1', name: 'Todos os Públicos', productId: 'all', clientId: 'all' }]);
+      setSelectedAudience('Todos os Públicos');
+    }
+  }, [dataSource, selectedProduct, selectedClient, selectedMonth]);
 
   // Filtrar públicos baseado no termo de busca, produto e cliente selecionados
   const filteredAudiences = audiences.filter(audience => {
@@ -210,15 +240,23 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
                          audience.interests?.some(interest => interest.toLowerCase().includes(searchTerm.toLowerCase())) ||
                          audience.location?.toLowerCase().includes(searchTerm.toLowerCase());
     
+    // Para públicos do Facebook, verificar se pertencem ao cliente e produto selecionados
+    if (dataSource === 'facebook' && audience.source === 'facebook') {
+      const matchesClient = selectedClient === 'Todos os Clientes' || 
+                           audience.clientId === selectedClient;
+      const matchesProduct = selectedProduct === 'Todos os Produtos' || 
+                            audience.productId === selectedProduct;
+      return matchesSearch && matchesClient && matchesProduct;
+    }
+    
+    // Para públicos manuais, usar a lógica de mapeamento
     const matchesClient = selectedClient === 'Todos os Clientes' || 
                          audience.clientId === 'all' || 
-                         audience.clientId === getClientIdFromName(selectedClient) ||
-                         audience.clientId === selectedClient; // Para públicos do Facebook
+                         audience.clientId === getClientIdFromName(selectedClient);
     
     const matchesProduct = selectedProduct === 'Todos os Produtos' || 
                           audience.productId === 'all' || 
-                          audience.productId === getProductIdFromName(selectedProduct) ||
-                          audience.productId === selectedProduct; // Para públicos do Facebook
+                          audience.productId === getProductIdFromName(selectedProduct);
     
     return matchesSearch && matchesClient && matchesProduct;
   });
@@ -236,9 +274,12 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Reset selected audience when client or product changes
+  // Reset selected audience when client or product changes (only if no saved audience)
   useEffect(() => {
-    setSelectedAudience('Todos os Públicos');
+    const savedAudience = localStorage.getItem('selectedAudience');
+    if (!savedAudience || savedAudience === 'Todos os Públicos') {
+      setSelectedAudience('Todos os Públicos');
+    }
   }, [selectedClient, selectedProduct, setSelectedAudience]);
 
   const handleAudienceSelect = (audience: Audience) => {
@@ -246,6 +287,9 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
     setSelectedAudience(audience.name);
     setIsOpen(false);
     setSearchTerm('');
+    
+    // Salvar público selecionado no localStorage
+    localStorage.setItem('selectedAudience', audience.name);
     
     // Disparar evento customizado se for um Ad Set do Facebook
     if (audience.source === 'facebook' && audience.adSet) {
@@ -263,9 +307,17 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
   };
 
   const handleClear = () => {
+    // Limpar a seleção e voltar para "Todos os Públicos"
     setSelectedAudience('Todos os Públicos');
+    
+    // Limpar dados relacionados do localStorage
+    localStorage.removeItem('selectedAudience');
+    localStorage.removeItem('selectedAdSetId');
+    
     setIsOpen(false);
     setSearchTerm('');
+    
+    console.log('AudiencePicker: Seleção de público limpa');
   };
 
   const handleDeleteAudience = (audienceId: string, audienceName: string, event: React.MouseEvent) => {
@@ -315,18 +367,29 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
     return <Users className="w-4 h-4 text-gray-400" />;
   };
 
+  // Verificar se o picker deve estar ativo
+  const isPickerActive = selectedProduct && selectedProduct !== 'Todos os Produtos' && selectedClient && selectedClient !== 'Selecione um cliente';
+
   return (
     <div className="relative" ref={pickerRef}>
       {/* Input field */}
       <div 
-        className="relative cursor-pointer"
-        onClick={() => setIsOpen(!isOpen)}
+        className={`relative ${isPickerActive ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+        onClick={() => isPickerActive && setIsOpen(!isOpen)}
       >
-        <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-        <div className="bg-gray-700 text-white pl-10 pr-8 py-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none w-[220px]">
-          <span className="truncate block">{getDisplayText()}</span>
+        <Users className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isPickerActive ? 'text-gray-400' : 'text-gray-600'}`} />
+        <div className={`pl-10 pr-8 py-2 rounded-lg border w-[220px] ${
+          isPickerActive 
+            ? 'bg-gray-700 text-white border-gray-600 focus:border-purple-500 focus:outline-none' 
+            : 'bg-gray-800 text-gray-500 border-gray-700'
+        }`}>
+          <span className="truncate block">
+            {isPickerActive ? getDisplayText() : 
+              selectedClient === 'Selecione um cliente' ? 'Selecione um cliente primeiro' : 
+              'Selecione um produto primeiro'}
+          </span>
         </div>
-        <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+        <ChevronDown className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isPickerActive ? 'text-gray-400' : 'text-gray-600'}`} />
         
         {/* Indicador de Status */}
         <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 ${
@@ -337,8 +400,27 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
       </div>
 
       {/* Dropdown */}
-      {isOpen && (
+      {isOpen && isPickerActive && (
         <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[400px] max-h-[400px] overflow-hidden">
+          {/* Action buttons - Fixed at top */}
+          <div className="border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
+            <div className="flex items-center justify-between p-3">
+              <button
+                onClick={handleClear}
+                className="flex items-center px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-all duration-200 ease-in-out"
+              >
+                <X className="w-4 h-4 mr-1" />
+                Limpar
+              </button>
+              <button
+                className="flex items-center px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-all duration-200 ease-in-out shadow-sm hover:shadow-md"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Novo Público
+              </button>
+            </div>
+          </div>
+
           {/* Search bar */}
           <div className="p-3 border-b border-gray-200">
             <div className="relative">
@@ -355,7 +437,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
           </div>
 
           {/* Audience list */}
-          <div className="max-h-[300px] overflow-y-auto">
+          <div className="max-h-[250px] overflow-y-auto">
             {isLoading ? (
               <div className="p-4 text-center text-gray-500">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500 mx-auto mb-2"></div>

@@ -443,6 +443,12 @@ export const metricsService = {
     console.log(`Cache set para métricas: ${key}`);
   },
 
+  // Método para limpar cache de métricas
+  clearCache(): void {
+    this.cache.clear();
+    console.log('Cache de métricas limpo completamente');
+  },
+
   // Buscar métricas por mês e serviço
   async getMetrics(month: string, client: string = 'Todos os Clientes', product: string = 'Todos os Produtos', audience: string = 'Todos os Públicos', campaignId?: string) {
     // Se não foi passado campaignId, tentar pegar do localStorage

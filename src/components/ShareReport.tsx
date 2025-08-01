@@ -1,48 +1,63 @@
 import React, { useState } from 'react';
-import { Share2, Copy, CheckCircle, ExternalLink } from 'lucide-react';
+import { Share2, Copy, CheckCircle, ExternalLink, Link, Trash2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import { shareService, ShareLink } from '../services/shareService';
 
 interface ShareReportProps {
   selectedAudience: string;
   selectedProduct: string;
   selectedClient: string;
   selectedMonth: string;
+  hasGeneratedLinks?: boolean;
 }
 
 const ShareReport: React.FC<ShareReportProps> = ({
   selectedAudience,
   selectedProduct,
   selectedClient,
-  selectedMonth
+  selectedMonth,
+  hasGeneratedLinks = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [generatedLink, setGeneratedLink] = useState('');
+  const [generatedLink, setGeneratedLink] = useState<ShareLink | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const generateShareLink = async () => {
     setIsGenerating(true);
     
-    // Simular geração de link (em produção, isso seria uma chamada para a API)
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Criar link personalizado com os parâmetros selecionados
-    const baseUrl = window.location.origin;
-    const params = new URLSearchParams({
-      audience: selectedAudience,
-      product: selectedProduct,
-      client: selectedClient,
-      month: selectedMonth,
-      shared: 'true'
-    });
-    
-    const shareLink = `${baseUrl}/shared-report?${params.toString()}`;
-    setGeneratedLink(shareLink);
-    setIsGenerating(false);
+    try {
+      // Simular geração de link (em produção, isso seria uma chamada para a API)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Criar link curto usando o serviço
+      const shareLink = shareService.createShareLink({
+        audience: selectedAudience,
+        product: selectedProduct,
+        client: selectedClient,
+        month: selectedMonth
+      });
+      
+      setGeneratedLink(shareLink);
+      
+      // Emitir evento para notificar que um link foi gerado
+      window.dispatchEvent(new CustomEvent('linkGenerated', {
+        detail: { shareLink }
+      }));
+    } catch (error) {
+      console.error('Erro ao gerar link:', error);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const copyToClipboard = async () => {
+    if (!generatedLink) return;
+    
     try {
-      await navigator.clipboard.writeText(generatedLink);
+      const shortUrl = shareService.getShortUrl(generatedLink.shortCode);
+      await navigator.clipboard.writeText(shortUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
@@ -51,7 +66,10 @@ const ShareReport: React.FC<ShareReportProps> = ({
   };
 
   const openShareLink = () => {
-    window.open(generatedLink, '_blank');
+    if (!generatedLink) return;
+    
+    const shortUrl = shareService.getShortUrl(generatedLink.shortCode);
+    window.open(shortUrl, '_blank');
   };
 
   const isDisabled = selectedAudience === 'Todos os Públicos' || 
@@ -66,6 +84,8 @@ const ShareReport: React.FC<ShareReportProps> = ({
         className={`p-2 rounded-lg flex items-center justify-center transition-all duration-200 relative ${
           isDisabled
             ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+            : hasGeneratedLinks
+            ? 'bg-green-600 hover:bg-green-700 text-white'
             : 'bg-gray-600 hover:bg-gray-700 text-gray-300 hover:text-white'
         }`}
         title={isDisabled ? 'Selecione um público específico para compartilhar' : 'Compartilhar Relatório'}
@@ -76,6 +96,8 @@ const ShareReport: React.FC<ShareReportProps> = ({
         <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 ${
           isDisabled
             ? 'bg-gray-500'
+            : hasGeneratedLinks
+            ? 'bg-green-500 shadow-lg shadow-green-500/50'
             : 'bg-blue-500 shadow-lg shadow-blue-500/50'
         }`}></div>
       </button>
@@ -162,7 +184,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
                     <div className="flex space-x-2">
                       <input
                         type="text"
-                        value={generatedLink}
+                        value={generatedLink ? shareService.getShortUrl(generatedLink.shortCode) : ''}
                         readOnly
                         className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
                       />
@@ -192,7 +214,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
                     
                     <button
                       onClick={() => {
-                        setGeneratedLink('');
+                        setGeneratedLink(null);
                         setCopied(false);
                       }}
                       className="flex-1 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
@@ -202,6 +224,73 @@ const ShareReport: React.FC<ShareReportProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Histórico de Links */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-blue-400 font-medium text-sm">📋 Links Compartilhados</h4>
+                  <button
+                    onClick={() => setShowHistory(!showHistory)}
+                    className="text-xs text-gray-400 hover:text-white transition-colors"
+                  >
+                    {showHistory ? 'Ocultar' : 'Mostrar'}
+                  </button>
+                </div>
+                
+                {showHistory && (
+                  <div className="bg-gray-700/30 rounded-lg p-3 max-h-40 overflow-y-auto">
+                    {shareService.getAllShareLinks().length > 0 ? (
+                      <div className="space-y-2">
+                        {shareService.getAllShareLinks().slice(0, 5).map((link) => (
+                          <div key={link.id} className="flex items-center justify-between p-2 bg-gray-600/30 rounded">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white text-xs truncate">
+                                {shareService.getShortUrl(link.shortCode)}
+                              </p>
+                              <p className="text-gray-400 text-xs">
+                                {new Date(link.createdAt).toLocaleDateString('pt-BR')}
+                              </p>
+                            </div>
+                            <div className="flex space-x-1">
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(shareService.getShortUrl(link.shortCode));
+                                  toast.success('Link copiado!');
+                                }}
+                                className="p-1 text-gray-400 hover:text-white transition-colors"
+                                title="Copiar"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  shareService.deactivateLink(link.shortCode);
+                                  toast.success('Link desativado!');
+                                  
+                                  // Verificar se ainda há links ativos
+                                  const remainingLinks = shareService.getAllShareLinks();
+                                  if (remainingLinks.length === 0) {
+                                    // Emitir evento para notificar que não há mais links
+                                    window.dispatchEvent(new CustomEvent('noLinksRemaining'));
+                                  }
+                                }}
+                                className="p-1 text-gray-400 hover:text-red-400 transition-colors"
+                                title="Desativar"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-400 text-xs text-center py-2">
+                        Nenhum link compartilhado ainda
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Informações Adicionais */}
               <div className="bg-blue-900/20 border border-blue-700/30 rounded-lg p-3">

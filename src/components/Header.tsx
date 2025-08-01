@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings, User, Search, LogOut, Facebook, Database } from 'lucide-react';
 import MetaAdsConfig from './MetaAdsConfig';
 import ShareReport from './ShareReport';
@@ -6,6 +6,7 @@ import MonthYearPicker from './MonthYearPicker';
 import ClientPicker from './ClientPicker';
 import ProductPicker from './ProductPicker';
 import AudiencePicker from './AudiencePicker';
+import { shareService } from '../services/shareService';
 
 import NotificationButton from './NotificationButton';
 
@@ -51,6 +52,37 @@ const Header: React.FC<HeaderProps> = ({
   isFacebookConnected,
   onDataSourceChange
 }) => {
+  const [hasGeneratedLinks, setHasGeneratedLinks] = useState(false);
+
+  // Verificar se há links gerados ao carregar o componente
+  useEffect(() => {
+    try {
+      const links = shareService.getAllShareLinks();
+      setHasGeneratedLinks(links.length > 0);
+    } catch (error) {
+      console.error('Erro ao carregar links gerados:', error);
+      setHasGeneratedLinks(false);
+    }
+  }, []);
+
+  // Listener para quando um link for gerado
+  useEffect(() => {
+    const handleLinkGenerated = () => {
+      setHasGeneratedLinks(true);
+    };
+
+    const handleNoLinksRemaining = () => {
+      setHasGeneratedLinks(false);
+    };
+
+    window.addEventListener('linkGenerated', handleLinkGenerated);
+    window.addEventListener('noLinksRemaining', handleNoLinksRemaining);
+
+    return () => {
+      window.removeEventListener('linkGenerated', handleLinkGenerated);
+      window.removeEventListener('noLinksRemaining', handleNoLinksRemaining);
+    };
+  }, []);
   return (
     <header className="bg-gradient-to-r from-gray-900 to-gray-800 border-b border-gray-700/50 shadow-lg">
       <div className="max-w-7xl mx-auto px-6 py-4">
@@ -169,6 +201,7 @@ const Header: React.FC<HeaderProps> = ({
                 selectedProduct={selectedProduct}
                 selectedClient={selectedClient}
                 selectedMonth={selectedMonth}
+                hasGeneratedLinks={hasGeneratedLinks}
               />
             </div>
           </div>

@@ -58,7 +58,7 @@ class MetaAdsService {
   private user: FacebookUser | null = null;
   private selectedAccount: AdAccount | null = null;
   private appId = import.meta.env.VITE_FACEBOOK_APP_ID || '1793110515418498'; // Novo App ID com permissões avançadas
-  private accessToken: string | null = null; // Token de acesso para API de Marketing
+
   
   // Sistema de cache para reduzir chamadas à API
   private cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
@@ -76,8 +76,26 @@ class MetaAdsService {
 
   // Métodos de cache
   private getCacheKey(type: string, params: any = {}): string {
-    const paramStr = Object.keys(params).length > 0 
-      ? '_' + JSON.stringify(params) 
+    // Incluir cliente atual e conta selecionada nos parâmetros de cache
+    const currentClient = localStorage.getItem('currentSelectedClient');
+    if (currentClient) {
+      params.client = currentClient;
+    }
+    
+    // Incluir a conta selecionada para diferenciar cache por conta
+    if (this.selectedAccount) {
+      params.accountId = this.selectedAccount.id;
+      params.accountName = this.selectedAccount.name;
+    }
+    
+    // Ordenar parâmetros para garantir consistência na chave
+    const sortedParams = Object.keys(params).sort().reduce((result, key) => {
+      result[key] = params[key];
+      return result;
+    }, {} as any);
+    
+    const paramStr = Object.keys(sortedParams).length > 0 
+      ? '_' + JSON.stringify(sortedParams) 
       : '';
     return `${type}${paramStr}`;
   }
@@ -129,12 +147,16 @@ class MetaAdsService {
     params: any = {}
   ): Promise<T> {
     const cacheKey = this.getCacheKey(type, params);
+    console.log(`MetaAdsService: Fazendo requisição para ${type} com chave: ${cacheKey}`);
     
     // Verificar cache primeiro
     const cached = this.getFromCache<T>(cacheKey);
     if (cached) {
+      console.log(`MetaAdsService: Cache hit para ${type} - retornando dados em cache`);
       return cached;
     }
+    
+    console.log(`MetaAdsService: Cache miss para ${type} - fazendo nova requisição`);
 
     // Verificar se já existe uma requisição pendente
     if (this.pendingRequests.has(cacheKey)) {
@@ -157,23 +179,9 @@ class MetaAdsService {
   }
 
   // Configurar token de acesso para API de Marketing
-  setAccessToken(token: string) {
-    this.accessToken = token;
-    localStorage.setItem('facebookAccessToken', token);
-    console.log('Token de acesso configurado');
-  }
-
-  // Obter token de acesso
-  getAccessToken(): string | null {
-    if (!this.accessToken) {
-      this.accessToken = localStorage.getItem('facebookAccessToken');
-    }
-    return this.accessToken;
-  }
-
   // Verificar se o serviço está configurado
   isConfigured(): boolean {
-    return this.isLoggedIn() && (this.hasSelectedAccount() || this.getAccessToken() !== null);
+    return this.isLoggedIn() && this.hasSelectedAccount();
   }
 
   // Inicializar Facebook SDK
@@ -274,6 +282,10 @@ class MetaAdsService {
                 
                 this.user = user;
                 localStorage.setItem('facebookUser', JSON.stringify(user));
+                
+                // Restaurar clientes removidos após login bem-sucedido
+                this.restoreRemovedClients();
+                
                 console.log('Usuário salvo:', user);
                 resolve(user);
               });
@@ -289,7 +301,8 @@ class MetaAdsService {
             }
           }, { 
             scope: 'email,public_profile,ads_read,ads_management,pages_show_list,pages_read_engagement',
-            return_scopes: true
+            return_scopes: true,
+            auth_type: 'rerequest'
           });
         }
       });
@@ -334,6 +347,10 @@ class MetaAdsService {
             
             this.user = user;
             localStorage.setItem('facebookUser', JSON.stringify(user));
+            
+            // Restaurar clientes removidos após login bem-sucedido
+            this.restoreRemovedClients();
+            
             resolve(user);
           });
         } else {
@@ -347,8 +364,7 @@ class MetaAdsService {
       }, { 
         scope: 'email,public_profile',
         return_scopes: true,
-        auth_type: 'rerequest',
-        redirect_uri: 'https://gtrafego.artnawebsite.com.br/'
+        auth_type: 'rerequest'
       });
     });
   }
@@ -426,8 +442,14 @@ class MetaAdsService {
 
   // Buscar Business Managers do usuário
   async getBusinessManagers(): Promise<BusinessManager[]> {
-    if (!this.user?.accessToken) {
-      throw new Error('Usuário não logado');
+    // Se não está logado, tentar carregar dados salvos
+    if (!this.isLoggedIn()) {
+      const savedData = this.getDataFromStorage('business_managers');
+      if (savedData) {
+        console.log('Carregando Business Managers do localStorage (offline)');
+        return savedData;
+      }
+      throw new Error('Usuário não logado e não há dados salvos');
     }
 
     return this.makeCachedRequest(
@@ -446,8 +468,13 @@ class MetaAdsService {
             }
           );
 
-          console.log('Business Managers encontrados:', response.data);
-          return response.data.data || [];
+          const data = response.data.data || [];
+          console.log('Business Managers encontrados:', data);
+          
+          // Salvar dados no localStorage
+          this.saveDataAfterLoad('business_managers', data);
+          
+          return data;
         } catch (error: any) {
           console.error('Erro ao buscar Business Managers:', error.response?.data || error.message);
           
@@ -609,11 +636,28 @@ class MetaAdsService {
 
   // Buscar campanhas da conta selecionada com filtro de período
   async getCampaigns(dateStart?: string, dateEnd?: string): Promise<MetaAdsCampaign[]> {
+    console.log('MetaAdsService.getCampaigns chamado com:', { dateStart, dateEnd });
+    console.log('MetaAdsService.isLoggedIn():', this.isLoggedIn());
+    console.log('MetaAdsService.selectedAccount:', this.selectedAccount);
+    
+    // Se não está logado, tentar carregar dados salvos
+    if (!this.isLoggedIn()) {
+      const savedData = this.getDataFromStorage('campaigns');
+      if (savedData) {
+        console.log('Carregando campanhas do localStorage (offline)');
+        return savedData;
+      }
+      throw new Error('Usuário não logado e não há dados salvos');
+    }
+
     if (!this.selectedAccount) {
       throw new Error('Nenhuma conta selecionada');
     }
 
     const params = { dateStart, dateEnd };
+    console.log('MetaAdsService.getCampaigns params:', params);
+    console.log('MetaAdsService.getCampaigns - selectedAccount:', this.selectedAccount);
+    console.log('MetaAdsService.getCampaigns - hasSelectedAccount():', this.hasSelectedAccount());
     
     return this.makeCachedRequest(
       'campaigns',
@@ -625,15 +669,20 @@ class MetaAdsService {
             `${this.baseURL}/${this.selectedAccount!.id}/campaigns`,
             {
               params: {
-                access_token: this.user?.accessToken || this.getAccessToken(),
+                access_token: this.user?.accessToken,
                 fields: 'id,name,status,objective,created_time,updated_time,start_time,stop_time',
                 limit: 1000 // Aumentar limite para pegar mais campanhas
               }
             }
           );
 
-          console.log('Campanhas encontradas:', response.data);
-          return response.data.data || [];
+          const data = response.data.data || [];
+          console.log('Campanhas encontradas:', data);
+          
+          // Salvar dados no localStorage
+          this.saveDataAfterLoad('campaigns', data);
+          
+          return data;
         } catch (error: any) {
           console.error('Erro ao buscar campanhas:', error.response?.data || error.message);
           throw new Error(`Erro ao buscar campanhas: ${error.response?.data?.error?.message || error.message}`);
@@ -646,15 +695,28 @@ class MetaAdsService {
 
   // Buscar conjuntos de anúncios (Ad Sets) da conta selecionada
   async getAdSets(campaignId?: string, dateStart?: string, dateEnd?: string): Promise<any[]> {
-    if (!this.user || !this.selectedAccount) {
-      throw new Error('Usuário não logado ou conta não selecionada');
+    // Se não está logado, tentar carregar dados salvos
+    if (!this.isLoggedIn()) {
+      const savedData = this.getDataFromStorage('adsets');
+      if (savedData) {
+        console.log('Carregando Ad Sets do localStorage (offline)');
+        return savedData;
+      }
+      throw new Error('Usuário não logado e não há dados salvos');
+    }
+
+    console.log('MetaAdsService.getAdSets - selectedAccount:', this.selectedAccount);
+    console.log('MetaAdsService.getAdSets - hasSelectedAccount():', this.hasSelectedAccount());
+    
+    if (!this.hasSelectedAccount()) {
+      throw new Error('Conta não selecionada');
     }
 
     try {
-      console.log(`Buscando conjuntos de anúncios da conta ${this.selectedAccount.id}...`);
+      console.log(`Buscando conjuntos de anúncios da conta ${this.selectedAccount!.id}...`);
       
       const params: any = {
-        access_token: this.user.accessToken,
+        access_token: this.user!.accessToken,
         fields: 'id,name,status,created_time,updated_time,start_time,stop_time,targeting',
         limit: 100
       };
@@ -667,7 +729,7 @@ class MetaAdsService {
         });
       }
 
-      let endpoint = `${this.baseURL}/${this.selectedAccount.id}/adsets`;
+      let endpoint = `${this.baseURL}/${this.selectedAccount!.id}/adsets`;
       
       // Se uma campanha específica foi fornecida, buscar conjuntos dessa campanha
       if (campaignId) {
@@ -676,8 +738,13 @@ class MetaAdsService {
 
       const response = await axios.get(endpoint, { params });
 
-      console.log('Conjuntos de anúncios encontrados:', response.data);
-      return response.data.data || [];
+      const data = response.data.data || [];
+      console.log('Conjuntos de anúncios encontrados:', data);
+      
+      // Salvar dados no localStorage
+      this.saveDataAfterLoad('adsets', data);
+      
+      return data;
     } catch (error: any) {
       console.error('Erro ao buscar conjuntos de anúncios:', error.response?.data || error.message);
       throw new Error(`Erro ao buscar conjuntos de anúncios: ${error.response?.data?.error?.message || error.message}`);
@@ -762,7 +829,7 @@ class MetaAdsService {
         console.log(`Buscando insights da conta ${this.selectedAccount!.id}...`);
         
         // Usar token de acesso se disponível, senão usar token do usuário
-        const accessToken = this.getAccessToken() || (this.user?.accessToken);
+        const accessToken = this.user?.accessToken;
         if (!accessToken) {
           throw new Error('Token de acesso não disponível');
         }
@@ -945,11 +1012,151 @@ class MetaAdsService {
     this.clearCache(type);
   }
 
+  // Método específico para limpar cache de métricas
+  clearMetricsCache(): void {
+    // Limpar cache de métricas
+    for (const key of this.cache.keys()) {
+      if (key.includes('metrics') || key.includes('insights')) {
+        this.cache.delete(key);
+        console.log(`Cache de métricas limpo: ${key}`);
+      }
+    }
+    
+    // Limpar também dados de métricas do localStorage
+    const keysToRemove = [
+      'metaAds_metrics',
+      'metaAds_insights',
+      'metaAds_campaign_insights',
+      'metaAds_adset_insights',
+      'metaAds_account_insights'
+    ];
+    
+    keysToRemove.forEach(key => {
+      try {
+        localStorage.removeItem(key);
+        console.log(`localStorage de métricas limpo: ${key}`);
+      } catch (error) {
+        console.error(`Erro ao limpar localStorage ${key}:`, error);
+      }
+    });
+  }
+
+  clearCacheByClient(clientName: string): void {
+    console.log(`Limpando cache para cliente: ${clientName}`);
+    
+    // Limpar cache que contém dados do cliente específico
+    for (const key of this.cache.keys()) {
+      if (key.includes(clientName)) {
+        this.cache.delete(key);
+        console.log(`Cache cleared for client ${clientName}: ${key}`);
+      }
+    }
+    
+    // Limpar também dados do localStorage relacionados
+    this.clearLocalStorageByClient(clientName);
+  }
+
+  // Novo método para limpar localStorage por cliente
+  // Método para restaurar clientes removidos
+  public restoreRemovedClients(): void {
+    try {
+      // Importar clientService dinamicamente
+      import('./clientService').then(({ clientService }) => {
+        const removedClients = clientService.getRemovedClients();
+        
+        // Restaurar apenas clientes do Facebook
+        removedClients.forEach((removedClient: any) => {
+          if (removedClient.source === 'facebook' && removedClient.businessManagerId) {
+            clientService.restoreClient(removedClient.id);
+            console.log(`MetaAdsService: Cliente restaurado: ${removedClient.name}`);
+          }
+        });
+      }).catch((error) => {
+        console.error('Erro ao importar clientService:', error);
+      });
+    } catch (error) {
+      console.error('Erro ao restaurar clientes removidos:', error);
+    }
+  }
+
+  private clearLocalStorageByClient(clientName: string): void {
+    const keysToRemove = [
+      'metaAds_campaigns',
+      'metaAds_adsets',
+      'metaAds_business_managers',
+      'metaAds_ad_accounts_by_business'
+    ];
+    
+    keysToRemove.forEach(key => {
+      try {
+        localStorage.removeItem(key);
+        console.log(`localStorage cleared: ${key}`);
+      } catch (error) {
+        console.error(`Erro ao limpar localStorage ${key}:`, error);
+      }
+    });
+  }
+
+  // Método para invalidar cache específico sem limpar completamente
+  invalidateCache(type: string, params: any = {}): void {
+    const cacheKey = this.getCacheKey(type, params);
+    if (this.cache.has(cacheKey)) {
+      this.cache.delete(cacheKey);
+      console.log(`Cache invalidated: ${cacheKey}`);
+    }
+  }
+
   getCacheStats(): { size: number; keys: string[] } {
     return {
       size: this.cache.size,
       keys: Array.from(this.cache.keys())
     };
+  }
+
+  // Métodos para persistir dados no localStorage
+  saveDataToStorage(type: string, data: any): void {
+    try {
+      const key = `metaAds_${type}`;
+      localStorage.setItem(key, JSON.stringify({
+        data,
+        timestamp: Date.now()
+      }));
+      console.log(`Dados salvos no localStorage: ${type}`);
+    } catch (error) {
+      console.error(`Erro ao salvar dados ${type}:`, error);
+    }
+  }
+
+  getDataFromStorage(type: string): any | null {
+    try {
+      const key = `metaAds_${type}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Verificar se os dados não são muito antigos (7 dias)
+        const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+        if (parsed.timestamp > sevenDaysAgo) {
+          console.log(`Dados carregados do localStorage: ${type}`);
+          return parsed.data;
+        } else {
+          console.log(`Dados ${type} expirados, removendo...`);
+          localStorage.removeItem(key);
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error(`Erro ao carregar dados ${type}:`, error);
+      return null;
+    }
+  }
+
+  hasStoredData(type: string): boolean {
+    return this.getDataFromStorage(type) !== null;
+  }
+
+  // Salvar dados automaticamente quando carregados
+  private saveDataAfterLoad(type: string, data: any): void {
+    this.saveDataToStorage(type, data);
   }
 }
 
