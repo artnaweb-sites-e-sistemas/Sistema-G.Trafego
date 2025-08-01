@@ -372,8 +372,9 @@ class MetaAdsService {
     try {
       console.log(`Buscando contas de anúncios do Business Manager ${businessId}...`);
       
+      // Usar o endpoint correto para buscar contas de anúncios do Business Manager
       const response = await axios.get(
-        `${this.baseURL}/${businessId}/adaccounts`,
+        `${this.baseURL}/${businessId}/owned_ad_accounts`,
         {
           params: {
             access_token: this.user.accessToken,
@@ -396,6 +397,39 @@ class MetaAdsService {
       return accounts;
     } catch (error: any) {
       console.error('Erro ao buscar contas de anúncios:', error.response?.data || error.message);
+      
+      // Se o endpoint owned_ad_accounts falhar, tentar o endpoint alternativo
+      if (error.response?.data?.error?.code === 100) {
+        console.log('Tentando endpoint alternativo...');
+        try {
+          const response = await axios.get(
+            `${this.baseURL}/${businessId}/client_ad_accounts`,
+            {
+              params: {
+                access_token: this.user.accessToken,
+                fields: 'id,name,account_id,account_status,currency'
+              }
+            }
+          );
+
+          console.log('Resposta da API (endpoint alternativo):', response.data);
+
+          if (response.data.error) {
+            throw new Error(`Erro da API do Facebook: ${response.data.error.message}`);
+          }
+
+          const accounts = response.data.data.filter((account: AdAccount) => 
+            account.account_status === 1 // Apenas contas ativas
+          );
+
+          console.log('Contas de anúncios encontradas (endpoint alternativo):', accounts);
+          return accounts;
+        } catch (secondError: any) {
+          console.error('Erro no endpoint alternativo:', secondError.response?.data || secondError.message);
+          throw new Error(`Erro ao buscar contas: ${secondError.response?.data?.error?.message || secondError.message}`);
+        }
+      }
+      
       throw new Error(`Erro ao buscar contas: ${error.response?.data?.error?.message || error.message}`);
     }
   }
