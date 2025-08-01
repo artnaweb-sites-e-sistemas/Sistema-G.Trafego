@@ -79,84 +79,69 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
     try {
       console.log('Iniciando login do Facebook...');
       
-      // Chamar FB.login() diretamente
-      if (typeof window !== 'undefined' && window.FB) {
-        window.FB.login((response: any) => {
-          console.log('Resposta do FB.login:', response);
-          
-          if (response.authResponse) {
-            console.log('Login bem-sucedido!');
-            const { accessToken, userID } = response.authResponse;
-            
-            // Buscar dados do usuário
-            window.FB.api('/me', { fields: 'name,email' }, (userInfo: any) => {
-              if (userInfo.error) {
-                console.error('Erro ao buscar dados do usuário:', userInfo.error);
-                alert('Erro ao buscar dados do usuário');
-                setIsLoading(false);
-                return;
-              }
-              
-              const user = {
-                id: userID,
-                name: userInfo.name,
-                email: userInfo.email,
-                accessToken: accessToken
-              };
-              
-              console.log('Dados do usuário:', user);
-              setUser(user);
-              metaAdsService.setUser(user);
-              localStorage.setItem('facebookUser', JSON.stringify(user));
-              
-              // Tentar carregar contas de anúncios
-              setStep('selectBusiness');
-              loadBusinessManagers();
-              setIsLoading(false);
-            });
-          } else {
-            console.log('Login falhou ou foi cancelado');
-            alert('Login falhou ou foi cancelado');
-            setIsLoading(false);
-          }
-        }, { 
-          scope: 'email,public_profile',
-          return_scopes: true,
-          auth_type: 'rerequest'
-        });
-      } else {
-        throw new Error('Facebook SDK não está disponível');
-      }
+      // Usar o serviço para fazer login
+      const user = await metaAdsService.loginWithFacebook();
+      console.log('Login bem-sucedido:', user);
+      
+      setUser(user);
+      setStep('selectBusiness');
+      
+      // Tentar carregar Business Managers
+      await loadBusinessManagers();
+      
     } catch (error: any) {
       console.error('Erro no login:', error);
-      alert(`Erro no login: ${error.message}`);
-      setIsLoading(false);
-    }
-  };
-
-  const loadBusinessManagers = async () => {
-    setIsLoading(true);
-    try {
-      const businesses = await metaAdsService.getBusinessManagers();
-      setBusinessManagers(businesses);
       
-      // Se não há Business Managers, tentar buscar contas de anúncios diretamente
-      if (businesses.length === 0) {
-        console.log('Nenhum Business Manager encontrado, tentando buscar contas diretamente...');
-        await loadAdAccounts();
+      // Mostrar mensagem de erro mais amigável
+      let errorMessage = 'Erro ao fazer login com o Facebook.';
+      
+      if (error.message.includes('não autorizado')) {
+        errorMessage = 'Login não autorizado. Verifique se você concedeu as permissões necessárias.';
+      } else if (error.message.includes('cancelado')) {
+        errorMessage = 'Login cancelado pelo usuário.';
+      } else if (error.message.includes('desconhecido')) {
+        errorMessage = 'Erro desconhecido no login. Tente novamente.';
+      } else if (error.message.includes('SDK não carregado')) {
+        errorMessage = 'Facebook SDK não carregado. Recarregue a página e tente novamente.';
       }
-    } catch (error: any) {
-      console.warn('Erro ao buscar Business Managers:', error.message);
-      // Se falhar, tentar buscar contas de anúncios diretamente
-      await loadAdAccounts();
+      
+      alert(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const loadAdAccounts = async (businessId?: string) => {
-    setIsLoading(true);
+  const loadBusinessManagers = async () => {
     try {
+      console.log('Carregando Business Managers...');
+      const managers = await metaAdsService.getBusinessManagers();
+      console.log('Business Managers carregados:', managers);
+      
+      if (managers.length > 0) {
+        setBusinessManagers(managers);
+        setStep('selectBusiness');
+      } else {
+        console.log('Nenhum Business Manager encontrado, tentando buscar contas diretamente...');
+        // Se não tem Business Managers, tentar buscar contas diretamente
+        await loadAdAccounts();
+      }
+    } catch (error: any) {
+      console.error('Erro ao carregar Business Managers:', error);
+      
+      // Se for erro de permissão, mostrar mensagem específica
+      if (error.message.includes('Permissões de anúncios não concedidas')) {
+        setStep('permissionsRequired');
+      } else {
+        // Para outros erros, tentar buscar contas diretamente
+        console.log('Tentando buscar contas diretamente...');
+        await loadAdAccounts();
+      }
+    }
+  };
+
+  const loadAdAccounts = async (businessId?: string) => {
+    try {
+      console.log('Carregando contas de anúncios...');
       let accounts: AdAccount[];
       
       if (businessId) {
@@ -165,17 +150,23 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
         accounts = await metaAdsService.getAdAccounts();
       }
       
+      console.log('Contas de anúncios carregadas:', accounts);
       setAdAccounts(accounts);
-      setStep('selectAccount');
+      
+      if (accounts.length > 0) {
+        setStep('selectAccount');
+      } else {
+        alert('Nenhuma conta de anúncios encontrada. Verifique se você tem acesso a contas de anúncios.');
+      }
     } catch (error: any) {
-      // Se o erro for sobre permissões, mostrar mensagem amigável
+      console.error('Erro ao carregar contas de anúncios:', error);
+      
+      // Se for erro de permissão, mostrar mensagem específica
       if (error.message.includes('Permissões de anúncios não concedidas')) {
         setStep('permissionsRequired');
       } else {
-        alert(`Erro ao carregar contas: ${error.message}`);
+        alert(`Erro ao carregar contas de anúncios: ${error.message}`);
       }
-    } finally {
-      setIsLoading(false);
     }
   };
 

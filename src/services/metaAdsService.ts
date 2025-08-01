@@ -105,15 +105,12 @@ class MetaAdsService {
         return;
       }
 
-      // Verificar se estamos em desenvolvimento local
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      
-      if (isLocalhost) {
-        // Para desenvolvimento local, vamos usar uma abordagem diferente
-        console.log('Executando em localhost - usando configuração de desenvolvimento');
-      }
+      console.log('Iniciando login do Facebook...');
 
-      // Primeiro fazer login com permissões básicas
+      // Fazer logout primeiro para limpar estado anterior
+      window.FB.logout();
+
+      // Login com permissões básicas
       window.FB.login((response: any) => {
         console.log('Resposta do FB.login:', response);
         
@@ -140,21 +137,22 @@ class MetaAdsService {
             
             this.user = user;
             localStorage.setItem('facebookUser', JSON.stringify(user));
+            console.log('Usuário salvo:', user);
             resolve(user);
           });
         } else {
           console.error('Login falhou:', response);
           if (response.status === 'not_authorized') {
             reject(new Error('Login não autorizado. Verifique se você concedeu as permissões necessárias.'));
+          } else if (response.status === 'unknown') {
+            reject(new Error('Erro desconhecido no login. Tente novamente.'));
           } else {
             reject(new Error('Login cancelado pelo usuário'));
           }
         }
       }, { 
         scope: 'email,public_profile',
-        return_scopes: true,
-        auth_type: 'rerequest',
-        redirect_uri: 'https://gtrafego.artnawebsite.com.br/'
+        return_scopes: true
       });
     });
   }
@@ -294,7 +292,21 @@ class MetaAdsService {
       return response.data.data || [];
     } catch (error: any) {
       console.error('Erro ao buscar Business Managers:', error.response?.data || error.message);
-      // Se não conseguir buscar Business Managers, retorna array vazio
+      
+      // Se for erro 400 (Bad Request), provavelmente não tem permissão
+      if (error.response?.status === 400) {
+        console.log('Erro 400 - provavelmente sem permissão para Business Managers');
+        return [];
+      }
+      
+      // Se for erro 403 (Forbidden), não tem permissão
+      if (error.response?.status === 403) {
+        console.log('Erro 403 - sem permissão para Business Managers');
+        return [];
+      }
+      
+      // Para outros erros, retorna array vazio
+      console.log('Outro erro ao buscar Business Managers, retornando array vazio');
       return [];
     }
   }
@@ -373,16 +385,28 @@ class MetaAdsService {
       console.log('Contas de anúncios encontradas:', accounts);
       return accounts;
     } catch (error: any) {
+      console.error('Erro ao buscar contas de anúncios:', error.response?.data || error.message);
+      
+      // Se for erro 403 (Forbidden), não tem permissão para ads
+      if (error.response?.status === 403) {
+        throw new Error('Permissões de anúncios não concedidas. Para acessar contas de anúncios, você precisa das permissões ads_read e ads_management que requerem App Review.');
+      }
+      
+      // Se for erro 400 (Bad Request), pode ser problema de permissão
+      if (error.response?.status === 400) {
+        throw new Error('Erro na requisição. Verifique se você tem permissões adequadas para acessar contas de anúncios.');
+      }
+      
+      // Se o erro for sobre token expirado
       if (error.response?.data?.error?.code === 190) {
         throw new Error('Token de acesso expirado. Faça login novamente.');
       }
       
-      // Se o erro for sobre permissões, dar uma mensagem mais amigável
+      // Se o erro for sobre permissões
       if (error.response?.data?.error?.code === 200) {
         throw new Error('Permissões de anúncios não concedidas. Para acessar contas de anúncios, você precisa conceder permissões adicionais.');
       }
       
-      console.error('Erro ao buscar contas de anúncios:', error.response?.data || error.message);
       throw new Error(`Erro ao buscar contas: ${error.response?.data?.error?.message || error.message}`);
     }
   }

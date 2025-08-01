@@ -5,19 +5,24 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dashboard Analytics Moderno</title>
-    <script async defer crossorigin="anonymous" src="https://connect.facebook.net/pt_BR/sdk.js"></script>
+    
+    <!-- Facebook SDK -->
     <script>
       window.fbAsyncInit = function() {
         console.log('Facebook SDK carregado, inicializando...');
+        
+        // Usar App ID do environment variable se disponível
+        const appId = '1829212554641028'; // Fallback
+        
         FB.init({
-          appId      : '1829212554641028',
-          cookie     : true,
-          xfbml      : true,
-          version    : 'v18.0'
+          appId: appId,
+          cookie: true,
+          xfbml: true,
+          version: 'v18.0'
         });
         
         console.log('Facebook SDK inicializado com sucesso!');
-        console.log('App ID:', '1829212554641028');
+        console.log('App ID:', appId);
         console.log('Versão:', 'v18.0');
           
         FB.AppEvents.logPageView();
@@ -31,21 +36,7 @@
             console.log('Usuário não está logado. Status:', response.status);
           }
         });
-          
       };
-
-      // Função callback para verificar estado do login
-      function checkLoginState() {
-        console.log('checkLoginState chamado');
-        if (typeof FB !== 'undefined') {
-          FB.getLoginStatus(function(response) {
-            console.log('Resposta do checkLoginState:', response);
-            statusChangeCallback(response);
-          });
-        } else {
-          console.error('Facebook SDK não está disponível em checkLoginState');
-        }
-      }
 
       // Função para processar mudanças de status
       function statusChangeCallback(response) {
@@ -53,14 +44,6 @@
         
         if (response.status === 'connected') {
           console.log('Usuário conectado com sucesso!');
-          
-          // Salvar dados do usuário no localStorage
-          const userData = {
-            id: response.authResponse.userID,
-            accessToken: response.authResponse.accessToken,
-            expiresIn: response.authResponse.expiresIn,
-            signedRequest: response.authResponse.signedRequest
-          };
           
           // Buscar dados completos do usuário
           FB.api('/me', { fields: 'name,email' }, function(userInfo) {
@@ -70,9 +53,10 @@
             }
             
             const completeUser = {
-              ...userData,
+              id: response.authResponse.userID,
               name: userInfo.name,
-              email: userInfo.email
+              email: userInfo.email,
+              accessToken: response.authResponse.accessToken
             };
             
             localStorage.setItem('facebookUser', JSON.stringify(completeUser));
@@ -93,14 +77,15 @@
         }
       }
 
-      (function(d, s, id){
-         var js, fjs = d.getElementsByTagName(s)[0];
-         if (d.getElementById(id)) {return;}
-         js = d.createElement(s); js.id = id;
-         js.src = "https://connect.facebook.net/pt_BR/sdk.js";
-         fjs.parentNode.insertBefore(js, fjs);
-         console.log('Script do Facebook SDK carregado');
-       }(document, 'script', 'facebook-jssdk'));
+      // Carregar Facebook SDK
+      (function(d, s, id) {
+        var js, fjs = d.getElementsByTagName(s)[0];
+        if (d.getElementById(id)) return;
+        js = d.createElement(s); js.id = id;
+        js.src = "https://connect.facebook.net/pt_BR/sdk.js";
+        fjs.parentNode.insertBefore(js, fjs);
+        console.log('Script do Facebook SDK carregado');
+      }(document, 'script', 'facebook-jssdk'));
     </script>
   </head>
   <body>
