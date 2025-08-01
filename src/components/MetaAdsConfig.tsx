@@ -16,7 +16,9 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
   const [selectedAccount, setSelectedAccount] = useState<AdAccount | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [step, setStep] = useState<'login' | 'selectBusiness' | 'selectAccount' | 'connected' | 'permissionsRequired'>('login');
+  const [step, setStep] = useState<'login' | 'selectBusiness' | 'selectAccount' | 'connected' | 'permissionsRequired' | 'tokenConfig'>('login');
+  const [accessToken, setAccessToken] = useState('');
+  const [tokenConfigured, setTokenConfigured] = useState(false);
 
   useEffect(() => {
     // Verificar se já existe usuário salvo
@@ -35,6 +37,13 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
       }
     }
 
+    // Verificar se já existe token de acesso configurado
+    const savedToken = localStorage.getItem('facebookAccessToken');
+    if (savedToken) {
+      setTokenConfigured(true);
+      metaAdsService.setAccessToken(savedToken);
+    }
+
     // Listener para evento de login bem-sucedido
     const handleLoginSuccess = (event: CustomEvent) => {
       console.log('Evento de login recebido:', event.detail);
@@ -51,6 +60,31 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
       window.removeEventListener('facebookLoginSuccess', handleLoginSuccess as EventListener);
     };
   }, []);
+
+  const handleConfigureToken = async () => {
+    if (!accessToken.trim()) {
+      alert('Por favor, insira o token de acesso');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      // Configurar o token
+      metaAdsService.setAccessToken(accessToken.trim());
+      setTokenConfigured(true);
+      
+      // Tentar buscar contas de anúncios
+      await loadAdAccounts();
+      
+      alert('Token configurado com sucesso!');
+    } catch (error: any) {
+      console.error('Erro ao configurar token:', error);
+      alert(`Erro ao configurar token: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const checkLoginStatus = async () => {
     try {
@@ -103,6 +137,8 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
         errorMessage = 'Erro desconhecido no login. Tente novamente.';
       } else if (error.message.includes('SDK não carregado')) {
         errorMessage = 'Facebook SDK não carregado. Recarregue a página e tente novamente.';
+      } else if (error.message.includes('dados do usuário')) {
+        errorMessage = 'Erro ao buscar dados do usuário. Tente novamente.';
       }
       
       alert(errorMessage);
@@ -462,11 +498,77 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
                   </button>
 
                   <button
-                    onClick={handleLogout}
-                    className="w-full bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
+                    onClick={() => setStep('tokenConfig')}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors"
                   >
-                    <LogOut className="w-4 h-4" />
-                    <span>Trocar Conta</span>
+                    <Settings className="w-5 h-5" />
+                    <span>Configurar Token de Acesso</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {step === 'tokenConfig' && (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
+                    <Settings className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-medium">Configurar Token de Acesso</h3>
+                    <p className="text-gray-400 text-sm">API de Marketing do Facebook</p>
+                  </div>
+                </div>
+
+                <div className="bg-green-900 border border-green-700 rounded-lg p-4">
+                  <p className="text-green-300 text-sm mb-4">
+                    Cole aqui o token de acesso gerado no Facebook Developers. 
+                    Este token permite acessar dados de anúncios diretamente.
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="w-4 h-4 text-green-400" />
+                      <span className="text-green-300 text-sm">Token com permissões ads_read e ads_management</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="w-4 h-4 text-green-400" />
+                      <span className="text-green-300 text-sm">Acesso direto às contas de anúncios</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Token de Acesso
+                    </label>
+                    <textarea
+                      value={accessToken}
+                      onChange={(e) => setAccessToken(e.target.value)}
+                      placeholder="Cole aqui o token de acesso..."
+                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      rows={4}
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleConfigureToken}
+                    disabled={isLoading || !accessToken.trim()}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors disabled:opacity-50"
+                  >
+                    {isLoading ? (
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Settings className="w-5 h-5" />
+                    )}
+                    <span>{isLoading ? 'Configurando...' : 'Configurar Token'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setStep('permissionsRequired')}
+                    className="w-full bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Voltar
                   </button>
                 </div>
               </div>

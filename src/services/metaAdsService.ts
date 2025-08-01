@@ -57,11 +57,27 @@ class MetaAdsService {
   private baseURL = 'https://graph.facebook.com/v18.0';
   private user: FacebookUser | null = null;
   private selectedAccount: AdAccount | null = null;
-  private appId = import.meta.env.VITE_FACEBOOK_APP_ID || '1829212554641028'; // Usar import.meta.env para Vite
+  private appId = import.meta.env.VITE_FACEBOOK_APP_ID || '1829212554641028';
+  private accessToken: string | null = null; // Token de acesso para API de Marketing
+
+  // Configurar token de acesso para API de Marketing
+  setAccessToken(token: string) {
+    this.accessToken = token;
+    localStorage.setItem('facebookAccessToken', token);
+    console.log('Token de acesso configurado');
+  }
+
+  // Obter token de acesso
+  getAccessToken(): string | null {
+    if (!this.accessToken) {
+      this.accessToken = localStorage.getItem('facebookAccessToken');
+    }
+    return this.accessToken;
+  }
 
   // Verificar se o serviço está configurado
   isConfigured(): boolean {
-    return this.isLoggedIn() && this.hasSelectedAccount();
+    return this.isLoggedIn() && (this.hasSelectedAccount() || this.getAccessToken() !== null);
   }
 
   // Inicializar Facebook SDK
@@ -107,21 +123,15 @@ class MetaAdsService {
 
       console.log('Iniciando login do Facebook...');
 
-      // Fazer logout primeiro para limpar estado anterior
-      window.FB.logout();
-
-      // Login com permissões básicas
-      window.FB.login((response: any) => {
-        console.log('Resposta do FB.login:', response);
+      // Verificar se já está logado primeiro
+      window.FB.getLoginStatus((statusResponse: any) => {
+        console.log('Status atual do login:', statusResponse);
         
-        if (response.authResponse) {
-          const { accessToken, userID } = response.authResponse;
-          console.log('Login bem-sucedido, userID:', userID);
+        if (statusResponse.status === 'connected') {
+          console.log('Usuário já está logado, buscando dados...');
           
           // Buscar dados do usuário
           window.FB.api('/me', { fields: 'name,email' }, (userInfo: any) => {
-            console.log('Dados do usuário:', userInfo);
-            
             if (userInfo.error) {
               console.error('Erro ao buscar dados do usuário:', userInfo.error);
               reject(new Error(`Erro ao buscar dados do usuário: ${userInfo.error.message}`));
@@ -129,30 +139,64 @@ class MetaAdsService {
             }
             
             const user: FacebookUser = {
-              id: userID,
+              id: statusResponse.authResponse.userID,
               name: userInfo.name,
               email: userInfo.email,
-              accessToken: accessToken
+              accessToken: statusResponse.authResponse.accessToken
             };
             
             this.user = user;
             localStorage.setItem('facebookUser', JSON.stringify(user));
-            console.log('Usuário salvo:', user);
+            console.log('Usuário já logado, dados salvos:', user);
             resolve(user);
           });
         } else {
-          console.error('Login falhou:', response);
-          if (response.status === 'not_authorized') {
-            reject(new Error('Login não autorizado. Verifique se você concedeu as permissões necessárias.'));
-          } else if (response.status === 'unknown') {
-            reject(new Error('Erro desconhecido no login. Tente novamente.'));
-          } else {
-            reject(new Error('Login cancelado pelo usuário'));
-          }
+          // Fazer login
+          console.log('Fazendo login...');
+          window.FB.login((response: any) => {
+            console.log('Resposta do FB.login:', response);
+            
+            if (response.authResponse) {
+              const { accessToken, userID } = response.authResponse;
+              console.log('Login bem-sucedido, userID:', userID);
+              
+              // Buscar dados do usuário
+              window.FB.api('/me', { fields: 'name,email' }, (userInfo: any) => {
+                console.log('Dados do usuário:', userInfo);
+                
+                if (userInfo.error) {
+                  console.error('Erro ao buscar dados do usuário:', userInfo.error);
+                  reject(new Error(`Erro ao buscar dados do usuário: ${userInfo.error.message}`));
+                  return;
+                }
+                
+                const user: FacebookUser = {
+                  id: userID,
+                  name: userInfo.name,
+                  email: userInfo.email,
+                  accessToken: accessToken
+                };
+                
+                this.user = user;
+                localStorage.setItem('facebookUser', JSON.stringify(user));
+                console.log('Usuário salvo:', user);
+                resolve(user);
+              });
+            } else {
+              console.error('Login falhou:', response);
+              if (response.status === 'not_authorized') {
+                reject(new Error('Login não autorizado. Verifique se você concedeu as permissões necessárias.'));
+              } else if (response.status === 'unknown') {
+                reject(new Error('Erro desconhecido no login. Tente novamente.'));
+              } else {
+                reject(new Error('Login cancelado pelo usuário'));
+              }
+            }
+          }, { 
+            scope: 'email,public_profile',
+            return_scopes: true
+          });
         }
-      }, { 
-        scope: 'email,public_profile',
-        return_scopes: true
       });
     });
   }
@@ -216,14 +260,23 @@ class MetaAdsService {
 
   // Logout
   logout() {
+    console.log('Fazendo logout...');
+    
+    // Verificar se há um usuário logado antes de fazer logout
+    if (this.user && this.user.accessToken) {
+      if (window.FB) {
+        window.FB.logout((response: any) => {
+          console.log('Logout do Facebook:', response);
+        });
+      }
+    }
+    
+    // Limpar dados locais
     this.user = null;
     this.selectedAccount = null;
     localStorage.removeItem('facebookUser');
     localStorage.removeItem('selectedAdAccount');
-    
-    if (window.FB) {
-      window.FB.logout();
-    }
+    console.log('Dados locais limpos');
   }
 
   // Verificar se está logado
@@ -350,19 +403,21 @@ class MetaAdsService {
 
   // Buscar contas de anúncios do usuário (método original - mantido para compatibilidade)
   async getAdAccounts(): Promise<AdAccount[]> {
-    if (!this.user) {
-      throw new Error('Usuário não está logado. Faça login primeiro.');
+    // Verificar se temos token de acesso
+    const accessToken = this.getAccessToken();
+    if (!accessToken) {
+      throw new Error('Token de acesso não configurado. Configure o token da API de Marketing primeiro.');
     }
 
     try {
-      console.log('Buscando contas de anúncios...');
-      console.log('Access Token:', this.user.accessToken.substring(0, 20) + '...');
+      console.log('Buscando contas de anúncios com token de acesso...');
+      console.log('Access Token:', accessToken.substring(0, 20) + '...');
       
       const response = await axios.get(
         `${this.baseURL}/me/adaccounts`,
         {
           params: {
-            access_token: this.user.accessToken,
+            access_token: accessToken,
             fields: 'id,name,account_id,account_status,currency'
           }
         }
@@ -389,7 +444,7 @@ class MetaAdsService {
       
       // Se for erro 403 (Forbidden), não tem permissão para ads
       if (error.response?.status === 403) {
-        throw new Error('Permissões de anúncios não concedidas. Para acessar contas de anúncios, você precisa das permissões ads_read e ads_management que requerem App Review.');
+        throw new Error('Permissões de anúncios não concedidas. Verifique se o token tem as permissões ads_read e ads_management.');
       }
       
       // Se for erro 400 (Bad Request), pode ser problema de permissão
@@ -399,12 +454,12 @@ class MetaAdsService {
       
       // Se o erro for sobre token expirado
       if (error.response?.data?.error?.code === 190) {
-        throw new Error('Token de acesso expirado. Faça login novamente.');
+        throw new Error('Token de acesso expirado. Gere um novo token.');
       }
       
       // Se o erro for sobre permissões
       if (error.response?.data?.error?.code === 200) {
-        throw new Error('Permissões de anúncios não concedidas. Para acessar contas de anúncios, você precisa conceder permissões adicionais.');
+        throw new Error('Permissões de anúncios não concedidas. Verifique se o token tem as permissões necessárias.');
       }
       
       throw new Error(`Erro ao buscar contas: ${error.response?.data?.error?.message || error.message}`);
@@ -457,39 +512,36 @@ class MetaAdsService {
 
   // Buscar insights da conta selecionada
   async getAccountInsights(dateStart: string, dateEnd: string): Promise<MetaAdsInsight[]> {
-    if (!this.user || !this.selectedAccount) {
-      throw new Error('Usuário não logado ou conta não selecionada');
+    if (!this.selectedAccount) {
+      throw new Error('Nenhuma conta selecionada');
+    }
+
+    // Usar token de acesso se disponível, senão usar token do usuário
+    const accessToken = this.getAccessToken() || (this.user?.accessToken);
+    if (!accessToken) {
+      throw new Error('Token de acesso não disponível');
     }
 
     try {
+      console.log(`Buscando insights da conta ${this.selectedAccount.id}...`);
+      
       const response = await axios.get(
         `${this.baseURL}/${this.selectedAccount.id}/insights`,
         {
           params: {
-            access_token: this.user.accessToken,
-            time_range: JSON.stringify({
+            access_token: accessToken,
+            fields: 'date_start,date_stop,impressions,clicks,spend,ctr,cpm,cpp,reach,frequency,actions,cost_per_action_type',
+            time_range: {
               since: dateStart,
               until: dateEnd
-            }),
-            fields: [
-              'impressions',
-              'clicks',
-              'spend',
-              'ctr',
-              'cpm',
-              'cpp',
-              'reach',
-              'frequency',
-              'actions',
-              'cost_per_action_type'
-            ].join(','),
-            time_increment: 1,
-            level: 'account'
+            },
+            time_increment: 1
           }
         }
       );
 
-      return response.data.data;
+      console.log('Insights encontrados:', response.data);
+      return response.data.data || [];
     } catch (error: any) {
       console.error('Erro ao buscar insights:', error.response?.data || error.message);
       throw new Error(`Erro ao buscar insights: ${error.response?.data?.error?.message || error.message}`);
