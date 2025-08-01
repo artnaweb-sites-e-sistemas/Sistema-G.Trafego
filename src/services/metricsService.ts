@@ -348,7 +348,7 @@ const mockData: MetricData[] = [
 
 export const metricsService = {
   // Buscar métricas por mês e serviço
-  async getMetrics(month: string, client: string = 'Todos os Clientes', product: string = 'Todos os Produtos', audience: string = 'Todos os Públicos') {
+  async getMetrics(month: string, client: string = 'Todos os Clientes', product: string = 'Todos os Produtos', audience: string = 'Todos os Públicos', campaignId?: string) {
     try {
       // Verificar se Meta Ads está configurado e tentar sincronizar
       if (metaAdsService.isConfigured()) {
@@ -360,7 +360,7 @@ export const metricsService = {
           const startDate = firstDayOfMonth.toISOString().split('T')[0];
           const endDate = lastDayOfMonth.toISOString().split('T')[0];
           
-          const metaAdsData = await metaAdsService.syncMetrics(month, startDate, endDate);
+          const metaAdsData = await metaAdsService.syncMetrics(month, startDate, endDate, campaignId);
           
           // Salvar no Firebase se possível
           for (const metric of metaAdsData) {
@@ -456,7 +456,7 @@ export const metricsService = {
   },
 
   // Sincronizar dados do Meta Ads
-  async syncMetaAdsData(month: string) {
+  async syncMetaAdsData(month: string, campaignId?: string) {
     if (!metaAdsService.isConfigured()) {
       throw new Error('Meta Ads não está configurado. Configure primeiro no painel.');
     }
@@ -469,7 +469,7 @@ export const metricsService = {
       const startDate = firstDayOfMonth.toISOString().split('T')[0];
       const endDate = lastDayOfMonth.toISOString().split('T')[0];
       
-      const metaAdsData = await metaAdsService.syncMetrics(month, startDate, endDate);
+      const metaAdsData = await metaAdsService.syncMetrics(month, startDate, endDate, campaignId);
       
       // Salvar no Firebase
       const savedIds = [];

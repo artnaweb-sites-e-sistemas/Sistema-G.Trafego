@@ -282,6 +282,47 @@ class MetaAdsService {
     }
   }
 
+  // Buscar insights de uma campanha específica
+  async getCampaignInsights(campaignId: string, dateStart: string, dateEnd: string): Promise<MetaAdsInsight[]> {
+    if (!this.user || !this.selectedAccount) {
+      throw new Error('Usuário não logado ou conta não selecionada');
+    }
+
+    try {
+      const response = await axios.get(
+        `${this.baseURL}/${campaignId}/insights`,
+        {
+          params: {
+            access_token: this.user.accessToken,
+            time_range: JSON.stringify({
+              since: dateStart,
+              until: dateEnd
+            }),
+            fields: [
+              'impressions',
+              'clicks',
+              'spend',
+              'ctr',
+              'cpm',
+              'cpp',
+              'reach',
+              'frequency',
+              'actions',
+              'cost_per_action_type'
+            ].join(','),
+            time_increment: 1,
+            level: 'campaign'
+          }
+        }
+      );
+
+      return response.data.data;
+    } catch (error: any) {
+      console.error('Erro ao buscar insights da campanha:', error.response?.data || error.message);
+      throw new Error(`Erro ao buscar insights da campanha: ${error.response?.data?.error?.message || error.message}`);
+    }
+  }
+
   // Converter dados para formato do dashboard
   convertToMetricData(insights: MetaAdsInsight[], month: string): any[] {
     return insights.map(insight => {
@@ -328,7 +369,7 @@ class MetaAdsService {
   }
 
   // Sincronizar dados
-  async syncMetrics(month: string, startDate: string, endDate: string) {
+  async syncMetrics(month: string, startDate: string, endDate: string, campaignId?: string) {
     if (!this.isLoggedIn() || !this.hasSelectedAccount()) {
       throw new Error('Usuário não logado ou conta não selecionada');
     }
@@ -336,7 +377,16 @@ class MetaAdsService {
     try {
       console.log('Sincronizando dados do Meta Ads...');
       
-      const insights = await this.getAccountInsights(startDate, endDate);
+      let insights: MetaAdsInsight[];
+      
+      if (campaignId) {
+        console.log(`Sincronizando dados da campanha: ${campaignId}`);
+        insights = await this.getCampaignInsights(campaignId, startDate, endDate);
+      } else {
+        console.log('Sincronizando dados da conta inteira');
+        insights = await this.getAccountInsights(startDate, endDate);
+      }
+      
       const metrics = this.convertToMetricData(insights, month);
       
       console.log(`Sincronizados ${metrics.length} registros do Meta Ads`);

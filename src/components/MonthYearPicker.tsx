@@ -72,16 +72,7 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
     setIsOpen(false);
   };
 
-  const handleClear = () => {
-    const currentDate = new Date();
-    const newYear = currentDate.getFullYear();
-    const newMonthIndex = currentDate.getMonth();
-    setSelectedYear(newYear);
-    setSelectedMonthIndex(newMonthIndex);
-    const newMonthString = `${months[newMonthIndex]} ${newYear}`;
-    setSelectedMonth(newMonthString);
-    setIsOpen(false);
-  };
+
 
   const handleThisMonth = () => {
     const currentDate = new Date();
@@ -100,17 +91,71 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
     return `${monthNameLower} de ${selectedYear}`;
   };
 
+  // Função para determinar a cor do indicador baseado no mês selecionado
+  const getIndicatorColor = () => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+    
+    // Criar data do mês selecionado
+    const selectedDate = new Date(selectedYear, selectedMonthIndex);
+    const currentMonthDate = new Date(currentYear, currentMonth);
+    
+    // Comparar meses
+    let colorClass = '';
+    let status = '';
+    
+    if (selectedDate.getTime() === currentMonthDate.getTime()) {
+      colorClass = 'bg-green-500 shadow-lg shadow-green-500/50';
+      status = 'Mês atual - Verde';
+    } else if (selectedDate > currentMonthDate) {
+      colorClass = 'bg-gray-500';
+      status = 'Mês futuro - Cinza';
+    } else {
+      colorClass = 'bg-yellow-500 shadow-lg shadow-yellow-500/50';
+      status = 'Mês passado - Amarelo';
+    }
+    
+    // Debug log
+    console.log('MonthYearPicker - Indicador de Cor:', {
+      currentDate: `${currentMonth + 1}/${currentYear}`,
+      selectedDate: `${selectedMonthIndex + 1}/${selectedYear}`,
+      status,
+      colorClass
+    });
+    
+    return colorClass;
+  };
+
   return (
     <div className="relative" ref={pickerRef}>
       {/* Input field */}
       <div 
         className="relative cursor-pointer"
         onClick={() => setIsOpen(!isOpen)}
+        title={(() => {
+          const currentDate = new Date();
+          const currentYear = currentDate.getFullYear();
+          const currentMonth = currentDate.getMonth();
+          const selectedDate = new Date(selectedYear, selectedMonthIndex);
+          const currentMonthDate = new Date(currentYear, currentMonth);
+          
+          if (selectedDate.getTime() === currentMonthDate.getTime()) {
+            return 'Mês atual selecionado';
+          } else if (selectedDate > currentMonthDate) {
+            return 'Mês futuro selecionado';
+          } else {
+            return 'Mês passado selecionado';
+          }
+        })()}
       >
         <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
         <div className="bg-gray-700 text-white pl-10 pr-4 py-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none min-w-[200px]">
           {formatDisplayMonth()}
         </div>
+        
+        {/* Indicador de Status */}
+        <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 ${getIndicatorColor()}`}></div>
       </div>
 
       {/* Dropdown */}
@@ -163,13 +208,7 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
           </div>
 
           {/* Action buttons */}
-          <div className="flex justify-between p-3 border-t border-gray-200">
-            <button
-              onClick={handleClear}
-              className="text-sm text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              Limpar
-            </button>
+          <div className="flex justify-end p-3 border-t border-gray-200">
             <button
               onClick={handleThisMonth}
               className="text-sm text-gray-600 hover:text-gray-800 transition-colors"

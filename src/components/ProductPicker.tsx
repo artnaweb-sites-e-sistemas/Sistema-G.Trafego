@@ -137,6 +137,13 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
           <span className="truncate block">{getDisplayText()}</span>
         </div>
         <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+        
+        {/* Indicador de Status */}
+        <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 ${
+          selectedProduct === 'Todos os Produtos' 
+            ? 'bg-gray-500' 
+            : 'bg-green-500 shadow-lg shadow-green-500/50'
+        }`}></div>
       </div>
 
       {/* Dropdown */}

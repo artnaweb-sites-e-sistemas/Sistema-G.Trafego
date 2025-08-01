@@ -13,6 +13,7 @@ function App() {
   const [selectedClient, setSelectedClient] = useState('Todos os Clientes');
   const [selectedProduct, setSelectedProduct] = useState('Todos os Produtos');
   const [selectedAudience, setSelectedAudience] = useState('Todos os Públicos');
+  const [selectedCampaign, setSelectedCampaign] = useState('');
   const [metrics, setMetrics] = useState<MetricData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +23,7 @@ function App() {
     const loadMetrics = async () => {
       try {
         setLoading(true);
-        const data = await metricsService.getMetrics(selectedMonth, selectedClient, selectedProduct, selectedAudience);
+        const data = await metricsService.getMetrics(selectedMonth, selectedClient, selectedProduct, selectedAudience, selectedCampaign);
         setMetrics(data);
       } catch (err: any) {
         setError(err.message);
@@ -32,7 +33,7 @@ function App() {
     };
 
     loadMetrics();
-  }, [selectedMonth, selectedClient, selectedProduct, selectedAudience, refreshTrigger]);
+  }, [selectedMonth, selectedClient, selectedProduct, selectedAudience, selectedCampaign, refreshTrigger]);
 
   const handleMetaAdsSync = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -49,6 +50,8 @@ function App() {
         setSelectedProduct={setSelectedProduct}
         selectedAudience={selectedAudience}
         setSelectedAudience={setSelectedAudience}
+        selectedCampaign={selectedCampaign}
+        setSelectedCampaign={setSelectedCampaign}
         onMetaAdsSync={handleMetaAdsSync}
       />
       
@@ -68,7 +71,7 @@ function App() {
           </>
         )}
         <InsightsSection />
-        <DailyControlTable metrics={metrics} />
+        <DailyControlTable metrics={metrics} selectedCampaign={selectedCampaign} />
         <HistorySection />
       </div>
     </div>

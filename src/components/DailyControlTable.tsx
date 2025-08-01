@@ -4,9 +4,10 @@ import { MetricData } from '../services/metricsService';
 
 interface DailyControlTableProps {
   metrics: MetricData[];
+  selectedCampaign?: string;
 }
 
-const DailyControlTable: React.FC<DailyControlTableProps> = ({ metrics }) => {
+const DailyControlTable: React.FC<DailyControlTableProps> = ({ metrics, selectedCampaign }) => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -59,6 +60,11 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({ metrics }) => {
       }
     });
     
+    // Se uma campanha específica está selecionada, destacar que os dados são específicos
+    if (selectedCampaign && metrics.length > 0) {
+      console.log(`Exibindo dados específicos da campanha: ${selectedCampaign}`);
+    }
+    
     // Add some sample active days if no data
     if (metrics.length === 0) {
       data[16].investment = formatCurrency(1.74);
@@ -80,7 +86,14 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({ metrics }) => {
     <div className="bg-gray-800 rounded-xl border border-gray-700">
       <div className="p-6 border-b border-gray-700">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-white">Controle Diário (Julho/2023)</h2>
+          <div>
+            <h2 className="text-xl font-semibold text-white">Controle Diário (Julho/2023)</h2>
+            {selectedCampaign && (
+              <p className="text-sm text-gray-400 mt-1">
+                Anúncio selecionado: {selectedCampaign}
+              </p>
+            )}
+          </div>
           <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors">
             <Plus className="w-4 h-4" />
             <span>Adicionar Dia</span>
@@ -100,7 +113,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({ metrics }) => {
               <th className="text-left p-3 text-gray-400 font-medium">CTR (%)</th>
               <th className="text-left p-3 text-gray-400 font-medium">LEADS</th>
               <th className="text-left p-3 text-gray-400 font-medium">CPL ($$$)</th>
-              <th className="text-left p-3 text-gray-400 font-medium">AÇÕES</th>
+              <th className="text-left p-3 text-gray-400 font-medium">STATUS</th>
             </tr>
           </thead>
           <tbody>

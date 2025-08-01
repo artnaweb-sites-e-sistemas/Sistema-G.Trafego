@@ -1,11 +1,13 @@
 import React from 'react';
-import { Settings, User, Bell, Search } from 'lucide-react';
+import { Settings, User, Search } from 'lucide-react';
 import MetaAdsConfig from './MetaAdsConfig';
 import ShareReport from './ShareReport';
 import MonthYearPicker from './MonthYearPicker';
 import ClientPicker from './ClientPicker';
 import ProductPicker from './ProductPicker';
 import AudiencePicker from './AudiencePicker';
+import AdCampaignPicker from './AdCampaignPicker';
+import NotificationButton from './NotificationButton';
 
 interface HeaderProps {
   selectedMonth: string;
@@ -16,6 +18,8 @@ interface HeaderProps {
   setSelectedProduct: (product: string) => void;
   selectedAudience: string;
   setSelectedAudience: (audience: string) => void;
+  selectedCampaign: string;
+  setSelectedCampaign: (campaign: string) => void;
   onMetaAdsSync: () => void;
 }
 
@@ -28,6 +32,8 @@ const Header: React.FC<HeaderProps> = ({
   setSelectedProduct,
   selectedAudience,
   setSelectedAudience,
+  selectedCampaign,
+  setSelectedCampaign,
   onMetaAdsSync
 }) => {
   return (
@@ -55,10 +61,12 @@ const Header: React.FC<HeaderProps> = ({
               <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-all duration-200 group">
                 <Search className="w-4 h-4 group-hover:scale-110 transition-transform" />
               </button>
-              <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-all duration-200 group relative">
-                <Bell className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></div>
-              </button>
+              <NotificationButton 
+                selectedClient={selectedClient}
+                selectedProduct={selectedProduct}
+                selectedAudience={selectedAudience}
+                selectedCampaign={selectedCampaign}
+              />
               <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-all duration-200 group">
                 <Settings className="w-4 h-4 group-hover:scale-110 transition-transform" />
               </button>
@@ -113,7 +121,14 @@ const Header: React.FC<HeaderProps> = ({
             </div>
 
             <div className="bg-gray-800/50 rounded-lg border border-gray-700/50 p-1">
-              <MetaAdsConfig onConfigSaved={onMetaAdsSync} />
+              <AdCampaignPicker 
+                selectedCampaign={selectedCampaign}
+                setSelectedCampaign={setSelectedCampaign}
+              />
+            </div>
+
+            <div className="bg-gray-800/50 rounded-lg border border-gray-700/50 p-1">
+              <MetaAdsConfig onConfigSaved={onMetaAdsSync} selectedCampaign={selectedCampaign} />
             </div>
 
             <div className="bg-gray-800/50 rounded-lg border border-gray-700/50 p-1">

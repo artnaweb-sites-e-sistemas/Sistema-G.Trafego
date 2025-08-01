@@ -5,9 +5,10 @@ import { metricsService } from '../services/metricsService';
 
 interface MetaAdsConfigProps {
   onConfigSaved: () => void;
+  selectedCampaign?: string;
 }
 
-const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
+const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, selectedCampaign }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<FacebookUser | null>(null);
   const [adAccounts, setAdAccounts] = useState<AdAccount[]>([]);
@@ -81,7 +82,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
       const today = new Date();
       const month = today.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
       
-      const result = await metricsService.syncMetaAdsData(month);
+      const result = await metricsService.syncMetaAdsData(month, selectedCampaign);
       alert(result.message);
       onConfigSaved();
     } catch (error: any) {
