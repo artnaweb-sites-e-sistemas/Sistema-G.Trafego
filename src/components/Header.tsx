@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, User, Search } from 'lucide-react';
+import { Settings, User, Search, LogOut } from 'lucide-react';
 import MetaAdsConfig from './MetaAdsConfig';
 import ShareReport from './ShareReport';
 import MonthYearPicker from './MonthYearPicker';
@@ -8,6 +8,7 @@ import ProductPicker from './ProductPicker';
 import AudiencePicker from './AudiencePicker';
 import AdCampaignPicker from './AdCampaignPicker';
 import NotificationButton from './NotificationButton';
+import { User as UserType } from '../services/authService';
 
 interface HeaderProps {
   selectedMonth: string;
@@ -21,6 +22,8 @@ interface HeaderProps {
   selectedCampaign: string;
   setSelectedCampaign: (campaign: string) => void;
   onMetaAdsSync: () => void;
+  currentUser: UserType | null;
+  onLogout: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -34,7 +37,9 @@ const Header: React.FC<HeaderProps> = ({
   setSelectedAudience,
   selectedCampaign,
   setSelectedCampaign,
-  onMetaAdsSync
+  onMetaAdsSync,
+  currentUser,
+  onLogout
 }) => {
   return (
     <header className="bg-gradient-to-r from-gray-900 to-gray-800 border-b border-gray-700/50 shadow-lg">
@@ -75,13 +80,28 @@ const Header: React.FC<HeaderProps> = ({
             <div className="h-6 w-px bg-gray-600"></div>
 
             <div className="flex items-center space-x-3 bg-gray-800/50 rounded-lg px-3 py-2 border border-gray-700/50">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                <User className="w-4 h-4 text-white" />
-              </div>
+              {currentUser?.photoURL ? (
+                <img 
+                  src={currentUser.photoURL} 
+                  alt={currentUser.name}
+                  className="w-8 h-8 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-white" />
+                </div>
+              )}
               <div className="hidden sm:block">
-                <p className="text-sm font-medium text-white">Administrador</p>
-                <p className="text-xs text-gray-400">Principal</p>
+                <p className="text-sm font-medium text-white">{currentUser?.name || 'Usuário'}</p>
+                <p className="text-xs text-gray-400">{currentUser?.role === 'admin' ? 'Administrador' : 'Usuário'}</p>
               </div>
+              <button
+                onClick={onLogout}
+                className="p-1 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-all duration-200"
+                title="Sair"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
@@ -128,7 +148,7 @@ const Header: React.FC<HeaderProps> = ({
             </div>
 
             <div className="bg-gray-800/50 rounded-lg border border-gray-700/50 p-1">
-              <MetaAdsConfig onConfigSaved={onMetaAdsSync} selectedCampaign={selectedCampaign} />
+              <MetaAdsConfig onConfigSaved={onMetaAdsSync} />
             </div>
 
             <div className="bg-gray-800/50 rounded-lg border border-gray-700/50 p-1">

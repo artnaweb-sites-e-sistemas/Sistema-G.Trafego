@@ -203,9 +203,9 @@ class MetaAdsService {
           console.error('Login com permissões básicas falhou:', response);
           if (response.status === 'not_authorized') {
             reject(new Error('Login não autorizado. Verifique se você concedeu as permissões necessárias.'));
-          } else {
-            reject(new Error('Login cancelado pelo usuário'));
-          }
+        } else {
+          reject(new Error('Login cancelado pelo usuário'));
+        }
         }
       }, { 
         scope: 'email,public_profile',
