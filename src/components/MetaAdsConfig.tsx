@@ -192,14 +192,16 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
       if (accounts.length > 0) {
         setStep('selectAccount');
       } else {
-        alert('Nenhuma conta de anúncios encontrada. Verifique se você tem acesso a contas de anúncios.');
+        // Se não há contas, mostrar opção de configurar token
+        setStep('tokenConfig');
       }
     } catch (error: any) {
       console.error('Erro ao carregar contas de anúncios:', error);
       
-      // Se for erro de permissão, mostrar mensagem específica
-      if (error.message.includes('Permissões de anúncios não concedidas')) {
-        setStep('permissionsRequired');
+      // Se for erro de permissão, mostrar opção de configurar token
+      if (error.message.includes('Token de acesso não configurado') || 
+          error.message.includes('Permissões de anúncios não concedidas')) {
+        setStep('tokenConfig');
       } else {
         alert(`Erro ao carregar contas de anúncios: ${error.message}`);
       }
@@ -340,11 +342,13 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
             {step === 'selectBusiness' && (
               <div className="space-y-4">
                 <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 text-white" />
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                    <Building className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-white font-medium">Olá, {user?.name}!</h3>
+                    <h3 className="text-white font-medium">
+                      {selectedBusiness ? `${selectedBusiness.name}` : 'Business Managers'}
+                    </h3>
                     <p className="text-gray-400 text-sm">Selecione um Business Manager</p>
                   </div>
                 </div>
@@ -366,7 +370,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
                           <div>
                             <div className="text-white font-medium">{business.name}</div>
                             <div className="text-gray-400 text-sm">
-                              ID: {business.id} • {business.account_type}
+                              Tipo: {business.account_type}
                             </div>
                           </div>
                         </div>
@@ -374,14 +378,20 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
                     ))
                   ) : (
                     <div className="text-center py-8">
-                      <p className="text-gray-400">Nenhum Business Manager encontrado</p>
-                      <p className="text-gray-500 text-sm mt-2">Buscando contas de anúncios diretamente...</p>
+                      <p className="text-gray-400 mb-4">Nenhum Business Manager encontrado</p>
+                      <button
+                        onClick={() => setStep('tokenConfig')}
+                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 mx-auto transition-colors"
+                      >
+                        <Settings className="w-4 h-4" />
+                        <span>Configurar Token de Acesso</span>
+                      </button>
                     </div>
                   )}
                 </div>
 
                 <button
-                  onClick={handleLogout}
+                  onClick={() => setStep('login')}
                   className="w-full bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
                 >
                   <LogOut className="w-4 h-4" />

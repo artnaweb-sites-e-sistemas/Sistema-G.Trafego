@@ -57,7 +57,7 @@ class MetaAdsService {
   private baseURL = 'https://graph.facebook.com/v18.0';
   private user: FacebookUser | null = null;
   private selectedAccount: AdAccount | null = null;
-  private appId = import.meta.env.VITE_FACEBOOK_APP_ID || '1829212554641028';
+  private appId = import.meta.env.VITE_FACEBOOK_APP_ID || '1793110515418498'; // Novo App ID com permissões avançadas
   private accessToken: string | null = null; // Token de acesso para API de Marketing
 
   // Configurar token de acesso para API de Marketing
@@ -151,8 +151,7 @@ class MetaAdsService {
             resolve(user);
           });
         } else {
-          // Fazer login
-          console.log('Fazendo login...');
+          // Login com permissões avançadas
           window.FB.login((response: any) => {
             console.log('Resposta do FB.login:', response);
             
@@ -193,7 +192,7 @@ class MetaAdsService {
               }
             }
           }, { 
-            scope: 'email,public_profile',
+            scope: 'email,public_profile,ads_read,ads_management,pages_show_list,pages_read_engagement',
             return_scopes: true
           });
         }
@@ -403,21 +402,20 @@ class MetaAdsService {
 
   // Buscar contas de anúncios do usuário (método original - mantido para compatibilidade)
   async getAdAccounts(): Promise<AdAccount[]> {
-    // Verificar se temos token de acesso
-    const accessToken = this.getAccessToken();
-    if (!accessToken) {
-      throw new Error('Token de acesso não configurado. Configure o token da API de Marketing primeiro.');
+    // Verificar se temos token do usuário com permissões avançadas
+    if (!this.user) {
+      throw new Error('Usuário não está logado. Faça login primeiro.');
     }
 
     try {
-      console.log('Buscando contas de anúncios com token de acesso...');
-      console.log('Access Token:', accessToken.substring(0, 20) + '...');
+      console.log('Buscando contas de anúncios com token do usuário...');
+      console.log('Access Token:', this.user.accessToken.substring(0, 20) + '...');
       
       const response = await axios.get(
         `${this.baseURL}/me/adaccounts`,
         {
           params: {
-            access_token: accessToken,
+            access_token: this.user.accessToken,
             fields: 'id,name,account_id,account_status,currency'
           }
         }
@@ -444,7 +442,7 @@ class MetaAdsService {
       
       // Se for erro 403 (Forbidden), não tem permissão para ads
       if (error.response?.status === 403) {
-        throw new Error('Permissões de anúncios não concedidas. Verifique se o token tem as permissões ads_read e ads_management.');
+        throw new Error('Permissões de anúncios não concedidas. Para acessar contas de anúncios, você precisa das permissões ads_read e ads_management que requerem App Review.');
       }
       
       // Se for erro 400 (Bad Request), pode ser problema de permissão
@@ -454,12 +452,12 @@ class MetaAdsService {
       
       // Se o erro for sobre token expirado
       if (error.response?.data?.error?.code === 190) {
-        throw new Error('Token de acesso expirado. Gere um novo token.');
+        throw new Error('Token de acesso expirado. Faça login novamente.');
       }
       
       // Se o erro for sobre permissões
       if (error.response?.data?.error?.code === 200) {
-        throw new Error('Permissões de anúncios não concedidas. Verifique se o token tem as permissões necessárias.');
+        throw new Error('Permissões de anúncios não concedidas. Para acessar contas de anúncios, você precisa conceder permissões adicionais.');
       }
       
       throw new Error(`Erro ao buscar contas: ${error.response?.data?.error?.message || error.message}`);
