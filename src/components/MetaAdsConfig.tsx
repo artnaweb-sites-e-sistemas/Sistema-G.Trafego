@@ -16,7 +16,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
   const [selectedAccount, setSelectedAccount] = useState<AdAccount | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [step, setStep] = useState<'login' | 'selectBusiness' | 'selectAccount' | 'connected'>('login');
+  const [step, setStep] = useState<'login' | 'selectBusiness' | 'selectAccount' | 'connected' | 'permissionsRequired'>('login');
 
   useEffect(() => {
     // Inicializar Facebook SDK
@@ -83,7 +83,12 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
       setAdAccounts(accounts);
       setStep('selectAccount');
     } catch (error: any) {
-      alert(`Erro ao carregar contas: ${error.message}`);
+      // Se o erro for sobre permissões, mostrar mensagem amigável
+      if (error.message.includes('Permissões de anúncios não concedidas')) {
+        setStep('permissionsRequired');
+      } else {
+        alert(`Erro ao carregar contas: ${error.message}`);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -309,6 +314,57 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
                   <LogOut className="w-4 h-4" />
                   <span>Trocar Conta</span>
                 </button>
+              </div>
+            )}
+
+            {step === 'permissionsRequired' && (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-10 h-10 bg-yellow-600 rounded-full flex items-center justify-center">
+                    <Settings className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-medium">Permissões Necessárias</h3>
+                    <p className="text-gray-400 text-sm">Para acessar contas de anúncios</p>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-900 border border-yellow-700 rounded-lg p-4">
+                  <p className="text-yellow-300 text-sm mb-4">
+                    Para acessar suas contas de anúncios, você precisa conceder permissões adicionais ao app.
+                  </p>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="w-4 h-4 text-green-400" />
+                      <span className="text-green-300 text-sm">Login básico funcionando</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <XCircle className="w-4 h-4 text-red-400" />
+                      <span className="text-red-300 text-sm">Permissões de anúncios necessárias</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={() => setStep('login')}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors"
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    </svg>
+                    <span>Conceder Permissões de Anúncios</span>
+                  </button>
+
+                  <button
+                    onClick={handleLogout}
+                    className="w-full bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Trocar Conta</span>
+                  </button>
+                </div>
               </div>
             )}
 
