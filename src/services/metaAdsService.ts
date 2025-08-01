@@ -59,6 +59,102 @@ class MetaAdsService {
   private selectedAccount: AdAccount | null = null;
   private appId = import.meta.env.VITE_FACEBOOK_APP_ID || '1793110515418498'; // Novo App ID com permissões avançadas
   private accessToken: string | null = null; // Token de acesso para API de Marketing
+  
+  // Sistema de cache para reduzir chamadas à API
+  private cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+  private readonly CACHE_TTL = {
+    BUSINESS_MANAGERS: 30 * 60 * 1000, // 30 minutos
+    AD_ACCOUNTS: 15 * 60 * 1000, // 15 minutos
+    CAMPAIGNS: 10 * 60 * 1000, // 10 minutos
+    AD_SETS: 10 * 60 * 1000, // 10 minutos
+    INSIGHTS: 5 * 60 * 1000, // 5 minutos
+    USER_INFO: 60 * 60 * 1000, // 1 hora
+  };
+
+  // Debounce para evitar múltiplas chamadas simultâneas
+  private pendingRequests = new Map<string, Promise<any>>();
+
+  // Métodos de cache
+  private getCacheKey(type: string, params: any = {}): string {
+    const paramStr = Object.keys(params).length > 0 
+      ? '_' + JSON.stringify(params) 
+      : '';
+    return `${type}${paramStr}`;
+  }
+
+  private getFromCache<T>(key: string): T | null {
+    const cached = this.cache.get(key);
+    if (!cached) return null;
+    
+    const now = Date.now();
+    if (now - cached.timestamp > cached.ttl) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    console.log(`Cache hit: ${key}`);
+    return cached.data;
+  }
+
+  private setCache(key: string, data: any, ttl: number): void {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl
+    });
+    console.log(`Cache set: ${key} (TTL: ${ttl/1000}s)`);
+  }
+
+  private clearCache(type?: string): void {
+    if (type) {
+      // Limpar cache específico
+      for (const key of this.cache.keys()) {
+        if (key.startsWith(type)) {
+          this.cache.delete(key);
+        }
+      }
+      console.log(`Cache cleared for type: ${type}`);
+    } else {
+      // Limpar todo o cache
+      this.cache.clear();
+      console.log('All cache cleared');
+    }
+  }
+
+  // Método para fazer requisições com cache e debounce
+  private async makeCachedRequest<T>(
+    type: string, 
+    requestFn: () => Promise<T>, 
+    ttl: number,
+    params: any = {}
+  ): Promise<T> {
+    const cacheKey = this.getCacheKey(type, params);
+    
+    // Verificar cache primeiro
+    const cached = this.getFromCache<T>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Verificar se já existe uma requisição pendente
+    if (this.pendingRequests.has(cacheKey)) {
+      console.log(`Using pending request for: ${cacheKey}`);
+      return this.pendingRequests.get(cacheKey)!;
+    }
+
+    // Fazer nova requisição
+    const requestPromise = requestFn().then(data => {
+      this.setCache(cacheKey, data, ttl);
+      this.pendingRequests.delete(cacheKey);
+      return data;
+    }).catch(error => {
+      this.pendingRequests.delete(cacheKey);
+      throw error;
+    });
+
+    this.pendingRequests.set(cacheKey, requestPromise);
+    return requestPromise;
+  }
 
   // Configurar token de acesso para API de Marketing
   setAccessToken(token: string) {
@@ -259,23 +355,30 @@ class MetaAdsService {
 
   // Logout
   logout() {
-    console.log('Fazendo logout...');
+    console.log('Fazendo logout do Meta Ads...');
     
-    // Verificar se há um usuário logado antes de fazer logout
-    if (this.user && this.user.accessToken) {
-      if (window.FB) {
-        window.FB.logout((response: any) => {
-          console.log('Logout do Facebook:', response);
-        });
+    // Limpar cache ao fazer logout
+    this.clearCache();
+    
+    // Fazer logout do Facebook SDK se disponível
+    if (window.FB && this.user?.accessToken) {
+      try {
+        window.FB.logout();
+        console.log('Logout do Facebook SDK realizado');
+      } catch (error) {
+        console.warn('Erro ao fazer logout do Facebook SDK:', error);
       }
     }
     
-    // Limpar dados locais
+    // Limpar dados do usuário
     this.user = null;
     this.selectedAccount = null;
+    
+    // Limpar dados locais
     localStorage.removeItem('facebookUser');
     localStorage.removeItem('selectedAdAccount');
-    console.log('Dados locais limpos');
+    
+    console.log('Logout concluído');
   }
 
   // Verificar se está logado
@@ -323,115 +426,102 @@ class MetaAdsService {
 
   // Buscar Business Managers do usuário
   async getBusinessManagers(): Promise<BusinessManager[]> {
-    if (!this.user) {
-      throw new Error('Usuário não está logado. Faça login primeiro.');
+    if (!this.user?.accessToken) {
+      throw new Error('Usuário não logado');
     }
 
-    try {
-      console.log('Buscando Business Managers...');
-      
-      const response = await axios.get(
-        `${this.baseURL}/me/businesses`,
-        {
-          params: {
-            access_token: this.user.accessToken,
-            fields: 'id,name,account_type'
+    return this.makeCachedRequest(
+      'business_managers',
+      async () => {
+        console.log('Buscando Business Managers...');
+        
+        try {
+          const response = await axios.get(
+            `${this.baseURL}/me/businesses`,
+            {
+              params: {
+                access_token: this.user!.accessToken,
+                fields: 'id,name,account_type'
+              }
+            }
+          );
+
+          console.log('Business Managers encontrados:', response.data);
+          return response.data.data || [];
+        } catch (error: any) {
+          console.error('Erro ao buscar Business Managers:', error.response?.data || error.message);
+          
+          if (error.response?.data?.error?.code === 100) {
+            throw new Error('Permissão negada. É necessário solicitar permissão ads_read no App Review.');
           }
+          
+          throw new Error(`Erro ao buscar Business Managers: ${error.response?.data?.error?.message || error.message}`);
         }
-      );
-
-      console.log('Business Managers encontrados:', response.data);
-      return response.data.data || [];
-    } catch (error: any) {
-      console.error('Erro ao buscar Business Managers:', error.response?.data || error.message);
-      
-      // Se for erro 400 (Bad Request), provavelmente não tem permissão
-      if (error.response?.status === 400) {
-        console.log('Erro 400 - provavelmente sem permissão para Business Managers');
-        return [];
-      }
-      
-      // Se for erro 403 (Forbidden), não tem permissão
-      if (error.response?.status === 403) {
-        console.log('Erro 403 - sem permissão para Business Managers');
-        return [];
-      }
-      
-      // Para outros erros, retorna array vazio
-      console.log('Outro erro ao buscar Business Managers, retornando array vazio');
-      return [];
-    }
+      },
+      this.CACHE_TTL.BUSINESS_MANAGERS
+    );
   }
 
   // Buscar contas de anúncios de um Business Manager específico
   async getAdAccountsByBusiness(businessId: string): Promise<AdAccount[]> {
-    if (!this.user) {
-      throw new Error('Usuário não está logado. Faça login primeiro.');
+    if (!this.user?.accessToken) {
+      throw new Error('Usuário não logado');
     }
 
-    try {
-      console.log(`Buscando contas de anúncios do Business Manager ${businessId}...`);
-      
-      // Usar o endpoint correto para buscar contas de anúncios do Business Manager
-      const response = await axios.get(
-        `${this.baseURL}/${businessId}/owned_ad_accounts`,
-        {
-          params: {
-            access_token: this.user.accessToken,
-            fields: 'id,name,account_id,account_status,currency'
-          }
-        }
-      );
-
-      console.log('Resposta da API:', response.data);
-
-      if (response.data.error) {
-        throw new Error(`Erro da API do Facebook: ${response.data.error.message}`);
-      }
-
-      const accounts = response.data.data.filter((account: AdAccount) => 
-        account.account_status === 1 // Apenas contas ativas
-      );
-
-      console.log('Contas de anúncios encontradas:', accounts);
-      return accounts;
-    } catch (error: any) {
-      console.error('Erro ao buscar contas de anúncios:', error.response?.data || error.message);
-      
-      // Se o endpoint owned_ad_accounts falhar, tentar o endpoint alternativo
-      if (error.response?.data?.error?.code === 100) {
-        console.log('Tentando endpoint alternativo...');
+    return this.makeCachedRequest(
+      'ad_accounts_by_business',
+      async () => {
+        console.log(`Buscando contas de anúncios para Business Manager ${businessId}...`);
+        
         try {
-          const response = await axios.get(
-            `${this.baseURL}/${businessId}/client_ad_accounts`,
+          // Primeiro, tentar owned_ad_accounts
+          let response = await axios.get(
+            `${this.baseURL}/${businessId}/owned_ad_accounts`,
             {
               params: {
-                access_token: this.user.accessToken,
+                access_token: this.user!.accessToken,
                 fields: 'id,name,account_id,account_status,currency'
               }
             }
           );
 
-          console.log('Resposta da API (endpoint alternativo):', response.data);
+          let adAccounts = response.data.data || [];
 
-          if (response.data.error) {
-            throw new Error(`Erro da API do Facebook: ${response.data.error.message}`);
+          // Se não encontrou owned_ad_accounts, tentar client_ad_accounts
+          if (adAccounts.length === 0) {
+            console.log('Nenhuma conta própria encontrada, tentando contas de cliente...');
+            
+            response = await axios.get(
+              `${this.baseURL}/${businessId}/client_ad_accounts`,
+              {
+                params: {
+                  access_token: this.user!.accessToken,
+                  fields: 'id,name,account_id,account_status,currency'
+                }
+              }
+            );
+
+            adAccounts = response.data.data || [];
           }
 
-          const accounts = response.data.data.filter((account: AdAccount) => 
-            account.account_status === 1 // Apenas contas ativas
-          );
-
-          console.log('Contas de anúncios encontradas (endpoint alternativo):', accounts);
-          return accounts;
-        } catch (secondError: any) {
-          console.error('Erro no endpoint alternativo:', secondError.response?.data || secondError.message);
-          throw new Error(`Erro ao buscar contas: ${secondError.response?.data?.error?.message || secondError.message}`);
+          console.log(`Contas de anúncios encontradas: ${adAccounts.length}`);
+          return adAccounts.map((account: any) => ({
+            ...account,
+            business_id: businessId
+          }));
+        } catch (error: any) {
+          console.error('Erro ao buscar contas de anúncios:', error.response?.data || error.message);
+          
+          if (error.response?.data?.error?.code === 100) {
+            throw new Error('Permissão negada. É necessário solicitar permissão ads_read no App Review.');
+          }
+          
+          throw new Error(`Erro ao buscar contas de anúncios: ${error.response?.data?.error?.message || error.message}`);
         }
-      }
-      
-      throw new Error(`Erro ao buscar contas: ${error.response?.data?.error?.message || error.message}`);
-    }
+      },
+      this.CACHE_TTL.AD_ACCOUNTS,
+      { businessId }
+    );
   }
 
   // Buscar contas de anúncios do usuário (método original - mantido para compatibilidade)
@@ -517,51 +607,97 @@ class MetaAdsService {
     return false;
   }
 
-  // Buscar campanhas da conta selecionada
-  async getCampaigns(): Promise<MetaAdsCampaign[]> {
+  // Buscar campanhas da conta selecionada com filtro de período
+  async getCampaigns(dateStart?: string, dateEnd?: string): Promise<MetaAdsCampaign[]> {
+    if (!this.selectedAccount) {
+      throw new Error('Nenhuma conta selecionada');
+    }
+
+    const params = { dateStart, dateEnd };
+    
+    return this.makeCachedRequest(
+      'campaigns',
+      async () => {
+        console.log(`Buscando campanhas da conta ${this.selectedAccount!.id}...`);
+        
+        try {
+          const response = await axios.get(
+            `${this.baseURL}/${this.selectedAccount!.id}/campaigns`,
+            {
+              params: {
+                access_token: this.user?.accessToken || this.getAccessToken(),
+                fields: 'id,name,status,objective,created_time,updated_time,start_time,stop_time',
+                limit: 1000 // Aumentar limite para pegar mais campanhas
+              }
+            }
+          );
+
+          console.log('Campanhas encontradas:', response.data);
+          return response.data.data || [];
+        } catch (error: any) {
+          console.error('Erro ao buscar campanhas:', error.response?.data || error.message);
+          throw new Error(`Erro ao buscar campanhas: ${error.response?.data?.error?.message || error.message}`);
+        }
+      },
+      this.CACHE_TTL.CAMPAIGNS,
+      params
+    );
+  }
+
+  // Buscar conjuntos de anúncios (Ad Sets) da conta selecionada
+  async getAdSets(campaignId?: string, dateStart?: string, dateEnd?: string): Promise<any[]> {
     if (!this.user || !this.selectedAccount) {
       throw new Error('Usuário não logado ou conta não selecionada');
     }
 
     try {
-      const response = await axios.get(
-        `${this.baseURL}/${this.selectedAccount.id}/campaigns`,
-        {
-          params: {
-            access_token: this.user.accessToken,
-            fields: 'id,name,status,objective,created_time,updated_time',
-            limit: 100
-          }
-        }
-      );
+      console.log(`Buscando conjuntos de anúncios da conta ${this.selectedAccount.id}...`);
+      
+      const params: any = {
+        access_token: this.user.accessToken,
+        fields: 'id,name,status,created_time,updated_time,start_time,stop_time,targeting',
+        limit: 100
+      };
 
-      return response.data.data;
+      // Adicionar filtros de data se fornecidos
+      if (dateStart && dateEnd) {
+        params.time_range = JSON.stringify({
+          since: dateStart,
+          until: dateEnd
+        });
+      }
+
+      let endpoint = `${this.baseURL}/${this.selectedAccount.id}/adsets`;
+      
+      // Se uma campanha específica foi fornecida, buscar conjuntos dessa campanha
+      if (campaignId) {
+        endpoint = `${this.baseURL}/${campaignId}/adsets`;
+      }
+
+      const response = await axios.get(endpoint, { params });
+
+      console.log('Conjuntos de anúncios encontrados:', response.data);
+      return response.data.data || [];
     } catch (error: any) {
-      console.error('Erro ao buscar campanhas:', error.response?.data || error.message);
-      throw new Error(`Erro ao buscar campanhas: ${error.response?.data?.error?.message || error.message}`);
+      console.error('Erro ao buscar conjuntos de anúncios:', error.response?.data || error.message);
+      throw new Error(`Erro ao buscar conjuntos de anúncios: ${error.response?.data?.error?.message || error.message}`);
     }
   }
 
-  // Buscar insights da conta selecionada
-  async getAccountInsights(dateStart: string, dateEnd: string): Promise<MetaAdsInsight[]> {
-    if (!this.selectedAccount) {
-      throw new Error('Nenhuma conta selecionada');
-    }
-
-    // Usar token de acesso se disponível, senão usar token do usuário
-    const accessToken = this.getAccessToken() || (this.user?.accessToken);
-    if (!accessToken) {
-      throw new Error('Token de acesso não disponível');
+  // Buscar insights de campanha específica
+  async getCampaignInsights(campaignId: string, dateStart: string, dateEnd: string): Promise<MetaAdsInsight[]> {
+    if (!this.user) {
+      throw new Error('Usuário não está logado. Faça login primeiro.');
     }
 
     try {
-      console.log(`Buscando insights da conta ${this.selectedAccount.id}...`);
+      console.log(`Buscando insights da campanha ${campaignId}...`);
       
       const response = await axios.get(
-        `${this.baseURL}/${this.selectedAccount.id}/insights`,
+        `${this.baseURL}/${campaignId}/insights`,
         {
           params: {
-            access_token: accessToken,
+            access_token: this.user.accessToken,
             fields: 'date_start,date_stop,impressions,clicks,spend,ctr,cpm,cpp,reach,frequency,actions,cost_per_action_type',
             time_range: {
               since: dateStart,
@@ -572,57 +708,98 @@ class MetaAdsService {
         }
       );
 
-      console.log('Insights encontrados:', response.data);
+      console.log('Insights da campanha encontrados:', response.data);
       return response.data.data || [];
-    } catch (error: any) {
-      console.error('Erro ao buscar insights:', error.response?.data || error.message);
-      throw new Error(`Erro ao buscar insights: ${error.response?.data?.error?.message || error.message}`);
-    }
-  }
-
-  // Buscar insights de uma campanha específica
-  async getCampaignInsights(campaignId: string, dateStart: string, dateEnd: string): Promise<MetaAdsInsight[]> {
-    if (!this.user || !this.selectedAccount) {
-      throw new Error('Usuário não logado ou conta não selecionada');
-    }
-
-    try {
-      const response = await axios.get(
-        `${this.baseURL}/${campaignId}/insights`,
-        {
-          params: {
-            access_token: this.user.accessToken,
-            time_range: JSON.stringify({
-              since: dateStart,
-              until: dateEnd
-            }),
-            fields: [
-              'impressions',
-              'clicks',
-              'spend',
-              'ctr',
-              'cpm',
-              'cpp',
-              'reach',
-              'frequency',
-              'actions',
-              'cost_per_action_type'
-            ].join(','),
-            time_increment: 1,
-            level: 'campaign'
-          }
-        }
-      );
-
-      return response.data.data;
     } catch (error: any) {
       console.error('Erro ao buscar insights da campanha:', error.response?.data || error.message);
       throw new Error(`Erro ao buscar insights da campanha: ${error.response?.data?.error?.message || error.message}`);
     }
   }
 
+  // Buscar insights de conjunto de anúncios específico
+  async getAdSetInsights(adSetId: string, dateStart: string, dateEnd: string): Promise<MetaAdsInsight[]> {
+    if (!this.user) {
+      throw new Error('Usuário não está logado. Faça login primeiro.');
+    }
+
+    try {
+      console.log(`Buscando insights do conjunto de anúncios ${adSetId}...`);
+      
+      const response = await axios.get(
+        `${this.baseURL}/${adSetId}/insights`,
+        {
+          params: {
+            access_token: this.user.accessToken,
+            fields: 'date_start,date_stop,impressions,clicks,spend,ctr,cpm,cpp,reach,frequency,actions,cost_per_action_type',
+            time_range: {
+              since: dateStart,
+              until: dateEnd
+            },
+            time_increment: 1
+          }
+        }
+      );
+
+      console.log('Insights do conjunto de anúncios encontrados:', response.data);
+      return response.data.data || [];
+    } catch (error: any) {
+      console.error('Erro ao buscar insights do conjunto de anúncios:', error.response?.data || error.message);
+      throw new Error(`Erro ao buscar insights do conjunto de anúncios: ${error.response?.data?.error?.message || error.message}`);
+    }
+  }
+
+  // Buscar insights da conta selecionada
+  async getAccountInsights(dateStart: string, dateEnd: string): Promise<MetaAdsInsight[]> {
+    if (!this.selectedAccount) {
+      throw new Error('Nenhuma conta selecionada');
+    }
+
+    const params = { dateStart, dateEnd };
+    
+    return this.makeCachedRequest(
+      'account_insights',
+      async () => {
+        console.log(`Buscando insights da conta ${this.selectedAccount!.id}...`);
+        
+        // Usar token de acesso se disponível, senão usar token do usuário
+        const accessToken = this.getAccessToken() || (this.user?.accessToken);
+        if (!accessToken) {
+          throw new Error('Token de acesso não disponível');
+        }
+
+        try {
+          console.log(`Buscando insights da conta ${this.selectedAccount!.id}...`);
+          
+          const response = await axios.get(
+            `${this.baseURL}/${this.selectedAccount!.id}/insights`,
+            {
+              params: {
+                access_token: accessToken,
+                fields: 'date_start,date_stop,impressions,clicks,spend,ctr,cpm,cpp,reach,frequency,actions,cost_per_action_type',
+                time_range: {
+                  since: dateStart,
+                  until: dateEnd
+                },
+                time_increment: 1, // Dados diários
+                limit: 1000 // Aumentar limite para pegar mais dados
+              }
+            }
+          );
+
+          console.log('Insights encontrados:', response.data);
+          return response.data.data || [];
+        } catch (error: any) {
+          console.error('Erro ao buscar insights:', error.response?.data || error.message);
+          throw new Error(`Erro ao buscar insights: ${error.response?.data?.error?.message || error.message}`);
+        }
+      },
+      this.CACHE_TTL.INSIGHTS,
+      params
+    );
+  }
+
   // Converter dados para formato do dashboard
-  convertToMetricData(insights: MetaAdsInsight[], month: string): any[] {
+  convertToMetricData(insights: MetaAdsInsight[], month: string, client?: string, product?: string, audience?: string): any[] {
     return insights.map(insight => {
       const leads = insight.actions?.find(action => 
         action.action_type === 'lead' || action.action_type === 'complete_registration'
@@ -648,6 +825,9 @@ class MetaAdsService {
         date: insight.date_start,
         month: month,
         service: 'Meta Ads',
+        client: client || 'Meta Ads',
+        product: product || 'Campanha Meta Ads',
+        audience: audience || 'Público Meta Ads',
         leads: leadsCount,
         revenue: estimatedRevenue,
         investment: investment,
@@ -667,7 +847,7 @@ class MetaAdsService {
   }
 
   // Sincronizar dados
-  async syncMetrics(month: string, startDate: string, endDate: string, campaignId?: string) {
+  async syncMetrics(month: string, startDate: string, endDate: string, campaignId?: string, client?: string, product?: string) {
     if (!this.isLoggedIn() || !this.hasSelectedAccount()) {
       throw new Error('Usuário não logado ou conta não selecionada');
     }
@@ -685,7 +865,7 @@ class MetaAdsService {
         insights = await this.getAccountInsights(startDate, endDate);
       }
       
-      const metrics = this.convertToMetricData(insights, month);
+      const metrics = this.convertToMetricData(insights, month, client, product);
       
       console.log(`Sincronizados ${metrics.length} registros do Meta Ads`);
       return metrics;
@@ -754,6 +934,22 @@ class MetaAdsService {
       console.log('Usuário não está logado');
       this.logout();
     }
+  }
+
+  // Métodos públicos para gerenciar cache
+  clearAllCache(): void {
+    this.clearCache();
+  }
+
+  clearCacheByType(type: string): void {
+    this.clearCache(type);
+  }
+
+  getCacheStats(): { size: number; keys: string[] } {
+    return {
+      size: this.cache.size,
+      keys: Array.from(this.cache.keys())
+    };
   }
 }
 

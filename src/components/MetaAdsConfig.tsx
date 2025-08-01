@@ -5,9 +5,10 @@ import { metricsService } from '../services/metricsService';
 
 interface MetaAdsConfigProps {
   onConfigSaved: () => void;
+  onDataSourceChange?: (source: 'manual' | 'facebook' | null, connected: boolean) => void;
 }
 
-const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
+const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSourceChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<FacebookUser | null>(null);
   const [businessManagers, setBusinessManagers] = useState<BusinessManager[]>([]);
@@ -19,6 +20,15 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
   const [step, setStep] = useState<'login' | 'selectBusiness' | 'selectAccount' | 'connected' | 'permissionsRequired' | 'tokenConfig'>('login');
   const [accessToken, setAccessToken] = useState('');
   const [tokenConfigured, setTokenConfigured] = useState(false);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [adSets, setAdSets] = useState<any[]>([]);
+  const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
+  const [selectedAdSet, setSelectedAdSet] = useState<any>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState('julho de 2023');
+  
+  // Estados para controlar origem dos dados
+  const [dataSource, setDataSource] = useState<'manual' | 'facebook' | null>(null);
+  const [isFacebookConnected, setIsFacebookConnected] = useState(false);
 
   useEffect(() => {
     // Verificar se já existe usuário salvo
@@ -28,6 +38,9 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
         const user = JSON.parse(savedUser);
         setUser(user);
         metaAdsService.setUser(user);
+        
+        // Configurar dados do Facebook automaticamente
+        setFacebookData();
         
         // Verificar status atual no Facebook
         checkLoginStatus();
@@ -51,6 +64,10 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
       setUser(user);
       metaAdsService.setUser(user);
       setStep('selectBusiness');
+      
+      // Configurar dados do Facebook automaticamente
+      setFacebookData();
+      
       loadBusinessManagers();
     };
 
@@ -119,6 +136,9 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
       
       setUser(user);
       setStep('selectBusiness');
+      
+      // Marcar que os dados são do Facebook
+      setFacebookData();
       
       // Tentar carregar Business Managers
       await loadBusinessManagers();
@@ -214,21 +234,284 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
   };
 
   const handleSelectAccount = (account: AdAccount) => {
-    metaAdsService.selectAdAccount(account);
     setSelectedAccount(account);
-    setStep('connected');
-    onConfigSaved();
-    setIsOpen(false);
+    metaAdsService.selectAdAccount(account);
+    
+    // Carregar campanhas da conta selecionada
+    loadCampaigns();
+  };
+
+  const loadCampaigns = async () => {
+    if (!selectedAccount) return;
+
+    try {
+      setIsLoading(true);
+      console.log('Carregando campanhas...');
+      
+      // Converter período para datas
+      const { startDate, endDate } = getPeriodDates(selectedPeriod);
+      
+      const campaignsData = await metaAdsService.getCampaigns(startDate, endDate);
+      setCampaigns(campaignsData);
+      
+      console.log('Campanhas carregadas:', campaignsData);
+    } catch (error: any) {
+      console.error('Erro ao carregar campanhas:', error);
+      alert(`Erro ao carregar campanhas: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadAdSets = async (campaignId?: string) => {
+    if (!selectedAccount) return;
+
+    try {
+      setIsLoading(true);
+      console.log('Carregando conjuntos de anúncios...');
+      
+      // Converter período para datas
+      const { startDate, endDate } = getPeriodDates(selectedPeriod);
+      
+      const adSetsData = await metaAdsService.getAdSets(campaignId, startDate, endDate);
+      setAdSets(adSetsData);
+      
+      console.log('Conjuntos de anúncios carregados:', adSetsData);
+    } catch (error: any) {
+      console.error('Erro ao carregar conjuntos de anúncios:', error);
+      alert(`Erro ao carregar conjuntos de anúncios: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSelectCampaign = (campaign: any) => {
+    setSelectedCampaign(campaign);
+    
+    // Carregar conjuntos de anúncios da campanha selecionada
+    loadAdSets(campaign.id);
+  };
+
+  const handleSelectAdSet = (adSet: any) => {
+    setSelectedAdSet(adSet);
+    
+    // Aqui você pode carregar as métricas específicas do conjunto de anúncios
+    loadAdSetMetrics(adSet.id);
+  };
+
+  const loadAdSetMetrics = async (adSetId: string) => {
+    try {
+      console.log('Carregando métricas do conjunto de anúncios...');
+      
+      // Converter período para datas
+      const { startDate, endDate } = getPeriodDates(selectedPeriod);
+      
+      const insights = await metaAdsService.getAdSetInsights(adSetId, startDate, endDate);
+      
+      // Aqui você pode processar os insights e atualizar as métricas do dashboard
+      console.log('Métricas carregadas:', insights);
+      
+      // Chamar callback para atualizar o dashboard
+      onConfigSaved();
+      
+    } catch (error: any) {
+      console.error('Erro ao carregar métricas:', error);
+      alert(`Erro ao carregar métricas: ${error.message}`);
+    }
+  };
+
+  const getPeriodDates = (period: string) => {
+    const now = new Date();
+    let startDate: string;
+    let endDate: string;
+
+    switch (period) {
+      case 'julho de 2023':
+        startDate = '2023-07-01';
+        endDate = '2023-07-31';
+        break;
+      case 'agosto de 2023':
+        startDate = '2023-08-01';
+        endDate = '2023-08-31';
+        break;
+      case 'setembro de 2023':
+        startDate = '2023-09-01';
+        endDate = '2023-09-30';
+        break;
+      case 'outubro de 2023':
+        startDate = '2023-10-01';
+        endDate = '2023-10-31';
+        break;
+      case 'novembro de 2023':
+        startDate = '2023-11-01';
+        endDate = '2023-11-30';
+        break;
+      case 'dezembro de 2023':
+        startDate = '2023-12-01';
+        endDate = '2023-12-31';
+        break;
+      case 'janeiro de 2024':
+        startDate = '2024-01-01';
+        endDate = '2024-01-31';
+        break;
+      case 'fevereiro de 2024':
+        startDate = '2024-02-01';
+        endDate = '2024-02-29';
+        break;
+      case 'março de 2024':
+        startDate = '2024-03-01';
+        endDate = '2024-03-31';
+        break;
+      case 'abril de 2024':
+        startDate = '2024-04-01';
+        endDate = '2024-04-30';
+        break;
+      case 'maio de 2024':
+        startDate = '2024-05-01';
+        endDate = '2024-05-31';
+        break;
+      case 'junho de 2024':
+        startDate = '2024-06-01';
+        endDate = '2024-06-30';
+        break;
+      case 'julho de 2024':
+        startDate = '2024-07-01';
+        endDate = '2024-07-31';
+        break;
+      case 'agosto de 2024':
+        startDate = '2024-08-01';
+        endDate = '2024-08-31';
+        break;
+      case 'setembro de 2024':
+        startDate = '2024-09-01';
+        endDate = '2024-09-30';
+        break;
+      case 'outubro de 2024':
+        startDate = '2024-10-01';
+        endDate = '2024-10-31';
+        break;
+      case 'novembro de 2024':
+        startDate = '2024-11-01';
+        endDate = '2024-11-30';
+        break;
+      case 'dezembro de 2024':
+        startDate = '2024-12-01';
+        endDate = '2024-12-31';
+        break;
+      case 'janeiro de 2025':
+        startDate = '2025-01-01';
+        endDate = '2025-01-31';
+        break;
+      case 'fevereiro de 2025':
+        startDate = '2025-02-01';
+        endDate = '2025-02-28';
+        break;
+      case 'março de 2025':
+        startDate = '2025-03-01';
+        endDate = '2025-03-31';
+        break;
+      case 'abril de 2025':
+        startDate = '2025-04-01';
+        endDate = '2025-04-30';
+        break;
+      case 'maio de 2025':
+        startDate = '2025-05-01';
+        endDate = '2025-05-31';
+        break;
+      case 'junho de 2025':
+        startDate = '2025-06-01';
+        endDate = '2025-06-30';
+        break;
+      case 'julho de 2025':
+        startDate = '2025-07-01';
+        endDate = '2025-07-31';
+        break;
+      default:
+        // Últimos 30 dias
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        startDate = thirtyDaysAgo.toISOString().split('T')[0];
+        endDate = now.toISOString().split('T')[0];
+    }
+
+    return { startDate, endDate };
   };
 
   const handleLogout = () => {
-    metaAdsService.logout();
+    console.log('Fazendo logout...');
+    
+    // Limpar dados do Facebook
     setUser(null);
     setSelectedAccount(null);
     setSelectedBusiness(null);
     setBusinessManagers([]);
     setAdAccounts([]);
+    setCampaigns([]);
+    setAdSets([]);
+    setSelectedCampaign(null);
+    setSelectedAdSet(null);
+    setIsFacebookConnected(false);
+    setDataSource(null);
+    
+    // Limpar dados locais
+    localStorage.removeItem('facebookUser');
+    localStorage.removeItem('selectedAdAccount');
+    
+    // Fazer logout do Facebook
+    metaAdsService.logout();
+    
+    // Voltar para tela de login
     setStep('login');
+  };
+
+  const clearFacebookData = () => {
+    console.log('Limpando dados do Facebook...');
+    
+    // Limpar apenas dados do Facebook, mantendo dados manuais
+    setUser(null);
+    setSelectedAccount(null);
+    setSelectedBusiness(null);
+    setBusinessManagers([]);
+    setAdAccounts([]);
+    setCampaigns([]);
+    setAdSets([]);
+    setSelectedCampaign(null);
+    setSelectedAdSet(null);
+    setIsFacebookConnected(false);
+    setDataSource(null);
+    
+    // Limpar dados locais
+    localStorage.removeItem('facebookUser');
+    localStorage.removeItem('selectedAdAccount');
+    
+    // Fazer logout do Facebook
+    metaAdsService.logout();
+  };
+
+  const setFacebookData = () => {
+    console.log('Configurando dados do Facebook...');
+    setDataSource('facebook');
+    setIsFacebookConnected(true);
+    
+    // Notificar mudança de origem dos dados
+    onDataSourceChange?.('facebook', true);
+    
+    // Limpar dados manuais se necessário
+    // Aqui você pode limpar dados manuais e carregar dados do Facebook
+  };
+
+  const setManualData = () => {
+    console.log('Configurando dados manuais...');
+    setDataSource('manual');
+    setIsFacebookConnected(false);
+    
+    // Notificar mudança de origem dos dados
+    onDataSourceChange?.('manual', false);
+    
+    // Limpar dados do Facebook
+    clearFacebookData();
+    
+    // Aqui você pode carregar dados manuais se existirem
+    // Por exemplo, dados salvos localmente ou de uma API própria
   };
 
   const syncData = async () => {

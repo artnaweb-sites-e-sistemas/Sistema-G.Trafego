@@ -5,7 +5,7 @@ interface NotificationButtonProps {
   selectedClient: string;
   selectedProduct: string;
   selectedAudience: string;
-  selectedCampaign: string;
+  selectedCampaign?: string;
 }
 
 const NotificationButton: React.FC<NotificationButtonProps> = ({
@@ -21,15 +21,13 @@ const NotificationButton: React.FC<NotificationButtonProps> = ({
   useEffect(() => {
     const hasSpecificSelections = selectedClient !== 'Todos os Clientes' || 
                                  selectedProduct !== 'Todos os Produtos' || 
-                                 selectedAudience !== 'Todos os Públicos' || 
-                                 selectedCampaign !== '';
+                                 selectedAudience !== 'Todos os Públicos';
     
     // Contar quantas seleções específicas existem
     let count = 0;
     if (selectedClient !== 'Todos os Clientes') count++;
     if (selectedProduct !== 'Todos os Produtos') count++;
     if (selectedAudience !== 'Todos os Públicos') count++;
-    if (selectedCampaign !== '') count++;
     
     setHasNotifications(hasSpecificSelections);
     setNotificationCount(count);

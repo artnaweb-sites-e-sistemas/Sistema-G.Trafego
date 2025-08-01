@@ -37,6 +37,71 @@ export interface MetricData {
 
 // Dados mockados para demonstração - Métricas vinculadas ao perfil do público
 const mockData: MetricData[] = [
+  // Dados para Maio 2023 (para teste)
+  {
+    id: 'maio-1',
+    date: '2023-05-15',
+    month: 'Maio 2023',
+    service: 'Meta Ads',
+    client: 'Cliente Teste',
+    product: 'Produto Teste',
+    audience: 'Público Teste',
+    leads: 25,
+    revenue: 5000,
+    investment: 1500,
+    impressions: 45000,
+    clicks: 800,
+    ctr: 1.78,
+    cpm: 33.33,
+    cpl: 60.00,
+    roas: 3.33,
+    roi: 233.33,
+    appointments: 15,
+    sales: 12,
+  },
+  {
+    id: 'maio-2',
+    date: '2023-05-20',
+    month: 'Maio 2023',
+    service: 'Meta Ads',
+    client: 'Cliente Teste',
+    product: 'Produto Teste',
+    audience: 'Público Teste',
+    leads: 30,
+    revenue: 6000,
+    investment: 1800,
+    impressions: 52000,
+    clicks: 950,
+    ctr: 1.83,
+    cpm: 34.62,
+    cpl: 60.00,
+    roas: 3.33,
+    roi: 233.33,
+    appointments: 18,
+    sales: 15,
+  },
+  {
+    id: 'maio-3',
+    date: '2023-05-25',
+    month: 'Maio 2023',
+    service: 'Meta Ads',
+    client: 'Cliente Teste',
+    product: 'Produto Teste',
+    audience: 'Público Teste',
+    leads: 35,
+    revenue: 7000,
+    investment: 2100,
+    impressions: 58000,
+    clicks: 1100,
+    ctr: 1.90,
+    cpm: 36.21,
+    cpl: 60.00,
+    roas: 3.33,
+    roi: 233.33,
+    appointments: 21,
+    sales: 18,
+  },
+  
   // Executivos 30-50 - Alto valor, menor volume, maior conversão
   {
     id: '1',
@@ -347,20 +412,123 @@ const mockData: MetricData[] = [
 ];
 
 export const metricsService = {
+  // Cache local para métricas
+  cache: new Map<string, { data: MetricData[]; timestamp: number; ttl: number }>(),
+  CACHE_TTL: 5 * 60 * 1000, // 5 minutos
+
+  getCacheKey(month: string, client: string, product: string, audience: string): string {
+    return `metrics_${month}_${client}_${product}_${audience}`;
+  },
+
+  getFromCache(key: string): MetricData[] | null {
+    const cached = this.cache.get(key);
+    if (!cached) return null;
+    
+    const now = Date.now();
+    if (now - cached.timestamp > cached.ttl) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    console.log(`Cache hit para métricas: ${key}`);
+    return cached.data;
+  },
+
+  setCache(key: string, data: MetricData[]): void {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl: this.CACHE_TTL
+    });
+    console.log(`Cache set para métricas: ${key}`);
+  },
+
   // Buscar métricas por mês e serviço
   async getMetrics(month: string, client: string = 'Todos os Clientes', product: string = 'Todos os Produtos', audience: string = 'Todos os Públicos', campaignId?: string) {
+    // Se não foi passado campaignId, tentar pegar do localStorage
+    if (!campaignId && product !== 'Todos os Produtos') {
+      const storedCampaignId = localStorage.getItem('selectedCampaignId');
+      if (storedCampaignId) {
+        campaignId = storedCampaignId;
+        console.log('Usando campaignId do localStorage:', campaignId);
+      }
+    }
+
+    // Se não foi passado adSetId, tentar pegar do localStorage
+    let adSetId: string | undefined;
+    if (audience !== 'Todos os Públicos') {
+      const storedAdSetId = localStorage.getItem('selectedAdSetId');
+      if (storedAdSetId) {
+        adSetId = storedAdSetId;
+        console.log('Usando adSetId do localStorage:', adSetId);
+      }
+    }
     try {
+      console.log(`Buscando métricas para: ${month}, Cliente: ${client}, Produto: ${product}, Público: ${audience}`);
+      
+      // Verificar cache primeiro
+      const cacheKey = this.getCacheKey(month, client, product, audience);
+      const cached = this.getFromCache(cacheKey);
+      if (cached) {
+        return cached;
+      }
+      
       // Verificar se Meta Ads está configurado e tentar sincronizar
       if (metaAdsService.isConfigured()) {
         try {
-          const today = new Date();
-          const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-          const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+          console.log('Meta Ads configurado, tentando sincronizar dados...');
+          
+          // Converter mês para formato de data
+          const monthMap: { [key: string]: number } = {
+            'Janeiro': 0, 'Fevereiro': 1, 'Março': 2, 'Abril': 3, 'Maio': 4, 'Junho': 5,
+            'Julho': 6, 'Agosto': 7, 'Setembro': 8, 'Outubro': 9, 'Novembro': 10, 'Dezembro': 11
+          };
+          
+          const [monthName, yearStr] = month.split(' ');
+          const monthIndex = monthMap[monthName] || 6;
+          const year = parseInt(yearStr) || 2023;
+          
+          const firstDayOfMonth = new Date(year, monthIndex, 1);
+          const lastDayOfMonth = new Date(year, monthIndex + 1, 0);
           
           const startDate = firstDayOfMonth.toISOString().split('T')[0];
           const endDate = lastDayOfMonth.toISOString().split('T')[0];
           
-          const metaAdsData = await metaAdsService.syncMetrics(month, startDate, endDate, campaignId);
+          console.log(`Sincronizando dados do Meta Ads para ${startDate} até ${endDate}`);
+          
+          // Se um cliente específico foi selecionado (Business Manager), buscar dados específicos
+          let metaAdsData;
+          if (client !== 'Todos os Clientes') {
+            console.log(`Buscando dados específicos para Business Manager: ${client}`);
+            
+            // Se há um Ad Set específico selecionado, buscar métricas do Ad Set
+            if (adSetId) {
+              console.log(`Buscando métricas específicas do Ad Set: ${adSetId}`);
+              const adSetInsights = await metaAdsService.getAdSetInsights(adSetId, startDate, endDate);
+              metaAdsData = metaAdsService.convertToMetricData(adSetInsights, month, client, product, audience);
+            } else {
+              // Passar client e product para o syncMetrics
+              metaAdsData = await metaAdsService.syncMetrics(month, startDate, endDate, campaignId, client, product);
+            }
+            
+            // Marcar dados como pertencentes à BM específica
+            metaAdsData = metaAdsData.map(metric => ({
+              ...metric,
+              client: client, // Usar o nome da BM como cliente
+              businessManager: client
+            }));
+          } else {
+            // Se há um Ad Set específico selecionado, buscar métricas do Ad Set
+            if (adSetId) {
+              console.log(`Buscando métricas específicas do Ad Set: ${adSetId}`);
+              const adSetInsights = await metaAdsService.getAdSetInsights(adSetId, startDate, endDate);
+              metaAdsData = metaAdsService.convertToMetricData(adSetInsights, month, client, product, audience);
+            } else {
+              metaAdsData = await metaAdsService.syncMetrics(month, startDate, endDate, campaignId, client, product);
+            }
+          }
+          
+          console.log(`Dados do Meta Ads sincronizados: ${metaAdsData.length} registros`);
           
           // Salvar no Firebase se possível
           for (const metric of metaAdsData) {
@@ -371,7 +539,27 @@ export const metricsService = {
             }
           }
           
-          return metaAdsData;
+          // Filtrar dados por cliente, produto e público se necessário
+          let filteredData = metaAdsData;
+          
+          if (client !== 'Todos os Clientes') {
+            filteredData = filteredData.filter(item => item.client === client);
+          }
+
+          if (product !== 'Todos os Produtos') {
+            filteredData = filteredData.filter(item => item.product === product);
+          }
+
+          if (audience !== 'Todos os Públicos') {
+            filteredData = filteredData.filter(item => item.audience === audience);
+          }
+          
+          console.log(`Dados filtrados: ${filteredData.length} registros`);
+          
+          // Salvar no cache
+          this.setCache(cacheKey, filteredData);
+          return filteredData;
+          
         } catch (error: any) {
           console.warn('Erro ao sincronizar Meta Ads, usando dados mockados:', error.message);
           // Continue para usar dados mockados
@@ -380,6 +568,7 @@ export const metricsService = {
 
       // Tentar buscar do Firebase primeiro (com tratamento de erro para índices)
       try {
+        console.log('Tentando buscar dados do Firebase...');
         const metricsRef = collection(db, 'metrics');
         let q = query(
           metricsRef, 
@@ -387,17 +576,35 @@ export const metricsService = {
           orderBy('date', 'desc')
         );
 
-
-
         const snapshot = await getDocs(q);
         const firebaseData = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as MetricData[];
 
-        // Se há dados no Firebase, retorna eles
+        console.log(`Dados do Firebase encontrados: ${firebaseData.length} registros`);
+
+        // Se há dados no Firebase, filtrar e retornar
         if (firebaseData.length > 0) {
-          return firebaseData;
+          let filteredData = firebaseData;
+          
+          if (client !== 'Todos os Clientes') {
+            filteredData = filteredData.filter(item => item.client === client);
+          }
+
+          if (product !== 'Todos os Produtos') {
+            filteredData = filteredData.filter(item => item.product === product);
+          }
+
+          if (audience !== 'Todos os Públicos') {
+            filteredData = filteredData.filter(item => item.audience === audience);
+          }
+          
+          console.log(`Dados do Firebase filtrados: ${filteredData.length} registros`);
+          
+          // Salvar no cache
+          this.setCache(cacheKey, filteredData);
+          return filteredData;
         }
       } catch (firebaseError: any) {
         console.warn('Erro na consulta Firebase (possível problema de índice):', firebaseError.message);
@@ -405,6 +612,7 @@ export const metricsService = {
       }
 
       // Caso contrário, retorna dados mockados
+      console.log('Usando dados mockados...');
       let filteredData = mockData.filter(item => item.month === month);
       
       if (client !== 'Todos os Clientes') {
@@ -425,6 +633,10 @@ export const metricsService = {
         service: item.service || 'Desconhecido'
       }));
 
+      console.log(`Dados mockados filtrados: ${filteredData.length} registros`);
+      
+      // Salvar no cache
+      this.setCache(cacheKey, filteredData);
       return filteredData;
 
     } catch (error: any) {

@@ -1,14 +1,22 @@
 import React from 'react';
-import { Settings, User, Search, LogOut } from 'lucide-react';
+import { Settings, User, Search, LogOut, Facebook, Database } from 'lucide-react';
 import MetaAdsConfig from './MetaAdsConfig';
 import ShareReport from './ShareReport';
 import MonthYearPicker from './MonthYearPicker';
 import ClientPicker from './ClientPicker';
 import ProductPicker from './ProductPicker';
 import AudiencePicker from './AudiencePicker';
-import AdCampaignPicker from './AdCampaignPicker';
+
 import NotificationButton from './NotificationButton';
-import { User as UserType } from '../services/authService';
+
+export interface UserType {
+  uid: string;
+  email: string;
+  name: string;
+  role: string;
+  photoURL?: string;
+  createdAt: Date;
+}
 
 interface HeaderProps {
   selectedMonth: string;
@@ -19,11 +27,12 @@ interface HeaderProps {
   setSelectedProduct: (product: string) => void;
   selectedAudience: string;
   setSelectedAudience: (audience: string) => void;
-  selectedCampaign: string;
-  setSelectedCampaign: (campaign: string) => void;
   onMetaAdsSync: () => void;
   currentUser: UserType | null;
   onLogout: () => void;
+  dataSource?: 'manual' | 'facebook' | null;
+  isFacebookConnected?: boolean;
+  onDataSourceChange?: (source: 'manual' | 'facebook' | null, connected: boolean) => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -35,11 +44,12 @@ const Header: React.FC<HeaderProps> = ({
   setSelectedProduct,
   selectedAudience,
   setSelectedAudience,
-  selectedCampaign,
-  setSelectedCampaign,
   onMetaAdsSync,
-  currentUser,
-  onLogout
+  currentUser, 
+  onLogout,
+  dataSource,
+  isFacebookConnected,
+  onDataSourceChange
 }) => {
   return (
     <header className="bg-gradient-to-r from-gray-900 to-gray-800 border-b border-gray-700/50 shadow-lg">
@@ -59,7 +69,7 @@ const Header: React.FC<HeaderProps> = ({
               <p className="text-xs text-gray-400 -mt-1">G. Tráfego Analytics</p>
             </div>
           </div>
-
+          
           {/* User Section */}
           <div className="flex items-center space-x-3">
             <div className="flex items-center space-x-2">
@@ -70,7 +80,6 @@ const Header: React.FC<HeaderProps> = ({
                 selectedClient={selectedClient}
                 selectedProduct={selectedProduct}
                 selectedAudience={selectedAudience}
-                selectedCampaign={selectedCampaign}
               />
               <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-all duration-200 group">
                 <Settings className="w-4 h-4 group-hover:scale-110 transition-transform" />
@@ -78,12 +87,12 @@ const Header: React.FC<HeaderProps> = ({
             </div>
 
             <div className="h-6 w-px bg-gray-600"></div>
-
+            
             <div className="flex items-center space-x-3 bg-gray-800/50 rounded-lg px-3 py-2 border border-gray-700/50">
               {currentUser?.photoURL ? (
                 <img 
                   src={currentUser.photoURL} 
-                  alt={currentUser.name}
+                  alt={currentUser.name} 
                   className="w-8 h-8 rounded-full object-cover"
                 />
               ) : (
@@ -120,6 +129,7 @@ const Header: React.FC<HeaderProps> = ({
               <ClientPicker 
                 selectedClient={selectedClient}
                 setSelectedClient={setSelectedClient}
+                dataSource={dataSource}
               />
             </div>
 
@@ -128,6 +138,8 @@ const Header: React.FC<HeaderProps> = ({
                 selectedProduct={selectedProduct}
                 setSelectedProduct={setSelectedProduct}
                 selectedClient={selectedClient}
+                dataSource={dataSource}
+                selectedMonth={selectedMonth}
               />
             </div>
 
@@ -137,18 +149,18 @@ const Header: React.FC<HeaderProps> = ({
                 setSelectedAudience={setSelectedAudience}
                 selectedProduct={selectedProduct}
                 selectedClient={selectedClient}
+                dataSource={dataSource}
+                selectedMonth={selectedMonth}
               />
             </div>
 
-            <div className="bg-gray-800/50 rounded-lg border border-gray-700/50 p-1">
-              <AdCampaignPicker 
-                selectedCampaign={selectedCampaign}
-                setSelectedCampaign={setSelectedCampaign}
-              />
-            </div>
+
 
             <div className="bg-gray-800/50 rounded-lg border border-gray-700/50 p-1">
-              <MetaAdsConfig onConfigSaved={onMetaAdsSync} />
+              <MetaAdsConfig 
+                onConfigSaved={onMetaAdsSync} 
+                onDataSourceChange={onDataSourceChange}
+              />
             </div>
 
             <div className="bg-gray-800/50 rounded-lg border border-gray-700/50 p-1">

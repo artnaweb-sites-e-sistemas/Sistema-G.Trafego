@@ -66,7 +66,7 @@ const AdCampaignPicker: React.FC<AdCampaignPickerProps> = ({
       <button
         onClick={() => isConnected && setIsOpen(!isOpen)}
         disabled={!isConnected || loading}
-        className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 min-w-[180px] ${
+        className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 w-[200px] ${
           isConnected 
             ? 'bg-gray-700 hover:bg-gray-600 text-white border border-gray-600 hover:border-gray-500' 
             : 'bg-gray-800 text-gray-500 border border-gray-700 cursor-not-allowed'

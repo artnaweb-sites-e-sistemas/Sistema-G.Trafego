@@ -5,9 +5,14 @@ import { MetricData } from '../services/metricsService';
 interface DailyControlTableProps {
   metrics: MetricData[];
   selectedCampaign?: string;
+  selectedMonth?: string;
 }
 
-const DailyControlTable: React.FC<DailyControlTableProps> = ({ metrics, selectedCampaign }) => {
+const DailyControlTable: React.FC<DailyControlTableProps> = ({ 
+  metrics, 
+  selectedCampaign,
+  selectedMonth = 'Julho 2023'
+}) => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -17,9 +22,24 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({ metrics, selected
 
   const generateDailyData = () => {
     const data: any[] = [];
-    const startDate = new Date(2023, 6, 1); // July 1, 2023
     
-    for (let i = 0; i < 31; i++) {
+    // Determinar o mês e ano baseado no selectedMonth
+    const monthMap: { [key: string]: number } = {
+      'Janeiro': 0, 'Fevereiro': 1, 'Março': 2, 'Abril': 3, 'Maio': 4, 'Junho': 5,
+      'Julho': 6, 'Agosto': 7, 'Setembro': 8, 'Outubro': 9, 'Novembro': 10, 'Dezembro': 11
+    };
+    
+    const [monthName, yearStr] = selectedMonth.split(' ');
+    const month = monthMap[monthName] || 6; // Default para Julho
+    const year = parseInt(yearStr) || 2023;
+    
+    // Criar data de início do mês
+    const startDate = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    console.log(`Gerando dados para ${selectedMonth}: ${daysInMonth} dias`);
+    
+    for (let i = 0; i < daysInMonth; i++) {
       const currentDate = new Date(startDate);
       currentDate.setDate(startDate.getDate() + i);
       
@@ -29,6 +49,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({ metrics, selected
       
       data.push({
         date: `${dayStr}/${monthStr}/${yearStr}`,
+        dateISO: currentDate.toISOString().split('T')[0], // Para comparação
         investment: formatCurrency(0),
         impressions: 0,
         clicks: 0,
@@ -40,23 +61,30 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({ metrics, selected
       });
     }
     
-    // Add data from Firebase metrics
+    // Adicionar dados das métricas do Meta Ads
+    console.log(`Filtrando ${metrics.length} métricas para ${selectedMonth}`);
+    
     metrics.forEach(metric => {
-      const metricDate = new Date(metric.date);
-      const dayIndex = metricDate.getDate() - 1;
-      
-      if (dayIndex >= 0 && dayIndex < data.length) {
-        data[dayIndex] = {
-          ...data[dayIndex],
-          investment: formatCurrency(metric.investment),
-          impressions: metric.impressions,
-          clicks: metric.clicks,
-          cpm: formatCurrency(metric.cpm),
-          ctr: `${metric.ctr.toFixed(2)}%`,
-          leads: metric.leads,
-          cpl: formatCurrency(metric.cpl),
-          status: metric.investment > 0 ? 'Ativo' : 'Inativo'
-        };
+      // Verificar se a métrica pertence ao mês selecionado
+      if (metric.month === selectedMonth) {
+        const metricDate = new Date(metric.date);
+        const dayIndex = metricDate.getDate() - 1;
+        
+        console.log(`Métrica encontrada para ${metric.date}: investimento ${metric.investment}`);
+        
+        if (dayIndex >= 0 && dayIndex < data.length) {
+          data[dayIndex] = {
+            ...data[dayIndex],
+            investment: formatCurrency(metric.investment),
+            impressions: metric.impressions,
+            clicks: metric.clicks,
+            cpm: formatCurrency(metric.cpm),
+            ctr: `${metric.ctr.toFixed(2)}%`,
+            leads: metric.leads,
+            cpl: formatCurrency(metric.cpl),
+            status: metric.investment > 0 ? 'Ativo' : 'Inativo'
+          };
+        }
       }
     });
     
@@ -65,16 +93,21 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({ metrics, selected
       console.log(`Exibindo dados específicos da campanha: ${selectedCampaign}`);
     }
     
-    // Add some sample active days if no data
+    // Adicionar alguns dados de exemplo se não houver dados reais
     if (metrics.length === 0) {
-      data[16].investment = formatCurrency(1.74);
-    data[16].impressions = 66;
-    data[16].clicks = 1;
-      data[16].cpm = formatCurrency(1.74);
-    data[16].ctr = '1,52%';
-    data[16].leads = 0;
-      data[16].cpl = formatCurrency(0);
-    data[16].status = 'Ativo';
+      console.log('Nenhuma métrica encontrada, usando dados de exemplo');
+      // Adicionar dados de exemplo no meio do mês
+      const middleDay = Math.floor(data.length / 2);
+      if (data[middleDay]) {
+        data[middleDay].investment = formatCurrency(1.74);
+        data[middleDay].impressions = 66;
+        data[middleDay].clicks = 1;
+        data[middleDay].cpm = formatCurrency(1.74);
+        data[middleDay].ctr = '1,52%';
+        data[middleDay].leads = 0;
+        data[middleDay].cpl = formatCurrency(0);
+        data[middleDay].status = 'Ativo';
+      }
     }
     
     return data;
@@ -87,10 +120,15 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({ metrics, selected
       <div className="p-6 border-b border-gray-700">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-white">Controle Diário (Julho/2023)</h2>
+            <h2 className="text-xl font-semibold text-white">Controle Diário ({selectedMonth})</h2>
             {selectedCampaign && (
               <p className="text-sm text-gray-400 mt-1">
                 Anúncio selecionado: {selectedCampaign}
+              </p>
+            )}
+            {metrics.length > 0 && (
+              <p className="text-sm text-green-400 mt-1">
+                ✓ {metrics.length} registros carregados do Meta Ads
               </p>
             )}
           </div>

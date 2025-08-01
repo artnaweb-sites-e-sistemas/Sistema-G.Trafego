@@ -22,6 +22,14 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
     'jul', 'ago', 'set', 'out', 'nov', 'dez'
   ];
 
+  // Função para obter o mês atual formatado
+  const getCurrentMonthString = () => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+    return `${months[currentMonth]} ${currentYear}`;
+  };
+
   // Parse current selected month string to get year and month
   useEffect(() => {
     const currentDate = new Date();
@@ -38,13 +46,30 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
       if (monthIndex !== -1) {
         setSelectedMonthIndex(monthIndex);
         setSelectedYear(year);
+      } else {
+        // Fallback to current date
+        setSelectedMonthIndex(currentMonth);
+        setSelectedYear(currentYear);
+        // Atualizar o selectedMonth para o mês atual se não conseguir fazer parse
+        setSelectedMonth(getCurrentMonthString());
       }
     } else {
       // Fallback to current date
       setSelectedMonthIndex(currentMonth);
       setSelectedYear(currentYear);
+      // Atualizar o selectedMonth para o mês atual se não conseguir fazer parse
+      setSelectedMonth(getCurrentMonthString());
     }
   }, [selectedMonth, months]);
+
+  // Inicializar com mês atual se selectedMonth estiver vazio ou inválido
+  useEffect(() => {
+    if (!selectedMonth || selectedMonth === '') {
+      const currentMonthString = getCurrentMonthString();
+      setSelectedMonth(currentMonthString);
+      console.log('MonthYearPicker: Inicializando com mês atual:', currentMonthString);
+    }
+  }, []);
 
   // Close picker when clicking outside
   useEffect(() => {
@@ -75,14 +100,17 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
 
 
   const handleThisMonth = () => {
+    const currentMonthString = getCurrentMonthString();
     const currentDate = new Date();
     const newYear = currentDate.getFullYear();
     const newMonthIndex = currentDate.getMonth();
+    
     setSelectedYear(newYear);
     setSelectedMonthIndex(newMonthIndex);
-    const newMonthString = `${months[newMonthIndex]} ${newYear}`;
-    setSelectedMonth(newMonthString);
+    setSelectedMonth(currentMonthString);
     setIsOpen(false);
+    
+    console.log('MonthYearPicker: Voltando para mês atual:', currentMonthString);
   };
 
   const formatDisplayMonth = () => {
@@ -150,8 +178,8 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
         })()}
       >
         <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-        <div className="bg-gray-700 text-white pl-10 pr-4 py-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none min-w-[200px]">
-          {formatDisplayMonth()}
+        <div className="bg-gray-700 text-white pl-10 pr-4 py-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none w-[220px]">
+          <span className="truncate block">{formatDisplayMonth()}</span>
         </div>
         
         {/* Indicador de Status */}
