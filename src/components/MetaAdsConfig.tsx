@@ -79,20 +79,57 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
     try {
       console.log('Iniciando login do Facebook...');
       
-      // Usar a função global checkLoginState
-      if (typeof window !== 'undefined' && (window as any).checkLoginState) {
-        (window as any).checkLoginState();
+      // Chamar FB.login() diretamente
+      if (typeof window !== 'undefined' && window.FB) {
+        window.FB.login((response: any) => {
+          console.log('Resposta do FB.login:', response);
+          
+          if (response.authResponse) {
+            console.log('Login bem-sucedido!');
+            const { accessToken, userID } = response.authResponse;
+            
+            // Buscar dados do usuário
+            window.FB.api('/me', { fields: 'name,email' }, (userInfo: any) => {
+              if (userInfo.error) {
+                console.error('Erro ao buscar dados do usuário:', userInfo.error);
+                alert('Erro ao buscar dados do usuário');
+                setIsLoading(false);
+                return;
+              }
+              
+              const user = {
+                id: userID,
+                name: userInfo.name,
+                email: userInfo.email,
+                accessToken: accessToken
+              };
+              
+              console.log('Dados do usuário:', user);
+              setUser(user);
+              metaAdsService.setUser(user);
+              localStorage.setItem('facebookUser', JSON.stringify(user));
+              
+              // Tentar carregar contas de anúncios
+              setStep('selectBusiness');
+              loadBusinessManagers();
+              setIsLoading(false);
+            });
+          } else {
+            console.log('Login falhou ou foi cancelado');
+            alert('Login falhou ou foi cancelado');
+            setIsLoading(false);
+          }
+        }, { 
+          scope: 'email,public_profile',
+          return_scopes: true,
+          auth_type: 'rerequest'
+        });
       } else {
-        // Fallback para o método anterior
-        const loggedUser = await metaAdsService.loginWithAdsPermissions();
-        setUser(loggedUser);
-        setStep('selectBusiness');
-        await loadBusinessManagers();
+        throw new Error('Facebook SDK não está disponível');
       }
     } catch (error: any) {
       console.error('Erro no login:', error);
       alert(`Erro no login: ${error.message}`);
-    } finally {
       setIsLoading(false);
     }
   };

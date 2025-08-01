@@ -8,12 +8,17 @@
     <script async defer crossorigin="anonymous" src="https://connect.facebook.net/pt_BR/sdk.js"></script>
     <script>
       window.fbAsyncInit = function() {
+        console.log('Facebook SDK carregado, inicializando...');
         FB.init({
           appId      : '1829212554641028',
           cookie     : true,
           xfbml      : true,
           version    : 'v18.0'
         });
+        
+        console.log('Facebook SDK inicializado com sucesso!');
+        console.log('App ID:', '1829212554641028');
+        console.log('Versão:', 'v18.0');
           
         FB.AppEvents.logPageView();
         
@@ -22,6 +27,8 @@
           console.log('Status de login na inicialização:', response);
           if (response.status === 'connected') {
             console.log('Usuário já está logado:', response.authResponse);
+          } else {
+            console.log('Usuário não está logado. Status:', response.status);
           }
         });
           
@@ -30,10 +37,14 @@
       // Função callback para verificar estado do login
       function checkLoginState() {
         console.log('checkLoginState chamado');
-        FB.getLoginStatus(function(response) {
-          console.log('Resposta do checkLoginState:', response);
-          statusChangeCallback(response);
-        });
+        if (typeof FB !== 'undefined') {
+          FB.getLoginStatus(function(response) {
+            console.log('Resposta do checkLoginState:', response);
+            statusChangeCallback(response);
+          });
+        } else {
+          console.error('Facebook SDK não está disponível em checkLoginState');
+        }
       }
 
       // Função para processar mudanças de status
@@ -88,6 +99,7 @@
          js = d.createElement(s); js.id = id;
          js.src = "https://connect.facebook.net/pt_BR/sdk.js";
          fjs.parentNode.insertBefore(js, fjs);
+         console.log('Script do Facebook SDK carregado');
        }(document, 'script', 'facebook-jssdk'));
     </script>
   </head>
