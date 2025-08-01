@@ -170,13 +170,13 @@ class MetaAdsService {
       // Fazer logout primeiro para limpar permissões anteriores
       window.FB.logout();
 
-      // Login solicitando permissões de anúncios
+      // Login solicitando apenas permissões básicas (que não precisam de App Review)
       window.FB.login((response: any) => {
-        console.log('Resposta do FB.login com permissões de anúncios:', response);
+        console.log('Resposta do FB.login com permissões básicas:', response);
         
         if (response.authResponse) {
           const { accessToken, userID } = response.authResponse;
-          console.log('Login com permissões de anúncios bem-sucedido, userID:', userID);
+          console.log('Login com permissões básicas bem-sucedido, userID:', userID);
           
           // Buscar dados do usuário
           window.FB.api('/me', { fields: 'name,email' }, (userInfo: any) => {
@@ -200,7 +200,7 @@ class MetaAdsService {
             resolve(user);
           });
         } else {
-          console.error('Login com permissões de anúncios falhou:', response);
+          console.error('Login com permissões básicas falhou:', response);
           if (response.status === 'not_authorized') {
             reject(new Error('Login não autorizado. Verifique se você concedeu as permissões necessárias.'));
           } else {
@@ -208,7 +208,7 @@ class MetaAdsService {
           }
         }
       }, { 
-        scope: 'email,public_profile,ads_read,ads_management',
+        scope: 'email,public_profile,pages_show_list,pages_read_engagement',
         return_scopes: true,
         auth_type: 'rerequest',
         redirect_uri: 'https://gtrafego.artnawebsite.com.br/'
