@@ -8,12 +8,19 @@ export interface FacebookUser {
   accessToken: string;
 }
 
+export interface BusinessManager {
+  id: string;
+  name: string;
+  account_type: string;
+}
+
 export interface AdAccount {
   id: string;
   name: string;
   account_id: string;
   account_status: number;
   currency: string;
+  business_id?: string;
 }
 
 export interface MetaAdsInsight {
@@ -203,13 +210,113 @@ class MetaAdsService {
     return false;
   }
 
-  // Buscar contas de anúncios do usuário
-  async getAdAccounts(): Promise<AdAccount[]> {
+  // Verificar permissões do usuário
+  async checkUserPermissions(): Promise<string[]> {
+    if (!this.user) {
+      throw new Error('Usuário não está logado.');
+    }
+
+    try {
+      const response = await axios.get(
+        `${this.baseURL}/me/permissions`,
+        {
+          params: {
+            access_token: this.user.accessToken
+          }
+        }
+      );
+
+      console.log('Permissões do usuário:', response.data);
+      return response.data.data.map((perm: any) => perm.permission);
+    } catch (error: any) {
+      console.error('Erro ao verificar permissões:', error);
+      return [];
+    }
+  }
+
+  // Buscar Business Managers do usuário
+  async getBusinessManagers(): Promise<BusinessManager[]> {
     if (!this.user) {
       throw new Error('Usuário não está logado. Faça login primeiro.');
     }
 
     try {
+      console.log('Buscando Business Managers...');
+      
+      const response = await axios.get(
+        `${this.baseURL}/me/businesses`,
+        {
+          params: {
+            access_token: this.user.accessToken,
+            fields: 'id,name,account_type'
+          }
+        }
+      );
+
+      console.log('Business Managers encontrados:', response.data);
+      return response.data.data || [];
+    } catch (error: any) {
+      console.error('Erro ao buscar Business Managers:', error.response?.data || error.message);
+      // Se não conseguir buscar Business Managers, retorna array vazio
+      return [];
+    }
+  }
+
+  // Buscar contas de anúncios de um Business Manager específico
+  async getAdAccountsByBusiness(businessId: string): Promise<AdAccount[]> {
+    if (!this.user) {
+      throw new Error('Usuário não está logado. Faça login primeiro.');
+    }
+
+    try {
+      console.log(`Buscando contas de anúncios do Business Manager ${businessId}...`);
+      
+      const response = await axios.get(
+        `${this.baseURL}/${businessId}/adaccounts`,
+        {
+          params: {
+            access_token: this.user.accessToken,
+            fields: 'id,name,account_id,account_status,currency'
+          }
+        }
+      );
+
+      console.log('Resposta da API:', response.data);
+
+      if (response.data.error) {
+        throw new Error(`Erro da API do Facebook: ${response.data.error.message}`);
+      }
+
+      const accounts = response.data.data.filter((account: AdAccount) => 
+        account.account_status === 1 // Apenas contas ativas
+      );
+
+      console.log('Contas de anúncios encontradas:', accounts);
+      return accounts;
+    } catch (error: any) {
+      console.error('Erro ao buscar contas de anúncios:', error.response?.data || error.message);
+      throw new Error(`Erro ao buscar contas: ${error.response?.data?.error?.message || error.message}`);
+    }
+  }
+
+  // Buscar contas de anúncios do usuário (método original - mantido para compatibilidade)
+  async getAdAccounts(): Promise<AdAccount[]> {
+    if (!this.user) {
+      throw new Error('Usuário não está logado. Faça login primeiro.');
+    }
+
+    // Primeiro verificar permissões
+    const permissions = await this.checkUserPermissions();
+    console.log('Permissões atuais:', permissions);
+
+    if (!permissions.includes('ads_read')) {
+      throw new Error('Permissão ads_read não concedida. É necessário conceder permissão para acessar contas de anúncios.');
+    }
+
+    try {
+      console.log('Buscando contas de anúncios...');
+      console.log('Access Token:', this.user.accessToken.substring(0, 20) + '...');
+      
       const response = await axios.get(
         `${this.baseURL}/me/adaccounts`,
         {
@@ -219,6 +326,8 @@ class MetaAdsService {
           }
         }
       );
+
+      console.log('Resposta da API:', response.data);
 
       if (response.data.error) {
         throw new Error(`Erro da API do Facebook: ${response.data.error.message}`);
@@ -232,6 +341,7 @@ class MetaAdsService {
         throw new Error('Nenhuma conta de anúncios ativa encontrada. Verifique se você tem acesso a contas de anúncios.');
       }
 
+      console.log('Contas de anúncios encontradas:', accounts);
       return accounts;
     } catch (error: any) {
       if (error.response?.data?.error?.code === 190) {

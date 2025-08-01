@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, CheckCircle, XCircle, RefreshCw, User, LogOut, Building } from 'lucide-react';
-import { metaAdsService, FacebookUser, AdAccount } from '../services/metaAdsService';
+import { metaAdsService, FacebookUser, AdAccount, BusinessManager } from '../services/metaAdsService';
 import { metricsService } from '../services/metricsService';
 
 interface MetaAdsConfigProps {
   onConfigSaved: () => void;
-  selectedCampaign?: string;
 }
 
-const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, selectedCampaign }) => {
+const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<FacebookUser | null>(null);
+  const [businessManagers, setBusinessManagers] = useState<BusinessManager[]>([]);
   const [adAccounts, setAdAccounts] = useState<AdAccount[]>([]);
+  const [selectedBusiness, setSelectedBusiness] = useState<BusinessManager | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<AdAccount | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [step, setStep] = useState<'login' | 'selectAccount' | 'connected'>('login');
+  const [step, setStep] = useState<'login' | 'selectBusiness' | 'selectAccount' | 'connected'>('login');
 
   useEffect(() => {
     // Inicializar Facebook SDK
@@ -28,8 +29,8 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, selectedCa
         setSelectedAccount(metaAdsService.getSelectedAccount());
         setStep('connected');
       } else {
-        setStep('selectAccount');
-        loadAdAccounts();
+        setStep('selectBusiness');
+        loadBusinessManagers();
       }
     }
   }, []);
@@ -39,8 +40,8 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, selectedCa
     try {
       const loggedUser = await metaAdsService.loginWithFacebook();
       setUser(loggedUser);
-      setStep('selectAccount');
-      await loadAdAccounts();
+      setStep('selectBusiness');
+      await loadBusinessManagers();
     } catch (error: any) {
       alert(`Erro no login: ${error.message}`);
     } finally {
@@ -48,16 +49,49 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, selectedCa
     }
   };
 
-  const loadAdAccounts = async () => {
+  const loadBusinessManagers = async () => {
     setIsLoading(true);
     try {
-      const accounts = await metaAdsService.getAdAccounts();
+      const businesses = await metaAdsService.getBusinessManagers();
+      setBusinessManagers(businesses);
+      
+      // Se não há Business Managers, tentar buscar contas de anúncios diretamente
+      if (businesses.length === 0) {
+        console.log('Nenhum Business Manager encontrado, tentando buscar contas diretamente...');
+        await loadAdAccounts();
+      }
+    } catch (error: any) {
+      console.warn('Erro ao buscar Business Managers:', error.message);
+      // Se falhar, tentar buscar contas de anúncios diretamente
+      await loadAdAccounts();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadAdAccounts = async (businessId?: string) => {
+    setIsLoading(true);
+    try {
+      let accounts: AdAccount[];
+      
+      if (businessId) {
+        accounts = await metaAdsService.getAdAccountsByBusiness(businessId);
+      } else {
+        accounts = await metaAdsService.getAdAccounts();
+      }
+      
       setAdAccounts(accounts);
+      setStep('selectAccount');
     } catch (error: any) {
       alert(`Erro ao carregar contas: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSelectBusiness = async (business: BusinessManager) => {
+    setSelectedBusiness(business);
+    await loadAdAccounts(business.id);
   };
 
   const handleSelectAccount = (account: AdAccount) => {
@@ -72,6 +106,8 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, selectedCa
     metaAdsService.logout();
     setUser(null);
     setSelectedAccount(null);
+    setSelectedBusiness(null);
+    setBusinessManagers([]);
     setAdAccounts([]);
     setStep('login');
   };
@@ -82,7 +118,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, selectedCa
       const today = new Date();
       const month = today.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
       
-      const result = await metricsService.syncMetaAdsData(month, selectedCampaign);
+      const result = await metricsService.syncMetaAdsData(month);
       alert(result.message);
       onConfigSaved();
     } catch (error: any) {
@@ -161,7 +197,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, selectedCa
               </div>
             )}
 
-            {step === 'selectAccount' && (
+            {step === 'selectBusiness' && (
               <div className="space-y-4">
                 <div className="flex items-center space-x-3 mb-4">
                   <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
@@ -169,6 +205,61 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, selectedCa
                   </div>
                   <div>
                     <h3 className="text-white font-medium">Olá, {user?.name}!</h3>
+                    <p className="text-gray-400 text-sm">Selecione um Business Manager</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <RefreshCw className="w-6 h-6 animate-spin text-blue-400" />
+                    </div>
+                  ) : businessManagers.length > 0 ? (
+                    businessManagers.map((business) => (
+                      <button
+                        key={business.id}
+                        onClick={() => handleSelectBusiness(business)}
+                        className="w-full bg-gray-700 hover:bg-gray-600 text-left p-3 rounded-lg transition-colors"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <Building className="w-5 h-5 text-blue-400" />
+                          <div>
+                            <div className="text-white font-medium">{business.name}</div>
+                            <div className="text-gray-400 text-sm">
+                              ID: {business.id} • {business.account_type}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-gray-400">Nenhum Business Manager encontrado</p>
+                      <p className="text-gray-500 text-sm mt-2">Buscando contas de anúncios diretamente...</p>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={handleLogout}
+                  className="w-full bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Trocar Conta</span>
+                </button>
+              </div>
+            )}
+
+            {step === 'selectAccount' && (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
+                    <CheckCircle className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-medium">
+                      {selectedBusiness ? `${selectedBusiness.name}` : 'Contas de Anúncios'}
+                    </h3>
                     <p className="text-gray-400 text-sm">Selecione uma conta de anúncios</p>
                   </div>
                 </div>
@@ -204,8 +295,16 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, selectedCa
                 </div>
 
                 <button
-                  onClick={handleLogout}
+                  onClick={() => setStep('selectBusiness')}
                   className="w-full bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
+                >
+                  <Building className="w-4 h-4" />
+                  <span>Voltar aos Business Managers</span>
+                </button>
+
+                <button
+                  onClick={handleLogout}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Trocar Conta</span>
@@ -242,7 +341,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, selectedCa
                   </button>
 
                   <button
-                    onClick={() => setStep('selectAccount')}
+                    onClick={() => setStep('selectBusiness')}
                     className="w-full bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
                   >
                     <Building className="w-4 h-4" />
