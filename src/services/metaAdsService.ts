@@ -60,23 +60,30 @@ class MetaAdsService {
   // Inicializar Facebook SDK
   initFacebookSDK(): Promise<void> {
     return new Promise((resolve) => {
+      console.log('Inicializando Facebook SDK...');
+      
       if (typeof window !== 'undefined' && window.FB) {
+        console.log('Facebook SDK já carregado');
         window.FB.init({
           appId: this.appId,
           cookie: true,
           xfbml: true,
           version: 'v18.0'
         });
+        console.log('Facebook SDK inicializado com appId:', this.appId);
         resolve();
       } else {
+        console.log('Aguardando Facebook SDK carregar...');
         // Aguardar SDK carregar
         window.fbAsyncInit = () => {
+          console.log('Facebook SDK carregado, inicializando...');
           window.FB.init({
             appId: this.appId,
             cookie: true,
             xfbml: true,
             version: 'v18.0'
           });
+          console.log('Facebook SDK inicializado com appId:', this.appId);
           resolve();
         };
       }
@@ -99,13 +106,20 @@ class MetaAdsService {
         console.log('Executando em localhost - usando configuração de desenvolvimento');
       }
 
+      // Usar uma abordagem mais compatível
       window.FB.login((response: any) => {
+        console.log('Resposta do FB.login:', response);
+        
         if (response.authResponse) {
           const { accessToken, userID } = response.authResponse;
+          console.log('Login bem-sucedido, userID:', userID);
           
           // Buscar dados do usuário
           window.FB.api('/me', { fields: 'name,email' }, (userInfo: any) => {
+            console.log('Dados do usuário:', userInfo);
+            
             if (userInfo.error) {
+              console.error('Erro ao buscar dados do usuário:', userInfo.error);
               reject(new Error(`Erro ao buscar dados do usuário: ${userInfo.error.message}`));
               return;
             }
@@ -122,13 +136,18 @@ class MetaAdsService {
             resolve(user);
           });
         } else {
+          console.error('Login falhou:', response);
           if (response.status === 'not_authorized') {
             reject(new Error('Login não autorizado. Verifique se você concedeu as permissões necessárias.'));
           } else {
             reject(new Error('Login cancelado pelo usuário'));
           }
         }
-      }, { scope: 'ads_read,ads_management' });
+      }, { 
+        scope: 'ads_read,ads_management',
+        return_scopes: true,
+        auth_type: 'rerequest'
+      });
     });
   }
 
