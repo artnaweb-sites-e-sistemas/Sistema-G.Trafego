@@ -106,13 +106,13 @@ class MetaAdsService {
         console.log('Executando em localhost - usando configuração de desenvolvimento');
       }
 
-      // Usar uma abordagem mais compatível
+      // Primeiro, fazer login básico
       window.FB.login((response: any) => {
         console.log('Resposta do FB.login:', response);
         
         if (response.authResponse) {
           const { accessToken, userID } = response.authResponse;
-          console.log('Login bem-sucedido, userID:', userID);
+          console.log('Login básico bem-sucedido, userID:', userID);
           
           // Buscar dados do usuário
           window.FB.api('/me', { fields: 'name,email' }, (userInfo: any) => {
@@ -133,7 +133,15 @@ class MetaAdsService {
             
             this.user = user;
             localStorage.setItem('facebookUser', JSON.stringify(user));
-            resolve(user);
+            
+            // Agora tentar solicitar permissões de anúncios
+            this.requestAdsPermissions(accessToken)
+              .then(() => resolve(user))
+              .catch((error) => {
+                console.warn('Permissões de anúncios não concedidas:', error.message);
+                // Mesmo sem permissões de anúncios, o login básico funcionou
+                resolve(user);
+              });
           });
         } else {
           console.error('Login falhou:', response);
@@ -144,8 +152,26 @@ class MetaAdsService {
           }
         }
       }, { 
-        scope: 'ads_read,ads_management',
+        scope: 'email,public_profile',
         return_scopes: true,
+        auth_type: 'rerequest',
+        redirect_uri: 'https://gtrafego.artnawebsite.com.br/'
+      });
+    });
+  }
+
+  // Solicitar permissões de anúncios
+  private async requestAdsPermissions(accessToken: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      window.FB.login((response: any) => {
+        if (response.authResponse) {
+          console.log('Permissões de anúncios concedidas');
+          resolve();
+        } else {
+          reject(new Error('Permissões de anúncios não concedidas'));
+        }
+      }, { 
+        scope: 'ads_read,ads_management',
         auth_type: 'rerequest'
       });
     });
