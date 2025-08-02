@@ -150,10 +150,10 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
   };
 
   return (
-    <div className="relative" ref={pickerRef}>
+    <div className="relative dropdown-container" ref={pickerRef}>
       {/* Input field */}
       <div 
-        className="relative cursor-pointer"
+        className="relative cursor-pointer dropdown-trigger"
         onClick={() => setIsOpen(!isOpen)}
         title={(() => {
           const currentDate = new Date();
@@ -178,19 +178,19 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
         <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
         
         {/* Indicador de Status */}
-        <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-300 shadow-sm ${getIndicatorColor()}`}></div>
+        <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-300 shadow-sm dropdown-indicator ${getIndicatorColor()}`}></div>
       </div>
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 min-w-[300px] backdrop-blur-sm">
+        <div className="dropdown-menu dropdown-spacer z-dropdown-high bg-slate-900 border border-slate-700 rounded-xl shadow-2xl" style={{ zIndex: 2147483647 }}>
           {/* Year selector */}
-          <div className="flex items-center justify-between p-3 border-b border-gray-200">
+          <div className="flex items-center justify-between p-3 border-b border-slate-700">
             <button
               onClick={() => handleYearChange(-1)}
-              className="p-1 hover:bg-gray-100 rounded"
+              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors"
             >
-              <ChevronLeft className="w-4 h-4 text-gray-600" />
+              <ChevronLeft className="w-4 h-4" />
             </button>
             <input
               type="number"
@@ -201,13 +201,13 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
                 const newMonthString = `${months[selectedMonthIndex]} ${newYear}`;
                 setSelectedMonth(newMonthString);
               }}
-              className="text-center font-medium text-gray-900 w-20 border-none focus:outline-none"
+              className="text-center font-medium text-slate-100 w-20 border-none focus:outline-none bg-transparent"
             />
             <button
               onClick={() => handleYearChange(1)}
-              className="p-1 hover:bg-gray-100 rounded"
+              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors"
             >
-              <ChevronRight className="w-4 h-4 text-gray-600" />
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
 
@@ -218,10 +218,10 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
                 <button
                   key={month}
                   onClick={() => handleMonthSelect(index)}
-                  className={`p-2 text-sm rounded hover:bg-gray-100 transition-colors ${
+                  className={`p-2 text-sm rounded transition-colors ${
                     index === selectedMonthIndex
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'text-gray-700'
+                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-slate-100'
                   }`}
                 >
                   {month}
@@ -231,10 +231,10 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
           </div>
 
           {/* Action buttons */}
-          <div className="flex justify-end p-3 border-t border-gray-200">
+          <div className="flex justify-end p-3 border-t border-slate-700">
             <button
               onClick={handleThisMonth}
-              className="text-sm text-gray-600 hover:text-gray-800 transition-colors"
+              className="text-sm text-slate-400 hover:text-purple-400 transition-colors"
             >
               Este mês
             </button>

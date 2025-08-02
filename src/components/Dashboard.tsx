@@ -443,7 +443,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         )}
         <InsightsSection />
         <DailyControlTable metrics={metrics} selectedCampaign={selectedCampaign} selectedMonth={selectedMonth} />
-        <HistorySection />
+        <HistorySection selectedProduct={selectedProduct} />
       </main>
       
       <Toaster 

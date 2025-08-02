@@ -188,9 +188,9 @@ class MetaAdsService {
     return this.accessToken;
   }
 
-  // Verificar se o serviço está configurado
+  // Verificar se está configurado
   isConfigured(): boolean {
-    return this.isLoggedIn() && (this.hasSelectedAccount() || this.getAccessToken() !== null);
+    return !!(this.user && this.selectedAccount);
   }
 
   // Inicializar Facebook SDK
@@ -570,6 +570,8 @@ class MetaAdsService {
 
   // Buscar contas de anúncios de um Business Manager específico
   async getAdAccountsByBusiness(businessId: string): Promise<AdAccount[]> {
+    console.log('🟣 MetaAdsService: getAdAccountsByBusiness chamado para BM:', businessId);
+    
     if (!this.user?.accessToken) {
       throw new Error('Usuário não logado');
     }
@@ -577,7 +579,7 @@ class MetaAdsService {
     return this.makeCachedRequest(
       'ad_accounts_by_business',
       async () => {
-    
+        console.log('🟣 MetaAdsService: Fazendo requisição para contas da BM:', businessId);
         
         try {
           // Primeiro, tentar owned_ad_accounts
@@ -592,10 +594,11 @@ class MetaAdsService {
           );
 
           let adAccounts = response.data.data || [];
+          console.log('🟣 MetaAdsService: Owned accounts encontradas:', adAccounts.length);
 
           // Se não encontrou owned_ad_accounts, tentar client_ad_accounts
           if (adAccounts.length === 0) {
-            console.log('Nenhuma conta própria encontrada, tentando contas de cliente...');
+            console.log('🟣 MetaAdsService: Nenhuma conta própria encontrada, tentando contas de cliente...');
             
             response = await axios.get(
               `${this.baseURL}/${businessId}/client_ad_accounts`,
@@ -608,15 +611,17 @@ class MetaAdsService {
             );
 
             adAccounts = response.data.data || [];
+            console.log('🟣 MetaAdsService: Client accounts encontradas:', adAccounts.length);
           }
 
+          console.log('🟣 MetaAdsService: Todas as contas encontradas:', adAccounts.map((acc: any) => `${acc.name} (${acc.id}) - Status: ${acc.account_status}`));
       
           return adAccounts.map((account: any) => ({
             ...account,
             business_id: businessId
           }));
         } catch (error: any) {
-          console.error('Erro ao buscar contas de anúncios:', error.response?.data || error.message);
+          console.error('🔴 MetaAdsService: Erro ao buscar contas de anúncios:', error.response?.data || error.message);
           
           if (error.response?.data?.error?.code === 100) {
             throw new Error('Permissão negada. É necessário solicitar permissão ads_read no App Review.');
@@ -700,17 +705,9 @@ class MetaAdsService {
     localStorage.setItem('selectedAdAccount', JSON.stringify(account));
   }
 
-  // Verificar se tem conta selecionada
+  // Verificar se há conta selecionada
   hasSelectedAccount(): boolean {
-    if (this.selectedAccount) return true;
-    
-    const savedAccount = localStorage.getItem('selectedAdAccount');
-    if (savedAccount) {
-      this.selectedAccount = JSON.parse(savedAccount);
-      return true;
-    }
-    
-    return false;
+    return !!this.selectedAccount;
   }
 
   // Buscar campanhas da conta selecionada com filtro de período
@@ -883,15 +880,9 @@ class MetaAdsService {
 
   // Buscar insights da conta selecionada
   async getAccountInsights(dateStart: string, dateEnd: string): Promise<MetaAdsInsight[]> {
-    console.log('🟣 MetaAdsService: getAccountInsights chamado');
-    console.log('🟣 MetaAdsService: Período:', dateStart, 'até', dateEnd);
-    
     if (!this.selectedAccount) {
-      console.error('🔴 MetaAdsService: Nenhuma conta selecionada');
-      throw new Error('Nenhuma conta selecionada');
+      return [];
     }
-
-    console.log('🟣 MetaAdsService: Conta selecionada:', this.selectedAccount.name, 'ID:', this.selectedAccount.id);
 
     const params = { dateStart, dateEnd };
     
@@ -900,14 +891,10 @@ class MetaAdsService {
       async () => {
         const accessToken = this.getAccessToken() || (this.user?.accessToken);
         if (!accessToken) {
-          console.error('🔴 MetaAdsService: Token de acesso não disponível');
           throw new Error('Token de acesso não disponível');
         }
 
-        console.log('🟣 MetaAdsService: Fazendo requisição para insights da conta...');
-
         try {
-          
           const response = await axios.get(
             `${this.baseURL}/${this.selectedAccount!.id}/insights`,
             {
@@ -924,10 +911,9 @@ class MetaAdsService {
             }
           );
 
-          console.log('🟣 MetaAdsService: Resposta da API recebida:', response.data.data?.length || 0, 'registros');
           return response.data.data || [];
         } catch (error: any) {
-          console.error('🔴 MetaAdsService: Erro ao buscar insights:', error.response?.data || error.message);
+          console.error('Erro ao buscar insights:', error.response?.data || error.message);
           throw new Error(`Erro ao buscar insights: ${error.response?.data?.error?.message || error.message}`);
         }
       },
@@ -1049,6 +1035,11 @@ class MetaAdsService {
   // Obter conta selecionada
   getSelectedAccount(): AdAccount | null {
     return this.selectedAccount;
+  }
+
+  // Limpar conta selecionada
+  clearSelectedAccount(): void {
+    this.selectedAccount = null;
   }
 
   // Método de debug para verificar estado da conexão

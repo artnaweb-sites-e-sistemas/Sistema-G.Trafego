@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Download } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { MetricData } from '../services/metricsService';
 
 interface DailyControlTableProps {
@@ -186,61 +186,62 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
   const dailyData = generateDailyData();
 
   return (
-    <div className="bg-gray-800 rounded-xl border border-gray-700">
-      <div className="p-6 border-b border-gray-700">
+    <div className="bg-slate-900 rounded-xl border border-slate-700 shadow-xl overflow-hidden">
+      <div className="p-6 border-b border-slate-700 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-white">Controle Diário ({selectedMonth})</h2>
+            <h2 className="text-2xl font-bold text-slate-100 mb-1">Controle Diário</h2>
+            <p className="text-slate-400 text-sm">{selectedMonth}</p>
             {selectedCampaign && (
-              <p className="text-sm text-gray-400 mt-1">
+              <p className="text-sm text-slate-400 mt-1">
                 Anúncio selecionado: {selectedCampaign}
               </p>
             )}
-            {metrics.length > 0 && (
-              <p className="text-sm text-green-400 mt-1">
+          </div>
+          {metrics.length > 0 && (
+            <div className="bg-emerald-900/30 rounded-lg p-3 border border-emerald-600/30">
+              <p className="text-sm text-emerald-400 font-medium">
                 ✓ {metrics.length} registros carregados do Meta Ads
               </p>
-            )}
-          </div>
-          <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors">
-            <Plus className="w-4 h-4" />
-            <span>Adicionar Dia</span>
-          </button>
+            </div>
+          )}
         </div>
       </div>
       
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-700">
-              <th className="text-left p-3 text-gray-400 font-medium">DIA</th>
-              <th className="text-left p-3 text-gray-400 font-medium">INVESTIMENTO ($$$)</th>
-              <th className="text-left p-3 text-gray-400 font-medium">IMPRESSÕES</th>
-              <th className="text-left p-3 text-gray-400 font-medium">CLIQUES</th>
-              <th className="text-left p-3 text-gray-400 font-medium">CPM ($$$)</th>
-              <th className="text-left p-3 text-gray-400 font-medium">CTR (%)</th>
-              <th className="text-left p-3 text-gray-400 font-medium">LEADS</th>
-              <th className="text-left p-3 text-gray-400 font-medium">CPL ($$$)</th>
-              <th className="text-left p-3 text-gray-400 font-medium">STATUS</th>
+            <tr className="border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-750">
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">DIA</th>
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">INVESTIMENTO ($$$)</th>
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">IMPRESSÕES</th>
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">CLIQUES</th>
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">CPM ($$$)</th>
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">CTR (%)</th>
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">LEADS</th>
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">CPL ($$$)</th>
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide">STATUS</th>
             </tr>
           </thead>
           <tbody>
             {dailyData.map((row, index) => (
-              <tr key={index} className="border-b border-gray-700 hover:bg-gray-750 transition-colors">
-                <td className="p-3 text-white">{row.date}</td>
-                <td className="p-3 text-white">{row.investment}</td>
-                <td className="p-3 text-white">{row.impressions}</td>
-                <td className="p-3 text-white">{row.clicks}</td>
-                <td className="p-3 text-white">{row.cpm}</td>
-                <td className="p-3 text-white">{row.ctr}</td>
-                <td className="p-3 text-white">{row.leads}</td>
-                <td className="p-3 text-white">{row.cpl}</td>
-                <td className="p-3">
+              <tr key={index} className={`hover:bg-slate-800/40 transition-all duration-200 ${
+                row.isToday ? 'bg-indigo-900/20 border-l-4 border-l-indigo-400 shadow-sm' : ''
+              } ${index === dailyData.length - 1 ? '' : 'border-b border-slate-700/30'}`}>
+                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.date}</td>
+                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.investment}</td>
+                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.impressions}</td>
+                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.clicks}</td>
+                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.cpm}</td>
+                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.ctr}</td>
+                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.leads}</td>
+                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.cpl}</td>
+                <td className="p-4">
                   <div className="flex items-center space-x-2">
-                    <span className={`px-2 py-1 rounded-full text-xs ${
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                       row.status === 'Ativo' 
-                        ? 'bg-green-900 text-green-400 border border-green-700' 
-                        : 'bg-red-900 text-red-400 border border-red-700'
+                        ? 'bg-emerald-900/60 text-emerald-400 border border-emerald-600/50' 
+                        : 'bg-rose-900/60 text-rose-400 border border-rose-600/50'
                     }`}>
                       {row.status}
                     </span>

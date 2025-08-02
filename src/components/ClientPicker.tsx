@@ -29,7 +29,7 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
-
+  
   // Carregar cliente salvo do localStorage ao inicializar
   useEffect(() => {
     const savedClient = localStorage.getItem('currentSelectedClient');
@@ -163,14 +163,11 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
     }
     
     if (client.source === 'facebook' && client.businessManager) {
-      console.log('🔵 ClientPicker: Buscando contas de anúncios para BM:', client.businessManager.id);
       try {
         const adAccounts = await metaAdsService.getAdAccountsByBusiness(client.businessManager.id);
-        console.log('🔵 ClientPicker: Contas de anúncios encontradas:', adAccounts.length);
         
         if (adAccounts.length > 0) {
           const activeAccount = adAccounts.find(account => account.account_status === 1) || adAccounts[0];
-          console.log('🔵 ClientPicker: Conta ativa selecionada:', activeAccount.name, 'ID:', activeAccount.id);
           metaAdsService.selectAdAccount(activeAccount);
           
           const event = new CustomEvent('clientChanged', {
@@ -182,7 +179,6 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
             }
           });
           window.dispatchEvent(event);
-          console.log('🔵 ClientPicker: Evento clientChanged disparado');
           
           // Disparar evento para carregar métricas de todas as campanhas
           const loadAllMetricsEvent = new CustomEvent('loadAllCampaignsMetrics', {
@@ -193,9 +189,10 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
             }
           });
           window.dispatchEvent(loadAllMetricsEvent);
-          console.log('🔵 ClientPicker: Evento loadAllCampaignsMetrics disparado');
         } else {
-          console.log('🔵 ClientPicker: Nenhuma conta de anúncios encontrada');
+          // Limpar a conta selecionada quando não há contas para este cliente
+          metaAdsService.clearSelectedAccount();
+          
           const event = new CustomEvent('clientChanged', {
             detail: {
               clientName: client.name,
@@ -219,7 +216,6 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
         window.dispatchEvent(event);
       }
     } else {
-      console.log('🔵 ClientPicker: Cliente manual, disparando evento clientChanged');
       const event = new CustomEvent('clientChanged', {
         detail: {
           clientName: client.name,
@@ -319,10 +315,10 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
   };
 
   return (
-    <div className="relative" ref={pickerRef}>
+    <div className="relative dropdown-container" ref={pickerRef}>
       {/* Input field */}
       <div 
-        className="relative cursor-pointer"
+        className="relative cursor-pointer dropdown-trigger"
         onClick={() => setIsOpen(!isOpen)}
       >
         <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -332,7 +328,7 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
         <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
         
         {/* Indicador de Status */}
-        <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 ${
+        <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 dropdown-indicator ${
           selectedClient === 'Todos os Clientes' || selectedClient === 'Selecione um cliente'
             ? 'bg-gray-500' 
             : 'bg-green-500 shadow-lg shadow-green-500/50'
@@ -341,19 +337,19 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[300px] max-h-[400px] overflow-hidden">
+        <div className="dropdown-menu dropdown-menu-large z-dropdown-high bg-slate-900 border border-slate-700 rounded-xl shadow-2xl" style={{ zIndex: 2147483647 }}>
           {/* Action buttons - Fixed at top */}
-          <div className="border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
+          <div className="border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-700">
             <div className="flex items-center justify-between p-3">
               <button
                 onClick={handleClear}
-                className="flex items-center px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-all duration-200 ease-in-out"
+                className="flex items-center px-3 py-1.5 text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-md transition-all duration-200 ease-in-out"
               >
                 <X className="w-4 h-4 mr-1" />
                 Limpar
               </button>
               <button
-                className="flex items-center px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-all duration-200 ease-in-out shadow-sm hover:shadow-md"
+                className="flex items-center px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-md transition-all duration-200 ease-in-out shadow-sm hover:shadow-md"
               >
                 <Plus className="w-4 h-4 mr-1" />
                 Novo Cliente
@@ -362,15 +358,15 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
           </div>
 
           {/* Search bar */}
-          <div className="p-3 border-b border-gray-200">
+          <div className="p-3 border-b border-slate-700">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input
                 type="text"
                 placeholder="Buscar cliente..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 text-gray-900"
+                className="w-full pl-10 pr-4 py-2 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500 text-slate-200 bg-slate-800 placeholder-slate-400"
                 autoFocus
               />
             </div>
@@ -378,54 +374,54 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
 
           {/* Loading state */}
           {isLoading && (
-            <div className="p-4 text-center text-gray-500">
+            <div className="p-4 text-center text-slate-400">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500 mx-auto mb-2"></div>
               Carregando Business Managers...
             </div>
           )}
 
           {/* Client list */}
-          <div className="max-h-[250px] overflow-y-auto">
+          <div className="dropdown-scroll">
             {filteredClients.length > 0 ? (
               filteredClients.map((client) => (
                 <div
                   key={client.id}
                   onClick={() => handleClientSelect(client)}
-                  className={`p-3 hover:bg-gray-50 cursor-pointer transition-colors group ${
-                    client.name === selectedClient ? 'bg-purple-50 border-l-4 border-purple-500' : ''
+                  className={`p-3 hover:bg-slate-800 cursor-pointer transition-colors group ${
+                    client.name === selectedClient ? 'bg-slate-800/80 border-l-4 border-purple-500' : ''
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
                         {getClientIcon(client)}
-                        <div className="font-medium text-gray-900">{client.name}</div>
+                        <div className="font-medium text-slate-200">{client.name}</div>
                       </div>
                       {client.company && (
-                        <div className="text-sm text-gray-500">{client.company}</div>
+                        <div className="text-sm text-slate-400">{client.company}</div>
                       )}
                       {client.source === 'facebook' && (
                         <div className="flex items-center space-x-2 mt-1">
-                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                          <span className="text-xs bg-green-900/30 text-green-400 px-2 py-1 rounded-full border border-green-500/30">
                             Sincronizado
                           </span>
                         </div>
                       )}
                       {client.email && (
-                        <div className="text-xs text-gray-400">{client.email}</div>
+                        <div className="text-xs text-slate-500">{client.email}</div>
                       )}
                     </div>
                     <div className="flex items-center space-x-2">
                       {client.name === selectedClient && (
                         <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
                       )}
-                      {client.name !== 'Todos os Clientes' && client.source !== 'facebook' && (
+                      {client.source === 'manual' && (
                         <button
                           onClick={(e) => handleDeleteClient(client.id, client.name, e)}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-all duration-200 ease-in-out"
+                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-400 transition-all duration-200"
                           title="Excluir cliente"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3 h-3" />
                         </button>
                       )}
                     </div>
@@ -433,13 +429,11 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
                 </div>
               ))
             ) : (
-              <div className="p-4 text-center text-gray-500">
-                Nenhum cliente encontrado
+              <div className="p-4 text-center text-slate-400">
+                {searchTerm ? 'Nenhum cliente encontrado' : 'Nenhum cliente disponível'}
               </div>
             )}
           </div>
-
-
         </div>
       )}
     </div>

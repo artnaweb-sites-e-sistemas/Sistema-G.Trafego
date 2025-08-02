@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Settings, CheckCircle, XCircle, RefreshCw, User, LogOut, Building } from 'lucide-react';
 import { metaAdsService, FacebookUser, AdAccount, BusinessManager } from '../services/metaAdsService';
 import { metricsService } from '../services/metricsService';
+import { createPortal } from 'react-dom';
 
 interface MetaAdsConfigProps {
   onConfigSaved: () => void;
@@ -26,10 +27,16 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
   const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
   const [selectedAdSet, setSelectedAdSet] = useState<any>(null);
   const [selectedPeriod, setSelectedPeriod] = useState('julho de 2023');
+  const [mounted, setMounted] = useState(false);
   
   // Estados para controlar origem dos dados
   const [dataSource, setDataSource] = useState<'manual' | 'facebook' | null>(null);
   const [isFacebookConnected, setIsFacebookConnected] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   useEffect(() => {
     // Verificar se já existe usuário salvo E se está realmente conectado
@@ -592,104 +599,279 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
 
   const isConnected = user && metaAdsService.isLoggedIn();
 
-  return (
-    <>
-      <button
-        onClick={() => setIsOpen(true)}
-        className={`p-2 rounded-lg flex items-center justify-center transition-all duration-200 relative ${
-          isConnected 
-            ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-            : 'bg-gray-600 hover:bg-gray-700 text-gray-300 hover:text-white'
-        }`}
-        title={isConnected ? 'Meta Ads Conectado - Clique para opções' : 'Configurar Meta Ads'}
+  // Modal Component usando Portal
+  const Modal = () => {
+    if (!mounted || !isOpen) return null;
+
+    return createPortal(
+      <div 
+        className="fixed inset-0 z-[999999] flex items-center justify-center p-4"
+        style={{
+          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(4px)',
+          WebkitBackdropFilter: 'blur(4px)'
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setIsOpen(false);
+          }
+        }}
       >
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-        </svg>
-        
-        {/* Indicador de Status */}
-        <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 ${
-          isConnected 
-            ? 'bg-green-500 shadow-lg shadow-green-500/50' 
-            : 'bg-red-500 shadow-lg shadow-red-500/50'
-        }`}></div>
-      </button>
+        <div 
+          className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-auto max-h-[90vh] overflow-y-auto"
+          style={{
+            animation: 'modalSlideIn 0.3s ease-out'
+          }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-700 sticky top-0 bg-gray-800 rounded-t-2xl">
+            <h2 className="text-xl font-semibold text-white">
+              {isConnected ? 'Meta Ads Conectado' : 'Meta Ads Integration'}
+            </h2>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="text-gray-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-gray-700"
+              aria-label="Fechar modal"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
 
-      {isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md border border-gray-700">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-white">
-                {isConnected ? 'Meta Ads Conectado' : 'Meta Ads Integration'}
-              </h2>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-
-            {!isConnected && step === 'login' && (
-              <div className="space-y-4">
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <User className="w-8 h-8 text-white" />
+          {/* Content */}
+          <div className="p-6">
+              {!isConnected && step === 'login' && (
+                <div className="space-y-6">
+                  {/* Ícone e Título */}
+                  <div className="text-center">
+                    <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                      <User className="w-10 h-10 text-white" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-white mb-3">Conectar com Facebook</h3>
+                    <p className="text-gray-400 text-sm leading-relaxed max-w-sm mx-auto">
+                      Faça login com sua conta do Facebook para acessar suas contas de anúncios e métricas
+                    </p>
                   </div>
-                  <h3 className="text-lg font-medium text-white mb-2">Conectar com Facebook</h3>
-                  <p className="text-gray-400 text-sm mb-6">
-                    Faça login com sua conta do Facebook para acessar suas contas de anúncios
-                  </p>
+
+                  {/* Botão de Login */}
+                  <button
+                    onClick={handleFacebookLogin}
+                    disabled={isLoading}
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-4 rounded-xl flex items-center justify-center space-x-3 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] facebook-modal-btn"
+                  >
+                    {isLoading ? (
+                      <>
+                        <RefreshCw className="w-5 h-5 animate-spin" />
+                        <span className="font-medium">Conectando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                        </svg>
+                        <span className="font-medium">Entrar com Facebook</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Informações Adicionais */}
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500">
+                      Suas informações estão seguras e não serão compartilhadas
+                    </p>
+                  </div>
                 </div>
+              )}
 
-                <button
-                  onClick={handleFacebookLogin}
-                  disabled={isLoading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors disabled:opacity-50"
-                >
-                  {isLoading ? (
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                      </svg>
-                      <span>Entrar com Facebook</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
-
-            {isConnected && (
-              <div className="space-y-4">
-                <div className="bg-green-900 border border-green-700 rounded-lg p-4">
-                  <div className="flex items-center space-x-3">
-                    <CheckCircle className="w-6 h-6 text-green-400" />
-                    <div>
-                      <h3 className="text-green-400 font-medium">Conectado com sucesso!</h3>
+              {isConnected && (
+                <div className="space-y-6">
+                  {/* Status de Conectado */}
+                  <div className="bg-gradient-to-r from-green-900/50 to-green-800/50 border border-green-600/50 rounded-xl p-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                        <CheckCircle className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-green-400 font-semibold text-lg">Conectado com sucesso!</h3>
+                        <p className="text-green-300 text-sm mt-1">
+                          {user?.name || 'Usuário do Facebook'}
+                        </p>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Botão de Logout */}
+                  <button
+                    onClick={handleLogout}
+                    className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-6 py-4 rounded-xl flex items-center justify-center space-x-3 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] facebook-modal-btn"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    <span className="font-medium">Trocar Conta</span>
+                  </button>
+
+                  {/* Informações da Conta */}
+                  {selectedAccount && (
+                    <div className="bg-gray-700/50 rounded-xl p-4 border border-gray-600/50">
+                      <h4 className="text-white font-medium mb-2">Conta Selecionada</h4>
+                      <p className="text-gray-300 text-sm">{selectedAccount.name}</p>
+                      <p className="text-gray-400 text-xs mt-1">ID: {selectedAccount.id}</p>
+                    </div>
+                  )}
                 </div>
+              )}
 
-                <button
-                  onClick={handleLogout}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors"
-                >
-                  <LogOut className="w-5 h-5" />
-                  <span>Trocar Conta</span>
-                </button>
-              </div>
-            )}
+              {/* Outros Estados do Modal */}
+              {step === 'selectBusiness' && (
+                <div className="space-y-4">
+                  <div className="text-center mb-6">
+                    <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Building className="w-8 h-8 text-white" />
+                    </div>
+                    <h3 className="text-lg font-medium text-white mb-2">Selecionar Business Manager</h3>
+                    <p className="text-gray-400 text-sm">Escolha o Business Manager que contém suas contas de anúncios</p>
+                  </div>
+                  
+                                     <div className="space-y-2 max-h-60 overflow-y-auto facebook-modal-scroll">
+                     {businessManagers.map((business) => (
+                       <button
+                         key={business.id}
+                         onClick={() => handleSelectBusiness(business)}
+                         className="w-full text-left p-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors border border-gray-600 hover:border-gray-500 facebook-modal-btn"
+                       >
+                         <h4 className="text-white font-medium">{business.name}</h4>
+                         <p className="text-gray-400 text-sm">ID: {business.id}</p>
+                       </button>
+                     ))}
+                   </div>
+                </div>
+              )}
 
+              {step === 'selectAccount' && (
+                <div className="space-y-4">
+                  <div className="text-center mb-6">
+                    <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-medium text-white mb-2">Selecionar Conta de Anúncios</h3>
+                    <p className="text-gray-400 text-sm">Escolha a conta de anúncios que deseja monitorar</p>
+                  </div>
+                  
+                                     <div className="space-y-2 max-h-60 overflow-y-auto facebook-modal-scroll">
+                     {adAccounts.map((account) => (
+                       <button
+                         key={account.id}
+                         onClick={() => handleSelectAccount(account)}
+                         disabled={isSelectingAccount}
+                         className="w-full text-left p-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors border border-gray-600 hover:border-gray-500 disabled:opacity-50 facebook-modal-btn"
+                       >
+                         <h4 className="text-white font-medium">{account.name}</h4>
+                         <p className="text-gray-400 text-sm">ID: {account.id}</p>
+                       </button>
+                     ))}
+                   </div>
+                </div>
+              )}
 
+              {step === 'permissionsRequired' && (
+                <div className="space-y-4">
+                  <div className="text-center mb-6">
+                    <div className="w-16 h-16 bg-yellow-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <XCircle className="w-8 h-8 text-white" />
+                    </div>
+                    <h3 className="text-lg font-medium text-white mb-2">Permissões Necessárias</h3>
+                    <p className="text-gray-400 text-sm">Para acessar suas contas de anúncios, precisamos de permissões adicionais</p>
+                  </div>
+                  
+                                     <button
+                     onClick={handleRequestAdsPermissions}
+                     disabled={isLoading}
+                     className="w-full bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors disabled:opacity-50 facebook-modal-btn"
+                   >
+                    {isLoading ? (
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                        <span>Solicitar Permissões</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
 
-
+              {step === 'tokenConfig' && (
+                <div className="space-y-4">
+                  <div className="text-center mb-6">
+                    <div className="w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Settings className="w-8 h-8 text-white" />
+                    </div>
+                    <h3 className="text-lg font-medium text-white mb-2">Configurar Token de Acesso</h3>
+                    <p className="text-gray-400 text-sm">Insira seu token de acesso do Facebook para conectar manualmente</p>
+                  </div>
+                  
+                                     <textarea
+                     value={accessToken}
+                     onChange={(e) => setAccessToken(e.target.value)}
+                     placeholder="Cole seu token de acesso aqui..."
+                     className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none facebook-modal-focus"
+                     rows={4}
+                     aria-label="Token de acesso do Facebook"
+                   />
+                  
+                                     <button
+                     onClick={handleConfigureToken}
+                     disabled={isLoading || !accessToken.trim()}
+                     className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors disabled:opacity-50 facebook-modal-btn"
+                   >
+                    {isLoading ? (
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>
+                        <Settings className="w-5 h-5" />
+                        <span>Configurar Token</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-    </>
-  );
-};
+        </div>,
+        document.body
+      );
+    };
+
+    return (
+      <>
+        <button
+          onClick={() => setIsOpen(true)}
+          className={`p-2 rounded-lg flex items-center justify-center transition-all duration-200 relative ${
+            isConnected 
+              ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+              : 'bg-gray-600 hover:bg-gray-700 text-gray-300 hover:text-white'
+          }`}
+          title={isConnected ? 'Meta Ads Conectado - Clique para opções' : 'Configurar Meta Ads'}
+        >
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+          </svg>
+          
+          {/* Indicador de Status */}
+          <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 ${
+            isConnected 
+              ? 'bg-green-500 shadow-lg shadow-green-500/50' 
+              : 'bg-red-500 shadow-lg shadow-red-500/50'
+          }`}></div>
+        </button>
+
+        <Modal />
+      </>
+    );
+  };
 
 export default MetaAdsConfig;

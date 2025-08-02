@@ -47,6 +47,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({ metrics }) =>
   const [ticketMedio, setTicketMedio] = useState(250);
   const [isEditingTicket, setIsEditingTicket] = useState(false);
   const [ticketEditValue, setTicketEditValue] = useState('');
+  const [ticketEditRawValue, setTicketEditRawValue] = useState('');
 
   // Estado para controlar os dados editáveis
   const [tableData, setTableData] = useState<TableRow[]>([
@@ -451,21 +452,26 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({ metrics }) =>
   // Funções para editar o Ticket Médio
   const handleTicketClick = () => {
     setIsEditingTicket(true);
-    setTicketEditValue(ticketMedio.toString());
+    // Converter o valor para centavos (multiplicar por 100)
+    const cents = Math.round(ticketMedio * 100);
+    setTicketEditRawValue(cents.toString());
+    setTicketEditValue(formatBRLFromDigits(cents.toString()));
   };
 
   const handleTicketSave = () => {
-    const newValue = parseFloat(ticketEditValue);
+    const newValue = parseFloat(ticketEditRawValue) / 100;
     if (!isNaN(newValue) && newValue > 0) {
       setTicketMedio(newValue);
     }
     setIsEditingTicket(false);
     setTicketEditValue('');
+    setTicketEditRawValue('');
   };
 
   const handleTicketCancel = () => {
     setIsEditingTicket(false);
     setTicketEditValue('');
+    setTicketEditRawValue('');
   };
 
   const handleTicketKeyPress = (e: React.KeyboardEvent) => {
@@ -474,6 +480,12 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({ metrics }) =>
     } else if (e.key === 'Escape') {
       handleTicketCancel();
     }
+  };
+
+  const handleTicketInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, '');
+    setTicketEditRawValue(digits);
+    setTicketEditValue(formatBRLFromDigits(digits));
   };
 
   // Função para obter o placeholder baseado no tipo de valor
@@ -631,79 +643,65 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({ metrics }) =>
   }, {} as Record<string, TableRow[]>);
 
   return (
-    <div className="bg-gray-800 rounded-xl border border-gray-700">
-      <div className="p-6 border-b border-gray-700">
+    <div className="bg-slate-900 rounded-xl border border-slate-600 shadow-xl overflow-hidden">
+      <div className="p-6 border-b border-slate-700 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-white">Detalhes Mensais (Julho/2025)</h2>
-          <div className="text-sm text-gray-400">
-            Ticket Médio (Bench):{' '}
+          <div>
+            <h2 className="text-2xl font-bold text-slate-100 mb-1">Detalhes Mensais</h2>
+            <p className="text-slate-400 text-sm">Julho/2025</p>
+          </div>
+          <div className={`relative rounded-xl p-4 border backdrop-blur-sm transition-all duration-300 ${
+            isEditingTicket 
+              ? 'bg-indigo-900/40 border-indigo-400/60 shadow-lg shadow-indigo-500/10' 
+              : 'bg-slate-800/80 border-slate-600/50 hover:bg-slate-800/90 hover:border-slate-500/60'
+          }`}>
+            <div className="text-sm text-slate-400 font-medium mb-2">Ticket Médio (Bench)</div>
+            
             {isEditingTicket ? (
-              <div className="inline-flex items-center">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={ticketEditValue}
-                    onChange={(e) => setTicketEditValue(e.target.value)}
-                    onKeyDown={handleTicketKeyPress}
-                    onBlur={handleTicketSave}
-                    className="bg-gray-700 text-white border border-blue-400 rounded px-3 py-1 outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-sm w-24"
-                    placeholder="R$ 0,00"
-                    autoFocus
-                  />
-                  <div className="absolute right-1 top-1/2 transform -translate-y-1/2 flex space-x-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleTicketSave();
-                      }}
-                      className="p-1 text-green-400 hover:text-green-300 hover:bg-green-400/10 rounded transition-colors"
-                      title="Salvar (Enter)"
-                    >
-                      <Check className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleTicketCancel();
-                      }}
-                      className="p-1 text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded transition-colors"
-                      title="Cancelar (Esc)"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
+              <input
+                type="text"
+                value={ticketEditValue}
+                onChange={handleTicketInputChange}
+                onKeyDown={handleTicketKeyPress}
+                onBlur={handleTicketSave}
+                className="w-full bg-transparent text-slate-100 border-none outline-none text-lg font-semibold"
+                placeholder="R$ 0,00"
+                autoFocus
+              />
+            ) : (
+              <div className="group cursor-pointer relative" onClick={handleTicketClick}>
+                <span className="text-slate-100 font-bold text-xl group-hover:text-indigo-300 transition-all duration-200">
+                  {formatCurrency(ticketMedio)}
+                </span>
+                <div className="absolute right-0 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <Edit3 className="w-4 h-4 text-indigo-400" />
                 </div>
               </div>
-            ) : (
-              <span 
-                className="text-white font-medium cursor-pointer hover:text-blue-300 transition-colors"
-                onClick={handleTicketClick}
-                title="Clique para editar"
-              >
-                {formatCurrency(ticketMedio)}
-              </span>
             )}
           </div>
         </div>
       </div>
       
       <div className="overflow-x-auto">
-        <table className="w-full table-fixed">
+        <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-700">
-              <th className="text-left p-4 text-gray-400 font-medium w-1/3">MÉTRICA</th>
-              <th className="text-right p-4 text-gray-400 font-medium w-1/6">BENCHMARK/PROJEÇÃO</th>
-              <th className="text-right p-4 text-gray-400 font-medium w-1/6">VALORES REAIS</th>
-              <th className="text-right p-4 text-gray-400 font-medium w-1/3">STATUS VS BENCHMARK</th>
+            <tr className="border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-750">
+              <th className="text-left p-5 text-slate-200 font-semibold text-sm uppercase tracking-wide w-2/5 border-r border-slate-600/50">Métrica</th>
+              <th className="text-left p-5 text-slate-200 font-semibold text-sm uppercase tracking-wide w-1/5 border-r border-slate-600/50">Benchmark/Projeção</th>
+              <th className="text-left p-5 text-slate-200 font-semibold text-sm uppercase tracking-wide w-1/5 border-r border-slate-600/50">Valores Reais</th>
+              <th className="text-left p-5 text-slate-200 font-semibold text-sm uppercase tracking-wide w-1/5">Status vs Benchmark</th>
             </tr>
           </thead>
           <tbody>
             {Object.entries(groupedData).map(([category, items]) => (
               <React.Fragment key={category}>
                 {/* Linha de categoria */}
-                <tr className="border-b border-gray-700 bg-gray-600">
-                  <td className="p-4 text-white font-medium" colSpan={4}>
-                    {category}
+                <tr className="border-b border-slate-700 bg-gradient-to-r from-slate-700/80 to-slate-600/80">
+                  <td className="p-4 text-slate-100 font-bold text-base" colSpan={4}>
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full mr-3 shadow-sm"></div>
+                      {category}
+                    </div>
                   </td>
                 </tr>
                 {/* Itens da categoria */}
@@ -712,18 +710,23 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({ metrics }) =>
                     item.category === category && item.metric === row.metric
                   );
                   
+                  const isLastItem = index === items.length - 1;
+                  const isLastCategory = Object.keys(groupedData).indexOf(category) === Object.keys(groupedData).length - 1;
+                  
                   return (
-                    <tr key={`${category}-${index}`} className="border-b border-gray-700 hover:bg-gray-750 transition-colors">
-                      <td className="p-4 text-white w-1/3">{row.metric}</td>
+                    <tr key={`${category}-${index}`} className={`hover:bg-slate-800/40 transition-all duration-200 ${
+                      isLastItem && isLastCategory ? '' : 'border-b border-slate-700/30'
+                    }`}>
+                      <td className="p-5 text-slate-200 font-medium w-2/5 border-r border-slate-600/50">{row.metric}</td>
                       
                       {/* Célula Benchmark editável */}
                       <td 
-                        className={`p-4 text-white relative group w-1/6 text-right ${
+                        className={`p-5 relative group w-1/5 text-left border-r border-slate-600/50 ${
                           row.benchmarkEditable 
                             ? editingCell?.rowIndex === globalIndex && editingCell?.field === 'benchmark'
-                              ? 'bg-gray-500 cursor-pointer transition-all duration-200 border-l-2 border-blue-400'
-                              : 'bg-gray-600 cursor-pointer hover:bg-gray-500 transition-all duration-200 border-l-2 border-transparent hover:border-blue-400'
-                            : 'bg-gray-800'
+                              ? 'bg-indigo-900/40 cursor-pointer transition-all duration-200 border-l-4 border-indigo-400 shadow-sm'
+                              : 'bg-slate-700/60 cursor-pointer hover:bg-indigo-900/30 transition-all duration-200 border-l-4 border-transparent hover:border-indigo-400/60'
+                            : 'bg-slate-800/40'
                         }`}
                         onClick={() => handleCellClick(globalIndex, 'benchmark', row.benchmark)}
                         onMouseEnter={() => row.benchmarkEditable && setIsHovered({rowIndex: globalIndex, field: 'benchmark'})}
@@ -736,27 +739,27 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({ metrics }) =>
                             onChange={handleInputChange}
                             onKeyDown={handleKeyPress}
                             onBlur={handleSave}
-                            className="w-full bg-transparent text-white border-none outline-none text-sm font-medium text-right"
+                            className="w-full bg-transparent text-slate-100 border-none outline-none text-base font-semibold text-left"
                             autoFocus
                             placeholder={getPlaceholder(row.metric, 'benchmark')}
                             ref={inputRef}
                           />
                         ) : (
-                          <span className="text-sm">{row.benchmark}</span>
+                          <span className="text-base font-semibold text-slate-100">{row.benchmark}</span>
                         )}
                         {row.benchmarkEditable && isHovered?.rowIndex === globalIndex && isHovered?.field === 'benchmark' && !editingCell && (
-                          <Edit3 className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400 opacity-60" />
+                          <Edit3 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-indigo-400 opacity-70" />
                         )}
                       </td>
                       
                       {/* Célula Valores Reais editável */}
                       <td 
-                        className={`p-4 text-white relative group w-1/6 text-right ${
+                        className={`p-5 relative group w-1/5 text-left border-r border-slate-600/50 ${
                           row.realValueEditable 
                             ? editingCell?.rowIndex === globalIndex && editingCell?.field === 'realValue'
-                              ? 'bg-purple-800/50 cursor-pointer transition-all duration-200 border-l-2 border-purple-400'
-                              : 'bg-purple-900/30 cursor-pointer hover:bg-purple-900/50 transition-all duration-200 border-l-2 border-transparent hover:border-purple-400'
-                            : 'bg-gray-800'
+                              ? 'bg-emerald-900/40 cursor-pointer transition-all duration-200 border-l-4 border-emerald-400 shadow-sm'
+                              : 'bg-slate-700/60 cursor-pointer hover:bg-emerald-900/30 transition-all duration-200 border-l-4 border-transparent hover:border-emerald-400/60'
+                            : 'bg-slate-800/40'
                         }`}
                         onClick={() => handleCellClick(globalIndex, 'realValue', row.realValue)}
                         onMouseEnter={() => row.realValueEditable && setIsHovered({rowIndex: globalIndex, field: 'realValue'})}
@@ -769,24 +772,26 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({ metrics }) =>
                             onChange={handleInputChange}
                             onKeyDown={handleKeyPress}
                             onBlur={handleSave}
-                            className="w-full bg-transparent text-white border-none outline-none text-sm font-medium text-right"
+                            className="w-full bg-transparent text-slate-100 border-none outline-none text-base font-semibold text-left"
                             autoFocus
                             placeholder={getPlaceholder(row.metric, 'realValue')}
                             ref={inputRef}
                           />
                         ) : (
-                          <span className="text-sm">{row.realValue}</span>
+                          <span className="text-base font-semibold text-slate-100">{row.realValue}</span>
                         )}
                         {row.realValueEditable && isHovered?.rowIndex === globalIndex && isHovered?.field === 'realValue' && !editingCell && (
-                          <Edit3 className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400 opacity-60" />
+                          <Edit3 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-emerald-400 opacity-70" />
                         )}
                       </td>
                       
                       {/* Célula Status */}
-                      <td className="p-4 text-white w-1/3 text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          <span className="text-sm">{row.status}</span>
-                          {getStatusIcon(row.statusColor)}
+                      <td className="p-5 w-1/5 text-left">
+                        <div className="flex items-center space-x-3">
+                          <span className="text-sm text-slate-300 font-medium">{row.status}</span>
+                          <div className="flex items-center">
+                            {getStatusIcon(row.statusColor)}
+                          </div>
                         </div>
                       </td>
                     </tr>

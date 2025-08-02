@@ -423,10 +423,10 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
   );
 
   return (
-    <div className="relative" ref={pickerRef}>
+    <div className="relative dropdown-container" ref={pickerRef}>
       {/* Input field */}
       <div 
-        className={`relative ${isPickerActive ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+        className={`relative ${isPickerActive ? 'cursor-pointer dropdown-trigger' : 'cursor-not-allowed'}`}
         onClick={() => isPickerActive && setIsOpen(!isOpen)}
       >
         <Package className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isPickerActive ? 'text-gray-400' : 'text-gray-600'}`} />
@@ -442,7 +442,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
         <ChevronDown className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isPickerActive ? 'text-gray-400' : 'text-gray-600'}`} />
         
         {/* Indicador de Status */}
-        <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 ${
+        <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 dropdown-indicator ${
           !selectedProduct 
             ? 'bg-gray-500' 
             : 'bg-green-500 shadow-lg shadow-green-500/50'
@@ -451,20 +451,20 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
 
       {/* Dropdown */}
       {isOpen && isPickerActive && (
-        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[350px] max-h-[400px] overflow-hidden">
+        <div className="dropdown-menu dropdown-menu-wide z-dropdown-high bg-slate-900 border border-slate-700 rounded-xl shadow-2xl" style={{ zIndex: 2147483647 }}>
           {/* Action buttons - Fixed at top */}
-          <div className="border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
+          <div className="border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-700">
             <div className="flex items-center justify-between p-3">
               <button
                 onClick={handleClear}
-                className="flex items-center px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-all duration-200 ease-in-out"
+                className="flex items-center px-3 py-1.5 text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-md transition-all duration-200 ease-in-out"
               >
                 <X className="w-4 h-4 mr-1" />
                 Limpar
               </button>
 
               <button
-                className="flex items-center px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-all duration-200 ease-in-out shadow-sm hover:shadow-md"
+                className="flex items-center px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-md transition-all duration-200 ease-in-out shadow-sm hover:shadow-md"
               >
                 <Plus className="w-4 h-4 mr-1" />
                 Novo Produto
@@ -473,24 +473,24 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
           </div>
 
           {/* Search bar */}
-          <div className="p-3 border-b border-gray-200">
+          <div className="p-3 border-b border-slate-700">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input
                 type="text"
                 placeholder="Buscar produto..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 text-gray-900"
+                className="w-full pl-10 pr-4 py-2 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500 text-slate-200 bg-slate-800 placeholder-slate-400"
                 autoFocus
               />
             </div>
           </div>
 
           {/* Product list */}
-          <div className="max-h-[250px] overflow-y-auto">
+          <div className="dropdown-scroll">
             {isLoading ? (
-              <div className="p-4 text-center text-gray-500">
+              <div className="p-4 text-center text-slate-400">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500 mx-auto mb-2"></div>
                 Carregando campanhas...
               </div>
@@ -499,34 +499,34 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
                 <div
                   key={product.id}
                   onClick={() => handleProductSelect(product)}
-                  className={`p-3 hover:bg-gray-50 cursor-pointer transition-colors group ${
-                    product.name === selectedProduct ? 'bg-purple-50 border-l-4 border-purple-500' : ''
+                  className={`p-3 hover:bg-slate-800 cursor-pointer transition-colors group ${
+                    product.name === selectedProduct ? 'bg-slate-800/80 border-l-4 border-purple-500' : ''
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
-                        <div className="font-medium text-gray-900">{product.name}</div>
+                        <div className="font-medium text-slate-200">{product.name}</div>
                       </div>
                       {product.description && (
-                        <div className="text-sm text-gray-500">{product.description}</div>
+                        <div className="text-sm text-slate-400">{product.description}</div>
                       )}
                       <div className="flex items-center space-x-2 mt-1">
                         {product.category && (
-                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                          <span className="text-xs bg-blue-900/30 text-blue-400 px-2 py-1 rounded-full border border-blue-500/30">
                             {product.category}
                           </span>
                         )}
                         {product.price && (
-                          <span className="text-xs font-medium text-green-600">
+                          <span className="text-xs font-medium text-green-400">
                             {formatPrice(product.price)}
                           </span>
                         )}
                         {product.source === 'facebook' && product.campaign && (
-                          <span className={`text-xs px-2 py-1 rounded-full ${
+                          <span className={`text-xs px-2 py-1 rounded-full border ${
                             product.campaign.status === 'ACTIVE' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-yellow-100 text-yellow-800'
+                              ? 'bg-green-900/30 text-green-400 border-green-500/30' 
+                              : 'bg-yellow-900/30 text-yellow-400 border-yellow-500/30'
                           }`}>
                             {product.campaign.status === 'ACTIVE' ? 'Ativa' : 'Pausada'}
                           </span>
@@ -540,7 +540,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
                       {product.source !== 'facebook' && (
                         <button
                           onClick={(e) => handleDeleteProduct(product.id, product.name, e)}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-all duration-200 ease-in-out"
+                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded transition-all duration-200 ease-in-out"
                           title="Excluir produto"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -551,7 +551,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
                 </div>
               ))
             ) : (
-              <div className="p-4 text-center text-gray-500">
+              <div className="p-4 text-center text-slate-400">
                 {dataSource === 'facebook' && metaAdsService.isLoggedIn()
                   ? 'Nenhuma campanha ativa encontrada para este período'
                   : selectedClient === 'Todos os Clientes' 
