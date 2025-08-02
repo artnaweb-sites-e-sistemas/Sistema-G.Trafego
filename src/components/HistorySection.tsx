@@ -182,7 +182,7 @@ const HistorySection: React.FC<HistorySectionProps> = ({ selectedProduct }) => {
       </div>
       
       {filteredReports.length > 0 ? (
-        <div className="space-y-4">
+      <div className="space-y-4">
           {filteredReports.map((report, index) => (
             <div key={index} className="bg-slate-800/80 rounded-lg border border-slate-600/30 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-3 p-4 pb-2">
@@ -216,47 +216,47 @@ const HistorySection: React.FC<HistorySectionProps> = ({ selectedProduct }) => {
                       <span className="text-slate-400 font-medium text-xs">AGENDAMENTOS</span>
                     </div>
                     <div className="text-slate-200 font-medium">{report.appointments}</div>
-                  </div>
-                  
-                  <div>
+          </div>
+          
+            <div>
                     <div className="flex items-center space-x-1 mb-1">
                       <span className="text-slate-400 font-medium text-xs">CPL</span>
                       <Info className="w-3 h-3 text-slate-500" />
                     </div>
                     <div className="text-slate-200 font-medium">{report.cpl}</div>
-                  </div>
+            </div>
                   
-                  <div>
+            <div>
                     <div className="flex items-center space-x-1 mb-1">
                       <span className="text-slate-400 font-medium text-xs">COMPARECIMENTO</span>
                     </div>
                     <div className="text-slate-200 font-medium">{report.attendance}</div>
-                  </div>
+            </div>
                   
-                  <div>
+            <div>
                     <div className="flex items-center space-x-1 mb-1">
                       <span className="text-slate-400 font-medium text-xs">CPV</span>
                       <Info className="w-3 h-3 text-slate-500" />
                     </div>
                     <div className="text-slate-200 font-medium">{report.cpv}</div>
-                  </div>
+            </div>
                   
-                  <div>
+            <div>
                     <div className="flex items-center space-x-1 mb-1">
                       <span className="text-slate-400 font-medium text-xs">VENDAS</span>
                     </div>
                     <div className="text-slate-200 font-medium">{report.sales}</div>
-                  </div>
+            </div>
                   
-                  <div>
+            <div>
                     <div className="flex items-center space-x-1 mb-1">
                       <span className="text-slate-400 font-medium text-xs">ROI</span>
                       <Info className="w-3 h-3 text-slate-500" />
                     </div>
                     <div className="text-slate-200 font-medium">{report.roi}</div>
-                  </div>
-                </div>
-                
+            </div>
+          </div>
+          
                 <div className="mt-4 flex items-center justify-between">
                   <div className="text-slate-400 text-sm">
                     {report.roi}
@@ -290,7 +290,7 @@ const HistorySection: React.FC<HistorySectionProps> = ({ selectedProduct }) => {
                   </div>
                 </div>
               </div>
-            </div>
+          </div>
           ))}
         </div>
       ) : (

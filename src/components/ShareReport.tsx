@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Share2, Copy, CheckCircle, ExternalLink, Link, Trash2 } from 'lucide-react';
+import { Share2, Copy, CheckCircle, ExternalLink, Link, RefreshCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { shareService, ShareLink } from '../services/shareService';
 import { createPortal } from 'react-dom';
@@ -23,9 +23,9 @@ const ShareReport: React.FC<ShareReportProps> = ({
   const [generatedLink, setGeneratedLink] = useState<ShareLink | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [hasLinkForCurrentSelection, setHasLinkForCurrentSelection] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -112,10 +112,40 @@ const ShareReport: React.FC<ShareReportProps> = ({
   };
 
   const openShareLink = () => {
+    if (generatedLink) {
+      window.open(shareService.getShortUrl(generatedLink.shortCode), '_blank');
+    }
+  };
+
+  const updateShareLink = async () => {
     if (!generatedLink) return;
     
-    const shortUrl = shareService.getShortUrl(generatedLink.shortCode);
-    window.open(shortUrl, '_blank');
+    setIsUpdating(true);
+    
+    try {
+      // Simular atualização (em produção, isso sincronizaria com Meta Ads)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Atualizar o link com os parâmetros atuais
+      const updatedLink = shareService.updateShareLink(generatedLink.shortCode, {
+        audience: selectedAudience,
+        product: selectedProduct,
+        client: selectedClient,
+        month: selectedMonth
+      });
+      
+      if (updatedLink) {
+        setGeneratedLink(updatedLink);
+        toast.success('Relatório atualizado com sucesso!');
+      } else {
+        toast.error('Erro ao atualizar relatório');
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar link:', error);
+      toast.error('Erro ao atualizar relatório');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const isDisabled = selectedAudience === 'Todos os Públicos' ||
@@ -169,37 +199,26 @@ const ShareReport: React.FC<ShareReportProps> = ({
             <div className="bg-slate-800/80 rounded-xl p-4 border border-slate-600/30 backdrop-blur-sm">
               <h3 className="text-slate-100 font-medium mb-3">Relatório Selecionado</h3>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
+                <div className="flex flex-col">
                   <span className="text-slate-400">Público:</span>
                   <span className="text-slate-200 font-medium">{selectedAudience}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-col">
                   <span className="text-slate-400">Produto:</span>
                   <span className="text-slate-200 font-medium">{selectedProduct}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-col">
                   <span className="text-slate-400">Cliente:</span>
                   <span className="text-slate-200 font-medium">{selectedClient}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-col">
                   <span className="text-slate-400">Período:</span>
                   <span className="text-slate-200 font-medium">{selectedMonth}</span>
                 </div>
               </div>
             </div>
 
-            {/* Status do Link */}
-            {hasLinkForCurrentSelection && (
-              <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-4 backdrop-blur-sm">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="w-5 h-5 text-green-400" />
-                  <span className="text-green-300 font-medium">Link já existe para esta seleção!</span>
-                </div>
-                <p className="text-green-400 text-sm mt-1">
-                  Um link personalizado já foi gerado para este público, produto e período.
-                </p>
-              </div>
-            )}
+
 
             {/* Geração do Link */}
             {!generatedLink ? (
@@ -275,66 +294,37 @@ const ShareReport: React.FC<ShareReportProps> = ({
                       <span>Abrir</span>
                     </button>
                   </div>
-                </div>
 
-                {/* Gerar Novo Link */}
-                <div className="text-center">
-                  <button
-                    onClick={() => {
-                      setGeneratedLink(null);
-                      setCopied(false);
-                      setHasLinkForCurrentSelection(false);
-                    }}
-                    className="text-purple-400 hover:text-purple-300 font-medium transition-colors"
-                  >
-                    Gerar Novo Link
-                  </button>
-                </div>
-
-                {/* Histórico de Links */}
-                <div className="border-t border-slate-700 pt-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-slate-100 font-medium">Links Compartilhados</h4>
+                  {/* Botão Atualizar Relatório */}
+                  <div className="mt-3">
                     <button
-                      onClick={() => setShowHistory(!showHistory)}
-                      className="text-purple-400 hover:text-purple-300 text-sm font-medium transition-colors"
+                      onClick={updateShareLink}
+                      disabled={isUpdating}
+                      className={`w-full px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center space-x-2 ${
+                        isUpdating
+                          ? 'bg-orange-700 text-orange-300 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white'
+                      }`}
                     >
-                      {showHistory ? 'Ocultar' : 'Mostrar'}
+                      {isUpdating ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                          <span>Atualizando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-4 h-4" />
+                          <span>Atualizar Relatório</span>
+                        </>
+                      )}
                     </button>
+                    <p className="text-xs text-slate-400 mt-2 text-center">
+                      Última sincronização: {generatedLink?.updatedAt 
+                        ? new Date(generatedLink.updatedAt).toLocaleDateString('pt-BR')
+                        : new Date(generatedLink?.createdAt || new Date()).toLocaleDateString('pt-BR')
+                      }
+                    </p>
                   </div>
-                  
-                  {showHistory && (
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {shareService.getAllShareLinks().map((link) => (
-                        <div key={link.shortCode} className="bg-slate-800/60 rounded-lg p-3 border border-slate-600/50 backdrop-blur-sm">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-slate-200 truncate">
-                                {shareService.getShortUrl(link.shortCode)}
-                              </p>
-                              <p className="text-xs text-slate-400">
-                                Criado em {new Date(link.createdAt).toLocaleDateString('pt-BR')}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => {
-                                shareService.deleteLink(link.shortCode);
-                                // Verificar se o link deletado era o atual
-                                if (generatedLink && generatedLink.shortCode === link.shortCode) {
-                                  setGeneratedLink(null);
-                                  setHasLinkForCurrentSelection(false);
-                                }
-                              }}
-                              className="text-red-400 hover:text-red-300 p-1 transition-colors"
-                              title="Excluir link"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
             )}

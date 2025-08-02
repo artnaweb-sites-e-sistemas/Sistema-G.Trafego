@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, TrendingUp, TrendingDown, Minus, Edit3, Check, X } from 'lucide-react';
+import { ChevronDown, TrendingUp, TrendingDown, Minus, Edit3, Check, X, Info } from 'lucide-react';
 import { MetricData, metricsService } from '../services/metricsService';
 
 interface MonthlyDetailsTableProps {
@@ -17,8 +17,51 @@ interface TableRow {
   realValueEditable: boolean;
 }
 
+// Componente de Tooltip customizado
+const Tooltip: React.FC<{ children: React.ReactNode; content: string; isVisible: boolean; position?: 'top' | 'right' | 'bottom' }> = ({ children, content, isVisible, position = 'top' }) => {
+  const getPositionClasses = () => {
+    switch (position) {
+      case 'right':
+        return 'top-1/2 -translate-y-1/2 left-full ml-2';
+      case 'bottom':
+        return 'top-full mt-2 left-1/2 transform -translate-x-1/2';
+      default: // top
+        return '-top-3 left-1/2 transform -translate-x-1/2 -translate-y-full';
+    }
+  };
+
+  const getArrowClasses = () => {
+    switch (position) {
+      case 'right':
+        return 'absolute top-1/2 -translate-y-1/2 -left-1 w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-gray-800';
+      case 'bottom':
+        return 'absolute -top-1 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-gray-800';
+      default: // top
+        return 'absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800';
+    }
+  };
+
+  return (
+    <div className="relative inline-block">
+      {children}
+      {isVisible && (
+        <div className={`absolute z-[9999] px-4 py-3 text-sm text-gray-100 bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl shadow-2xl border border-gray-600/50 backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-200 ${getPositionClasses()}`}>
+          <div className="flex items-start space-x-2">
+            <div className="w-1 h-1 bg-red-400 rounded-full animate-pulse mt-2 flex-shrink-0"></div>
+            <span className="font-medium leading-relaxed" style={{ 
+              whiteSpace: 'nowrap'
+            }}>{content}</span>
+          </div>
+          <div className={getArrowClasses()}></div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({ metrics }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [tooltipStates, setTooltipStates] = useState<{ [key: string]: boolean }>({});
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -633,6 +676,31 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({ metrics }) =>
     }
   };
 
+  // Função para obter tooltip de cada métrica
+  const getMetricTooltip = (metric: string): string => {
+    const tooltips: { [key: string]: string } = {
+      'Investimento pretendido (Mês)': 'Valor que você planeja investir no mês em anúncios',
+      'CPM': 'Custo por mil impressões. Quanto você paga para mostrar seu anúncio 1000 vezes',
+      'Impressões': 'Número total de vezes que seu anúncio foi exibido para pessoas',
+      'CPC': 'Custo por clique. Quanto você paga cada vez que alguém clica no seu anúncio',
+      'Cliques': 'Número de vezes que pessoas clicaram no seu anúncio',
+      'CTR': 'Taxa de cliques. Porcentagem de pessoas que clicaram no seu anúncio',
+      'Leads / Msgs': 'Número de pessoas que enviaram mensagem ou se interessaram pelo seu produto',
+      'Tx. Mensagens (Leads/Cliques)': 'Porcentagem de pessoas que clicaram e depois enviaram mensagem',
+      'CPL (Custo por Lead)': 'Quanto você gasta para conseguir cada pessoa interessada',
+      'Agendamentos': 'Número de consultas ou reuniões agendadas com clientes',
+      'Tx. Agendamento (Agend./Leads)': 'Porcentagem de leads que viraram agendamentos',
+      'Comparecimento': 'Número de pessoas que realmente compareceram às consultas',
+      'Tx. Comparecimento (Comp./Agend.)': 'Porcentagem de agendamentos que viraram comparecimentos',
+      'Vendas': 'Número total de vendas realizadas através dos anúncios',
+      'Tx. Conversão Vendas (Vendas/Comp.)': 'Porcentagem de comparecimentos que viraram vendas',
+      'CPV (Custo por Venda)': 'Quanto você gasta para conseguir cada venda',
+      'Lucro': 'Receita total menos o investimento em anúncios',
+      'ROI': 'Retorno sobre investimento. Quanto você ganha de volta para cada real investido'
+    };
+    return tooltips[metric] || 'Informação sobre esta métrica';
+  };
+
   // Agrupar dados por categoria
   const groupedData = tableData.reduce((acc, item) => {
     if (!acc[item.category]) {
@@ -643,7 +711,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({ metrics }) =>
   }, {} as Record<string, TableRow[]>);
 
   return (
-    <div className="bg-slate-900 rounded-xl border border-slate-600 shadow-xl overflow-hidden">
+    <div className="bg-slate-900 rounded-xl border border-slate-600 shadow-xl">
       <div className="p-6 border-b border-slate-700 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900">
         <div className="flex items-center justify-between">
           <div>
@@ -717,7 +785,20 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({ metrics }) =>
                     <tr key={`${category}-${index}`} className={`hover:bg-slate-800/40 transition-all duration-200 ${
                       isLastItem && isLastCategory ? '' : 'border-b border-slate-700/30'
                     }`}>
-                      <td className="p-5 text-slate-200 font-medium w-2/5 border-r border-slate-600/50">{row.metric}</td>
+                      <td className="p-5 text-slate-200 font-medium w-2/5 border-r border-slate-600/50">
+                        <div className="flex items-center space-x-2">
+                          <span>{row.metric}</span>
+                          <Tooltip content={getMetricTooltip(row.metric)} isVisible={tooltipStates[`${category}-${index}`] || false} position="right">
+                            <div
+                              className="cursor-default group/tooltip"
+                              onMouseEnter={() => setTooltipStates(prev => ({ ...prev, [`${category}-${index}`]: true }))}
+                              onMouseLeave={() => setTooltipStates(prev => ({ ...prev, [`${category}-${index}`]: false }))}
+                            >
+                              <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                            </div>
+                          </Tooltip>
+                        </div>
+                      </td>
                       
                       {/* Célula Benchmark editável */}
                       <td 

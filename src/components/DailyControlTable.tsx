@@ -1,23 +1,85 @@
-import React from 'react';
-import { Download } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, Info } from 'lucide-react';
 import { MetricData } from '../services/metricsService';
 
 interface DailyControlTableProps {
   metrics: MetricData[];
   selectedCampaign?: string;
   selectedMonth?: string;
+  customRecordCount?: number;
 }
+
+// Componente de Tooltip customizado
+const Tooltip: React.FC<{ children: React.ReactNode; content: string; isVisible: boolean; position?: 'top' | 'right' | 'bottom' }> = ({ children, content, isVisible, position = 'top' }) => {
+  const getPositionClasses = () => {
+    switch (position) {
+      case 'right':
+        return 'top-1/2 -translate-y-1/2 left-full ml-2';
+      case 'bottom':
+        return 'top-full mt-2 left-1/2 transform -translate-x-1/2';
+      default: // top
+        return '-top-3 left-1/2 transform -translate-x-1/2 -translate-y-full';
+    }
+  };
+
+  const getArrowClasses = () => {
+    switch (position) {
+      case 'right':
+        return 'absolute top-1/2 -translate-y-1/2 -left-1 w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-gray-800';
+      case 'bottom':
+        return 'absolute -top-1 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-gray-800';
+      default: // top
+        return 'absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800';
+    }
+  };
+
+  return (
+    <div className="relative inline-block">
+      {children}
+      {isVisible && (
+        <div className={`absolute z-[9999] px-4 py-3 text-sm text-gray-100 bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl shadow-2xl border border-gray-600/50 backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-200 ${getPositionClasses()}`}>
+          <div className="flex items-start space-x-2">
+            <div className="w-1 h-1 bg-red-400 rounded-full animate-pulse mt-2 flex-shrink-0"></div>
+            <span className="font-medium leading-relaxed" style={{ 
+              whiteSpace: 'nowrap'
+            }}>{content}</span>
+          </div>
+          <div className={getArrowClasses()}></div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const DailyControlTable: React.FC<DailyControlTableProps> = ({ 
   metrics, 
   selectedCampaign,
-  selectedMonth = 'Julho 2023'
+  selectedMonth = 'Julho 2023',
+  customRecordCount
 }) => {
+  const [tooltipStates, setTooltipStates] = useState<{ [key: string]: boolean }>({});
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
     }).format(value);
+  };
+
+  // Função para obter tooltip de cada coluna
+  const getColumnTooltip = (column: string): string => {
+    const tooltips: { [key: string]: string } = {
+      'Data': 'Data do registro de controle diário',
+      'Investimento': 'Valor investido em anúncios neste dia',
+      'Impressões': 'Número de vezes que o anúncio foi exibido neste dia',
+      'Cliques': 'Número de cliques recebidos neste dia',
+      'CPM': 'Custo por mil impressões neste dia',
+      'CTR': 'Taxa de cliques (porcentagem de impressões que viraram cliques)',
+      'Leads': 'Número de leads gerados neste dia',
+      'CPL': 'Custo por lead gerado neste dia',
+      'Status': 'Status do anúncio: Ativo (com investimento) ou Inativo (sem investimento)'
+    };
+    return tooltips[column] || 'Informação sobre esta coluna';
   };
 
   const generateDailyData = () => {
@@ -96,32 +158,15 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
           }
         } catch (error) {
           console.warn('Erro ao processar data da métrica:', error);
-          metricDate = new Date(metric.date);
+          return;
         }
         
+        // Encontrar o índice do dia correspondente
         const dayIndex = metricDate.getDate() - 1;
         
-
-        
-
-        
         if (dayIndex >= 0 && dayIndex < data.length) {
-          // Verificar se é um dia futuro - se for, sempre manter como Inativo
-          if (data[dayIndex].isFutureDay) {
-            console.log(`Dia ${metricDate.getDate()} é futuro - mantendo como Inativo`);
-            data[dayIndex] = {
-              ...data[dayIndex],
-              investment: formatCurrency(0),
-              impressions: 0,
-              clicks: 0,
-              cpm: formatCurrency(0),
-              ctr: '0,00%',
-              leads: 0,
-              cpl: formatCurrency(0),
-              status: 'Inativo'
-            };
-          } else {
-            // Para dias passados ou atuais, aplicar os dados reais
+          // Só atualizar se não for um dia futuro
+          if (!data[dayIndex].isFutureDay) {
             data[dayIndex] = {
               ...data[dayIndex],
               investment: formatCurrency(metric.investment),
@@ -138,55 +183,101 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       }
     });
     
-    // Lógica especial para o dia atual se há campanha selecionada
-    if (selectedCampaign && metrics.length > 0) {
-      console.log(`Exibindo dados específicos da campanha: ${selectedCampaign}`);
-      
-      // Se há campanha selecionada e é o mês atual, marcar o dia atual como ativo
-      const isCurrentMonth = month === currentMonth && year === currentYear;
-      if (isCurrentMonth) {
-        const todayIndex = currentDay - 1;
-        if (todayIndex >= 0 && todayIndex < data.length) {
-          // Se não há dados específicos para hoje, mas há campanha ativa, marcar como ativo
-          if (data[todayIndex].investment === formatCurrency(0) && data[todayIndex].isToday) {
-            data[todayIndex].status = 'Ativo';
-            data[todayIndex].investment = formatCurrency(0.01); // Valor simbólico
-            console.log(`Dia atual (${currentDay}) marcado como ativo - campanha em execução`);
-          }
-        }
-      }
-    }
-    
-    // Adicionar alguns dados de exemplo se não houver dados reais (apenas para meses passados)
-    if (metrics.length === 0) {
-      const isPastMonth = year < currentYear || (year === currentYear && month < currentMonth);
-      
-      if (isPastMonth) {
-  
-        // Adicionar dados de exemplo no meio do mês
-        const middleDay = Math.floor(data.length / 2);
-        if (data[middleDay]) {
-          data[middleDay].investment = formatCurrency(1.74);
-          data[middleDay].impressions = 66;
-          data[middleDay].clicks = 1;
-          data[middleDay].cpm = formatCurrency(1.74);
-          data[middleDay].ctr = '1,52%';
-          data[middleDay].leads = 0;
-          data[middleDay].cpl = formatCurrency(0);
-          data[middleDay].status = 'Ativo';
-        }
-      } else {
-    
-      }
-    }
-    
     return data;
   };
 
   const dailyData = generateDailyData();
 
+  const calculateTotals = () => {
+    const totals = {
+      investment: formatCurrency(0),
+      impressions: 0,
+      clicks: 0,
+      cpm: formatCurrency(0),
+      ctr: '0,00%',
+      leads: 0,
+      cpl: formatCurrency(0),
+      activeDays: 0
+    };
+
+    dailyData.forEach(row => {
+      if (row.status === 'Ativo') {
+        totals.activeDays++;
+        
+      // Extrair valores numéricos das strings formatadas
+      const investmentValue = parseFloat(row.investment.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
+      const impressionsValue = row.impressions || 0;
+      const clicksValue = row.clicks || 0;
+      const leadsValue = row.leads || 0;
+        const cpmValue = parseFloat(row.cpm.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
+        const cplValue = parseFloat(row.cpl.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
+      
+        // Acumular totais
+        totals.investment = formatCurrency(parseFloat(totals.investment.replace(/[^\d,.-]/g, '').replace(',', '.')) + investmentValue);
+      totals.impressions += impressionsValue;
+      totals.clicks += clicksValue;
+      totals.leads += leadsValue;
+      
+        // Calcular médias
+        const totalInvestment = parseFloat(totals.investment.replace(/[^\d,.-]/g, '').replace(',', '.'));
+        const totalImpressions = totals.impressions;
+        const totalClicks = totals.clicks;
+        const totalLeads = totals.leads;
+        
+        if (totalImpressions > 0) {
+          totals.cpm = formatCurrency((totalInvestment / totalImpressions) * 1000);
+          totals.ctr = `${((totalClicks / totalImpressions) * 100).toFixed(2)}%`;
+        }
+        
+        if (totalLeads > 0) {
+          totals.cpl = formatCurrency(totalInvestment / totalLeads);
+        }
+      }
+    });
+
+    return totals;
+  };
+
+  const totals = calculateTotals();
+
+  const TotalsRow = ({ isHeader = false }: { isHeader?: boolean }) => (
+    <tr className={`border-b border-slate-700 ${isHeader ? 'bg-gradient-to-r from-slate-700/80 to-slate-600/80' : 'bg-gradient-to-r from-slate-800/80 to-slate-700/80'}`}>
+      <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
+        {isHeader ? 'TOTAIS' : `${totals.activeDays} dias ativos`}
+      </td>
+      <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
+        {totals.investment}
+      </td>
+      <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
+        {totals.impressions}
+      </td>
+      <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
+        {totals.clicks}
+      </td>
+      <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
+        {totals.cpm}
+      </td>
+      <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
+        {totals.ctr}
+      </td>
+      <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
+        {totals.leads}
+      </td>
+      <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
+        {totals.cpl}
+      </td>
+      <td className="p-4">
+        <div className="flex items-center space-x-2">
+          <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-900/60 text-blue-400 border border-blue-600/50">
+            {totals.activeDays} dias ativos
+          </span>
+        </div>
+      </td>
+    </tr>
+  );
+
   return (
-    <div className="bg-slate-900 rounded-xl border border-slate-700 shadow-xl overflow-hidden">
+    <div className="bg-slate-900 rounded-xl border border-slate-700 shadow-xl">
       <div className="p-6 border-b border-slate-700 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900">
         <div className="flex items-center justify-between">
           <div>
@@ -201,7 +292,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
           {metrics.length > 0 && (
             <div className="bg-emerald-900/30 rounded-lg p-3 border border-emerald-600/30">
               <p className="text-sm text-emerald-400 font-medium">
-                ✓ {metrics.length} registros carregados do Meta Ads
+                ✓ {customRecordCount || metrics.length} registros carregados do Meta Ads
               </p>
             </div>
           )}
@@ -212,18 +303,136 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-750">
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">DIA</th>
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">INVESTIMENTO ($$$)</th>
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">IMPRESSÕES</th>
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">CLIQUES</th>
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">CPM ($$$)</th>
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">CTR (%)</th>
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">LEADS</th>
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">CPL ($$$)</th>
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide">STATUS</th>
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                <div className="flex items-center space-x-2">
+                  <span>DIA</span>
+                  <Tooltip content={getColumnTooltip('Data')} isVisible={tooltipStates['Data'] || false} position="bottom">
+                    <div
+                      className="cursor-default group/tooltip"
+                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Data': true }))}
+                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Data': false }))}
+                    >
+                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                    </div>
+                  </Tooltip>
+                </div>
+              </th>
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                <div className="flex items-center space-x-2">
+                  <span>INVESTIMENTO ($$$)</span>
+                  <Tooltip content={getColumnTooltip('Investimento')} isVisible={tooltipStates['Investimento'] || false} position="bottom">
+                    <div
+                      className="cursor-default group/tooltip"
+                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Investimento': true }))}
+                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Investimento': false }))}
+                    >
+                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                    </div>
+                  </Tooltip>
+                </div>
+              </th>
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                <div className="flex items-center space-x-2">
+                  <span>IMPRESSÕES</span>
+                  <Tooltip content={getColumnTooltip('Impressões')} isVisible={tooltipStates['Impressões'] || false} position="bottom">
+                    <div
+                      className="cursor-default group/tooltip"
+                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Impressões': true }))}
+                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Impressões': false }))}
+                    >
+                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                    </div>
+                  </Tooltip>
+                </div>
+              </th>
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                <div className="flex items-center space-x-2">
+                  <span>CLIQUES</span>
+                  <Tooltip content={getColumnTooltip('Cliques')} isVisible={tooltipStates['Cliques'] || false} position="bottom">
+                    <div
+                      className="cursor-default group/tooltip"
+                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Cliques': true }))}
+                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Cliques': false }))}
+                    >
+                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                    </div>
+                  </Tooltip>
+                </div>
+              </th>
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                <div className="flex items-center space-x-2">
+                  <span>CPM ($$$)</span>
+                  <Tooltip content={getColumnTooltip('CPM')} isVisible={tooltipStates['CPM'] || false} position="bottom">
+                    <div
+                      className="cursor-default group/tooltip"
+                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'CPM': true }))}
+                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'CPM': false }))}
+                    >
+                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                    </div>
+                  </Tooltip>
+                </div>
+              </th>
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                <div className="flex items-center space-x-2">
+                  <span>CTR (%)</span>
+                  <Tooltip content={getColumnTooltip('CTR')} isVisible={tooltipStates['CTR'] || false} position="bottom">
+                    <div
+                      className="cursor-default group/tooltip"
+                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'CTR': true }))}
+                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'CTR': false }))}
+                    >
+                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                    </div>
+                  </Tooltip>
+                </div>
+              </th>
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                <div className="flex items-center space-x-2">
+                  <span>LEADS</span>
+                  <Tooltip content={getColumnTooltip('Leads')} isVisible={tooltipStates['Leads'] || false} position="bottom">
+                    <div
+                      className="cursor-default group/tooltip"
+                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Leads': true }))}
+                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Leads': false }))}
+                    >
+                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                    </div>
+                  </Tooltip>
+                </div>
+              </th>
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                <div className="flex items-center space-x-2">
+                  <span>CPL ($$$)</span>
+                  <Tooltip content={getColumnTooltip('CPL')} isVisible={tooltipStates['CPL'] || false} position="bottom">
+                    <div
+                      className="cursor-default group/tooltip"
+                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'CPL': true }))}
+                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'CPL': false }))}
+                    >
+                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                    </div>
+                  </Tooltip>
+                </div>
+              </th>
+              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide">
+                <div className="flex items-center space-x-2">
+                  <span>STATUS</span>
+                  <Tooltip content={getColumnTooltip('Status')} isVisible={tooltipStates['Status'] || false} position="bottom">
+                    <div
+                      className="cursor-default group/tooltip"
+                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Status': true }))}
+                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Status': false }))}
+                    >
+                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                    </div>
+                  </Tooltip>
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
+            <TotalsRow isHeader />
             {dailyData.map((row, index) => (
               <tr key={index} className={`hover:bg-slate-800/40 transition-all duration-200 ${
                 row.isToday ? 'bg-indigo-900/20 border-l-4 border-l-indigo-400 shadow-sm' : ''
@@ -249,6 +458,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                 </td>
               </tr>
             ))}
+            <TotalsRow />
           </tbody>
         </table>
       </div>

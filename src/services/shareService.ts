@@ -4,6 +4,7 @@ export interface ShareLink {
   shortCode: string;
   originalUrl: string;
   createdAt: Date;
+  updatedAt?: Date;
   expiresAt?: Date;
   isActive: boolean;
 }
@@ -36,6 +37,11 @@ class ShareService {
             // Converter createdAt de string para Date
             if (value.createdAt && typeof value.createdAt === 'string') {
               value.createdAt = new Date(value.createdAt);
+            }
+            
+            // Converter updatedAt de string para Date (se existir)
+            if (value.updatedAt && typeof value.updatedAt === 'string') {
+              value.updatedAt = new Date(value.updatedAt);
             }
             
             // Converter expiresAt de string para Date (se existir)
@@ -113,6 +119,39 @@ class ShareService {
     this.saveToStorage();
 
     return shareLink;
+  }
+
+  public updateShareLink(shortCode: string, newParams: {
+    audience: string;
+    product: string;
+    client: string;
+    month: string;
+  }): ShareLink | null {
+    const link = this.shareLinks.get(shortCode);
+    
+    if (!link || !link.isActive) {
+      return null;
+    }
+
+    // Criar nova URL com parâmetros atualizados
+    const baseUrl = window.location.origin;
+    const searchParams = new URLSearchParams({
+      audience: newParams.audience,
+      product: newParams.product,
+      client: newParams.client,
+      month: newParams.month,
+      shared: 'true'
+    });
+    
+    const newOriginalUrl = `${baseUrl}/shared-report?${searchParams.toString()}`;
+    
+    // Atualizar o link
+    link.originalUrl = newOriginalUrl;
+    link.updatedAt = new Date();
+    
+    this.saveToStorage();
+    
+    return link;
   }
 
   public getShareLink(shortCode: string): ShareLink | null {
