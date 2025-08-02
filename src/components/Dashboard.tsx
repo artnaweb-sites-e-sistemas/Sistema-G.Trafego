@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import Header from './Header';
 import MetricsGrid from './MetricsGrid';
@@ -20,14 +20,14 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [isFacebookConnected, setIsFacebookConnected] = useState(false);
 
   // Função para obter o mês atual formatado
-  const getCurrentMonth = () => {
+  const getCurrentMonth = useCallback(() => {
     const now = new Date();
     const months = [
       'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
       'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
     ];
     return `${months[now.getMonth()]} ${now.getFullYear()}`;
-  };
+  }, []);
 
   // Estados para filtros do dashboard
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
@@ -47,30 +47,20 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     const savedAudience = localStorage.getItem('selectedAudience');
     const savedCampaign = localStorage.getItem('selectedCampaignId');
     
-    console.log('Dashboard: Carregando estado salvo do localStorage');
-    console.log('Cliente salvo:', savedClient);
-    console.log('Produto salvo:', savedProduct);
-    console.log('Público salvo:', savedAudience);
-    console.log('Campanha salva:', savedCampaign);
-    
     if (savedClient && savedClient !== 'Todos os Clientes') {
       setSelectedClient(savedClient);
-      console.log('Dashboard: Cliente restaurado:', savedClient);
     }
     
     if (savedProduct && savedProduct !== 'Todos os Produtos') {
       setSelectedProduct(savedProduct);
-      console.log('Dashboard: Produto restaurado:', savedProduct);
     }
     
     if (savedAudience && savedAudience !== 'Todos os Públicos') {
       setSelectedAudience(savedAudience);
-      console.log('Dashboard: Público restaurado:', savedAudience);
     }
     
     if (savedCampaign) {
       setSelectedCampaign(savedCampaign);
-      console.log('Dashboard: Campanha restaurada:', savedCampaign);
     }
   }, []);
 
@@ -78,326 +68,168 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   useEffect(() => {
     const currentMonth = getCurrentMonth();
     if (selectedMonth !== currentMonth) {
-      console.log('Dashboard: Atualizando mês selecionado para mês atual:', currentMonth);
       setSelectedMonth(currentMonth);
     }
-  }, []);
+  }, [selectedMonth, getCurrentMonth]);
 
   // Carregar métricas
   useEffect(() => {
     const loadMetrics = async () => {
-      console.log('🟡 Dashboard: loadMetrics chamado');
-      console.log('🟡 Dashboard: Estado atual - Cliente:', selectedClient, 'Produto:', selectedProduct, 'Público:', selectedAudience);
-      console.log('🟡 Dashboard: DataSource:', dataSource, 'Facebook Conectado:', isFacebookConnected);
-      
       // Não carregar métricas se não há cliente selecionado
       if (selectedClient === 'Selecione um cliente' || selectedClient === 'Todos os Clientes') {
-        console.log('🟡 Dashboard: Nenhum cliente selecionado - zerando métricas');
         setMetrics([]);
         setLoading(false);
         return;
       }
 
-      // Não carregar métricas se não está conectado ao Meta Ads
+      // Se o Meta Ads não está conectado, zerar métricas
       if (dataSource === 'facebook' && !isFacebookConnected) {
-        console.log('🟡 Dashboard: Meta Ads não conectado - zerando métricas');
         setMetrics([]);
         setLoading(false);
         return;
       }
 
       try {
-        console.log('🟡 Dashboard: Iniciando carregamento de métricas...');
         setLoading(true);
-
-        const data = await metricsService.getMetrics(selectedMonth, selectedClient, selectedProduct, selectedAudience, selectedCampaign);
-        console.log('🟡 Dashboard: Métricas carregadas:', data.length, 'registros');
+        setError(null);
+        
+        const data = await metricsService.getMetrics(selectedClient, selectedProduct, selectedAudience, selectedMonth);
         setMetrics(data);
-      } catch (err: any) {
-        console.error('🔴 Dashboard: Erro ao carregar métricas:', err.message);
-        setError(err.message);
-      } finally {
         setLoading(false);
-        console.log('🟡 Dashboard: Carregamento de métricas concluído');
+      } catch (err: any) {
+        setError(err.message);
+        setLoading(false);
       }
     };
 
     loadMetrics();
-  }, [selectedMonth, selectedClient, selectedProduct, selectedAudience, selectedCampaign, refreshTrigger, dataSource, isFacebookConnected]);
+  }, [selectedClient, selectedProduct, selectedAudience, selectedMonth, dataSource, isFacebookConnected, refreshTrigger]);
 
-  // Listener para seleção de Business Manager
+  // Consolidar todos os event listeners em um único useEffect
   useEffect(() => {
-    const handleBusinessManagerSelected = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { businessManager, clientName } = customEvent.detail;
-      console.log('Business Manager selecionada:', businessManager, clientName);
-      
-      // Atualizar cliente selecionado
-      setSelectedClient(clientName);
-      
-      try {
-        // Forçar recarregamento das métricas com o novo cliente
-        setRefreshTrigger(prev => prev + 1);
-      } catch (error) {
-        console.error('Erro ao carregar métricas da Business Manager:', error);
-      }
-    };
+    const eventHandlers = {
+      businessManagerSelected: (event: Event) => {
+        const customEvent = event as CustomEvent;
+        const { businessManager, clientName } = customEvent.detail;
+        setSelectedClient(clientName);
+        localStorage.setItem('currentSelectedClient', clientName);
+      },
 
-    window.addEventListener('businessManagerSelected', handleBusinessManagerSelected);
-
-    return () => {
-      window.removeEventListener('businessManagerSelected', handleBusinessManagerSelected);
-    };
-  }, []);
-
-  // Listener para seleção de Campanha
-  useEffect(() => {
-    const handleCampaignSelected = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { campaign, productName, campaignId } = customEvent.detail;
-      console.log('Campanha selecionada:', campaign, productName, 'ID:', campaignId);
-      
-      // Atualizar produto selecionado
-      setSelectedProduct(productName);
-      
-      // Armazenar o ID da campanha para usar nas métricas
-      if (campaignId) {
+      campaignSelected: (event: Event) => {
+        const customEvent = event as CustomEvent;
+        const { campaign, productName, campaignId } = customEvent.detail;
+        setSelectedProduct(productName);
+        setSelectedCampaign(campaignId);
+        localStorage.setItem('selectedProduct', productName);
         localStorage.setItem('selectedCampaignId', campaignId);
-      }
-      
-      try {
-        // Forçar recarregamento das métricas com a nova campanha
-        setRefreshTrigger(prev => prev + 1);
-      } catch (error) {
-        console.error('Erro ao carregar métricas da campanha:', error);
-      }
-    };
+      },
 
-    window.addEventListener('campaignSelected', handleCampaignSelected);
-
-    return () => {
-      window.removeEventListener('campaignSelected', handleCampaignSelected);
-    };
-  }, []);
-
-  // Listener para seleção de Ad Set (Público)
-  useEffect(() => {
-    const handleAdSetSelected = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { adSet, audienceName, adSetId } = customEvent.detail;
-      console.log('Ad Set selecionado:', adSet, audienceName, 'ID:', adSetId);
-      
-      // Atualizar público selecionado
-      setSelectedAudience(audienceName);
-      
-      // Armazenar o ID do Ad Set para usar nas métricas
-      if (adSetId) {
+      adSetSelected: (event: Event) => {
+        const customEvent = event as CustomEvent;
+        const { adSet, audienceName, adSetId } = customEvent.detail;
+        setSelectedAudience(audienceName);
+        localStorage.setItem('selectedAudience', audienceName);
         localStorage.setItem('selectedAdSetId', adSetId);
-      }
-      
-      try {
-        // Forçar recarregamento das métricas com o novo Ad Set
+      },
+
+      clientCleared: (event: Event) => {
+        const customEvent = event as CustomEvent;
+        const { clientName } = customEvent.detail;
+        setSelectedClient('Todos os Clientes');
+        setSelectedProduct('Todos os Produtos');
+        setSelectedAudience('Todos os Públicos');
+        setSelectedCampaign('');
+        setMetrics([]);
+        localStorage.removeItem('currentSelectedClient');
+        localStorage.removeItem('selectedProduct');
+        localStorage.removeItem('selectedAudience');
+        localStorage.removeItem('selectedCampaignId');
+      },
+
+      noProductsFound: (event: Event) => {
+        const customEvent = event as CustomEvent;
+        const { clientName } = customEvent.detail;
+        setSelectedProduct('Todos os Produtos');
+        setSelectedAudience('Todos os Públicos');
+        setSelectedCampaign('');
+        setMetrics([]);
+      },
+
+      metaAdsDataRefreshed: (event: Event) => {
+        const customEvent = event as CustomEvent;
+        const { type, timestamp } = customEvent.detail;
         setRefreshTrigger(prev => prev + 1);
-      } catch (error) {
-        console.error('Erro ao carregar métricas do Ad Set:', error);
-      }
-    };
+      },
 
-    window.addEventListener('adSetSelected', handleAdSetSelected);
+      metaAdsLoggedOut: (event: Event) => {
+        const customEvent = event as CustomEvent;
+        const { timestamp } = customEvent.detail;
+        setSelectedClient('Todos os Clientes');
+        setSelectedProduct('Todos os Produtos');
+        setSelectedAudience('Todos os Públicos');
+        setSelectedCampaign('');
+        setMetrics([]);
+        setDataSource(null);
+        setIsFacebookConnected(false);
+      },
 
-    return () => {
-      window.removeEventListener('adSetSelected', handleAdSetSelected);
-    };
-  }, []);
-
-  // Listener para limpeza de cliente
-  useEffect(() => {
-    const handleClientCleared = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { clientName } = customEvent.detail;
-      console.log('Cliente limpo:', clientName);
-      
-      // Atualizar cliente selecionado no Dashboard
-      setSelectedClient('Selecione um cliente');
-      
-      // Zerar métricas quando cliente for limpo
-      setMetrics([]);
-      setSelectedProduct('Todos os Produtos');
-      setSelectedAudience('Todos os Públicos');
-      setSelectedCampaign('');
-      
-      // Forçar refresh das métricas para garantir que sejam zeradas
-      setRefreshTrigger(prev => prev + 1);
-      
-      console.log('Dashboard: Cliente e métricas zerados após limpeza');
-    };
-
-    window.addEventListener('clientCleared', handleClientCleared);
-
-    return () => {
-      window.removeEventListener('clientCleared', handleClientCleared);
-    };
-  }, []);
-
-  // Listener para quando não há produtos encontrados
-  useEffect(() => {
-    const handleNoProductsFound = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { clientName } = customEvent.detail;
-      console.log('Nenhum produto encontrado para cliente:', clientName);
-      
-      // Zerar métricas quando não há produtos
-      setMetrics([]);
-      setSelectedProduct('Todos os Produtos');
-      setSelectedAudience('Todos os Públicos');
-      setSelectedCampaign('');
-      
-      console.log('Dashboard: Métricas zeradas - nenhum produto encontrado');
-    };
-
-    window.addEventListener('noProductsFound', handleNoProductsFound);
-
-    return () => {
-      window.removeEventListener('noProductsFound', handleNoProductsFound);
-    };
-  }, []);
-
-  // Listener para atualizações do Meta Ads
-  useEffect(() => {
-    const handleMetaAdsDataRefreshed = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { type, timestamp } = customEvent.detail;
-      console.log('Dados do Meta Ads atualizados:', type, timestamp);
-      
-      // Forçar refresh das métricas quando dados são atualizados
-      setRefreshTrigger(prev => prev + 1);
-      
-      console.log('Dashboard: Refresh forçado após atualização do Meta Ads');
-    };
-
-    window.addEventListener('metaAdsDataRefreshed', handleMetaAdsDataRefreshed);
-
-    return () => {
-      window.removeEventListener('metaAdsDataRefreshed', handleMetaAdsDataRefreshed);
-    };
-  }, []);
-
-  // Listener para logout do Meta Ads
-  useEffect(() => {
-    const handleMetaAdsLoggedOut = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { timestamp } = customEvent.detail;
-      console.log('Logout do Meta Ads detectado:', timestamp);
-      
-      // Limpar dados do dashboard quando Meta Ads desconecta
-      setSelectedClient('Selecione um cliente');
-      setSelectedProduct('Todos os Produtos');
-      setSelectedAudience('Todos os Públicos');
-      setSelectedCampaign('');
-      setMetrics([]);
-      setDataSource(null);
-      setIsFacebookConnected(false);
-      
-      // Forçar refresh para garantir limpeza
-      setRefreshTrigger(prev => prev + 1);
-      
-      console.log('Dashboard: Dados limpos após logout do Meta Ads');
-    };
-
-    window.addEventListener('metaAdsLoggedOut', handleMetaAdsLoggedOut);
-
-    return () => {
-      window.removeEventListener('metaAdsLoggedOut', handleMetaAdsLoggedOut);
-    };
-  }, []);
-
-  // Listener para carregar métricas de todas as campanhas
-  useEffect(() => {
-    const handleLoadAllCampaignsMetrics = async (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { clientName, source, adAccount } = customEvent.detail;
-      
-      console.log('🟢 Dashboard: Evento loadAllCampaignsMetrics recebido');
-      console.log('🟢 Dashboard: Detalhes - Cliente:', clientName, 'Source:', source, 'AdAccount:', adAccount?.name);
-      
-      try {
-        const { metricsService } = await import('../services/metricsService');
-        metricsService.clearCache();
-        console.log('🟢 Dashboard: Cache do metricsService limpo');
-        
-        // Forçar refresh das métricas
-        setRefreshTrigger(prev => prev + 1);
-        console.log('🟢 Dashboard: RefreshTrigger incrementado');
-      } catch (error) {
-        console.warn('🔴 Dashboard: Erro ao carregar métricas de todas as campanhas:', error);
-      }
-    };
-
-    window.addEventListener('loadAllCampaignsMetrics', handleLoadAllCampaignsMetrics);
-
-    return () => {
-      window.removeEventListener('loadAllCampaignsMetrics', handleLoadAllCampaignsMetrics);
-    };
-  }, []);
-
-  // Listener para mudança de cliente
-  useEffect(() => {
-    const handleClientChanged = async (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { clientName, source, businessManager, adAccount } = customEvent.detail;
-
-      console.log('🟢 Dashboard: Evento clientChanged recebido');
-      console.log('🟢 Dashboard: Detalhes - Cliente:', clientName, 'Source:', source, 'BM:', businessManager?.name, 'AdAccount:', adAccount?.name);
-      
-      // Atualizar o cliente selecionado
-      setSelectedClient(clientName);
-      console.log('🟢 Dashboard: Cliente atualizado no estado:', clientName);
-      
-      // Atualizar dataSource baseado no tipo de cliente
-      if (source === 'facebook') {
-        setDataSource('facebook');
-        setIsFacebookConnected(true);
-        console.log('🟢 Dashboard: DataSource definido como Facebook');
-        
+      loadAllCampaignsMetrics: async (event: Event) => {
+        const customEvent = event as CustomEvent;
+        const { clientName, source, adAccount } = customEvent.detail;
         try {
-          const { metricsService } = await import('../services/metricsService');
-          metricsService.clearCache();
-          console.log('🟢 Dashboard: Cache do metricsService limpo');
-          
-          // Forçar carregamento imediato das métricas para o cliente selecionado
-          console.log('🟢 Dashboard: Forçando carregamento de métricas para cliente:', clientName);
+          await metricsService.clearCache();
           setRefreshTrigger(prev => prev + 1);
         } catch (error) {
-          console.warn('🔴 Dashboard: Erro ao limpar cache:', error);
+          console.warn('Erro ao limpar cache:', error);
         }
-      } else if (source === 'manual') {
-        setDataSource('manual');
-        setIsFacebookConnected(false);
-        console.log('🟢 Dashboard: DataSource definido como Manual');
+      },
+
+      clientChanged: async (event: Event) => {
+        const customEvent = event as CustomEvent;
+        const { clientName, source, businessManager, adAccount } = customEvent.detail;
         
-        // Para clientes manuais, também forçar refresh
-        setRefreshTrigger(prev => prev + 1);
-        console.log('🟢 Dashboard: RefreshTrigger incrementado para cliente manual');
+        setSelectedClient(clientName);
+        localStorage.setItem('currentSelectedClient', clientName);
+        
+        if (source === 'facebook') {
+          setDataSource('facebook');
+          setIsFacebookConnected(true);
+          try {
+            await metricsService.clearCache();
+            setRefreshTrigger(prev => prev + 1);
+          } catch (error) {
+            console.warn('Erro ao limpar cache:', error);
+          }
+        } else if (source === 'manual') {
+          setDataSource('manual');
+          setIsFacebookConnected(false);
+          setRefreshTrigger(prev => prev + 1);
+        }
       }
     };
 
-    window.addEventListener('clientChanged', handleClientChanged);
+    // Adicionar todos os event listeners
+    Object.entries(eventHandlers).forEach(([eventName, handler]) => {
+      window.addEventListener(eventName, handler);
+    });
 
+    // Cleanup function
     return () => {
-      window.removeEventListener('clientChanged', handleClientChanged);
+      Object.entries(eventHandlers).forEach(([eventName, handler]) => {
+        window.removeEventListener(eventName, handler);
+      });
     };
   }, []);
 
-  const handleMetaAdsSync = () => {
+  const handleMetaAdsSync = useCallback(() => {
     setRefreshTrigger(prev => prev + 1);
-  };
+  }, []);
 
   // Função para atualizar origem dos dados
-  const handleDataSourceChange = (source: 'manual' | 'facebook' | null, connected: boolean) => {
-    console.log('Atualizando origem dos dados:', source, connected);
+  const handleDataSourceChange = useCallback((source: 'manual' | 'facebook' | null, connected: boolean) => {
     setDataSource(source);
     setIsFacebookConnected(connected);
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 text-white">

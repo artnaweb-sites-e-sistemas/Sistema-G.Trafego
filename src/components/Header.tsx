@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Settings, User, Search, LogOut, Facebook, Database } from 'lucide-react';
 import MetaAdsConfig from './MetaAdsConfig';
 import ShareReport from './ShareReport';
@@ -67,13 +67,13 @@ const Header: React.FC<HeaderProps> = ({
 
   // Listener para quando um link for gerado
   useEffect(() => {
-    const handleLinkGenerated = () => {
+    const handleLinkGenerated = useCallback(() => {
       setHasGeneratedLinks(true);
-    };
+    }, []);
 
-    const handleNoLinksRemaining = () => {
+    const handleNoLinksRemaining = useCallback(() => {
       setHasGeneratedLinks(false);
-    };
+    }, []);
 
     window.addEventListener('linkGenerated', handleLinkGenerated);
     window.addEventListener('noLinksRemaining', handleNoLinksRemaining);

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Users, ChevronDown, Search, Plus, Trash2, Facebook, X } from 'lucide-react';
 import { metaAdsService, BusinessManager } from '../services/metaAdsService';
 
@@ -35,14 +35,13 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
     const savedClient = localStorage.getItem('currentSelectedClient');
     if (savedClient && savedClient !== 'Todos os Clientes') {
       setSelectedClient(savedClient);
-      console.log('ClientPicker: Cliente restaurado do localStorage:', savedClient);
     }
   }, [setSelectedClient]);
 
   // Listener para reagir quando cliente for limpo pelo Dashboard
   useEffect(() => {
     const handleClientCleared = () => {
-      console.log('ClientPicker: Recebeu evento clientCleared, mantendo estado limpo');
+      // Mantém o estado limpo quando necessário
     };
 
     window.addEventListener('clientCleared', handleClientCleared);
@@ -52,17 +51,11 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
   // Carregar Business Managers do Meta Ads quando conectado
   useEffect(() => {
     const loadBusinessManagers = async () => {
-      console.log('ClientPicker: dataSource =', dataSource);
-      console.log('ClientPicker: metaAdsService.isLoggedIn() =', metaAdsService.isLoggedIn());
-      console.log('ClientPicker: metaAdsService.hasStoredData() =', metaAdsService.hasStoredData('business_managers'));
-      
       if (dataSource === 'facebook') {
         try {
           setIsLoading(true);
-          console.log('Carregando Business Managers...');
           
           const businessManagers = await metaAdsService.getBusinessManagers();
-          console.log('Business Managers encontrados:', businessManagers);
           
           // Converter Business Managers para formato de clientes
           const facebookClients: Client[] = businessManagers.map((bm, index) => ({
@@ -72,8 +65,6 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
             source: 'facebook' as const,
             businessManager: bm
           }));
-          
-          console.log('Clientes do Facebook criados:', facebookClients);
           
           // Definir Business Managers como clientes (sem "Todos os Clientes")
           setClients(facebookClients);
@@ -88,7 +79,6 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
           setIsLoading(false);
         }
       } else if (dataSource === 'manual') {
-        console.log('Carregando clientes manuais...');
         // Carregar clientes manuais (sem "Todos os Clientes")
         setClients([
           { id: '2', name: 'João Silva', email: 'joao@empresa.com', company: 'Empresa ABC', source: 'manual' },
@@ -99,8 +89,6 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
           { id: '7', name: 'Lucia Mendes', email: 'lucia@ecommerce.com', company: 'E-commerce Plus', source: 'manual' },
           { id: '8', name: 'Roberto Lima', email: 'roberto@agencia.com', company: 'Agência Criativa', source: 'manual' },
         ]);
-      } else {
-        console.log('DataSource não é facebook ou usuário não está logado');
       }
     };
 
@@ -127,9 +115,7 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleClientSelect = async (client: Client) => {
-    console.log('🔵 ClientPicker: Iniciando seleção de cliente:', client.name, 'Source:', client.source);
-    
+  const handleClientSelect = useCallback(async (client: Client) => {
     setSelectedClient(client.name);
     setIsOpen(false);
     setSearchTerm('');
@@ -140,93 +126,53 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
     localStorage.removeItem('selectedAudience');
     
     localStorage.setItem('currentSelectedClient', client.name);
-    console.log('🔵 ClientPicker: Cliente salvo no localStorage:', client.name);
     
     if (client.source === 'facebook') {
-      console.log('🔵 ClientPicker: Cliente é do Facebook, limpando cache...');
       metaAdsService.clearAllCache();
       
       const keysToRemove = [
         'metaAds_campaigns',
-        'metaAds_adsets',
-        'metaAds_business_managers',
-        'metaAds_ad_accounts_by_business',
-        'metaAds_metrics',
-        'metaAds_insights'
+        'metaAds_ad_sets',
+        'metaAds_insights',
+        'metaAds_accounts',
+        'metaAds_business_managers'
       ];
-      keysToRemove.forEach(key => localStorage.removeItem(key));
       
-      import('../services/metricsService').then(({ metricsService }) => {
-        metricsService.clearCache();
-        console.log('🔵 ClientPicker: Cache do metricsService limpo');
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
       });
-    }
-    
-    if (client.source === 'facebook' && client.businessManager) {
+      
+      // Limpar cache do metricsService
       try {
-        const adAccounts = await metaAdsService.getAdAccountsByBusiness(client.businessManager.id);
-        
-        if (adAccounts.length > 0) {
-          const activeAccount = adAccounts.find(account => account.account_status === 1) || adAccounts[0];
-          metaAdsService.selectAdAccount(activeAccount);
-          
-          const event = new CustomEvent('clientChanged', {
-            detail: {
-              clientName: client.name,
-              businessManager: client.businessManager,
-              adAccount: activeAccount,
-              source: 'facebook'
-            }
-          });
-          window.dispatchEvent(event);
-          
-          // Disparar evento para carregar métricas de todas as campanhas
-          const loadAllMetricsEvent = new CustomEvent('loadAllCampaignsMetrics', {
-            detail: {
-              clientName: client.name,
-              source: 'facebook',
-              adAccount: activeAccount
-            }
-          });
-          window.dispatchEvent(loadAllMetricsEvent);
-        } else {
-          // Limpar a conta selecionada quando não há contas para este cliente
-          metaAdsService.clearSelectedAccount();
-          
-          const event = new CustomEvent('clientChanged', {
-            detail: {
-              clientName: client.name,
-              businessManager: client.businessManager,
-              adAccount: null,
-              source: 'facebook'
-            }
-          });
-          window.dispatchEvent(event);
-        }
+        const { metricsService } = await import('../services/metricsService');
+        metricsService.clearCache();
       } catch (error) {
-        console.error('🔴 ClientPicker: Erro ao configurar conta:', error);
-        const event = new CustomEvent('clientChanged', {
-          detail: {
-            clientName: client.name,
-            businessManager: client.businessManager,
-            adAccount: null,
-            source: 'facebook'
-          }
-        });
-        window.dispatchEvent(event);
+        console.warn('Erro ao limpar cache do metricsService:', error);
       }
-    } else {
+      
+      // Disparar evento customizado para notificar outros componentes
       const event = new CustomEvent('clientChanged', {
         detail: {
           clientName: client.name,
-          source: 'manual'
+          source: 'facebook',
+          businessManager: client.businessManager,
+          adAccount: null
+        }
+      });
+      window.dispatchEvent(event);
+    } else {
+      // Disparar evento customizado para clientes manuais
+      const event = new CustomEvent('clientChanged', {
+        detail: {
+          clientName: client.name,
+          source: 'manual',
+          businessManager: null,
+          adAccount: null
         }
       });
       window.dispatchEvent(event);
     }
-    
-    console.log('🔵 ClientPicker: Seleção de cliente concluída');
-  };
+  }, [setSelectedClient]);
 
   const handleClear = async () => {
     // Capturar cliente anterior ANTES de limpar localStorage

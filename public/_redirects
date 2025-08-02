@@ -1,1 +1,17 @@
+# Configuração para SPA (Single Page Application)
+# Redireciona todas as rotas para index.html para que o React Router possa lidar com elas
+
+# Rota para links curtos de relatórios
+/r/*    /index.html   200
+
+# Rota para relatórios compartilhados
+/shared-report    /index.html   200
+
+# Rota de login
+/login    /index.html   200
+
+# Rota principal
+/    /index.html   200
+
+# Fallback para todas as outras rotas
 /*    /index.html   200 

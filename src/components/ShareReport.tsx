@@ -69,32 +69,38 @@ const ShareReport: React.FC<ShareReportProps> = ({
     checkExistingLink();
   }, [selectedAudience, selectedProduct, selectedClient, selectedMonth]);
 
-  const generateShareLink = async () => {
-    setIsGenerating(true);
-    
+  const handleGenerateLink = () => {
     try {
-      // Simular geração de link (em produção, isso seria uma chamada para a API)
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Criar link curto usando o serviço
+      console.log('🔗 Gerando link de compartilhamento...');
+      console.log('📋 Parâmetros:', {
+        audience: selectedAudience,
+        product: selectedProduct,
+        client: selectedClient,
+        month: selectedMonth
+      });
+
       const shareLink = shareService.createShareLink({
         audience: selectedAudience,
         product: selectedProduct,
         client: selectedClient,
         month: selectedMonth
       });
-      
+
+      console.log('✅ Link gerado:', shareLink);
+      console.log('🔗 URL curta:', shareService.getShortUrl(shareLink.shortCode));
+
       setGeneratedLink(shareLink);
       setHasLinkForCurrentSelection(true);
       
-      // Emitir evento para notificar que um link foi gerado
+      // Disparar evento para notificar outros componentes
       window.dispatchEvent(new CustomEvent('linkGenerated', {
         detail: { shareLink }
       }));
+      
+      toast.success('Link de compartilhamento gerado com sucesso!');
     } catch (error) {
-      console.error('Erro ao gerar link:', error);
-    } finally {
-      setIsGenerating(false);
+      console.error('❌ Erro ao gerar link:', error);
+      toast.error('Erro ao gerar link de compartilhamento');
     }
   };
 
@@ -226,7 +232,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
                 <div className="text-center">
                   <p className="text-slate-400 mb-4">Gere um link personalizado para compartilhar este relatório</p>
                   <button
-                    onClick={generateShareLink}
+                    onClick={handleGenerateLink}
                     disabled={isGenerating}
                     className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 flex items-center justify-center space-x-2 mx-auto ${
                       isGenerating

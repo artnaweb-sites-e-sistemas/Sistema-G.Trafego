@@ -1,11 +1,73 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import PublicReportView from './components/PublicReportView';
 import { authService, User } from './services/authService';
 import { shareService } from './services/shareService';
+
+// Componente para rota de link curto
+const ShortLinkRoute: React.FC = () => {
+  const { shortCode } = useParams<{ shortCode: string }>();
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    const processShortLink = async () => {
+      try {
+        console.log('🔗 Processando link curto:', shortCode);
+        
+        if (!shortCode) {
+          console.error('❌ Código curto não fornecido');
+          navigate('/login', { replace: true });
+          return;
+        }
+
+        const shareLink = shareService.getShareLink(shortCode);
+        console.log('🔍 Link encontrado:', shareLink);
+        
+        if (shareLink) {
+          // Extrair parâmetros da URL original
+          const url = new URL(shareLink.originalUrl);
+          const params = url.searchParams;
+          
+          console.log('📋 Parâmetros extraídos:', {
+            audience: params.get('audience'),
+            product: params.get('product'),
+            client: params.get('client'),
+            month: params.get('month')
+          });
+          
+          // Redirecionar para a página pública com os parâmetros
+          const publicUrl = `/shared-report?${params.toString()}`;
+          console.log('🔄 Redirecionando para:', publicUrl);
+          
+          navigate(publicUrl, { replace: true });
+        } else {
+          console.error('❌ Link não encontrado para o código:', shortCode);
+          // Se o link não for encontrado, redirecionar para login
+          navigate('/login', { replace: true });
+        }
+      } catch (error) {
+        console.error('❌ Erro ao processar link curto:', error);
+        navigate('/login', { replace: true });
+      }
+    };
+
+    processShortLink();
+  }, [shortCode, navigate]);
+
+  // Mostrar loading enquanto processa o redirecionamento
+  return (
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="text-white text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+        <p>Carregando relatório...</p>
+        <p className="text-sm text-gray-400 mt-2">Código: {shortCode}</p>
+      </div>
+    </div>
+  );
+};
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -105,24 +167,6 @@ function App() {
     }
 
     return <>{children}</>;
-  };
-
-  // Componente para rota de link curto
-  const ShortLinkRoute = () => {
-    const pathname = window.location.pathname;
-    const shortCode = pathname.replace('/r/', '');
-    
-    if (shortCode) {
-      const shareLink = shareService.getShareLink(shortCode);
-      if (shareLink) {
-        // Redirecionar para a URL original
-        window.location.href = shareLink.originalUrl;
-        return null;
-      }
-    }
-    
-    // Se o link não for encontrado, redirecionar para login
-    return <Navigate to="/login" replace />;
   };
 
   if (isLoading) {
