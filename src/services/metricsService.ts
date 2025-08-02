@@ -37,6 +37,71 @@ export interface MetricData {
 
 // Dados mockados para demonstração - Métricas vinculadas ao perfil do público
 const mockData: MetricData[] = [
+  // Dados para Janeiro 2025 (atual)
+  {
+    id: 'jan-2025-1',
+    date: '2025-01-15',
+    month: 'Janeiro 2025',
+    service: 'Meta Ads',
+    client: 'Cliente Teste',
+    product: 'Produto Teste',
+    audience: 'Público Teste',
+    leads: 25,
+    revenue: 5000,
+    investment: 1500,
+    impressions: 45000,
+    clicks: 800,
+    ctr: 1.78,
+    cpm: 33.33,
+    cpl: 60.00,
+    roas: 3.33,
+    roi: 233.33,
+    appointments: 15,
+    sales: 12,
+  },
+  {
+    id: 'jan-2025-2',
+    date: '2025-01-20',
+    month: 'Janeiro 2025',
+    service: 'Meta Ads',
+    client: 'Cliente Teste',
+    product: 'Produto Teste',
+    audience: 'Público Teste',
+    leads: 30,
+    revenue: 6000,
+    investment: 1800,
+    impressions: 52000,
+    clicks: 950,
+    ctr: 1.83,
+    cpm: 34.62,
+    cpl: 60.00,
+    roas: 3.33,
+    roi: 233.33,
+    appointments: 18,
+    sales: 15,
+  },
+  {
+    id: 'jan-2025-3',
+    date: '2025-01-25',
+    month: 'Janeiro 2025',
+    service: 'Meta Ads',
+    client: 'Cliente Teste',
+    product: 'Produto Teste',
+    audience: 'Público Teste',
+    leads: 35,
+    revenue: 7000,
+    investment: 2100,
+    impressions: 58000,
+    clicks: 1100,
+    ctr: 1.90,
+    cpm: 36.21,
+    cpl: 60.00,
+    roas: 3.33,
+    roi: 233.33,
+    appointments: 21,
+    sales: 18,
+  },
+  
   // Dados para Maio 2023 (para teste)
   {
     id: 'maio-1',
@@ -821,6 +886,8 @@ export const metricsService = {
   // Buscar métricas públicas (para links compartilhados)
   async getPublicMetrics(month: string, client: string, product: string, audience: string): Promise<MetricData[]> {
     try {
+      console.log('🔍 [PUBLIC] Buscando métricas públicas:', { month, client, product, audience });
+      
       // Tentar buscar do Firebase primeiro
       try {
         const metricsRef = collection(db, 'metrics');
@@ -833,29 +900,36 @@ export const metricsService = {
           ...doc.data()
         })) as MetricData[];
 
+        console.log('📊 [PUBLIC] Dados do Firebase encontrados:', firebaseData.length);
+
         // Filtrar dados por cliente, produto e público
         if (firebaseData.length > 0) {
           let filteredData = firebaseData;
           
           if (client && client !== 'Todos os Clientes') {
             filteredData = filteredData.filter(item => item.client === client);
+            console.log('👥 [PUBLIC] Filtrado por cliente:', client, 'Resultado:', filteredData.length);
           }
 
           if (product && product !== '' && product !== 'Todos os Produtos') {
             filteredData = filteredData.filter(item => item.product === product);
+            console.log('📦 [PUBLIC] Filtrado por produto:', product, 'Resultado:', filteredData.length);
           }
 
           if (audience && audience !== '' && audience !== 'Todos os Públicos') {
             filteredData = filteredData.filter(item => item.audience === audience);
+            console.log('🎯 [PUBLIC] Filtrado por público:', audience, 'Resultado:', filteredData.length);
           }
           
+          console.log('✅ [PUBLIC] Retornando dados do Firebase:', filteredData.length);
           return filteredData;
         }
       } catch (firebaseError: any) {
-        console.warn('Erro na consulta Firebase pública:', firebaseError.message);
+        console.warn('⚠️ [PUBLIC] Erro na consulta Firebase pública:', firebaseError.message);
       }
 
       // Se não há dados no Firebase, usar dados mockados específicos
+      console.log('🔄 [PUBLIC] Usando dados mockados para:', month);
       let filteredData = mockData.filter(item => item.month === month);
       
       if (client && client !== 'Todos os Clientes') {
@@ -876,9 +950,10 @@ export const metricsService = {
         service: item.service || 'Manual'
       }));
 
+      console.log('✅ [PUBLIC] Retornando dados mockados:', filteredData.length);
       return filteredData;
     } catch (error: any) {
-      console.error('Erro ao buscar métricas públicas:', error.message);
+      console.error('❌ [PUBLIC] Erro ao buscar métricas públicas:', error.message);
       return [];
     }
   },

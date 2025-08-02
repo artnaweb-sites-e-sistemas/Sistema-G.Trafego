@@ -764,11 +764,14 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({ metrics }) =>
             {Object.entries(groupedData).map(([category, items]) => (
               <React.Fragment key={category}>
                 {/* Linha de categoria */}
-                <tr className="border-b border-slate-700 bg-gradient-to-r from-slate-700/80 to-slate-600/80">
-                  <td className="p-4 text-slate-100 font-bold text-base" colSpan={4}>
+                <tr className="border-b border-slate-700 bg-gradient-to-r from-slate-800/40 via-slate-700/30 to-slate-800/40">
+                  <td className="p-3 text-slate-400 font-medium text-sm" colSpan={4}>
                     <div className="flex items-center">
-                      <div className="w-2 h-2 bg-indigo-400 rounded-full mr-3 shadow-sm"></div>
-                      {category}
+                      <div className="w-2 h-2 bg-slate-500 rounded-full mr-3"></div>
+                      <span className="text-slate-400 font-medium tracking-wide uppercase text-xs">
+                        {category}
+                      </span>
+                      <div className="ml-3 flex-1 h-px bg-slate-600/30"></div>
                     </div>
                   </td>
                 </tr>

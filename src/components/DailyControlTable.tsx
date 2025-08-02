@@ -105,9 +105,6 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
     
-
-
-    
     for (let i = 0; i < daysInMonth; i++) {
       const currentDate = new Date(startDate);
       currentDate.setDate(startDate.getDate() + i);
@@ -141,8 +138,6 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
     }
     
     // Adicionar dados das métricas do Meta Ads
-
-    
     metrics.forEach(metric => {
       // Verificar se a métrica pertence ao mês selecionado
       if (metric.month === selectedMonth) {
@@ -204,19 +199,19 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       if (row.status === 'Ativo') {
         totals.activeDays++;
         
-      // Extrair valores numéricos das strings formatadas
-      const investmentValue = parseFloat(row.investment.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
-      const impressionsValue = row.impressions || 0;
-      const clicksValue = row.clicks || 0;
-      const leadsValue = row.leads || 0;
+        // Extrair valores numéricos das strings formatadas
+        const investmentValue = parseFloat(row.investment.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
+        const impressionsValue = row.impressions || 0;
+        const clicksValue = row.clicks || 0;
+        const leadsValue = row.leads || 0;
         const cpmValue = parseFloat(row.cpm.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
         const cplValue = parseFloat(row.cpl.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
       
         // Acumular totais
         totals.investment = formatCurrency(parseFloat(totals.investment.replace(/[^\d,.-]/g, '').replace(',', '.')) + investmentValue);
-      totals.impressions += impressionsValue;
-      totals.clicks += clicksValue;
-      totals.leads += leadsValue;
+        totals.impressions += impressionsValue;
+        totals.clicks += clicksValue;
+        totals.leads += leadsValue;
       
         // Calcular médias
         const totalInvestment = parseFloat(totals.investment.replace(/[^\d,.-]/g, '').replace(',', '.'));
@@ -241,9 +236,19 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
   const totals = calculateTotals();
 
   const TotalsRow = ({ isHeader = false }: { isHeader?: boolean }) => (
-    <tr className={`border-b border-slate-700 ${isHeader ? 'bg-gradient-to-r from-slate-700/80 to-slate-600/80' : 'bg-gradient-to-r from-slate-800/80 to-slate-700/80'}`}>
+    <tr className={`border-b-2 border-slate-600 ${isHeader ? 'bg-gradient-to-r from-slate-800/60 to-slate-700/60' : 'bg-gradient-to-r from-blue-900/20 to-indigo-900/20'}`}>
       <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
-        {isHeader ? 'TOTAIS' : `${totals.activeDays} dias ativos`}
+        {isHeader ? (
+          <div className="flex items-center space-x-2">
+            <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+            <span>TOTAIS</span>
+          </div>
+        ) : (
+          <div className="flex items-center space-x-2">
+            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+            <span>{totals.activeDays} dias ativos</span>
+          </div>
+        )}
       </td>
       <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
         {totals.investment}
@@ -268,8 +273,12 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       </td>
       <td className="p-4">
         <div className="flex items-center space-x-2">
-          <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-900/60 text-blue-400 border border-blue-600/50">
-            {totals.activeDays} dias ativos
+          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+            isHeader 
+              ? 'bg-blue-900/40 text-blue-300 border border-blue-600/30' 
+              : 'bg-green-900/40 text-green-300 border border-green-600/30'
+          }`}>
+            {isHeader ? 'Resumo Geral' : `${totals.activeDays} dias ativos`}
           </span>
         </div>
       </td>
@@ -435,9 +444,16 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
             <TotalsRow isHeader />
             {dailyData.map((row, index) => (
               <tr key={index} className={`hover:bg-slate-800/40 transition-all duration-200 ${
-                row.isToday ? 'bg-indigo-900/20 border-l-4 border-l-indigo-400 shadow-sm' : ''
-              } ${index === dailyData.length - 1 ? '' : 'border-b border-slate-700/30'}`}>
-                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.date}</td>
+                row.isToday ? 'bg-gradient-to-r from-blue-900/15 via-indigo-900/10 to-blue-900/15 border-l-4 border-l-blue-400 shadow-lg relative' : ''
+              } ${index === dailyData.length - 1 ? 'border-b-2 border-slate-600' : 'border-b border-slate-700/30'}`}>
+                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">
+                  <div className="flex items-center space-x-2">
+                    {row.isToday && (
+                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                    )}
+                    <span className={row.isToday ? 'text-blue-300 font-semibold' : ''}>{row.date}</span>
+                  </div>
+                </td>
                 <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.investment}</td>
                 <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.impressions}</td>
                 <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.clicks}</td>
@@ -449,8 +465,12 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                   <div className="flex items-center space-x-2">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                       row.status === 'Ativo' 
-                        ? 'bg-emerald-900/60 text-emerald-400 border border-emerald-600/50' 
-                        : 'bg-rose-900/60 text-rose-400 border border-rose-600/50'
+                        ? row.isToday 
+                          ? 'bg-emerald-900/80 text-emerald-300 border-2 border-emerald-400 shadow-lg' 
+                          : 'bg-emerald-900/60 text-emerald-400 border border-emerald-600/50'
+                        : row.isToday
+                          ? 'bg-rose-900/80 text-rose-300 border-2 border-rose-400 shadow-lg'
+                          : 'bg-rose-900/60 text-rose-400 border border-rose-600/50'
                     }`}>
                       {row.status}
                     </span>

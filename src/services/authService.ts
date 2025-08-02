@@ -70,7 +70,7 @@ class AuthService {
           name: newUser.name,
           email: newUser.email,
           role: newUser.role,
-          photoURL: newUser.photoURL,
+          photoURL: newUser.photoURL || null,
           createdAt: newUser.createdAt
         });
         
