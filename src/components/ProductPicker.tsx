@@ -31,7 +31,6 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [products, setProducts] = useState<Product[]>([
-    { id: '1', name: 'Todos os Produtos', clientId: 'all' },
     { id: '2', name: 'Pacote Básico', description: 'Serviços essenciais', price: 500, category: 'Marketing', clientId: '2', source: 'manual' },
     { id: '3', name: 'Pacote Premium', description: 'Serviços completos', price: 1200, category: 'Marketing', clientId: '2', source: 'manual' },
     { id: '4', name: 'Consultoria Mensal', description: 'Acompanhamento especializado', price: 800, category: 'Consultoria', clientId: '3', source: 'manual' },
@@ -59,27 +58,23 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
     return clientMap[clientName] || 'all';
   };
 
-  // Carregar campanhas do Meta Ads
+  // Carregar campanhas do Meta Ads (método original que usa estado local)
   const loadMetaAdsCampaigns = async () => {
-    console.log('ProductPicker: loadMetaAdsCampaigns chamado');
-    console.log('ProductPicker: dataSource =', dataSource);
-    console.log('ProductPicker: isLoggedIn =', metaAdsService.isLoggedIn());
-    console.log('ProductPicker: selectedClient =', selectedClient);
-    
     if (dataSource === 'facebook' && selectedClient && selectedClient !== 'Todos os Clientes') {
       try {
         setIsLoading(true);
-        console.log('ProductPicker: Carregando campanhas do Meta Ads para BM:', selectedClient);
         
-        // Verificar se há uma conta selecionada
         const selectedAccount = metaAdsService.getSelectedAccount();
+        
         if (!selectedAccount) {
-          console.log('ProductPicker: Nenhuma conta selecionada, aguardando...');
           setIsLoading(false);
           return;
         }
         
-        console.log('ProductPicker: Ad Account selecionada:', selectedAccount.name);
+        if (!metaAdsService.isLoggedIn()) {
+          setIsLoading(false);
+          return;
+        }
         
         // Obter datas do mês selecionado
         const getPeriodDates = (monthString: string) => {
@@ -107,82 +102,39 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
         };
 
         const { startDate, endDate } = getPeriodDates(selectedMonth || '');
-        console.log('ProductPicker: Período selecionado:', { startDate, endDate });
         
         const campaignsData = await metaAdsService.getCampaigns(startDate, endDate);
-        console.log('ProductPicker: Campanhas encontradas:', campaignsData);
         
-        // Filtrar apenas campanhas ativas
         const activeCampaigns = campaignsData.filter(campaign => 
           campaign.status === 'ACTIVE' || campaign.status === 'PAUSED'
         );
         
-        console.log('ProductPicker: Campanhas ativas:', activeCampaigns);
-        
-        // Converter campanhas para formato de produtos
         const facebookProducts: Product[] = activeCampaigns.map((campaign, index) => ({
           id: `fb-campaign-${campaign.id}`,
           name: campaign.name,
-          description: `Campanha ${campaign.status === 'ACTIVE' ? 'Ativa' : 'Pausada'} - ${campaign.objective || 'Sem objetivo definido'}`,
+          description: `Campanha ${campaign.status === 'ACTIVE' ? 'Ativa' : 'Pausada'} - ${getCampaignObjective(campaign.objective)}`,
           category: 'Meta Ads',
           clientId: selectedClient,
           source: 'facebook' as const,
           campaign: campaign
         }));
         
-        console.log('ProductPicker: Produtos do Facebook criados:', facebookProducts);
-        
-        // Se não há campanhas, mostrar apenas "Todos os Produtos"
+        // Se não há campanhas, mostrar lista vazia
         if (facebookProducts.length === 0) {
           console.log('ProductPicker: Nenhuma campanha encontrada para este cliente');
-          
-          // Forçar reset completo
-          setProducts([
-            { id: '1', name: 'Todos os Produtos', clientId: 'all' }
-          ]);
-          setSelectedProduct('Todos os Produtos');
-          
-          // Limpar localStorage relacionado
-          localStorage.removeItem('selectedProduct');
-          localStorage.removeItem('selectedAudience');
-          localStorage.removeItem('selectedCampaignId');
-          localStorage.removeItem('selectedAdSetId');
-          
-          // Disparar evento para zerar métricas
-          const event = new CustomEvent('noProductsFound', {
-            detail: { clientName: selectedClient }
-          });
-          window.dispatchEvent(event);
-          
-          console.log('ProductPicker: Reset completo realizado - nenhuma campanha encontrada');
+          setProducts([]);
         } else {
-          // Se há campanhas, adicionar "Todos os Produtos" + campanhas
-          const allProducts = [
-            { id: '1', name: 'Todos os Produtos', clientId: 'all' },
-            ...facebookProducts
-          ];
-          
-          setProducts(allProducts);
-          
-          // Se não há produto selecionado, selecionar "Todos os Produtos"
-          if (selectedProduct === 'Todos os Produtos' || !selectedProduct) {
-            setSelectedProduct('Todos os Produtos');
-          }
+          setProducts(facebookProducts);
         }
         
       } catch (error: any) {
         console.error('Erro ao carregar campanhas do Meta Ads:', error.message);
-        // Em caso de erro, mostrar apenas "Todos os Produtos"
-        setProducts([
-          { id: '1', name: 'Todos os Produtos', clientId: 'all' }
-        ]);
+        setProducts([]);
       } finally {
         setIsLoading(false);
       }
     } else if (dataSource === 'manual') {
-      console.log('ProductPicker: Carregando produtos manuais...');
       setProducts([
-        { id: '1', name: 'Todos os Produtos', clientId: 'all' },
         { id: '2', name: 'Pacote Básico', description: 'Serviços essenciais', price: 500, category: 'Marketing', clientId: '2', source: 'manual' },
         { id: '3', name: 'Pacote Premium', description: 'Serviços completos', price: 1200, category: 'Marketing', clientId: '2', source: 'manual' },
         { id: '4', name: 'Consultoria Mensal', description: 'Acompanhamento especializado', price: 800, category: 'Consultoria', clientId: '3', source: 'manual' },
@@ -195,82 +147,62 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
       ]);
     } else {
       console.log('ProductPicker: DataSource não é facebook ou usuário não está logado');
-      // Mostrar apenas "Todos os Produtos" quando não há fonte de dados
-      setProducts([
-        { id: '1', name: 'Todos os Produtos', clientId: 'all' }
-      ]);
+      setProducts([]);
     }
   };
 
-  // Carregar produto salvo do localStorage ao inicializar
+  // Listener para quando cliente for alterado
   useEffect(() => {
-    const savedProduct = localStorage.getItem('selectedProduct');
-    const savedClient = localStorage.getItem('currentSelectedClient');
-    
-    // Só restaurar produto se há cliente selecionado
-    if (savedProduct && savedProduct !== 'Todos os Produtos' && savedClient && savedClient !== 'Todos os Clientes') {
-      setSelectedProduct(savedProduct);
-      console.log('ProductPicker: Produto restaurado do localStorage:', savedProduct);
-    }
-  }, []);
+    const handleClientChanged = async (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { clientName, source, adAccount } = customEvent.detail;
+      
+      console.log('ProductPicker: Cliente alterado para:', clientName, 'fonte:', source);
+      
+      // Limpar seleção atual
+      setSelectedProduct('');
+      
+      // Carregar produtos baseado no novo cliente
+      if (source === 'facebook') {
+        await loadMetaAdsCampaignsForClient(clientName, source, adAccount);
+        
+        // Carregar métricas de todas as campanhas do cliente
+        try {
+          const { metricsService } = await import('../services/metricsService');
+          metricsService.clearCache();
+          
+          // Disparar evento para carregar métricas de todas as campanhas
+          window.dispatchEvent(new CustomEvent('loadAllCampaignsMetrics', {
+            detail: { 
+              clientName,
+              source,
+              adAccount
+            }
+          }));
+        } catch (error) {
+          console.warn('ProductPicker: Erro ao carregar métricas:', error);
+        }
+      } else if (source === 'manual') {
+        await loadMetaAdsCampaignsForClient(clientName, source, null);
+      }
+    };
 
-  // Carregar produtos quando dataSource, selectedClient ou selectedMonth mudar
+    window.addEventListener('clientChanged', handleClientChanged);
+    return () => window.removeEventListener('clientChanged', handleClientChanged);
+  }, [dataSource, selectedMonth]);
+
+  // Carregar produtos quando componente montar ou quando cliente/dataSource mudar
   useEffect(() => {
-    console.log('ProductPicker: useEffect disparado');
-    console.log('ProductPicker: dataSource =', dataSource);
-    console.log('ProductPicker: selectedClient =', selectedClient);
-    console.log('ProductPicker: selectedMonth =', selectedMonth);
-    console.log('ProductPicker: isLoggedIn =', metaAdsService.isLoggedIn());
-    
-    // Só carregar se há cliente selecionado
-    if (selectedClient && selectedClient !== 'Todos os Clientes' && selectedClient !== 'Selecione um cliente') {
-      console.log('ProductPicker: Cliente válido selecionado, carregando campanhas...');
-      
-      // Pequeno delay para garantir que o cache seja limpo
-      const timer = setTimeout(() => {
-        console.log('ProductPicker: Executando loadMetaAdsCampaigns após delay');
-        loadMetaAdsCampaigns();
-      }, 200); // Aumentado o delay para dar mais tempo para o cache ser limpo
-      
-      return () => {
-        console.log('ProductPicker: Limpando timer');
-        clearTimeout(timer);
-      };
-    } else {
-      console.log('ProductPicker: Cliente inválido ou não selecionado, resetando produtos');
-      // Resetar produtos quando não há cliente selecionado
-      setProducts([{ id: '1', name: 'Todos os Produtos', clientId: 'all' }]);
-      setSelectedProduct('Todos os Produtos');
+    if (selectedClient && selectedClient !== 'Todos os Clientes') {
+      loadMetaAdsCampaigns();
     }
-  }, [dataSource, selectedClient, selectedMonth]);
-
-  // Filtrar produtos baseado no termo de busca e cliente selecionado
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.category?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // Para produtos do Facebook, verificar se pertencem ao cliente selecionado
-    if (dataSource === 'facebook' && product.source === 'facebook') {
-      const matchesClient = selectedClient === 'Todos os Clientes' || 
-                           product.clientId === selectedClient;
-      return matchesSearch && matchesClient;
-    }
-    
-    // Para produtos manuais, usar a lógica de mapeamento
-    const matchesClient = selectedClient === 'Todos os Clientes' || 
-                         product.clientId === 'all' || 
-                         product.clientId === getClientIdFromName(selectedClient);
-    
-    return matchesSearch && matchesClient;
-  });
+  }, [selectedClient, dataSource, selectedMonth]);
 
   // Close picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
-        setSearchTerm('');
       }
     };
 
@@ -278,75 +210,137 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Reset selected product when client changes (only if no saved product)
-  useEffect(() => {
-    const savedProduct = localStorage.getItem('selectedProduct');
-    if (!savedProduct || savedProduct === 'Todos os Produtos') {
-      setSelectedProduct('Todos os Produtos');
-    }
-  }, [selectedClient, setSelectedProduct]);
-
-  // Listener para evento de Business Manager selecionada
-  useEffect(() => {
-    const handleBusinessManagerSelected = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { businessManager, clientName } = customEvent.detail;
-      console.log('ProductPicker: Business Manager selecionada:', businessManager, clientName);
-      
-      // Forçar recarregamento das campanhas após um pequeno delay
-      setTimeout(() => {
-        console.log('ProductPicker: Recarregando campanhas após seleção de BM');
-        loadMetaAdsCampaigns();
-      }, 300);
-    };
-
-    window.addEventListener('businessManagerSelected', handleBusinessManagerSelected);
-
-    return () => {
-      window.removeEventListener('businessManagerSelected', handleBusinessManagerSelected);
-    };
-  }, []);
-
   const handleProductSelect = (product: Product) => {
-    console.log('Produto selecionado:', product);
     setSelectedProduct(product.name);
     setIsOpen(false);
     setSearchTerm('');
     
-    // Salvar produto selecionado no localStorage
-    localStorage.setItem('selectedProduct', product.name);
+    // Salvar no localStorage
+    localStorage.setItem('currentSelectedProduct', product.name);
     
-    // Disparar evento customizado se for uma campanha do Facebook
+    console.log('ProductPicker: Produto selecionado:', product.name);
+    
+    // Se for uma campanha do Facebook, salvar o ID da campanha
     if (product.source === 'facebook' && product.campaign) {
-      console.log(`Campanha selecionada: ${product.campaign.name} (${product.campaign.id})`);
-      
-      const event = new CustomEvent('campaignSelected', {
+      localStorage.setItem('selectedCampaignId', product.campaign.id);
+      console.log('ProductPicker: Campanha ID salvo:', product.campaign.id);
+    }
+    
+    // Emitir evento para notificar outros componentes
+    window.dispatchEvent(new CustomEvent('productSelected', {
+      detail: { 
+        productName: product.name,
+        productId: product.id,
+        source: product.source,
+        campaign: product.campaign
+      }
+    }));
+    
+    // Se for uma campanha do Facebook, disparar evento específico para carregar métricas
+    if (product.source === 'facebook' && product.campaign) {
+      window.dispatchEvent(new CustomEvent('campaignSelected', {
         detail: {
           campaign: product.campaign,
           productName: product.name,
           campaignId: product.campaign.id
         }
-      });
-      window.dispatchEvent(event);
+      }));
     }
   };
 
   const handleClear = () => {
-    // Limpar a seleção e voltar para "Todos os Produtos"
-    setSelectedProduct('Todos os Produtos');
-    
-    // Limpar dados relacionados do localStorage
-    localStorage.removeItem('selectedProduct');
-    localStorage.removeItem('selectedAudience');
-    localStorage.removeItem('selectedAdSetId');
-    
-    // Invalidar cache de ad sets
-    metaAdsService.invalidateCache('adsets');
-    
-    setIsOpen(false);
+    setSelectedProduct('');
     setSearchTerm('');
+    localStorage.removeItem('currentSelectedProduct');
     
-    console.log('ProductPicker: Seleção de produto limpa');
+    console.log('ProductPicker: Seleção limpa');
+    
+    // Emitir evento para notificar outros componentes
+    window.dispatchEvent(new CustomEvent('productCleared'));
+  };
+
+  const loadMetaAdsCampaignsForClient = async (clientName: string, source: string, adAccount: any) => {
+    if (source === 'facebook' && adAccount) {
+      try {
+        setIsLoading(true);
+        
+        // Obter datas do mês selecionado
+        const getPeriodDates = (monthString: string) => {
+          const months = [
+            'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+            'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+          ];
+          
+          const [monthName, yearStr] = monthString.split(' ');
+          const year = parseInt(yearStr);
+          const monthIndex = months.findIndex(m => m.toLowerCase() === monthName.toLowerCase());
+          
+          if (monthIndex === -1) {
+            const now = new Date();
+            return {
+              startDate: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0],
+              endDate: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
+            };
+          }
+          
+          const startDate = new Date(year, monthIndex, 1).toISOString().split('T')[0];
+          const endDate = new Date(year, monthIndex + 1, 0).toISOString().split('T')[0];
+          
+          return { startDate, endDate };
+        };
+
+        const { startDate, endDate } = getPeriodDates(selectedMonth || '');
+        
+        const campaignsData = await metaAdsService.getCampaigns(startDate, endDate);
+        
+        const activeCampaigns = campaignsData.filter(campaign => 
+          campaign.status === 'ACTIVE' || campaign.status === 'PAUSED'
+        );
+        
+        const facebookProducts: Product[] = activeCampaigns.map((campaign, index) => ({
+          id: `fb-campaign-${campaign.id}`,
+          name: campaign.name,
+          description: `Campanha ${campaign.status === 'ACTIVE' ? 'Ativa' : 'Pausada'} - ${getCampaignObjective(campaign.objective)}`,
+          category: 'Meta Ads',
+          clientId: clientName,
+          source: 'facebook' as const,
+          campaign: campaign
+        }));
+        
+        setProducts(facebookProducts);
+        
+      } catch (error: any) {
+        if (error.message.includes('Nenhuma conta de anúncios selecionada') || 
+            error.message.includes('Conta de anúncios não configurada')) {
+          setTimeout(async () => {
+            try {
+              await loadMetaAdsCampaignsForClient(clientName, source, adAccount);
+            } catch (retryError: any) {
+              setProducts([]);
+            }
+          }, 3000);
+        } else {
+          setProducts([]);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    } else if (source === 'manual') {
+      setProducts([
+        { id: '2', name: 'Pacote Básico', description: 'Serviços essenciais', price: 500, category: 'Marketing', clientId: '2', source: 'manual' },
+        { id: '3', name: 'Pacote Premium', description: 'Serviços completos', price: 1200, category: 'Marketing', clientId: '2', source: 'manual' },
+        { id: '4', name: 'Consultoria Mensal', description: 'Acompanhamento especializado', price: 800, category: 'Consultoria', clientId: '3', source: 'manual' },
+        { id: '5', name: 'Gestão de Redes Sociais', description: 'Criação e gestão de conteúdo', price: 600, category: 'Social Media', clientId: '3', source: 'manual' },
+        { id: '6', name: 'Campanha Google Ads', description: 'Gestão de campanhas', price: 900, category: 'Publicidade', clientId: '4', source: 'manual' },
+        { id: '7', name: 'Website Institucional', description: 'Desenvolvimento de site', price: 2500, category: 'Desenvolvimento', clientId: '5', source: 'manual' },
+        { id: '8', name: 'E-commerce Completo', description: 'Loja virtual completa', price: 3500, category: 'Desenvolvimento', clientId: '6', source: 'manual' },
+        { id: '9', name: 'SEO Básico', description: 'Otimização para buscadores', price: 400, category: 'SEO', clientId: '7', source: 'manual' },
+        { id: '10', name: 'SEO Avançado', description: 'SEO completo e monitoramento', price: 800, category: 'SEO', clientId: '8', source: 'manual' },
+      ]);
+    } else {
+      console.log('ProductPicker: DataSource não é facebook ou usuário não está logado');
+      setProducts([]);
+    }
   };
 
   const handleDeleteProduct = (productId: string, productName: string, event: React.MouseEvent) => {
@@ -363,17 +357,16 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
       setProducts(prevProducts => prevProducts.filter(product => product.id !== productId));
       
       if (productName === selectedProduct) {
-        setSelectedProduct('Todos os Produtos');
+        setSelectedProduct('');
       }
       
       setSearchTerm('');
-      console.log(`Produto ${productName} (ID: ${productId}) foi excluído com sucesso!`);
     }
   };
 
   const getDisplayText = () => {
-    if (selectedProduct === 'Todos os Produtos') {
-      return 'Todos os Produtos';
+    if (!selectedProduct) {
+      return 'Selecionar Produto';
     }
     const product = products.find(p => p.name === selectedProduct);
     return product ? product.name : 'Selecionar Produto';
@@ -394,8 +387,40 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
     return <Package className="w-4 h-4 text-gray-400" />;
   };
 
+  // Função para traduzir objetivos das campanhas
+  const getCampaignObjective = (objective: string | undefined): string => {
+    if (!objective) return 'Sem objetivo definido';
+    
+    const objectives: { [key: string]: string } = {
+      'OUTCOME_ENGAGEMENT': 'Engajamento',
+      'OUTCOME_AWARENESS': 'Reconhecimento',
+      'OUTCOME_TRAFFIC': 'Tráfego',
+      'OUTCOME_LEADS': 'Leads',
+      'OUTCOME_SALES': 'Vendas',
+      'OUTCOME_APP_PROMOTION': 'Promoção de App',
+      'OUTCOME_BRAND_AWARENESS': 'Reconhecimento da Marca',
+      'OUTCOME_REACH': 'Alcance',
+      'OUTCOME_VIDEO_VIEWS': 'Visualizações de Vídeo',
+      'OUTCOME_CONVERSIONS': 'Conversões',
+      'OUTCOME_ACTION': 'Ações',
+      'OUTCOME_APP_INSTALLS': 'Instalações de App',
+      'OUTCOME_CATALOG_SALES': 'Vendas do Catálogo',
+      'OUTCOME_MESSAGES': 'Mensagens',
+      'OUTCOME_STORE_VISITS': 'Visitas à Loja',
+      'OUTCOME_WEBSITE_CONVERSIONS': 'Conversões do Site'
+    };
+    
+    return objectives[objective] || objective;
+  };
+
   // Verificar se o picker deve estar ativo
   const isPickerActive = selectedClient && selectedClient !== 'Todos os Clientes' && selectedClient !== 'Selecione um cliente';
+
+  // Filtrar produtos baseado no termo de busca
+  const filteredProducts = products.filter(product =>
+    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
   return (
     <div className="relative" ref={pickerRef}>
@@ -405,7 +430,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
         onClick={() => isPickerActive && setIsOpen(!isOpen)}
       >
         <Package className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isPickerActive ? 'text-gray-400' : 'text-gray-600'}`} />
-        <div className={`pl-10 pr-8 py-2 rounded-lg border w-[220px] ${
+        <div className={`pl-10 pr-8 py-2 rounded-lg border w-full ${
           isPickerActive 
             ? 'bg-gray-700 text-white border-gray-600 focus:border-purple-500 focus:outline-none' 
             : 'bg-gray-800 text-gray-500 border-gray-700'
@@ -418,7 +443,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
         
         {/* Indicador de Status */}
         <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 ${
-          selectedProduct === 'Todos os Produtos' 
+          !selectedProduct 
             ? 'bg-gray-500' 
             : 'bg-green-500 shadow-lg shadow-green-500/50'
         }`}></div>
@@ -437,6 +462,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
                 <X className="w-4 h-4 mr-1" />
                 Limpar
               </button>
+
               <button
                 className="flex items-center px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-all duration-200 ease-in-out shadow-sm hover:shadow-md"
               >
@@ -480,18 +506,12 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
-                        {getProductIcon(product)}
                         <div className="font-medium text-gray-900">{product.name}</div>
-                        {product.source === 'facebook' && (
-                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                            Meta Ads
-                          </span>
-                        )}
                       </div>
                       {product.description && (
-                        <div className="text-sm text-gray-500 ml-6">{product.description}</div>
+                        <div className="text-sm text-gray-500">{product.description}</div>
                       )}
-                      <div className="flex items-center space-x-2 mt-1 ml-6">
+                      <div className="flex items-center space-x-2 mt-1">
                         {product.category && (
                           <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
                             {product.category}
@@ -517,7 +537,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
                       {product.name === selectedProduct && (
                         <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
                       )}
-                      {product.name !== 'Todos os Produtos' && product.source !== 'facebook' && (
+                      {product.source !== 'facebook' && (
                         <button
                           onClick={(e) => handleDeleteProduct(product.id, product.name, e)}
                           className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-all duration-200 ease-in-out"
@@ -541,34 +561,10 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
               </div>
             )}
           </div>
-
-          {/* Action buttons */}
-          <div className="border-t border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
-            <div className="flex items-center justify-between p-4">
-              <button
-                onClick={handleClear}
-                className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-all duration-200 ease-in-out"
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                Limpar Seleção
-              </button>
-              <div className="flex items-center space-x-2">
-                <div className="w-px h-6 bg-gray-300"></div>
-                <button
-                  className="flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-all duration-200 ease-in-out shadow-sm hover:shadow-md"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Novo Produto
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </div>
   );
 };
 
-export default ProductPicker; 
+export default ProductPicker;

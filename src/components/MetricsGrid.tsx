@@ -31,18 +31,20 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, subtitle, trend, 
   };
 
   return (
-    <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-gray-600 transition-colors">
-      <div className="space-y-2">
-        <h3 className="text-gray-400 text-sm font-medium">{title}</h3>
-        <div className="text-3xl font-bold text-white">{value}</div>
+    <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm rounded-2xl p-8 border border-gray-700/50 hover:border-gray-600/70 transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-black/20 group">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-gray-300 text-sm font-semibold uppercase tracking-wide">{title}</h3>
+          {trend && trendValue && (
+            <div className={`flex items-center space-x-1 text-xs font-medium px-2 py-1 rounded-full ${getTrendColor()} bg-opacity-10 ${trend === 'up' ? 'bg-green-500' : trend === 'down' ? 'bg-red-500' : 'bg-gray-500'}`}>
+              {getTrendIcon()}
+              <span>{trendValue}</span>
+            </div>
+          )}
+        </div>
+        <div className="text-4xl font-bold text-white group-hover:text-gray-100 transition-colors">{value}</div>
         {subtitle && (
-          <p className="text-gray-500 text-sm">{subtitle}</p>
-        )}
-        {trend && trendValue && (
-          <div className={`flex items-center space-x-1 text-sm ${getTrendColor()}`}>
-            {getTrendIcon()}
-            <span>{trendValue}</span>
-          </div>
+          <p className="text-gray-400 text-sm leading-relaxed">{subtitle}</p>
         )}
       </div>
     </div>
@@ -112,7 +114,7 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics }) => {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
       {metricsCards.map((metric, index) => (
         <MetricCard key={index} {...metric} />
       ))}

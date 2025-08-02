@@ -87,124 +87,147 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="bg-gradient-to-r from-gray-900 to-gray-800 border-b border-gray-700/50 shadow-lg">
-      <div className="max-w-7xl mx-auto px-6 py-4">
+      <div className="max-w-7xl mx-auto px-8 py-6">
         {/* Logo Section */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center space-x-4">
             <div className="relative">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                <div className="w-5 h-5 bg-white rounded-md shadow-sm"></div>
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/25">
+                <div className="w-6 h-6 bg-white rounded-lg shadow-sm"></div>
               </div>
             </div>
             <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent tracking-tight">
                 Dashboard
               </h1>
-              <p className="text-xs text-gray-400 -mt-1">G. Tráfego Analytics</p>
+              <p className="text-sm text-gray-400 -mt-1 font-medium">G. Tráfego Analytics</p>
             </div>
           </div>
           
           {/* User Section */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-all duration-200 group">
-                <Search className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              <button className="p-3 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition-all duration-300 group shadow-sm hover:shadow-md">
+                <Search className="w-5 h-5 group-hover:scale-110 transition-transform" />
               </button>
               <NotificationButton 
                 selectedClient={selectedClient}
                 selectedProduct={selectedProduct}
                 selectedAudience={selectedAudience}
               />
-              <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-all duration-200 group">
-                <Settings className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              <button className="p-3 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition-all duration-300 group shadow-sm hover:shadow-md">
+                <Settings className="w-5 h-5 group-hover:scale-110 transition-transform" />
               </button>
             </div>
 
-            <div className="h-6 w-px bg-gray-600"></div>
+            <div className="h-8 w-px bg-gradient-to-b from-gray-600 to-transparent"></div>
             
-            <div className="flex items-center space-x-3 bg-gray-800/50 rounded-lg px-3 py-2 border border-gray-700/50">
+            <div className="flex items-center space-x-4 bg-gray-800/50 backdrop-blur-sm rounded-xl px-4 py-3 border border-gray-700/30 shadow-lg">
               {currentUser?.photoURL ? (
                 <img 
                   src={currentUser.photoURL} 
                   alt={currentUser.name} 
-                  className="w-8 h-8 rounded-full object-cover"
+                  className="w-10 h-10 rounded-full object-cover border-2 border-gray-600"
                 />
               ) : (
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
+                  <User className="w-5 h-5 text-white" />
                 </div>
               )}
               <div className="hidden sm:block">
-                <p className="text-sm font-medium text-white">{currentUser?.name || 'Usuário'}</p>
-                <p className="text-xs text-gray-400">{currentUser?.role === 'admin' ? 'Administrador' : 'Usuário'}</p>
+                <p className="text-sm font-semibold text-white">{currentUser?.name || 'Usuário'}</p>
+                <p className="text-xs text-gray-400 font-medium">{currentUser?.role === 'admin' ? 'Administrador' : 'Usuário'}</p>
               </div>
               <button
                 onClick={onLogout}
-                className="p-1 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-all duration-200"
+                className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-300 hover:scale-105"
                 title="Sair"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-5 h-5" />
               </button>
             </div>
           </div>
         </div>
 
         {/* Filters Section */}
-        <div className="flex items-center justify-center">
-          <div className="flex items-center space-x-3">
-            <div className="bg-gray-800/50 rounded-lg border border-gray-700/50 p-1">
-              <MonthYearPicker 
-                selectedMonth={selectedMonth}
-                setSelectedMonth={setSelectedMonth}
-              />
+        <div className="flex items-center justify-center w-full">
+          <div className="flex items-center space-x-3 w-full max-w-7xl">
+            {/* Filtros com largura fixa */}
+            <div className="flex flex-col items-center space-y-1 w-1/4">
+              <label className="text-xs font-medium text-gray-400 uppercase tracking-wide">Período</label>
+              <div className="bg-gray-800/40 rounded-lg border border-gray-700/30 p-2 shadow-sm hover:shadow-md transition-all duration-200 w-full">
+                <MonthYearPicker 
+                  selectedMonth={selectedMonth}
+                  setSelectedMonth={setSelectedMonth}
+                />
+              </div>
             </div>
 
-            <div className="bg-gray-800/50 rounded-lg border border-gray-700/50 p-1">
-              <ClientPicker 
-                selectedClient={selectedClient}
-                setSelectedClient={setSelectedClient}
-                dataSource={dataSource}
-              />
+            <div className="flex flex-col items-center space-y-1 w-1/4">
+              <label className="text-xs font-medium text-gray-400 uppercase tracking-wide">Cliente</label>
+              <div className="bg-gray-800/40 rounded-lg border border-gray-700/30 p-2 shadow-sm hover:shadow-md transition-all duration-200 w-full">
+                <ClientPicker 
+                  selectedClient={selectedClient}
+                  setSelectedClient={setSelectedClient}
+                  dataSource={dataSource}
+                />
+              </div>
             </div>
 
-            <div className="bg-gray-800/50 rounded-lg border border-gray-700/50 p-1">
-              <ProductPicker 
-                selectedProduct={selectedProduct}
-                setSelectedProduct={setSelectedProduct}
-                selectedClient={selectedClient}
-                dataSource={dataSource}
-                selectedMonth={selectedMonth}
-              />
+            <div className="flex flex-col items-center space-y-1 w-1/4">
+              <label className="text-xs font-medium text-gray-400 uppercase tracking-wide">Produto</label>
+              <div className="bg-gray-800/40 rounded-lg border border-gray-700/30 p-2 shadow-sm hover:shadow-md transition-all duration-200 w-full">
+                <ProductPicker 
+                  selectedProduct={selectedProduct}
+                  setSelectedProduct={setSelectedProduct}
+                  selectedClient={selectedClient}
+                  dataSource={dataSource}
+                  selectedMonth={selectedMonth}
+                />
+              </div>
             </div>
 
-            <div className="bg-gray-800/50 rounded-lg border border-gray-700/50 p-1">
-              <AudiencePicker 
-                selectedAudience={selectedAudience}
-                setSelectedAudience={setSelectedAudience}
-                selectedProduct={selectedProduct}
-                selectedClient={selectedClient}
-                dataSource={dataSource}
-                selectedMonth={selectedMonth}
-              />
+            <div className="flex flex-col items-center space-y-1 w-1/4">
+              <label className="text-xs font-medium text-gray-400 uppercase tracking-wide">Público</label>
+              <div className="bg-gray-800/40 rounded-lg border border-gray-700/30 p-2 shadow-sm hover:shadow-md transition-all duration-200 w-full">
+                <AudiencePicker 
+                  selectedAudience={selectedAudience}
+                  setSelectedAudience={setSelectedAudience}
+                  selectedProduct={selectedProduct}
+                  selectedClient={selectedClient}
+                  dataSource={dataSource}
+                  selectedMonth={selectedMonth}
+                />
+              </div>
             </div>
 
-
-
-            <div className="bg-gray-800/50 rounded-lg border border-gray-700/50 p-1">
-              <MetaAdsConfig 
-                onConfigSaved={onMetaAdsSync} 
-                onDataSourceChange={onDataSourceChange}
-              />
+            {/* Separador sutil */}
+            <div className="flex items-center justify-center w-8 h-full">
+              <div className="w-px h-12 bg-gray-600/30 mt-4"></div>
             </div>
 
-            <div className="bg-gray-800/50 rounded-lg border border-gray-700/50 p-1">
-              <ShareReport 
-                selectedAudience={selectedAudience}
-                selectedProduct={selectedProduct}
-                selectedClient={selectedClient}
-                selectedMonth={selectedMonth}
-                hasGeneratedLinks={hasGeneratedLinks}
-              />
+            {/* Ações - alinhadas com as abas de filtros */}
+            <div className="flex flex-col items-center space-y-1 w-16">
+              <div className="h-4"></div> {/* Espaçador invisível para alinhar com as labels */}
+              <div className="bg-gray-800/40 rounded-lg border border-gray-700/30 p-2 shadow-sm hover:shadow-md transition-all duration-200">
+                <MetaAdsConfig 
+                  onConfigSaved={onMetaAdsSync} 
+                  onDataSourceChange={onDataSourceChange}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center space-y-1 w-16">
+              <div className="h-4"></div> {/* Espaçador invisível para alinhar com as labels */}
+              <div className="bg-gray-800/40 rounded-lg border border-gray-700/30 p-2 shadow-sm hover:shadow-md transition-all duration-200">
+                <ShareReport 
+                  selectedAudience={selectedAudience}
+                  selectedProduct={selectedProduct}
+                  selectedClient={selectedClient}
+                  selectedMonth={selectedMonth}
+                  hasGeneratedLinks={hasGeneratedLinks}
+                />
+              </div>
             </div>
           </div>
         </div>

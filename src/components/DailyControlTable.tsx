@@ -43,8 +43,8 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
     
-    console.log(`Gerando dados para ${selectedMonth}: ${daysInMonth} dias`);
-    console.log(`Data atual: ${currentDay}/${currentMonth + 1}/${currentYear}`);
+
+
     
     for (let i = 0; i < daysInMonth; i++) {
       const currentDate = new Date(startDate);
@@ -79,7 +79,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
     }
     
     // Adicionar dados das métricas do Meta Ads
-    console.log(`Filtrando ${metrics.length} métricas para ${selectedMonth}`);
+
     
     metrics.forEach(metric => {
       // Verificar se a métrica pertence ao mês selecionado
@@ -103,7 +103,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
         
 
         
-        console.log(`Métrica encontrada para ${metric.date}: investimento ${metric.investment}`);
+
         
         if (dayIndex >= 0 && dayIndex < data.length) {
           // Verificar se é um dia futuro - se for, sempre manter como Inativo
@@ -162,7 +162,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       const isPastMonth = year < currentYear || (year === currentYear && month < currentMonth);
       
       if (isPastMonth) {
-        console.log('Nenhuma métrica encontrada para mês passado, usando dados de exemplo');
+  
         // Adicionar dados de exemplo no meio do mês
         const middleDay = Math.floor(data.length / 2);
         if (data[middleDay]) {
@@ -176,7 +176,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
           data[middleDay].status = 'Ativo';
         }
       } else {
-        console.log('Mês atual ou futuro sem dados - mantendo status inativo para dias futuros');
+    
       }
     }
     

@@ -120,7 +120,7 @@ class MetaAdsService {
       timestamp: Date.now(),
       ttl
     });
-    console.log(`Cache set: ${key} (TTL: ${ttl/1000}s)`);
+
   }
 
   private clearCache(type?: string): void {
@@ -135,7 +135,7 @@ class MetaAdsService {
     } else {
       // Limpar todo o cache
       this.cache.clear();
-      console.log('All cache cleared');
+  
     }
   }
 
@@ -147,20 +147,15 @@ class MetaAdsService {
     params: any = {}
   ): Promise<T> {
     const cacheKey = this.getCacheKey(type, params);
-    console.log(`MetaAdsService: Fazendo requisição para ${type} com chave: ${cacheKey}`);
     
     // Verificar cache primeiro
     const cached = this.getFromCache<T>(cacheKey);
     if (cached) {
-      console.log(`MetaAdsService: Cache hit para ${type} - retornando dados em cache`);
       return cached;
     }
-    
-    console.log(`MetaAdsService: Cache miss para ${type} - fazendo nova requisição`);
 
     // Verificar se já existe uma requisição pendente
     if (this.pendingRequests.has(cacheKey)) {
-      console.log(`Using pending request for: ${cacheKey}`);
       return this.pendingRequests.get(cacheKey)!;
     }
 
@@ -582,7 +577,7 @@ class MetaAdsService {
     return this.makeCachedRequest(
       'ad_accounts_by_business',
       async () => {
-        console.log(`Buscando contas de anúncios para Business Manager ${businessId}...`);
+    
         
         try {
           // Primeiro, tentar owned_ad_accounts
@@ -615,7 +610,7 @@ class MetaAdsService {
             adAccounts = response.data.data || [];
           }
 
-          console.log(`Contas de anúncios encontradas: ${adAccounts.length}`);
+      
           return adAccounts.map((account: any) => ({
             ...account,
             business_id: businessId
@@ -720,63 +715,42 @@ class MetaAdsService {
 
   // Buscar campanhas da conta selecionada com filtro de período
   async getCampaigns(dateStart?: string, dateEnd?: string): Promise<MetaAdsCampaign[]> {
-    console.log('MetaAdsService.getCampaigns chamado com:', { dateStart, dateEnd });
-    console.log('MetaAdsService.isLoggedIn():', this.isLoggedIn());
-    console.log('MetaAdsService.selectedAccount:', this.selectedAccount);
-    
-    // Verificação rigorosa de login
     if (!this.isLoggedIn()) {
-      console.log('Usuário não está logado - não buscando campanhas');
-      throw new Error('Usuário não está logado no Meta Ads');
+      throw new Error('Usuário não está logado no Meta Ads. Faça login novamente.');
     }
     
-    // Verificar se há conta selecionada
-    if (!this.selectedAccount) {
-      console.log('Nenhuma conta de anúncios selecionada');
-      throw new Error('Nenhuma conta de anúncios selecionada');
+    if (!this.hasSelectedAccount()) {
+      throw new Error('Nenhuma conta de anúncios selecionada. Selecione um Business Manager primeiro.');
     }
     
-    // Verificar se o token ainda é válido
     if (!this.user?.accessToken && !this.accessToken) {
-      console.log('Token de acesso não encontrado');
-      throw new Error('Token de acesso não encontrado');
+      throw new Error('Token de acesso não encontrado. Faça login novamente.');
     }
 
     if (!this.selectedAccount) {
-      throw new Error('Nenhuma conta selecionada');
+      throw new Error('Conta de anúncios não configurada corretamente. Tente selecionar o cliente novamente.');
     }
-
+    
     const params = { dateStart, dateEnd };
-    console.log('MetaAdsService.getCampaigns params:', params);
-    console.log('MetaAdsService.getCampaigns - selectedAccount:', this.selectedAccount);
-    console.log('MetaAdsService.getCampaigns - hasSelectedAccount():', this.hasSelectedAccount());
     
     return this.makeCachedRequest(
       'campaigns',
       async () => {
-        console.log(`Buscando campanhas da conta ${this.selectedAccount!.id}...`);
-        
         try {
-          const response = await axios.get(
-            `${this.baseURL}/${this.selectedAccount!.id}/campaigns`,
-            {
-              params: {
-                access_token: this.user?.accessToken || this.getAccessToken(),
-                fields: 'id,name,status,objective,created_time,updated_time,start_time,stop_time',
-                limit: 1000 // Aumentar limite para pegar mais campanhas
-              }
+          const accessToken = this.user?.accessToken || this.getAccessToken();
+          const url = `${this.baseURL}/${this.selectedAccount!.id}/campaigns`;
+          
+          const response = await axios.get(url, {
+            params: {
+              access_token: accessToken,
+              fields: 'id,name,status,objective,created_time,updated_time,start_time,stop_time',
+              limit: 1000
             }
-          );
+          });
 
           const data = response.data.data || [];
-          console.log('Campanhas encontradas:', data);
-          
-          // Salvar dados no localStorage
-          this.saveDataAfterLoad('campaigns', data);
-          
           return data;
         } catch (error: any) {
-          console.error('Erro ao buscar campanhas:', error.response?.data || error.message);
           throw new Error(`Erro ao buscar campanhas: ${error.response?.data?.error?.message || error.message}`);
         }
       },
@@ -909,25 +883,30 @@ class MetaAdsService {
 
   // Buscar insights da conta selecionada
   async getAccountInsights(dateStart: string, dateEnd: string): Promise<MetaAdsInsight[]> {
+    console.log('🟣 MetaAdsService: getAccountInsights chamado');
+    console.log('🟣 MetaAdsService: Período:', dateStart, 'até', dateEnd);
+    
     if (!this.selectedAccount) {
+      console.error('🔴 MetaAdsService: Nenhuma conta selecionada');
       throw new Error('Nenhuma conta selecionada');
     }
+
+    console.log('🟣 MetaAdsService: Conta selecionada:', this.selectedAccount.name, 'ID:', this.selectedAccount.id);
 
     const params = { dateStart, dateEnd };
     
     return this.makeCachedRequest(
       'account_insights',
       async () => {
-        console.log(`Buscando insights da conta ${this.selectedAccount!.id}...`);
-        
-        // Usar token de acesso se disponível, senão usar token do usuário
         const accessToken = this.getAccessToken() || (this.user?.accessToken);
         if (!accessToken) {
+          console.error('🔴 MetaAdsService: Token de acesso não disponível');
           throw new Error('Token de acesso não disponível');
         }
 
+        console.log('🟣 MetaAdsService: Fazendo requisição para insights da conta...');
+
         try {
-          console.log(`Buscando insights da conta ${this.selectedAccount!.id}...`);
           
           const response = await axios.get(
             `${this.baseURL}/${this.selectedAccount!.id}/insights`,
@@ -945,10 +924,10 @@ class MetaAdsService {
             }
           );
 
-          console.log('Insights encontrados:', response.data);
+          console.log('🟣 MetaAdsService: Resposta da API recebida:', response.data.data?.length || 0, 'registros');
           return response.data.data || [];
         } catch (error: any) {
-          console.error('Erro ao buscar insights:', error.response?.data || error.message);
+          console.error('🔴 MetaAdsService: Erro ao buscar insights:', error.response?.data || error.message);
           throw new Error(`Erro ao buscar insights: ${error.response?.data?.error?.message || error.message}`);
         }
       },
@@ -959,7 +938,7 @@ class MetaAdsService {
 
   // Converter dados para formato do dashboard
   convertToMetricData(insights: MetaAdsInsight[], month: string, client?: string, product?: string, audience?: string): any[] {
-    return insights.map(insight => {
+    const result = insights.map(insight => {
       const leads = insight.actions?.find(action => 
         action.action_type === 'lead' || action.action_type === 'complete_registration'
       )?.value || '0';
@@ -1006,7 +985,7 @@ class MetaAdsService {
         correctedDate = insight.date_start;
       }
 
-      return {
+      const metricData = {
         date: correctedDate,
         month: month,
         service: 'Meta Ads',
@@ -1023,12 +1002,14 @@ class MetaAdsService {
         cpl: cpl,
         roas: roas,
         roi: roi,
-        appointments: Math.floor(leadsCount * 0.6),
-        sales: Math.floor(leadsCount * 0.3),
-        createdAt: new Date(),
-        updatedAt: new Date()
+        appointments: leadsCount,
+        sales: leadsCount
       };
+
+      return metricData;
     });
+    
+    return result;
   }
 
   // Sincronizar dados
@@ -1038,7 +1019,7 @@ class MetaAdsService {
     }
 
     try {
-      console.log('Sincronizando dados do Meta Ads...');
+  
       
       let insights: MetaAdsInsight[];
       
@@ -1046,13 +1027,13 @@ class MetaAdsService {
         console.log(`Sincronizando dados da campanha: ${campaignId}`);
         insights = await this.getCampaignInsights(campaignId, startDate, endDate);
       } else {
-        console.log('Sincronizando dados da conta inteira');
+    
         insights = await this.getAccountInsights(startDate, endDate);
       }
       
       const metrics = this.convertToMetricData(insights, month, client, product);
       
-      console.log(`Sincronizados ${metrics.length} registros do Meta Ads`);
+  
       return metrics;
     } catch (error: any) {
       console.error('Erro na sincronização:', error.message);
@@ -1069,6 +1050,20 @@ class MetaAdsService {
   getSelectedAccount(): AdAccount | null {
     return this.selectedAccount;
   }
+
+  // Método de debug para verificar estado da conexão
+  debugConnectionStatus(): void {
+    console.log('=== DEBUG CONNECTION STATUS ===');
+    console.log('User:', this.user ? { id: this.user.id, name: this.user.name } : 'null');
+    console.log('Selected Account:', this.selectedAccount ? { id: this.selectedAccount.id, name: this.selectedAccount.name } : 'null');
+    console.log('Access Token:', this.accessToken ? 'present' : 'null');
+    console.log('Is Logged In:', this.isLoggedIn());
+    console.log('Has Selected Account:', this.hasSelectedAccount());
+    console.log('Is Configured:', this.isConfigured());
+    console.log('=== END DEBUG ===');
+  }
+
+
 
   // Verificar status de login
   async getLoginStatus(): Promise<{ status: string; authResponse?: any }> {

@@ -86,9 +86,13 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Carregar métricas
   useEffect(() => {
     const loadMetrics = async () => {
+      console.log('🟡 Dashboard: loadMetrics chamado');
+      console.log('🟡 Dashboard: Estado atual - Cliente:', selectedClient, 'Produto:', selectedProduct, 'Público:', selectedAudience);
+      console.log('🟡 Dashboard: DataSource:', dataSource, 'Facebook Conectado:', isFacebookConnected);
+      
       // Não carregar métricas se não há cliente selecionado
       if (selectedClient === 'Selecione um cliente' || selectedClient === 'Todos os Clientes') {
-        console.log('Dashboard: Nenhum cliente selecionado - zerando métricas');
+        console.log('🟡 Dashboard: Nenhum cliente selecionado - zerando métricas');
         setMetrics([]);
         setLoading(false);
         return;
@@ -96,21 +100,25 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
       // Não carregar métricas se não está conectado ao Meta Ads
       if (dataSource === 'facebook' && !isFacebookConnected) {
-        console.log('Dashboard: Meta Ads não conectado - zerando métricas');
+        console.log('🟡 Dashboard: Meta Ads não conectado - zerando métricas');
         setMetrics([]);
         setLoading(false);
         return;
       }
 
       try {
+        console.log('🟡 Dashboard: Iniciando carregamento de métricas...');
         setLoading(true);
-        console.log('Dashboard: Carregando métricas para cliente:', selectedClient);
+
         const data = await metricsService.getMetrics(selectedMonth, selectedClient, selectedProduct, selectedAudience, selectedCampaign);
+        console.log('🟡 Dashboard: Métricas carregadas:', data.length, 'registros');
         setMetrics(data);
       } catch (err: any) {
+        console.error('🔴 Dashboard: Erro ao carregar métricas:', err.message);
         setError(err.message);
       } finally {
         setLoading(false);
+        console.log('🟡 Dashboard: Carregamento de métricas concluído');
       }
     };
 
@@ -303,6 +311,83 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     };
   }, []);
 
+  // Listener para carregar métricas de todas as campanhas
+  useEffect(() => {
+    const handleLoadAllCampaignsMetrics = async (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { clientName, source, adAccount } = customEvent.detail;
+      
+      console.log('🟢 Dashboard: Evento loadAllCampaignsMetrics recebido');
+      console.log('🟢 Dashboard: Detalhes - Cliente:', clientName, 'Source:', source, 'AdAccount:', adAccount?.name);
+      
+      try {
+        const { metricsService } = await import('../services/metricsService');
+        metricsService.clearCache();
+        console.log('🟢 Dashboard: Cache do metricsService limpo');
+        
+        // Forçar refresh das métricas
+        setRefreshTrigger(prev => prev + 1);
+        console.log('🟢 Dashboard: RefreshTrigger incrementado');
+      } catch (error) {
+        console.warn('🔴 Dashboard: Erro ao carregar métricas de todas as campanhas:', error);
+      }
+    };
+
+    window.addEventListener('loadAllCampaignsMetrics', handleLoadAllCampaignsMetrics);
+
+    return () => {
+      window.removeEventListener('loadAllCampaignsMetrics', handleLoadAllCampaignsMetrics);
+    };
+  }, []);
+
+  // Listener para mudança de cliente
+  useEffect(() => {
+    const handleClientChanged = async (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { clientName, source, businessManager, adAccount } = customEvent.detail;
+
+      console.log('🟢 Dashboard: Evento clientChanged recebido');
+      console.log('🟢 Dashboard: Detalhes - Cliente:', clientName, 'Source:', source, 'BM:', businessManager?.name, 'AdAccount:', adAccount?.name);
+      
+      // Atualizar o cliente selecionado
+      setSelectedClient(clientName);
+      console.log('🟢 Dashboard: Cliente atualizado no estado:', clientName);
+      
+      // Atualizar dataSource baseado no tipo de cliente
+      if (source === 'facebook') {
+        setDataSource('facebook');
+        setIsFacebookConnected(true);
+        console.log('🟢 Dashboard: DataSource definido como Facebook');
+        
+        try {
+          const { metricsService } = await import('../services/metricsService');
+          metricsService.clearCache();
+          console.log('🟢 Dashboard: Cache do metricsService limpo');
+          
+          // Forçar carregamento imediato das métricas para o cliente selecionado
+          console.log('🟢 Dashboard: Forçando carregamento de métricas para cliente:', clientName);
+          setRefreshTrigger(prev => prev + 1);
+        } catch (error) {
+          console.warn('🔴 Dashboard: Erro ao limpar cache:', error);
+        }
+      } else if (source === 'manual') {
+        setDataSource('manual');
+        setIsFacebookConnected(false);
+        console.log('🟢 Dashboard: DataSource definido como Manual');
+        
+        // Para clientes manuais, também forçar refresh
+        setRefreshTrigger(prev => prev + 1);
+        console.log('🟢 Dashboard: RefreshTrigger incrementado para cliente manual');
+      }
+    };
+
+    window.addEventListener('clientChanged', handleClientChanged);
+
+    return () => {
+      window.removeEventListener('clientChanged', handleClientChanged);
+    };
+  }, []);
+
   const handleMetaAdsSync = () => {
     setRefreshTrigger(prev => prev + 1);
   };
@@ -315,7 +400,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 text-white">
       <Header 
         selectedMonth={selectedMonth}
         setSelectedMonth={setSelectedMonth}
@@ -333,14 +418,22 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         onDataSourceChange={handleDataSourceChange}
       />
       
-      <div className="max-w-7xl mx-auto px-4 py-6 space-y-8">
+      <main className="max-w-7xl mx-auto px-6 py-8 space-y-10">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+          <div className="flex items-center justify-center py-16">
+            <div className="relative">
+              <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-700 border-t-purple-500 shadow-lg"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-400 animate-ping opacity-20"></div>
+            </div>
           </div>
         ) : error ? (
-          <div className="bg-red-900 border border-red-700 text-red-400 px-4 py-3 rounded-lg">
-            Erro ao carregar dados: {error}
+          <div className="bg-gradient-to-r from-red-900/50 to-red-800/50 border border-red-500/30 text-red-300 px-6 py-4 rounded-xl backdrop-blur-sm shadow-lg">
+            <div className="flex items-center space-x-3">
+              <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                <span className="text-xs font-bold">!</span>
+              </div>
+              <span>Erro ao carregar dados: {error}</span>
+            </div>
           </div>
         ) : (
           <>
@@ -351,9 +444,20 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         <InsightsSection />
         <DailyControlTable metrics={metrics} selectedCampaign={selectedCampaign} selectedMonth={selectedMonth} />
         <HistorySection />
-      </div>
+      </main>
       
-      <Toaster position="top-right" />
+      <Toaster 
+        position="top-right" 
+        toastOptions={{
+          style: {
+            background: '#1f2937',
+            color: '#f9fafb',
+            border: '1px solid #374151',
+            borderRadius: '12px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }
+        }}
+      />
     </div>
   );
 };

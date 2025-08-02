@@ -48,6 +48,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
       } catch (error) {
         console.error('Erro ao carregar usuário salvo:', error);
         localStorage.removeItem('facebookUser');
+        setManualData();
       }
     } else {
       console.log('Usuário não encontrado ou não está conectado, iniciando em modo manual');
@@ -671,13 +672,13 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
                   </div>
                 </div>
 
-                  <button
-                    onClick={handleLogout}
+                <button
+                  onClick={handleLogout}
                   className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors"
-                  >
+                >
                   <LogOut className="w-5 h-5" />
                   <span>Trocar Conta</span>
-                  </button>
+                </button>
               </div>
             )}
 

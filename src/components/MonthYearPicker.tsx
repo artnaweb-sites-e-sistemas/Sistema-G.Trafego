@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 
 interface MonthYearPickerProps {
   selectedMonth: string;
@@ -144,13 +144,7 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
       status = 'Mês passado - Amarelo';
     }
     
-    // Debug log
-    console.log('MonthYearPicker - Indicador de Cor:', {
-      currentDate: `${currentMonth + 1}/${currentYear}`,
-      selectedDate: `${selectedMonthIndex + 1}/${selectedYear}`,
-      status,
-      colorClass
-    });
+
     
     return colorClass;
   };
@@ -178,17 +172,18 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
         })()}
       >
         <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-        <div className="bg-gray-700 text-white pl-10 pr-4 py-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none w-[220px]">
-          <span className="truncate block">{formatDisplayMonth()}</span>
+        <div className="bg-gray-700 text-white pl-10 pr-8 py-2 rounded-lg border border-gray-600/50 focus:border-purple-500/70 focus:outline-none w-full shadow-sm hover:shadow-md transition-all duration-300">
+          <span className="truncate block font-medium">{formatDisplayMonth()}</span>
         </div>
+        <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
         
         {/* Indicador de Status */}
-        <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 ${getIndicatorColor()}`}></div>
+        <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-300 shadow-sm ${getIndicatorColor()}`}></div>
       </div>
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[280px]">
+        <div className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 min-w-[300px] backdrop-blur-sm">
           {/* Year selector */}
           <div className="flex items-center justify-between p-3 border-b border-gray-200">
             <button

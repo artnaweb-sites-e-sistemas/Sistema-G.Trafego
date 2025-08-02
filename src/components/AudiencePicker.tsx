@@ -36,7 +36,6 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [audiences, setAudiences] = useState<Audience[]>([
-    { id: '1', name: 'Todos os Públicos', productId: 'all', clientId: 'all' },
     { id: '2', name: 'Executivos 30-50', description: 'Profissionais de alto nível', ageRange: '30-50', interests: ['Negócios', 'Tecnologia'], location: 'São Paulo', size: 15000, productId: '2', clientId: '2', source: 'manual' },
     { id: '3', name: 'Empreendedores', description: 'Donos de pequenas empresas', ageRange: '25-45', interests: ['Empreendedorismo', 'Marketing'], location: 'Brasil', size: 25000, productId: '3', clientId: '2', source: 'manual' },
     { id: '4', name: 'Startups', description: 'Empresas em crescimento', ageRange: '20-40', interests: ['Inovação', 'Tecnologia'], location: 'São Paulo', size: 8000, productId: '4', clientId: '3', source: 'manual' },
@@ -148,41 +147,21 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         
         console.log('AudiencePicker: Públicos do Facebook criados:', facebookAudiences);
         
-        // Se não há Ad Sets, mostrar apenas "Todos os Públicos"
+        // Se não há Ad Sets, mostrar lista vazia
         if (facebookAudiences.length === 0) {
-          console.log('AudiencePicker: Nenhum Ad Set encontrado para este produto');
-          setAudiences([
-            { id: '1', name: 'Todos os Públicos', productId: 'all', clientId: 'all' }
-          ]);
-          setSelectedAudience('Todos os Públicos');
+          setAudiences([]);
         } else {
-          // Se há Ad Sets, adicionar "Todos os Públicos" + Ad Sets
-          const allAudiences = [
-            { id: '1', name: 'Todos os Públicos', productId: 'all', clientId: 'all' },
-            ...facebookAudiences
-          ];
-          
-          setAudiences(allAudiences);
-          
-          // Se não há público selecionado, selecionar "Todos os Públicos"
-          if (selectedAudience === 'Todos os Públicos' || !selectedAudience) {
-            setSelectedAudience('Todos os Públicos');
-          }
+          setAudiences(facebookAudiences);
         }
         
       } catch (error: any) {
         console.error('Erro ao carregar Ad Sets do Meta Ads:', error.message);
-        // Em caso de erro, mostrar apenas "Todos os Públicos"
-        setAudiences([
-          { id: '1', name: 'Todos os Públicos', productId: 'all', clientId: 'all' }
-        ]);
+        setAudiences([]);
       } finally {
         setIsLoading(false);
       }
     } else if (dataSource === 'manual') {
-      console.log('AudiencePicker: Carregando públicos manuais...');
       setAudiences([
-        { id: '1', name: 'Todos os Públicos', productId: 'all', clientId: 'all' },
         { id: '2', name: 'Executivos 30-50', description: 'Profissionais de alto nível', ageRange: '30-50', interests: ['Negócios', 'Tecnologia'], location: 'São Paulo', size: 15000, productId: '2', clientId: '2', source: 'manual' },
         { id: '3', name: 'Empreendedores', description: 'Donos de pequenas empresas', ageRange: '25-45', interests: ['Empreendedorismo', 'Marketing'], location: 'Brasil', size: 25000, productId: '3', clientId: '2', source: 'manual' },
         { id: '4', name: 'Startups', description: 'Empresas em crescimento', ageRange: '20-40', interests: ['Inovação', 'Tecnologia'], location: 'São Paulo', size: 8000, productId: '4', clientId: '3', source: 'manual' },
@@ -195,43 +174,69 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
       ]);
     } else {
       console.log('AudiencePicker: DataSource não é facebook ou usuário não está logado');
-      // Mostrar apenas "Todos os Públicos" quando não há fonte de dados
-      setAudiences([
-        { id: '1', name: 'Todos os Públicos', productId: 'all', clientId: 'all' }
-      ]);
+      setAudiences([]);
     }
   };
 
   // Carregar público salvo do localStorage ao inicializar
   useEffect(() => {
-    const savedAudience = localStorage.getItem('selectedAudience');
-    const savedProduct = localStorage.getItem('selectedProduct');
+    const savedAudience = localStorage.getItem('currentSelectedAudience');
+    const savedProduct = localStorage.getItem('currentSelectedProduct');
     
     // Só restaurar público se há produto selecionado
-    if (savedAudience && savedAudience !== 'Todos os Públicos' && savedProduct && savedProduct !== 'Todos os Produtos') {
+    if (savedAudience && savedAudience !== '' && savedProduct && savedProduct !== '') {
       setSelectedAudience(savedAudience);
       console.log('AudiencePicker: Público restaurado do localStorage:', savedAudience);
     }
-  }, []);
+  }, [setSelectedAudience]);
 
   // Carregar públicos quando dataSource, selectedProduct, selectedClient ou selectedMonth mudar
   useEffect(() => {
-    console.log('AudiencePicker: Produto mudou para:', selectedProduct, 'Cliente:', selectedClient);
+    console.log('AudiencePicker: useEffect disparado');
+    console.log('AudiencePicker: selectedProduct =', selectedProduct);
+    console.log('AudiencePicker: selectedClient =', selectedClient);
+    console.log('AudiencePicker: dataSource =', dataSource);
     
     // Só carregar se há produto selecionado
     if (selectedProduct && selectedProduct !== 'Todos os Produtos') {
-      // Pequeno delay para garantir que o cache seja limpo
+      console.log('AudiencePicker: Produto válido selecionado, carregando Ad Sets...');
+      
+      // Delay para garantir que o cache seja limpo
       const timer = setTimeout(() => {
+        console.log('AudiencePicker: Executando loadMetaAdsAdSets após delay');
         loadMetaAdsAdSets();
-      }, 100);
+      }, 300);
       
       return () => clearTimeout(timer);
     } else {
+      console.log('AudiencePicker: Produto inválido ou não selecionado, resetando públicos');
       // Resetar públicos quando não há produto selecionado
       setAudiences([{ id: '1', name: 'Todos os Públicos', productId: 'all', clientId: 'all' }]);
       setSelectedAudience('Todos os Públicos');
     }
   }, [dataSource, selectedProduct, selectedClient, selectedMonth]);
+
+  // Listener para evento de campanha selecionada
+  useEffect(() => {
+    const handleCampaignSelected = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { campaign, productName, campaignId } = customEvent.detail;
+      console.log('AudiencePicker: Campanha selecionada:', campaign, productName);
+      console.log('AudiencePicker: Campaign ID:', campaignId);
+      
+      // Forçar recarregamento dos Ad Sets após um delay
+      setTimeout(() => {
+        console.log('AudiencePicker: Recarregando Ad Sets após seleção de campanha');
+        loadMetaAdsAdSets();
+      }, 500);
+    };
+
+    window.addEventListener('campaignSelected', handleCampaignSelected);
+
+    return () => {
+      window.removeEventListener('campaignSelected', handleCampaignSelected);
+    };
+  }, []);
 
   // Filtrar públicos baseado no termo de busca, produto e cliente selecionados
   const filteredAudiences = audiences.filter(audience => {
@@ -276,24 +281,31 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
 
   // Reset selected audience when client or product changes (only if no saved audience)
   useEffect(() => {
-    const savedAudience = localStorage.getItem('selectedAudience');
-    if (!savedAudience || savedAudience === 'Todos os Públicos') {
-      setSelectedAudience('Todos os Públicos');
+    const savedAudience = localStorage.getItem('currentSelectedAudience');
+    if (!savedAudience || savedAudience === '') {
+      setSelectedAudience('');
     }
   }, [selectedClient, selectedProduct, setSelectedAudience]);
 
   const handleAudienceSelect = (audience: Audience) => {
+    console.log('=== INICIANDO SELEÇÃO DE PÚBLICO ===');
     console.log('Público selecionado:', audience);
+    
+    // Atualizar estado imediatamente
     setSelectedAudience(audience.name);
     setIsOpen(false);
     setSearchTerm('');
     
     // Salvar público selecionado no localStorage
-    localStorage.setItem('selectedAudience', audience.name);
+    localStorage.setItem('currentSelectedAudience', audience.name);
+    localStorage.setItem('currentSelectedProduct', selectedProduct); // Salvar produto selecionado
     
     // Disparar evento customizado se for um Ad Set do Facebook
     if (audience.source === 'facebook' && audience.adSet) {
       console.log(`Ad Set selecionado: ${audience.adSet.name} (${audience.adSet.id})`);
+      
+      // Salvar ID do Ad Set no localStorage
+      localStorage.setItem('selectedAdSetId', audience.adSet.id);
       
       const event = new CustomEvent('adSetSelected', {
         detail: {
@@ -303,21 +315,32 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         }
       });
       window.dispatchEvent(event);
+      console.log('Evento adSetSelected disparado com sucesso');
+    } else {
+      // Para públicos manuais, disparar evento também
+      const event = new CustomEvent('audienceSelected', {
+        detail: {
+          audienceName: audience.name,
+          source: audience.source
+        }
+      });
+      window.dispatchEvent(event);
+      console.log('Evento audienceSelected disparado para público manual');
     }
+    
+    console.log('=== SELEÇÃO DE PÚBLICO CONCLUÍDA ===');
   };
 
   const handleClear = () => {
-    // Limpar a seleção e voltar para "Todos os Públicos"
-    setSelectedAudience('Todos os Públicos');
-    
-    // Limpar dados relacionados do localStorage
-    localStorage.removeItem('selectedAudience');
-    localStorage.removeItem('selectedAdSetId');
-    
-    setIsOpen(false);
+    setSelectedAudience('');
     setSearchTerm('');
+    localStorage.removeItem('currentSelectedAudience');
+    localStorage.removeItem('currentSelectedProduct'); // Remover produto selecionado
     
-    console.log('AudiencePicker: Seleção de público limpa');
+    console.log('AudiencePicker: Seleção limpa');
+    
+    // Emitir evento para notificar outros componentes
+    window.dispatchEvent(new CustomEvent('audienceCleared'));
   };
 
   const handleDeleteAudience = (audienceId: string, audienceName: string, event: React.MouseEvent) => {
@@ -326,7 +349,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
     // Não permitir deletar públicos do Facebook
     const audience = audiences.find(a => a.id === audienceId);
     if (audience?.source === 'facebook') {
-      alert('Não é possível excluir conjuntos de anúncios do Meta Ads. Use o Facebook Ads Manager para gerenciar seus conjuntos de anúncios.');
+      alert('Não é possível excluir conjuntos de anúncios do Meta Ads. Use o Facebook Ads Manager para gerenciar seus anúncios.');
       return;
     }
     
@@ -334,17 +357,16 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
       setAudiences(prevAudiences => prevAudiences.filter(audience => audience.id !== audienceId));
       
       if (audienceName === selectedAudience) {
-        setSelectedAudience('Todos os Públicos');
+        setSelectedAudience('');
       }
       
       setSearchTerm('');
-      console.log(`Público ${audienceName} (ID: ${audienceId}) foi excluído com sucesso!`);
     }
   };
 
   const getDisplayText = () => {
-    if (selectedAudience === 'Todos os Públicos') {
-      return 'Todos os Públicos';
+    if (!selectedAudience) {
+      return 'Selecionar Público';
     }
     const audience = audiences.find(a => a.name === selectedAudience);
     return audience ? audience.name : 'Selecionar Público';
@@ -378,7 +400,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         onClick={() => isPickerActive && setIsOpen(!isOpen)}
       >
         <Users className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isPickerActive ? 'text-gray-400' : 'text-gray-600'}`} />
-        <div className={`pl-10 pr-8 py-2 rounded-lg border w-[220px] ${
+        <div className={`pl-10 pr-8 py-2 rounded-lg border w-full ${
           isPickerActive 
             ? 'bg-gray-700 text-white border-gray-600 focus:border-purple-500 focus:outline-none' 
             : 'bg-gray-800 text-gray-500 border-gray-700'
@@ -393,7 +415,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         
         {/* Indicador de Status */}
         <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 ${
-          selectedAudience === 'Todos os Públicos' 
+          !selectedAudience 
             ? 'bg-gray-500' 
             : 'bg-green-500 shadow-lg shadow-green-500/50'
         }`}></div>
@@ -455,18 +477,12 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
-                        {getAudienceIcon(audience)}
                         <div className="font-medium text-gray-900">{audience.name}</div>
-                        {audience.source === 'facebook' && (
-                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                            Meta Ads
-                          </span>
-                        )}
                       </div>
                       {audience.description && (
-                        <div className="text-sm text-gray-500 ml-6">{audience.description}</div>
+                        <div className="text-sm text-gray-500">{audience.description}</div>
                       )}
-                      <div className="flex items-center space-x-2 mt-1 ml-6">
+                      <div className="flex items-center space-x-2 mt-1">
                         {audience.ageRange && (
                           <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
                             {audience.ageRange} anos
@@ -493,7 +509,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
                         )}
                       </div>
                       {audience.interests && audience.interests.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1 ml-6">
+                        <div className="flex flex-wrap gap-1 mt-1">
                           {audience.interests.map((interest, index) => (
                             <span key={index} className="text-xs bg-gray-100 text-gray-600 px-1 py-0.5 rounded">
                               {interest}
@@ -506,7 +522,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
                       {audience.name === selectedAudience && (
                         <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
                       )}
-                      {audience.name !== 'Todos os Públicos' && audience.source !== 'facebook' && (
+                      {audience.source !== 'facebook' && (
                         <button
                           onClick={(e) => handleDeleteAudience(audience.id, audience.name, e)}
                           className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-all duration-200 ease-in-out"
@@ -523,38 +539,14 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
               <div className="p-4 text-center text-gray-500">
                 {dataSource === 'facebook' && metaAdsService.isLoggedIn()
                   ? 'Nenhum conjunto de anúncios ativo encontrado para esta campanha'
-                  : selectedClient === 'Todos os Clientes' 
+                  : selectedClient === 'Selecione um cliente' 
                     ? 'Selecione um cliente para ver os públicos'
-                    : selectedProduct === 'Todos os Produtos'
+                    : selectedProduct === 'Selecione um produto'
                     ? 'Selecione um produto para ver os públicos'
                     : 'Nenhum público encontrado'
                 }
               </div>
             )}
-          </div>
-
-          {/* Action buttons */}
-          <div className="border-t border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
-            <div className="flex items-center justify-between p-4">
-              <button
-                onClick={handleClear}
-                className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-all duration-200 ease-in-out"
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                Limpar Seleção
-              </button>
-              <div className="flex items-center space-x-2">
-                <div className="w-px h-6 bg-gray-300"></div>
-                <button
-                  className="flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-all duration-200 ease-in-out shadow-sm hover:shadow-md"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Novo Público
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}

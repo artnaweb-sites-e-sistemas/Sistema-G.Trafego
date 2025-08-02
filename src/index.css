@@ -1,3 +1,37 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Estilos específicos para o modal do Meta Ads */
+.meta-ads-modal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+.meta-ads-modal-content {
+  width: 100%;
+  max-width: 28rem;
+  margin: 0 auto;
+  position: relative;
+  transform: translateZ(0);
+}
+
+/* Garantir que o conteúdo do modal seja responsivo */
+@media (max-width: 640px) {
+  .meta-ads-modal {
+    padding: 0.5rem;
+  }
+  
+  .meta-ads-modal-content {
+    max-width: 100%;
+  }
+}
+
+/* Melhorar a aparência do backdrop */
+.modal-backdrop {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}

@@ -507,13 +507,13 @@ export const metricsService = {
       timestamp: Date.now(),
       ttl: this.CACHE_TTL
     });
-    console.log(`Cache set para métricas: ${key}`);
+
   },
 
   // Método para limpar cache de métricas
   clearCache(): void {
     this.cache.clear();
-    console.log('Cache de métricas limpo completamente');
+
   },
 
   // Método para forçar refresh dos dados
@@ -537,12 +537,15 @@ export const metricsService = {
 
   // Buscar métricas por mês e serviço
   async getMetrics(month: string, client: string = 'Todos os Clientes', product: string = 'Todos os Produtos', audience: string = 'Todos os Públicos', campaignId?: string) {
+    console.log('🟠 MetricsService: getMetrics chamado');
+    console.log('🟠 MetricsService: Parâmetros - Mês:', month, 'Cliente:', client, 'Produto:', product, 'Público:', audience, 'CampaignId:', campaignId);
+    
     // Se não foi passado campaignId, tentar pegar do localStorage
     if (!campaignId && product !== 'Todos os Produtos') {
       const storedCampaignId = localStorage.getItem('selectedCampaignId');
       if (storedCampaignId) {
         campaignId = storedCampaignId;
-        console.log('Usando campaignId do localStorage:', campaignId);
+        console.log('🟠 MetricsService: Usando campaignId do localStorage:', campaignId);
       }
     }
 
@@ -552,23 +555,27 @@ export const metricsService = {
       const storedAdSetId = localStorage.getItem('selectedAdSetId');
       if (storedAdSetId) {
         adSetId = storedAdSetId;
-        console.log('Usando adSetId do localStorage:', adSetId);
+        console.log('🟠 MetricsService: Usando adSetId do localStorage:', adSetId);
       }
     }
     try {
-      console.log(`Buscando métricas para: ${month}, Cliente: ${client}, Produto: ${product}, Público: ${audience}`);
+      console.log('🟠 MetricsService: Iniciando busca de métricas...');
       
       // Verificar cache primeiro
       const cacheKey = this.getCacheKey(month, client, product, audience);
       const cached = this.getFromCache(cacheKey);
       if (cached) {
+        console.log('🟠 MetricsService: Dados encontrados no cache:', cached.length, 'registros');
         return cached;
       }
       
+      console.log('🟠 MetricsService: Cache não encontrado, buscando dados...');
+      
       // Verificar se Meta Ads está configurado e tentar sincronizar
       if (metaAdsService.isConfigured()) {
+        console.log('🟠 MetricsService: Meta Ads configurado, iniciando sincronização...');
+        
         try {
-          console.log('Meta Ads configurado, tentando sincronizar dados...');
           
           // Converter mês para formato de data
           const monthMap: { [key: string]: number } = {
@@ -586,21 +593,30 @@ export const metricsService = {
           const startDate = firstDayOfMonth.toISOString().split('T')[0];
           const endDate = lastDayOfMonth.toISOString().split('T')[0];
           
-          console.log(`Sincronizando dados do Meta Ads para ${startDate} até ${endDate}`);
+          console.log('🟠 MetricsService: Período de busca:', startDate, 'até', endDate);
+          
+
           
           // Se um cliente específico foi selecionado (Business Manager), buscar dados específicos
           let metaAdsData;
           if (client !== 'Todos os Clientes') {
-            console.log(`Buscando dados específicos para Business Manager: ${client}`);
+            console.log('🟠 MetricsService: Cliente específico selecionado:', client);
             
             // Se há um Ad Set específico selecionado, buscar métricas do Ad Set
             if (adSetId) {
-              console.log(`Buscando métricas específicas do Ad Set: ${adSetId}`);
+              console.log(`🟠 MetricsService: Buscando métricas específicas do Ad Set: ${adSetId}`);
               const adSetInsights = await metaAdsService.getAdSetInsights(adSetId, startDate, endDate);
               metaAdsData = metaAdsService.convertToMetricData(adSetInsights, month, client, product, audience);
+            } else if (campaignId) {
+              // Se há uma campanha específica selecionada, buscar métricas da campanha
+              console.log(`🟠 MetricsService: Buscando métricas específicas da campanha: ${campaignId}`);
+              const campaignInsights = await metaAdsService.getCampaignInsights(campaignId, startDate, endDate);
+              metaAdsData = metaAdsService.convertToMetricData(campaignInsights, month, client, product, audience);
             } else {
-              // Passar client e product para o syncMetrics
-              metaAdsData = await metaAdsService.syncMetrics(month, startDate, endDate, campaignId, client, product);
+              // Se apenas o cliente foi selecionado, buscar métricas de toda a conta (todas as campanhas)
+              console.log(`🟠 MetricsService: Buscando métricas de todas as campanhas para o cliente: ${client}`);
+              const accountInsights = await metaAdsService.getAccountInsights(startDate, endDate);
+              metaAdsData = metaAdsService.convertToMetricData(accountInsights, month, client, product, audience);
             }
             
             // Marcar dados como pertencentes à BM específica
@@ -610,17 +626,26 @@ export const metricsService = {
               businessManager: client
             }));
           } else {
+            console.log('🟠 MetricsService: Nenhum cliente específico selecionado');
             // Se há um Ad Set específico selecionado, buscar métricas do Ad Set
             if (adSetId) {
-              console.log(`Buscando métricas específicas do Ad Set: ${adSetId}`);
+              console.log(`🟠 MetricsService: Buscando métricas específicas do Ad Set: ${adSetId}`);
               const adSetInsights = await metaAdsService.getAdSetInsights(adSetId, startDate, endDate);
               metaAdsData = metaAdsService.convertToMetricData(adSetInsights, month, client, product, audience);
+            } else if (campaignId) {
+              // Se há uma campanha específica selecionada, buscar métricas da campanha
+              console.log(`🟠 MetricsService: Buscando métricas específicas da campanha: ${campaignId}`);
+              const campaignInsights = await metaAdsService.getCampaignInsights(campaignId, startDate, endDate);
+              metaAdsData = metaAdsService.convertToMetricData(campaignInsights, month, client, product, audience);
             } else {
-              metaAdsData = await metaAdsService.syncMetrics(month, startDate, endDate, campaignId, client, product);
+              // Se nenhum filtro específico, buscar métricas de toda a conta
+              console.log('🟠 MetricsService: Buscando métricas de toda a conta');
+              const accountInsights = await metaAdsService.getAccountInsights(startDate, endDate);
+              metaAdsData = metaAdsService.convertToMetricData(accountInsights, month, client, product, audience);
             }
           }
           
-          console.log(`Dados do Meta Ads sincronizados: ${metaAdsData.length} registros`);
+          console.log('🟠 MetricsService: Dados do Meta Ads obtidos:', metaAdsData.length, 'registros');
           
           // Salvar no Firebase se possível
           for (const metric of metaAdsData) {
@@ -638,29 +663,27 @@ export const metricsService = {
             filteredData = filteredData.filter(item => item.client === client);
           }
 
-          if (product !== 'Todos os Produtos') {
+          if (product && product !== '' && product !== 'Todos os Produtos') {
             filteredData = filteredData.filter(item => item.product === product);
           }
 
-          if (audience !== 'Todos os Públicos') {
+          if (audience && audience !== '' && audience !== 'Todos os Públicos') {
             filteredData = filteredData.filter(item => item.audience === audience);
           }
-          
-          console.log(`Dados filtrados: ${filteredData.length} registros`);
           
           // Salvar no cache
           this.setCache(cacheKey, filteredData);
           return filteredData;
           
         } catch (error: any) {
-          console.warn('Erro ao sincronizar Meta Ads, usando dados mockados:', error.message);
+          console.warn('🔴 MetricsService: Erro ao sincronizar Meta Ads, usando dados mockados:', error.message);
           // Continue para usar dados mockados
         }
       }
 
       // Tentar buscar do Firebase primeiro (com tratamento de erro para índices)
       try {
-        console.log('Tentando buscar dados do Firebase...');
+        console.log('🟠 MetricsService: Tentando buscar dados do Firebase...');
         const metricsRef = collection(db, 'metrics');
         let q = query(
           metricsRef, 
@@ -674,7 +697,7 @@ export const metricsService = {
           ...doc.data()
         })) as MetricData[];
 
-        console.log(`Dados do Firebase encontrados: ${firebaseData.length} registros`);
+        console.log(`🟠 MetricsService: Dados do Firebase encontrados: ${firebaseData.length} registros`);
 
         // Se há dados no Firebase, filtrar e retornar
         if (firebaseData.length > 0) {
@@ -684,51 +707,50 @@ export const metricsService = {
             filteredData = filteredData.filter(item => item.client === client);
           }
 
-          if (product !== 'Todos os Produtos') {
+          if (product && product !== '' && product !== 'Todos os Produtos') {
             filteredData = filteredData.filter(item => item.product === product);
           }
 
-          if (audience !== 'Todos os Públicos') {
+          if (audience && audience !== '' && audience !== 'Todos os Públicos') {
             filteredData = filteredData.filter(item => item.audience === audience);
           }
           
-          console.log(`Dados do Firebase filtrados: ${filteredData.length} registros`);
+          console.log(`🟠 MetricsService: Dados do Firebase filtrados: ${filteredData.length} registros`);
           
           // Salvar no cache
           this.setCache(cacheKey, filteredData);
+          console.log('🟠 MetricsService: Retornando dados do Firebase');
           return filteredData;
         }
       } catch (firebaseError: any) {
-        console.warn('Erro na consulta Firebase (possível problema de índice):', firebaseError.message);
+        console.warn('🔴 MetricsService: Erro na consulta Firebase (possível problema de índice):', firebaseError.message);
         // Continua para usar dados mockados
       }
 
       // Caso contrário, retorna dados mockados
-      console.log('Usando dados mockados...');
+      console.log('🟠 MetricsService: Usando dados mockados...');
       let filteredData = mockData.filter(item => item.month === month);
       
       if (client !== 'Todos os Clientes') {
         filteredData = filteredData.filter(item => item.client === client);
       }
 
-      if (product !== 'Todos os Produtos') {
+      if (product && product !== '' && product !== 'Todos os Produtos') {
         filteredData = filteredData.filter(item => item.product === product);
       }
 
-      if (audience !== 'Todos os Públicos') {
+      if (audience && audience !== '' && audience !== 'Todos os Públicos') {
         filteredData = filteredData.filter(item => item.audience === audience);
       }
 
       // Garante que todos tenham o campo service
       filteredData = filteredData.map(item => ({
         ...item,
-        service: item.service || 'Desconhecido'
+        service: item.service || 'Manual'
       }));
 
-      console.log(`Dados mockados filtrados: ${filteredData.length} registros`);
-      
-      // Salvar no cache
-      this.setCache(cacheKey, filteredData);
+      console.log('🟠 MetricsService: Dados mockados filtrados:', filteredData.length, 'registros');
+      console.log('🟠 MetricsService: Retornando dados mockados');
       return filteredData;
 
     } catch (error: any) {
@@ -741,11 +763,11 @@ export const metricsService = {
         filteredData = filteredData.filter(item => item.client === client);
       }
 
-      if (product !== 'Todos os Produtos') {
+      if (product && product !== '' && product !== 'Todos os Produtos') {
         filteredData = filteredData.filter(item => item.product === product);
       }
 
-      if (audience !== 'Todos os Públicos') {
+      if (audience && audience !== '' && audience !== 'Todos os Públicos') {
         filteredData = filteredData.filter(item => item.audience === audience);
       }
 

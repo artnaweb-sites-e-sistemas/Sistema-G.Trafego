@@ -68,7 +68,7 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
           const facebookClients: Client[] = businessManagers.map((bm, index) => ({
             id: `fb-${bm.id}`,
             name: bm.name,
-            company: `Business Manager (${bm.account_type})`,
+            company: 'Business Manager',
             source: 'facebook' as const,
             businessManager: bm
           }));
@@ -127,109 +127,109 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleClientSelect = (client: Client) => {
-    console.log('Cliente selecionado:', client);
+  const handleClientSelect = async (client: Client) => {
+    console.log('🔵 ClientPicker: Iniciando seleção de cliente:', client.name, 'Source:', client.source);
+    
     setSelectedClient(client.name);
     setIsOpen(false);
     setSearchTerm('');
     
-    // Salvar cliente atual no localStorage para cache
+    localStorage.removeItem('selectedCampaignId');
+    localStorage.removeItem('selectedAdSetId');
+    localStorage.removeItem('selectedProduct');
+    localStorage.removeItem('selectedAudience');
+    
     localStorage.setItem('currentSelectedClient', client.name);
+    console.log('🔵 ClientPicker: Cliente salvo no localStorage:', client.name);
     
-    // Limpar dados de campanhas e Ad Sets anteriores do localStorage apenas se for cliente diferente
-    const previousClient = localStorage.getItem('currentSelectedClient');
-    if (previousClient && previousClient !== client.name) {
-      localStorage.removeItem('selectedCampaignId');
-      localStorage.removeItem('selectedAdSetId');
-      localStorage.removeItem('selectedProduct');
-      localStorage.removeItem('selectedAudience');
-    }
-    
-    // Invalidar cache do Meta Ads para forçar recarregamento dos dados
     if (client.source === 'facebook') {
-      console.log('Invalidando cache do Meta Ads para novo cliente...');
+      console.log('🔵 ClientPicker: Cliente é do Facebook, limpando cache...');
+      metaAdsService.clearAllCache();
       
-      // Limpar cache de clientes anteriores
-      if (previousClient && previousClient !== client.name) {
-        metaAdsService.clearCacheByClient(previousClient);
-      }
+      const keysToRemove = [
+        'metaAds_campaigns',
+        'metaAds_adsets',
+        'metaAds_business_managers',
+        'metaAds_ad_accounts_by_business',
+        'metaAds_metrics',
+        'metaAds_insights'
+      ];
+      keysToRemove.forEach(key => localStorage.removeItem(key));
       
-      // Limpar todo o cache de campanhas e Ad Sets para garantir dados frescos
-      metaAdsService.clearCacheByType('campaigns');
-      metaAdsService.clearCacheByType('adsets');
-      
-      // Limpar cache de métricas para o cliente anterior
-      if (previousClient && previousClient !== client.name) {
-        // Importar metricsService de forma síncrona
-        import('../services/metricsService').then(({ metricsService }) => {
-          metricsService.clearCacheByClient(previousClient);
-          console.log(`Cache de métricas limpo para cliente anterior: ${previousClient}`);
-        });
-      }
-      
-      // Limpar também localStorage relacionado
-      localStorage.removeItem('selectedProduct');
-      localStorage.removeItem('selectedAudience');
-      localStorage.removeItem('selectedCampaignId');
-      localStorage.removeItem('selectedAdSetId');
-      
-      // Invalidar cache de campanhas e Ad Sets para o novo cliente
-      metaAdsService.invalidateCache('campaigns');
-      metaAdsService.invalidateCache('adsets');
-      
-      console.log('Cache e localStorage limpos para novo cliente:', client.name);
+      import('../services/metricsService').then(({ metricsService }) => {
+        metricsService.clearCache();
+        console.log('🔵 ClientPicker: Cache do metricsService limpo');
+      });
     }
     
-    // Se for uma Business Manager do Facebook, carregar métricas específicas
     if (client.source === 'facebook' && client.businessManager) {
-      console.log(`Business Manager selecionada: ${client.businessManager.name} (${client.businessManager.id})`);
-      
-      // Selecionar automaticamente uma conta de anúncios da Business Manager
-      const selectAdAccountForBusiness = async () => {
-        try {
-          console.log('Selecionando conta de anúncios para Business Manager:', client.businessManager!.id);
-          const adAccounts = await metaAdsService.getAdAccountsByBusiness(client.businessManager!.id);
+      console.log('🔵 ClientPicker: Buscando contas de anúncios para BM:', client.businessManager.id);
+      try {
+        const adAccounts = await metaAdsService.getAdAccountsByBusiness(client.businessManager.id);
+        console.log('🔵 ClientPicker: Contas de anúncios encontradas:', adAccounts.length);
+        
+        if (adAccounts.length > 0) {
+          const activeAccount = adAccounts.find(account => account.account_status === 1) || adAccounts[0];
+          console.log('🔵 ClientPicker: Conta ativa selecionada:', activeAccount.name, 'ID:', activeAccount.id);
+          metaAdsService.selectAdAccount(activeAccount);
           
-          if (adAccounts.length > 0) {
-            // Filtrar contas que pertencem especificamente a este Business Manager
-            const businessAccounts = adAccounts.filter(account => 
-              account.business_id === client.businessManager!.id
-            );
-            
-            // Selecionar a primeira conta ativa da Business Manager específica
-            const activeAccount = businessAccounts.find(account => account.account_status === 1) || businessAccounts[0] || adAccounts[0];
-            
-            metaAdsService.selectAdAccount(activeAccount);
-            console.log('Conta de anúncios selecionada para', client.name + ':', activeAccount.name);
-            console.log('Business ID da conta:', activeAccount.business_id);
-          } else {
-            console.warn('Nenhuma conta de anúncios encontrada para esta Business Manager');
-          }
-        } catch (error) {
-          console.error('Erro ao selecionar conta de anúncios:', error);
+          const event = new CustomEvent('clientChanged', {
+            detail: {
+              clientName: client.name,
+              businessManager: client.businessManager,
+              adAccount: activeAccount,
+              source: 'facebook'
+            }
+          });
+          window.dispatchEvent(event);
+          console.log('🔵 ClientPicker: Evento clientChanged disparado');
+          
+          // Disparar evento para carregar métricas de todas as campanhas
+          const loadAllMetricsEvent = new CustomEvent('loadAllCampaignsMetrics', {
+            detail: {
+              clientName: client.name,
+              source: 'facebook',
+              adAccount: activeAccount
+            }
+          });
+          window.dispatchEvent(loadAllMetricsEvent);
+          console.log('🔵 ClientPicker: Evento loadAllCampaignsMetrics disparado');
+        } else {
+          console.log('🔵 ClientPicker: Nenhuma conta de anúncios encontrada');
+          const event = new CustomEvent('clientChanged', {
+            detail: {
+              clientName: client.name,
+              businessManager: client.businessManager,
+              adAccount: null,
+              source: 'facebook'
+            }
+          });
+          window.dispatchEvent(event);
         }
-      };
-      
-      selectAdAccountForBusiness();
-      
-      // Disparar evento customizado para notificar outros componentes
-      const event = new CustomEvent('businessManagerSelected', {
+      } catch (error) {
+        console.error('🔴 ClientPicker: Erro ao configurar conta:', error);
+        const event = new CustomEvent('clientChanged', {
+          detail: {
+            clientName: client.name,
+            businessManager: client.businessManager,
+            adAccount: null,
+            source: 'facebook'
+          }
+        });
+        window.dispatchEvent(event);
+      }
+    } else {
+      console.log('🔵 ClientPicker: Cliente manual, disparando evento clientChanged');
+      const event = new CustomEvent('clientChanged', {
         detail: {
-          businessManager: client.businessManager,
-          clientName: client.name
+          clientName: client.name,
+          source: 'manual'
         }
       });
       window.dispatchEvent(event);
-      
-      console.log('ClientPicker: Evento businessManagerSelected disparado para:', client.name);
-      
-      // Forçar atualização do estado após um pequeno delay
-      setTimeout(() => {
-        console.log('ClientPicker: Forçando atualização do estado após seleção de BM');
-        // Disparar evento novamente para garantir que todos os componentes recebam
-        window.dispatchEvent(event);
-      }, 100);
     }
+    
+    console.log('🔵 ClientPicker: Seleção de cliente concluída');
   };
 
   const handleClear = async () => {
@@ -326,7 +326,7 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
         onClick={() => setIsOpen(!isOpen)}
       >
         <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-        <div className="bg-gray-700 text-white pl-10 pr-8 py-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none w-[220px]">
+        <div className="bg-gray-700 text-white pl-10 pr-8 py-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none w-full">
           <span className="truncate block">{getDisplayText()}</span>
         </div>
         <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -400,14 +400,16 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
                       <div className="flex items-center space-x-2">
                         {getClientIcon(client)}
                         <div className="font-medium text-gray-900">{client.name}</div>
-                        {client.source === 'facebook' && (
-                          <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
-                            Facebook
-                          </span>
-                        )}
                       </div>
                       {client.company && (
                         <div className="text-sm text-gray-500">{client.company}</div>
+                      )}
+                      {client.source === 'facebook' && (
+                        <div className="flex items-center space-x-2 mt-1">
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                            Sincronizado
+                          </span>
+                        </div>
                       )}
                       {client.email && (
                         <div className="text-xs text-gray-400">{client.email}</div>
