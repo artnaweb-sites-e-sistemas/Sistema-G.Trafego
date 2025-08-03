@@ -388,8 +388,8 @@ const ShareReport: React.FC<ShareReportProps> = ({
                     </button>
                     <p className="text-xs text-slate-400 mt-2 text-center">
                       Última sincronização: {generatedLink?.updatedAt 
-                        ? new Date(generatedLink.updatedAt).toLocaleDateString('pt-BR')
-                        : new Date(generatedLink?.createdAt || new Date()).toLocaleDateString('pt-BR')
+                        ? `${new Date(generatedLink.updatedAt).toLocaleDateString('pt-BR')} às ${new Date(generatedLink.updatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                        : `${new Date(generatedLink?.createdAt || new Date()).toLocaleDateString('pt-BR')} às ${new Date(generatedLink?.createdAt || new Date()).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
                       }
                     </p>
                   </div>

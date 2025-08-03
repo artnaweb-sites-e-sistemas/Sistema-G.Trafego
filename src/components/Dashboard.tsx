@@ -407,20 +407,43 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
           </div>
         ) : (
           <>
-            <MetricsGrid metrics={metrics} />
-            {selectedProduct && selectedProduct !== 'Todos os Produtos' && (
-              <MonthlyDetailsTable 
-                metrics={metrics} 
-                selectedProduct={selectedProduct}
-                selectedMonth={selectedMonth}
-                onValuesChange={setMonthlyDetailsValues}
-              />
+            {/* Se não está conectado ao Meta Ads, mostra mensagem de conexão */}
+            {(!isFacebookConnected && (dataSource === null || dataSource === 'manual' || dataSource === 'facebook')) ? (
+              <div className="flex flex-col items-center justify-center py-24">
+                <div className="text-lg text-gray-300 mb-2 font-semibold">Conecte-se ao Meta Ads para começar.</div>
+                <div className="text-sm text-gray-400">É necessário conectar sua conta Meta Ads antes de selecionar um cliente e visualizar as informações do dashboard.</div>
+              </div>
+            ) : (!selectedClient || selectedClient === 'Selecione um cliente' || selectedClient === 'Todos os Clientes') ? (
+              <div className="flex flex-col items-center justify-center py-24">
+                <div className="text-lg text-gray-300 mb-2 font-semibold">Selecione um cliente para visualizar as informações do dashboard.</div>
+                <div className="text-sm text-gray-400">Nenhum dado será exibido até que um cliente seja selecionado no topo da página.</div>
+              </div>
+            ) : (
+              <>
+                {/* Lógica condicional para renderização das seções */}
+                {selectedAudience && selectedAudience !== 'Todos os Públicos' ? (
+                  <DailyControlTable metrics={metrics} selectedCampaign={selectedCampaign} selectedMonth={selectedMonth} />
+                ) : selectedProduct && selectedProduct !== 'Todos os Produtos' ? (
+                  <>
+                    <MonthlyDetailsTable 
+                      metrics={metrics} 
+                      selectedProduct={selectedProduct}
+                      selectedMonth={selectedMonth}
+                      onValuesChange={setMonthlyDetailsValues}
+                    />
+                    <InsightsSection />
+                  </>
+                ) : (
+                  <MetricsGrid metrics={metrics} />
+                )}
+              </>
+            )}
+            {/* Renderizar HistorySection apenas se produto OU público estiver selecionado */}
+            {((selectedProduct && selectedProduct !== 'Todos os Produtos') || (selectedAudience && selectedAudience !== 'Todos os Públicos')) && isFacebookConnected && (
+              <HistorySection selectedProduct={selectedProduct} />
             )}
           </>
         )}
-        <InsightsSection />
-        <DailyControlTable metrics={metrics} selectedCampaign={selectedCampaign} selectedMonth={selectedMonth} />
-        <HistorySection selectedProduct={selectedProduct} />
         {/* <ShareReport
           selectedAudience={selectedAudience}
           selectedProduct={selectedProduct}
