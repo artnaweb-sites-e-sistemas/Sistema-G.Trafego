@@ -12,6 +12,7 @@ interface ShareReportProps {
   selectedMonth: string;
   hasGeneratedLinks?: boolean;
   metrics: MetricData[]; // NOVO: Recebe as métricas do dashboard
+  monthlyDetailsValues?: { agendamentos: number; vendas: number };
 }
 
 const ShareReport: React.FC<ShareReportProps> = ({
@@ -20,7 +21,8 @@ const ShareReport: React.FC<ShareReportProps> = ({
   selectedClient,
   selectedMonth,
   hasGeneratedLinks = false,
-  metrics // NOVO
+  metrics, // NOVO
+  monthlyDetailsValues = { agendamentos: 0, vendas: 0 }
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [generatedLink, setGeneratedLink] = useState<ShareLink | null>(null);
@@ -81,14 +83,25 @@ const ShareReport: React.FC<ShareReportProps> = ({
         await metricsService.addMetric(metric);
       }
     }
+    
+    // Salvar detalhes mensais atuais no Firebase (vinculado apenas ao produto)
+    if (monthlyDetailsValues && selectedProduct && selectedProduct !== 'Todos os Produtos' && (monthlyDetailsValues.agendamentos > 0 || monthlyDetailsValues.vendas > 0)) {
+      await metricsService.saveMonthlyDetails({
+        month: selectedMonth,
+        product: selectedProduct,
+        agendamentos: monthlyDetailsValues.agendamentos,
+        vendas: monthlyDetailsValues.vendas
+      });
+    }
       // Simular geração de link (em produção, isso seria uma chamada para a API)
       await new Promise(resolve => setTimeout(resolve, 1000));
-      // Criar link curto usando o serviço
+      // Criar link curto usando o serviço com valores dos detalhes mensais
       const shareLink = shareService.createShareLink({
         audience: selectedAudience,
         product: selectedProduct,
         client: selectedClient,
-        month: selectedMonth
+        month: selectedMonth,
+        monthlyDetails: monthlyDetailsValues
       });
       setGeneratedLink(shareLink);
       setHasLinkForCurrentSelection(true);
@@ -126,28 +139,71 @@ const ShareReport: React.FC<ShareReportProps> = ({
     if (!generatedLink) return;
     setIsUpdating(true);
     try {
-          // Atualizar métricas no Firebase
-    if (metrics && metrics.length > 0) {
-      for (const metric of metrics) {
-        // Se já existe um id, atualiza; senão, adiciona
-        if (metric.id) {
-          await metricsService.updateMetric(metric.id, metric);
-        } else {
-          await metricsService.addMetric(metric);
+      // Sincronizar dados mais recentes do Meta Ads e salvar no Firebase
+      let syncedSuccessfully = false;
+      try {
+        const campaignId = localStorage.getItem('selectedCampaignId') || undefined;
+        console.log('ShareReport: Iniciando sincronização do Meta Ads...');
+        await metricsService.syncMetaAdsData(selectedMonth, campaignId, selectedClient, selectedProduct, selectedAudience);
+        console.log('ShareReport: Sincronização do Meta Ads concluída com sucesso');
+        syncedSuccessfully = true;
+      } catch (syncError) {
+        console.warn('Falha ao sincronizar dados do Meta Ads:', syncError);
+      }
+
+      // Se a sincronização falhou, tentar salvar as métricas existentes
+      if (!syncedSuccessfully && metrics && metrics.length > 0) {
+        console.log('ShareReport: Salvando métricas existentes como fallback...');
+        for (const metric of metrics) {
+          // Se já existe um id, atualiza; senão, adiciona
+          if (metric.id) {
+            await metricsService.updateMetric(metric.id, metric);
+          } else {
+            await metricsService.addMetric(metric);
+          }
         }
       }
+    
+    // Atualizar detalhes mensais no Firebase (vinculado apenas ao produto)
+    if (monthlyDetailsValues && selectedProduct && selectedProduct !== 'Todos os Produtos' && (monthlyDetailsValues.agendamentos > 0 || monthlyDetailsValues.vendas > 0)) {
+      await metricsService.saveMonthlyDetails({
+        month: selectedMonth,
+        product: selectedProduct,
+        agendamentos: monthlyDetailsValues.agendamentos,
+        vendas: monthlyDetailsValues.vendas
+      });
     }
       // Simular atualização (em produção, isso sincronizaria com Meta Ads)
       await new Promise(resolve => setTimeout(resolve, 1000));
-      // Atualizar o link com os parâmetros atuais
+      // Atualizar o link com os parâmetros atuais e valores dos detalhes mensais
       const updatedLink = shareService.updateShareLink(generatedLink.shortCode, {
         audience: selectedAudience,
         product: selectedProduct,
         client: selectedClient,
-        month: selectedMonth
+        month: selectedMonth,
+        monthlyDetails: monthlyDetailsValues
       });
       if (updatedLink) {
         setGeneratedLink(updatedLink);
+
+        // Limpar cache de métricas e notificar o Dashboard para recarregar
+        metricsService.clearCache();
+        
+        // Aguardar um pouco para garantir que os dados foram persistidos no Firebase
+        setTimeout(() => {
+          const eventDetail = { type: 'insights', timestamp: Date.now(), source: 'shareReport' };
+          
+          // Usar localStorage como ponte entre dashboard e página pública
+          localStorage.setItem('metaAdsDataRefreshed', JSON.stringify(eventDetail));
+          console.log('ShareReport: Sinal de atualização salvo no localStorage:', eventDetail);
+          
+          // Também disparar evento local (para dashboard)
+          window.dispatchEvent(new CustomEvent('metaAdsDataRefreshed', {
+            detail: eventDetail
+          }));
+          console.log('ShareReport: Evento metaAdsDataRefreshed disparado após atualização:', eventDetail);
+        }, 1000);
+
         toast.success('Relatório atualizado com sucesso!');
       } else {
         toast.error('Erro ao atualizar relatório');

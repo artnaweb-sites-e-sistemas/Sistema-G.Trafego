@@ -914,6 +914,7 @@ export const metricsService = {
 
         // Filtrar dados por cliente, produto e público
         if (firebaseData.length > 0) {
+          console.log('getPublicMetrics: Dados Firebase encontrados:', firebaseData.length, 'registros');
           let filteredData = firebaseData;
           
           if (client && client !== 'Todos os Clientes') {
@@ -928,6 +929,7 @@ export const metricsService = {
             filteredData = filteredData.filter(item => item.audience === audience);
           }
           
+          console.log('getPublicMetrics: Retornando dados filtrados:', filteredData.length, 'registros');
           return filteredData;
         }
       } catch (firebaseError: any) {
@@ -965,7 +967,7 @@ export const metricsService = {
   },
 
   // Sincronizar dados do Meta Ads
-  async syncMetaAdsData(month: string, campaignId?: string) {
+  async syncMetaAdsData(month: string, campaignId?: string, client?: string, product?: string, audience?: string) {
     if (!metaAdsService.isConfigured()) {
       throw new Error('Meta Ads não está configurado. Configure primeiro no painel.');
     }
@@ -978,7 +980,7 @@ export const metricsService = {
       const startDate = firstDayOfMonth.toISOString().split('T')[0];
       const endDate = lastDayOfMonth.toISOString().split('T')[0];
       
-      const metaAdsData = await metaAdsService.syncMetrics(month, startDate, endDate, campaignId);
+      const metaAdsData = await metaAdsService.syncMetrics(month, startDate, endDate, campaignId, client, product, audience);
       
       // Salvar no Firebase
       const savedIds = [];
@@ -1028,6 +1030,83 @@ export const metricsService = {
     } catch (error) {
       console.error('Erro ao atualizar métrica:', error);
       throw new Error('Não foi possível atualizar a métrica. Verifique as permissões do Firebase.');
+    }
+  },
+
+  // Salvar detalhes mensais editáveis (Agendamentos, Vendas e Ticket Médio) - vinculado apenas ao produto
+  async saveMonthlyDetails(data: {
+    month: string;
+    product: string;
+    agendamentos: number;
+    vendas: number;
+    ticketMedio?: number;
+  }) {
+    try {
+      const detailsRef = collection(db, 'monthlyDetails');
+      
+      // Buscar documento existente baseado apenas em mês e produto
+      const q = query(
+        detailsRef,
+        where('month', '==', data.month),
+        where('product', '==', data.product)
+      );
+      
+      const snapshot = await getDocs(q);
+      
+      if (snapshot.empty) {
+        // Criar novo documento
+        await addDoc(detailsRef, {
+          ...data,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      } else {
+        // Atualizar documento existente
+        const docRef = doc(db, 'monthlyDetails', snapshot.docs[0].id);
+        const updateData: any = {
+          agendamentos: data.agendamentos,
+          vendas: data.vendas,
+          updatedAt: new Date()
+        };
+        
+        // Incluir ticketMedio apenas se foi fornecido
+        if (data.ticketMedio !== undefined) {
+          updateData.ticketMedio = data.ticketMedio;
+        }
+        
+        await updateDoc(docRef, updateData);
+      }
+    } catch (error) {
+      console.error('Erro ao salvar detalhes mensais:', error);
+      throw new Error('Não foi possível salvar os detalhes mensais.');
+    }
+  },
+
+  // Buscar detalhes mensais editáveis - vinculado apenas ao produto
+  async getMonthlyDetails(month: string, product: string) {
+    try {
+      const detailsRef = collection(db, 'monthlyDetails');
+      const q = query(
+        detailsRef,
+        where('month', '==', month),
+        where('product', '==', product)
+      );
+      
+      const snapshot = await getDocs(q);
+      
+      if (!snapshot.empty) {
+        const data = snapshot.docs[0].data();
+        return {
+          agendamentos: data.agendamentos || 0,
+          vendas: data.vendas || 0,
+          ticketMedio: data.ticketMedio || 0
+        };
+      }
+      
+      return { agendamentos: 0, vendas: 0, ticketMedio: 0 };
+    } catch (error) {
+      console.error('Erro ao buscar detalhes mensais:', error);
+      return { agendamentos: 0, vendas: 0, ticketMedio: 0 };
     }
   },
 

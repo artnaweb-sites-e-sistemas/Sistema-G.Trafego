@@ -312,18 +312,20 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
     return <Users className="w-4 h-4 text-gray-400" />;
   };
 
+  const isClientSelected = selectedClient && selectedClient !== 'Selecione um cliente' && selectedClient !== 'Todos os Clientes' && selectedClient !== '' && selectedClient !== undefined && selectedClient !== null;
+
   return (
     <div className="relative dropdown-container" ref={pickerRef}>
       {/* Input field */}
       <div 
-        className="relative cursor-pointer dropdown-trigger"
+        className={`relative cursor-pointer dropdown-trigger`}
         onClick={() => setIsOpen(!isOpen)}
       >
-        <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-        <div className="bg-gray-700 text-white pl-10 pr-8 py-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none w-full">
+        <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <div className="pl-10 pr-8 py-2 rounded-lg border w-full bg-gray-700 text-white border-gray-600 focus:border-purple-500 focus:outline-none">
           <span className="truncate block">{getDisplayText()}</span>
         </div>
-        <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+        <ChevronDown className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isClientSelected ? 'text-gray-400' : 'text-gray-600'}`} />
         
         {/* Indicador de Status */}
         <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 dropdown-indicator ${

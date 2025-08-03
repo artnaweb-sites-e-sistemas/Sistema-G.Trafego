@@ -32,44 +32,15 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
   // Estados para filtros do dashboard
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
-  const [selectedClient, setSelectedClient] = useState('Todos os Clientes');
-  const [selectedProduct, setSelectedProduct] = useState('Todos os Produtos');
-  const [selectedAudience, setSelectedAudience] = useState('Todos os Públicos');
+  const [selectedClient, setSelectedClient] = useState('Selecione um cliente');
+  const [selectedProduct, setSelectedProduct] = useState('');
+  const [selectedAudience, setSelectedAudience] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState('');
   const [metrics, setMetrics] = useState<MetricData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-  // Carregar estado salvo do localStorage ao inicializar
-  useEffect(() => {
-    const savedClient = localStorage.getItem('currentSelectedClient');
-    const savedProduct = localStorage.getItem('selectedProduct');
-    const savedAudience = localStorage.getItem('selectedAudience');
-    const savedCampaign = localStorage.getItem('selectedCampaignId');
-    
-    
-    
-    if (savedClient && savedClient !== 'Todos os Clientes') {
-      setSelectedClient(savedClient);
-  
-    }
-    
-    if (savedProduct && savedProduct !== 'Todos os Produtos') {
-      setSelectedProduct(savedProduct);
-  
-    }
-    
-    if (savedAudience && savedAudience !== 'Todos os Públicos') {
-      setSelectedAudience(savedAudience);
-  
-    }
-    
-    if (savedCampaign) {
-      setSelectedCampaign(savedCampaign);
-  
-    }
-  }, []);
+  const [monthlyDetailsValues, setMonthlyDetailsValues] = useState({ agendamentos: 0, vendas: 0 });
 
   // Garantir que o mês selecionado seja sempre válido
   useEffect(() => {
@@ -292,7 +263,11 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       setMetrics([]);
       setDataSource(null);
       setIsFacebookConnected(false);
-      
+      // Limpar filtros do localStorage
+      localStorage.removeItem('currentSelectedClient');
+      localStorage.removeItem('selectedProduct');
+      localStorage.removeItem('selectedAudience');
+      localStorage.removeItem('selectedCampaignId');
       // Forçar refresh para garantir limpeza
       setRefreshTrigger(prev => prev + 1);
       
@@ -409,6 +384,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         dataSource={dataSource}
         isFacebookConnected={isFacebookConnected}
         onDataSourceChange={handleDataSourceChange}
+        monthlyDetailsValues={monthlyDetailsValues}
+        metrics={metrics}
       />
       
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-10">
@@ -431,20 +408,27 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         ) : (
           <>
             <MetricsGrid metrics={metrics} />
-            <MonthlyDetailsTable metrics={metrics} />
+            {selectedProduct && selectedProduct !== 'Todos os Produtos' && (
+              <MonthlyDetailsTable 
+                metrics={metrics} 
+                selectedProduct={selectedProduct}
+                selectedMonth={selectedMonth}
+                onValuesChange={setMonthlyDetailsValues}
+              />
+            )}
           </>
         )}
         <InsightsSection />
         <DailyControlTable metrics={metrics} selectedCampaign={selectedCampaign} selectedMonth={selectedMonth} />
         <HistorySection selectedProduct={selectedProduct} />
-        <ShareReport
+        {/* <ShareReport
           selectedAudience={selectedAudience}
           selectedProduct={selectedProduct}
           selectedClient={selectedClient}
           selectedMonth={selectedMonth}
           hasGeneratedLinks={false}
           metrics={metrics}
-        />
+        /> */}
       </main>
       
       <Toaster 

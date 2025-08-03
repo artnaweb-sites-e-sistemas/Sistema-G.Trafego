@@ -7,6 +7,7 @@ import ClientPicker from './ClientPicker';
 import ProductPicker from './ProductPicker';
 import AudiencePicker from './AudiencePicker';
 import { shareService } from '../services/shareService';
+import { MetricData } from '../services/metricsService';
 
 import NotificationButton from './NotificationButton';
 
@@ -34,6 +35,8 @@ interface HeaderProps {
   dataSource?: 'manual' | 'facebook' | null;
   isFacebookConnected?: boolean;
   onDataSourceChange?: (source: 'manual' | 'facebook' | null, connected: boolean) => void;
+  monthlyDetailsValues?: { agendamentos: number; vendas: number };
+  metrics?: MetricData[];
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -50,7 +53,9 @@ const Header: React.FC<HeaderProps> = ({
   onLogout,
   dataSource,
   isFacebookConnected,
-  onDataSourceChange
+  onDataSourceChange,
+  monthlyDetailsValues = { agendamentos: 0, vendas: 0 },
+  metrics = []
 }) => {
   const [hasGeneratedLinks, setHasGeneratedLinks] = useState(false);
 
@@ -226,6 +231,8 @@ const Header: React.FC<HeaderProps> = ({
                   selectedClient={selectedClient}
                   selectedMonth={selectedMonth}
                   hasGeneratedLinks={hasGeneratedLinks}
+                  metrics={metrics}
+                  monthlyDetailsValues={monthlyDetailsValues}
                 />
               </div>
             </div>

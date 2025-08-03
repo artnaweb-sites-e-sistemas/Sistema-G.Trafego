@@ -391,9 +391,11 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         
         {/* Indicador de Status */}
         <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 dropdown-indicator ${
-          !selectedAudience 
-            ? 'bg-gray-500' 
-            : 'bg-green-500 shadow-lg shadow-green-500/50'
+          selectedClient && selectedClient !== 'Selecione um cliente' && selectedClient !== '' && selectedClient !== undefined && selectedClient !== null &&
+          selectedProduct && selectedProduct !== '' && selectedProduct !== undefined && selectedProduct !== null &&
+          selectedAudience && selectedAudience !== '' && selectedAudience !== undefined && selectedAudience !== null && selectedAudience !== 'Selecione um público' && selectedAudience !== 'Todos os Públicos'
+            ? 'bg-green-500 shadow-lg shadow-green-500/50'
+            : 'bg-gray-500'
         }`}></div>
       </div>
 

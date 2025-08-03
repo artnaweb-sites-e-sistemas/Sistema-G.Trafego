@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Eye, Lock, Calendar, User, Package, Users, Info, TrendingUp, TrendingDown, DollarSign, Users as UsersIcon, MessageSquare, ShoppingCart, Target, BarChart3, CheckCircle, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Eye, Lock, Calendar, User, Package, Users, Info, TrendingUp, TrendingDown, DollarSign, Users as UsersIcon, MessageSquare, ShoppingCart, Target, BarChart3, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import DailyControlTable from './DailyControlTable';
 import { metricsService, MetricData } from '../services/metricsService';
 import dayjs from 'dayjs';
@@ -15,60 +15,13 @@ const PublicReportView: React.FC = () => {
     product: '',
     client: '',
     month: '',
-    campaignType: 'landing_page'
+    campaignType: 'landing_page',
+    monthlyDetails: {
+      agendamentos: 0,
+      vendas: 0,
+      ticketMedio: 0
+    }
   });
-
-  // Calcular valores baseados no controle diário
-  const calculateDailyBasedMetrics = () => {
-    const dailyData = generateDailyData();
-    
-    const totals = {
-      investment: 0,
-      impressions: 0,
-      clicks: 0,
-      leads: 0,
-      activeDays: 0
-    };
-
-    dailyData.forEach(row => {
-      const investmentValue = row.investment || 0;
-      const impressionsValue = row.impressions || 0;
-      const clicksValue = row.clicks || 0;
-      const leadsValue = row.leads || 0;
-      
-      totals.investment += investmentValue;
-      totals.impressions += impressionsValue;
-      totals.clicks += clicksValue;
-      totals.leads += leadsValue;
-      
-      if (row.status === 'Ativo') {
-        totals.activeDays++;
-      }
-    });
-
-    // Calcular métricas derivadas
-    const avgCPM = totals.impressions > 0 ? (totals.investment / totals.impressions) * 1000 : 0;
-    const avgCTR = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
-    const avgCPL = totals.leads > 0 ? totals.investment / totals.leads : 0;
-    const totalROAS = totals.investment > 0 ? (totals.leads * 100) / totals.investment : 0;
-    const totalROI = totals.investment > 0 ? ((totals.leads * 100) - totals.investment) / totals.investment * 100 : 0;
-
-    return {
-      totalLeads: totals.leads,
-      totalRevenue: totals.leads * 100,
-      totalInvestment: totals.investment,
-      totalImpressions: totals.impressions,
-      totalClicks: totals.clicks,
-      avgCTR: Number(avgCTR.toFixed(2)),
-      avgCPM: Number(avgCPM.toFixed(2)),
-      avgCPL: Number(avgCPL.toFixed(2)),
-      totalROAS: Number(totalROAS.toFixed(2)),
-      totalROI: Number(totalROI.toFixed(1)),
-      totalAppointments: Math.floor(totals.leads * 0.6),
-      totalSales: Math.floor(totals.leads * 0.4),
-      activeDays: totals.activeDays
-    };
-  };
 
   // Função para gerar dados diários (copiada do DailyControlTable)
   const generateDailyData = () => {
@@ -83,10 +36,12 @@ const PublicReportView: React.FC = () => {
     const month = monthMap[monthName] || 6;
     const year = parseInt(yearStr) || 2023;
     
+    const today = new Date();
+    
+    // console.log('PublicReportView: Gerando dados para', monthName, yearStr, '- Data atual:', today.toISOString().split('T')[0]);
+    
     const startDate = new Date(year, month, 1);
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    
-    const today = new Date();
     const currentDay = today.getDate();
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
@@ -123,42 +78,189 @@ const PublicReportView: React.FC = () => {
     }
     
     // Adicionar dados das métricas
-    metrics.forEach(metric => {
-      if (metric.month === reportInfo.month) {
-        let metricDate: Date;
-        try {
-          if (/^\d{4}-\d{2}-\d{2}$/.test(metric.date)) {
-            const [year, month, day] = metric.date.split('-').map(Number);
-            metricDate = new Date(year, month - 1, day);
-          } else {
-            metricDate = new Date(metric.date);
-          }
-        } catch (error) {
-          metricDate = new Date(metric.date);
+    const relevantMetrics = metrics.filter(metric => metric.month === reportInfo.month);
+    console.log('PublicReportView: generateDailyData - Processando', relevantMetrics.length, 'métricas para', reportInfo.month);
+    console.log('PublicReportView: generateDailyData - Primeira métrica exemplo:', relevantMetrics[0]);
+    console.log('PublicReportView: generateDailyData - Total de métricas disponíveis:', metrics.length);
+    
+    // Mapa de data → mapa de serviço → métrica mais recente
+    const dailyServiceMap = new Map<string, Map<string, any>>();
+    
+    relevantMetrics.forEach((metric, index) => {
+      const dateKey = metric.date; // YYYY-MM-DD
+      const serviceKey = metric.service || 'Desconhecido';
+      
+      if (index < 3) {
+        console.log(`PublicReportView: Métrica ${index + 1}:`, {
+          date: metric.date,
+          service: serviceKey,
+          investment: metric.investment,
+          leads: metric.leads,
+          updatedAt: metric.updatedAt
+        });
+      }
+      
+      if (!dailyServiceMap.has(dateKey)) {
+        dailyServiceMap.set(dateKey, new Map<string, any>());
+      }
+      const serviceMap = dailyServiceMap.get(dateKey)!;
+      const existing = serviceMap.get(serviceKey);
+      
+      // Se não existe ou a métrica é mais recente, salva
+      if (!existing || (metric.updatedAt && existing.updatedAt && new Date(metric.updatedAt).getTime() > new Date(existing.updatedAt).getTime())) {
+        serviceMap.set(serviceKey, metric);
+      }
+    });
+    
+    // Agora, somar as métricas por data, considerando somente a mais recente de cada serviço
+    const dailyMetricsMap = new Map<string, {
+      investment: number;
+      impressions: number;
+      clicks: number;
+      leads: number;
+    }>();
+    
+    dailyServiceMap.forEach((serviceMap, dateKey) => {
+      let agg = { investment: 0, impressions: 0, clicks: 0, leads: 0 };
+      serviceMap.forEach((metric: any) => {
+        agg.investment += metric.investment || 0;
+        agg.impressions += metric.impressions || 0;
+        agg.clicks += metric.clicks || 0;
+        agg.leads += metric.leads || 0;
+      });
+      dailyMetricsMap.set(dateKey, agg);
+    });
+    
+    console.log('PublicReportView: Métricas agregadas por data:', Object.fromEntries(dailyMetricsMap));
+    
+    // Agora aplicar os valores agregados aos dias
+    dailyMetricsMap.forEach((aggregated, dateKey) => {
+      let metricDate: Date;
+      try {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+          const [year, month, day] = dateKey.split('-').map(Number);
+          metricDate = new Date(year, month - 1, day);
+        } else {
+          metricDate = new Date(dateKey);
         }
-        
-        const dayIndex = metricDate.getDate() - 1;
-        
-        if (dayIndex >= 0 && dayIndex < data.length) {
-          if (!data[dayIndex].isFutureDay) {
-            data[dayIndex] = {
-              ...data[dayIndex],
-              investment: metric.investment,
-              impressions: metric.impressions,
-              clicks: metric.clicks,
-              cpm: metric.cpm,
-              ctr: metric.ctr,
-              leads: metric.leads,
-              cpl: metric.cpl,
-              status: metric.investment > 0 ? 'Ativo' : 'Inativo'
-            };
-          }
-        }
+      } catch (error) {
+        metricDate = new Date(dateKey);
+      }
+      
+      const dayIndex = metricDate.getDate() - 1;
+      
+      if (dayIndex >= 0 && dayIndex < data.length) {
+        data[dayIndex] = {
+          ...data[dayIndex],
+          investment: aggregated.investment,
+          impressions: aggregated.impressions,
+          clicks: aggregated.clicks,
+          leads: aggregated.leads,
+          // CPM e CTR serão recalculados depois
+          cpm: 0,
+          ctr: 0,
+          cpl: 0,
+          status: aggregated.investment > 0 ? 'Ativo' : 'Inativo'
+        };
+      }
+    });
+    
+    // Recalcular métricas derivadas após agregação
+    data.forEach(day => {
+      if (day.investment > 0 && day.impressions > 0) {
+        day.cpm = (day.investment / day.impressions) * 1000;
+        day.ctr = (day.clicks / day.impressions) * 100;
+      }
+      if (day.investment > 0 && day.leads > 0) {
+        day.cpl = day.investment / day.leads;
       }
     });
     
     return data;
   };
+
+  // Gerar dados diários com memoização para evitar re-renders excessivos
+  const dailyData = useMemo(() => {
+    return generateDailyData();
+  }, [metrics, reportInfo.month]);
+
+  // Calcular valores baseados no controle diário
+  const calculateDailyBasedMetrics = useMemo(() => {
+    console.log('PublicReportView: calculateDailyBasedMetrics iniciado com dailyData.length:', dailyData.length);
+    
+    const totals = {
+      investment: 0,
+      impressions: 0,
+      clicks: 0,
+      leads: 0,
+      activeDays: 0
+    };
+
+    dailyData.forEach((row, index) => {
+      const investmentValue = row.investment || 0;
+      const impressionsValue = row.impressions || 0;
+      const clicksValue = row.clicks || 0;
+      const leadsValue = row.leads || 0;
+      
+      if (index < 5 && (investmentValue > 0 || leadsValue > 0)) { // Log apenas primeiros dias com dados
+        console.log(`PublicReportView: Dia ${index + 1}:`, {
+          date: row.date,
+          investment: investmentValue,
+          leads: leadsValue,
+          status: row.status
+        });
+      }
+      
+      totals.investment += investmentValue;
+      totals.impressions += impressionsValue;
+      totals.clicks += clicksValue;
+      totals.leads += leadsValue;
+      
+      if (row.status === 'Ativo') {
+        totals.activeDays++;
+      }
+    });
+    
+    console.log('PublicReportView: Totais calculados:', totals);
+
+    // Calcular métricas derivadas
+    const avgCPM = totals.impressions > 0 ? (totals.investment / totals.impressions) * 1000 : 0;
+    const avgCTR = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+    const avgCPL = totals.leads > 0 ? totals.investment / totals.leads : 0;
+    const totalROAS = totals.investment > 0 ? (totals.leads * 100) / totals.investment : 0;
+    const totalROI = totals.investment > 0 ? ((totals.leads * 100) - totals.investment) / totals.investment * 100 : 0;
+
+    // Usar valores reais dos detalhes mensais se disponíveis, senão usar cálculo baseado em leads
+    const realAppointments = reportInfo.monthlyDetails.agendamentos > 0 
+      ? reportInfo.monthlyDetails.agendamentos 
+      : Math.floor(totals.leads * 0.6);
+    
+    const realSales = reportInfo.monthlyDetails.vendas > 0 
+      ? reportInfo.monthlyDetails.vendas 
+      : Math.floor(totals.leads * 0.4);
+
+    // Calcular receita baseada nas vendas reais
+    const ticketMedio = reportInfo.monthlyDetails.ticketMedio && reportInfo.monthlyDetails.ticketMedio > 0 ? reportInfo.monthlyDetails.ticketMedio : 250;
+    const realRevenue = realSales * ticketMedio;
+    const realROAS = totals.investment > 0 ? realRevenue / totals.investment : 0;
+    const realROI = totals.investment > 0 ? ((realRevenue - totals.investment) / totals.investment) * 100 : 0;
+
+    return {
+      totalLeads: totals.leads,
+      totalRevenue: realRevenue,
+      totalInvestment: totals.investment,
+      totalImpressions: totals.impressions,
+      totalClicks: totals.clicks,
+      avgCTR: Number(avgCTR.toFixed(2)),
+      avgCPM: Number(avgCPM.toFixed(2)),
+      avgCPL: Number(avgCPL.toFixed(2)),
+      totalROAS: Number(realROAS.toFixed(2)),
+      totalROI: Number(realROI.toFixed(1)),
+      totalAppointments: realAppointments,
+      totalSales: realSales,
+      activeDays: totals.activeDays
+    };
+  }, [dailyData, reportInfo.monthlyDetails]);
 
   // Componente de Tooltip customizado
   const Tooltip: React.FC<{ children: React.ReactNode; content: string; isVisible: boolean }> = ({ children, content, isVisible }) => {
@@ -180,7 +282,12 @@ const PublicReportView: React.FC = () => {
 
   // Componente do Painel Executivo (Resumo do que realmente importa)
   const ExecutiveSummary: React.FC = () => {
-    const aggregated = calculateDailyBasedMetrics();
+    const aggregated = calculateDailyBasedMetrics;
+    console.log('PublicReportView: ExecutiveSummary renderizado com aggregated:', {
+      totalInvestment: aggregated.totalInvestment,
+      totalLeads: aggregated.totalLeads,
+      refreshTrigger
+    });
     const [tooltipStates, setTooltipStates] = useState<{ [key: string]: boolean }>({});
 
     const formatCurrency = (value: number) => {
@@ -269,7 +376,12 @@ const PublicReportView: React.FC = () => {
               <h3 className="text-slate-300 font-medium text-sm">Retorno (ROI)</h3>
             </div>
             <div className={`text-2xl font-semibold mb-1 ${roiStatus.color}`}>
-              {aggregated.totalROI.toFixed(1)}%
+              {Number(aggregated.totalROI.toFixed(1)).toLocaleString('pt-BR', { maximumFractionDigits: 1 })
+                .replace(',0','') // remove zero desnecessário
+              }%
+              {aggregated.totalInvestment > 0 && (
+                <span className="text-slate-400 font-normal text-lg"> ({(aggregated.totalRevenue / aggregated.totalInvestment).toFixed(1)}x)</span>
+              )}
             </div>
             <p className="text-slate-400 text-xs">{roiStatus.text}</p>
           </div>
@@ -348,7 +460,7 @@ const PublicReportView: React.FC = () => {
 
   // Componente de Relatório Explicativo
   const ExplanatoryReport: React.FC = () => {
-    const aggregated = calculateDailyBasedMetrics();
+    const aggregated = calculateDailyBasedMetrics;
 
     const formatCurrency = (value: number) => {
       return new Intl.NumberFormat('pt-BR', {
@@ -554,9 +666,12 @@ const PublicReportView: React.FC = () => {
     );
   };
 
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
   useEffect(() => {
     const loadPublicReport = async () => {
       try {
+        console.log('PublicReportView: loadPublicReport iniciado, refreshTrigger:', refreshTrigger);
         setLoading(true);
         
         // Extrair parâmetros da URL
@@ -566,11 +681,50 @@ const PublicReportView: React.FC = () => {
         const month = searchParams.get('month') || '';
         const campaignType = searchParams.get('campaignType') || 'landing_page'; // 'whatsapp' ou 'landing_page'
         
-        setReportInfo({ audience, product, client, month, campaignType });
+        // Extrair dados dos detalhes mensais se disponíveis
+        const agendamentos = parseInt(searchParams.get('agendamentos') || '0');
+        const vendas = parseInt(searchParams.get('vendas') || '0');
+        const ticketMedioParam = parseFloat(searchParams.get('ticketMedio') || '0');
+        
+        setReportInfo({ 
+          audience, 
+          product, 
+          client, 
+          month, 
+          campaignType,
+                      monthlyDetails: {
+              agendamentos,
+              vendas,
+              ticketMedio: ticketMedioParam
+            }
+        });
         
         // Carregar métricas públicas
-              const data = await metricsService.getPublicMetrics(month, client, product, audience);
-      setMetrics(data);
+        console.log('PublicReportView: Carregando métricas para:', { month, client, product, audience });
+        const data = await metricsService.getPublicMetrics(month, client, product, audience);
+        console.log('PublicReportView: Métricas carregadas:', data.length, 'registros');
+        setMetrics(data);
+        
+        // Sempre tentar buscar detalhes mensais mais recentes salvos no Firebase
+        if (product && month) {
+          try {
+            const savedDetails = await metricsService.getMonthlyDetails(month, product);
+            if (savedDetails) {
+              setReportInfo(prev => ({
+                ...prev,
+                monthlyDetails: {
+                  agendamentos: savedDetails.agendamentos,
+                  vendas: savedDetails.vendas,
+                  ticketMedio: savedDetails.ticketMedio || 0
+                }
+              }));
+            }
+          } catch (error) {
+            console.error('Erro ao carregar detalhes salvos:', error);
+          }
+        }
+        
+        console.log('PublicReportView: loadPublicReport concluído');
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -579,7 +733,51 @@ const PublicReportView: React.FC = () => {
     };
 
     loadPublicReport();
-  }, [searchParams]);
+  }, [searchParams, refreshTrigger]);
+
+  // Listener para atualizações do relatório via localStorage
+  useEffect(() => {
+    let lastUpdateTimestamp = 0;
+
+    const checkForUpdates = () => {
+      try {
+        const storedUpdate = localStorage.getItem('metaAdsDataRefreshed');
+        if (storedUpdate) {
+          const updateData = JSON.parse(storedUpdate);
+          
+          // Verificar se é uma atualização nova
+          if (updateData.timestamp > lastUpdateTimestamp) {
+            lastUpdateTimestamp = updateData.timestamp;
+            console.log('PublicReportView: Atualização detectada via localStorage:', updateData);
+            
+            // Aguardar um pouco para garantir que o Firebase foi atualizado
+            setTimeout(() => {
+              console.log('PublicReportView: Iniciando reload das métricas...');
+              setRefreshTrigger(prev => {
+                const newValue = prev + 1;
+                console.log('PublicReportView: RefreshTrigger atualizado para:', newValue);
+                return newValue;
+              });
+            }, 2000);
+          }
+        }
+      } catch (error) {
+        console.error('PublicReportView: Erro ao verificar atualizações:', error);
+      }
+    };
+
+    // Verificar imediatamente
+    checkForUpdates();
+
+    // Verificar a cada 3 segundos
+    const interval = setInterval(checkForUpdates, 3000);
+    console.log('PublicReportView: Monitoramento de localStorage iniciado');
+
+    return () => {
+      clearInterval(interval);
+      console.log('PublicReportView: Monitoramento de localStorage parado');
+    };
+  }, []);
 
   // Encontrar a última data de atualização entre as métricas
   const lastUpdated = metrics.length > 0
@@ -704,18 +902,19 @@ const PublicReportView: React.FC = () => {
         </div>
 
         {/* Conteúdo do Relatório */}
-        <div className="space-y-8">
+        <div key={`content-${refreshTrigger}-${metrics.length}`} className="space-y-8">
           {/* Painel Executivo */}
-          <ExecutiveSummary />
+          <ExecutiveSummary key={`executive-${refreshTrigger}-${metrics.length}`} />
           
           {/* Relatório Explicativo */}
-          <ExplanatoryReport />
+          <ExplanatoryReport key={`explanatory-${refreshTrigger}-${metrics.length}`} />
           
           {/* Tabela de Controle Diário */}
           <DailyControlTable 
+            key={`table-${refreshTrigger}-${metrics.length}`}
             metrics={metrics} 
             selectedMonth={reportInfo.month}
-            customRecordCount={calculateDailyBasedMetrics().activeDays}
+            customRecordCount={calculateDailyBasedMetrics.activeDays}
           />
         </div>
 

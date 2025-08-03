@@ -92,6 +92,10 @@ class ShareService {
     product: string;
     client: string;
     month: string;
+    monthlyDetails?: {
+      agendamentos: number;
+      vendas: number;
+    };
   }): ShareLink {
     const shortCode = this.generateUniqueShortCode();
     const baseUrl = window.location.origin;
@@ -104,6 +108,12 @@ class ShareService {
       month: params.month,
       shared: 'true'
     });
+
+    // Adicionar dados dos detalhes mensais se fornecidos
+    if (params.monthlyDetails) {
+      searchParams.set('agendamentos', params.monthlyDetails.agendamentos.toString());
+      searchParams.set('vendas', params.monthlyDetails.vendas.toString());
+    }
     
     const originalUrl = `${baseUrl}/shared-report?${searchParams.toString()}`;
     
@@ -126,6 +136,10 @@ class ShareService {
     product: string;
     client: string;
     month: string;
+    monthlyDetails?: {
+      agendamentos: number;
+      vendas: number;
+    };
   }): ShareLink | null {
     const link = this.shareLinks.get(shortCode);
     
@@ -142,6 +156,12 @@ class ShareService {
       month: newParams.month,
       shared: 'true'
     });
+
+    // Adicionar dados dos detalhes mensais se fornecidos
+    if (newParams.monthlyDetails) {
+      searchParams.set('agendamentos', newParams.monthlyDetails.agendamentos.toString());
+      searchParams.set('vendas', newParams.monthlyDetails.vendas.toString());
+    }
     
     const newOriginalUrl = `${baseUrl}/shared-report?${searchParams.toString()}`;
     

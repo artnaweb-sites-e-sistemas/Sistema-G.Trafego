@@ -145,44 +145,73 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       });
     }
     
-    // Adicionar dados das métricas do Meta Ads
-    metrics.forEach(metric => {
-      // Verificar se a métrica pertence ao mês selecionado
-      if (metric.month === selectedMonth) {
-        // Corrigir problema de timezone - Meta Ads pode retornar datas com offset
-        let metricDate: Date;
-        try {
-          // Se a data está no formato YYYY-MM-DD, criar data local
-          if (/^\d{4}-\d{2}-\d{2}$/.test(metric.date)) {
-            const [year, month, day] = metric.date.split('-').map(Number);
-            metricDate = new Date(year, month - 1, day); // month - 1 porque Date usa 0-based months
-          } else {
-            metricDate = new Date(metric.date);
-          }
-        } catch (error) {
-          console.warn('Erro ao processar data da métrica:', error);
-          return;
-        }
-        
-        // Encontrar o índice do dia correspondente
-        const dayIndex = metricDate.getDate() - 1;
-        
-        if (dayIndex >= 0 && dayIndex < data.length) {
-          // Sempre atualizar com dados das métricas, independente se é dia futuro
-          // (o relatório pode ser de um mês futuro ou passado)
-          data[dayIndex] = {
-            ...data[dayIndex],
-            investment: formatCurrency(metric.investment),
-            impressions: metric.impressions,
-            clicks: metric.clicks,
-            cpm: formatCurrency(metric.cpm),
-            ctr: `${metric.ctr.toFixed(2)}%`,
-            leads: metric.leads,
-            cpl: formatCurrency(metric.cpl),
-            status: metric.investment > 0 ? 'Ativo' : 'Inativo'
-          };
+    // -------- Nova lógica: escolher apenas a métrica mais recente por serviço em cada dia --------
+    type DayKey = string; // YYYY-MM-DD
+    interface Agg {
+      investment: number;
+      impressions: number;
+      clicks: number;
+      leads: number;
+      updatedAt?: any;
+      service?: string;
+    }
+    const dayServiceMap = new Map<DayKey, Map<string, Agg>>();
 
+    metrics.forEach(metric => {
+      if (metric.month !== selectedMonth) return;
+      const dateKey = metric.date;
+      const serviceKey = metric.service || 'Desconhecido';
+
+      if (!dayServiceMap.has(dateKey)) {
+        dayServiceMap.set(dateKey, new Map<string, Agg>());
+      }
+      const serviceMap = dayServiceMap.get(dateKey)!;
+      const existing = serviceMap.get(serviceKey);
+
+      if (!existing || (metric.updatedAt && existing.updatedAt && new Date(metric.updatedAt).getTime() > new Date(existing.updatedAt).getTime())) {
+        serviceMap.set(serviceKey, metric as any);
+      }
+    });
+
+    // Agregar por dia somando serviços
+    const dayAggMap = new Map<DayKey, Agg>();
+    dayServiceMap.forEach((serviceMap, dateKey) => {
+      let agg: Agg = { investment: 0, impressions: 0, clicks: 0, leads: 0 };
+      serviceMap.forEach(metric => {
+        agg.investment += metric.investment || 0;
+        agg.impressions += metric.impressions || 0;
+        agg.clicks += metric.clicks || 0;
+        agg.leads += metric.leads || 0;
+      });
+      dayAggMap.set(dateKey, agg);
+    });
+
+    // Aplicar aos dias
+    dayAggMap.forEach((agg, dateKey) => {
+      let metricDate: Date;
+      try {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+          const [year, month, day] = dateKey.split('-').map(Number);
+          metricDate = new Date(year, month - 1, day);
+        } else {
+          metricDate = new Date(dateKey);
         }
+      } catch {
+        metricDate = new Date(dateKey);
+      }
+      const dayIndex = metricDate.getDate() - 1;
+      if (dayIndex >= 0 && dayIndex < data.length) {
+        data[dayIndex] = {
+          ...data[dayIndex],
+          investment: formatCurrency(agg.investment),
+          impressions: agg.impressions,
+          clicks: agg.clicks,
+          cpm: agg.impressions > 0 ? formatCurrency((agg.investment / agg.impressions) * 1000) : formatCurrency(0),
+          ctr: agg.impressions > 0 ? `${((agg.clicks / agg.impressions) * 100).toFixed(2)}%` : '0,00%',
+          leads: agg.leads,
+          cpl: agg.leads > 0 ? formatCurrency(agg.investment / agg.leads) : formatCurrency(0),
+          status: agg.investment > 0 ? 'Ativo' : 'Inativo'
+        };
       }
     });
     

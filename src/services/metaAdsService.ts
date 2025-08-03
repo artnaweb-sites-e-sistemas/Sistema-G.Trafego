@@ -999,7 +999,7 @@ class MetaAdsService {
   }
 
   // Sincronizar dados
-  async syncMetrics(month: string, startDate: string, endDate: string, campaignId?: string, client?: string, product?: string) {
+  async syncMetrics(month: string, startDate: string, endDate: string, campaignId?: string, client?: string, product?: string, audience?: string) {
     if (!this.isLoggedIn() || !this.hasSelectedAccount()) {
       throw new Error('Usuário não logado ou conta não selecionada');
     }
@@ -1017,7 +1017,7 @@ class MetaAdsService {
         insights = await this.getAccountInsights(startDate, endDate);
       }
       
-      const metrics = this.convertToMetricData(insights, month, client, product);
+      const metrics = this.convertToMetricData(insights, month, client, product, audience);
       
   
       return metrics;
