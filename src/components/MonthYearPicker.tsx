@@ -67,8 +67,7 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
     if (!selectedMonth || selectedMonth === '') {
       const currentMonthString = getCurrentMonthString();
       setSelectedMonth(currentMonthString);
-      console.log('MonthYearPicker: Inicializando com mês atual:', currentMonthString);
-    }
+          }
   }, []);
 
   // Close picker when clicking outside
@@ -97,8 +96,6 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
     setIsOpen(false);
   };
 
-
-
   const handleThisMonth = () => {
     const currentMonthString = getCurrentMonthString();
     const currentDate = new Date();
@@ -110,8 +107,7 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
     setSelectedMonth(currentMonthString);
     setIsOpen(false);
     
-    console.log('MonthYearPicker: Voltando para mês atual:', currentMonthString);
-  };
+      };
 
   const formatDisplayMonth = () => {
     const monthName = months[selectedMonthIndex];
@@ -143,9 +139,7 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
       colorClass = 'bg-yellow-500 shadow-lg shadow-yellow-500/50';
       status = 'Mês passado - Amarelo';
     }
-    
 
-    
     return colorClass;
   };
 

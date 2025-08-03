@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Eye, Lock, Calendar, User, Package, Users, Info, TrendingUp, TrendingDown, DollarSign, Users as UsersIcon, MessageSquare, ShoppingCart, Target, BarChart3, CheckCircle, AlertTriangle } from 'lucide-react';
 import DailyControlTable from './DailyControlTable';
 import { metricsService, MetricData } from '../services/metricsService';
+import dayjs from 'dayjs';
 
 const PublicReportView: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -568,8 +569,8 @@ const PublicReportView: React.FC = () => {
         setReportInfo({ audience, product, client, month, campaignType });
         
         // Carregar métricas públicas
-        const data = await metricsService.getPublicMetrics(month, client, product, audience);
-        setMetrics(data);
+              const data = await metricsService.getPublicMetrics(month, client, product, audience);
+      setMetrics(data);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -579,6 +580,33 @@ const PublicReportView: React.FC = () => {
 
     loadPublicReport();
   }, [searchParams]);
+
+  // Encontrar a última data de atualização entre as métricas
+  const lastUpdated = metrics.length > 0
+    ? metrics.reduce((latest, m) => {
+        if (!m.updatedAt) return latest;
+        
+        let date: Date | null = null;
+        
+        // Tratar diferentes formatos de data que podem vir do Firebase
+        if (m.updatedAt instanceof Date) {
+          date = m.updatedAt;
+        } else if (typeof m.updatedAt === 'object' && m.updatedAt.toDate) {
+          // Timestamp do Firestore
+          date = m.updatedAt.toDate();
+        } else if (typeof m.updatedAt === 'string' || typeof m.updatedAt === 'number') {
+          // String ou timestamp em milliseconds
+          date = new Date(m.updatedAt);
+        }
+        
+        // Verificar se a data é válida
+        if (date && !isNaN(date.getTime())) {
+          return (!latest || date > latest) ? date : latest;
+        }
+        
+        return latest;
+      }, null as Date | null)
+    : null;
 
   const handleBackToLogin = () => {
     window.location.href = '/';
@@ -634,6 +662,11 @@ const PublicReportView: React.FC = () => {
             <div className="flex items-center space-x-2 text-blue-400">
               <Eye className="w-5 h-5" />
               <span className="text-sm font-medium">Visualização Pública</span>
+              {lastUpdated && (
+                <span className="text-xs text-slate-400 ml-2">|
+                  Última atualização: {dayjs(lastUpdated).format('DD/MM/YYYY HH:mm')}
+                </span>
+              )}
             </div>
           </div>
         </div>

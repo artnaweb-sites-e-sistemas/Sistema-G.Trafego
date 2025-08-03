@@ -84,13 +84,11 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
     if (dataSource === 'facebook' && selectedProduct && selectedProduct !== 'Todos os Produtos') {
       try {
         setIsLoading(true);
-        console.log('AudiencePicker: Carregando Ad Sets do Meta Ads para campanha:', selectedProduct);
-        
+                
         // Obter ID da campanha do localStorage
         const campaignId = localStorage.getItem('selectedCampaignId');
         if (!campaignId) {
-          console.log('AudiencePicker: Nenhuma campanha selecionada');
-          return;
+                    return;
         }
         
         // Obter datas do mês selecionado
@@ -119,18 +117,14 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         };
 
         const { startDate, endDate } = getPeriodDates(selectedMonth || '');
-        console.log('AudiencePicker: Período selecionado:', { startDate, endDate });
-        
+                
         const adSetsData = await metaAdsService.getAdSets(campaignId, startDate, endDate);
-        console.log('AudiencePicker: Ad Sets encontrados:', adSetsData);
-        
+                
         // Filtrar apenas Ad Sets ativos
         const activeAdSets = adSetsData.filter(adSet => 
           adSet.status === 'ACTIVE' || adSet.status === 'PAUSED'
         );
-        
-        console.log('AudiencePicker: Ad Sets ativos:', activeAdSets);
-        
+
         // Converter Ad Sets para formato de públicos
         const facebookAudiences: Audience[] = activeAdSets.map((adSet, index) => ({
           id: `fb-adset-${adSet.id}`,
@@ -144,9 +138,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
           source: 'facebook' as const,
           adSet: adSet
         }));
-        
-        console.log('AudiencePicker: Públicos do Facebook criados:', facebookAudiences);
-        
+
         // Se não há Ad Sets, mostrar lista vazia
         if (facebookAudiences.length === 0) {
           setAudiences([]);
@@ -173,8 +165,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         { id: '10', name: 'Agencias Criativas', description: 'Design e comunicação', ageRange: '23-40', interests: ['Design', 'Criatividade'], location: 'São Paulo', size: 7000, productId: '10', clientId: '8', source: 'manual' },
       ]);
     } else {
-      console.log('AudiencePicker: DataSource não é facebook ou usuário não está logado');
-      setAudiences([]);
+            setAudiences([]);
     }
   };
 
@@ -186,31 +177,23 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
     // Só restaurar público se há produto selecionado
     if (savedAudience && savedAudience !== '' && savedProduct && savedProduct !== '') {
       setSelectedAudience(savedAudience);
-      console.log('AudiencePicker: Público restaurado do localStorage:', savedAudience);
-    }
+          }
   }, [setSelectedAudience]);
 
   // Carregar públicos quando dataSource, selectedProduct, selectedClient ou selectedMonth mudar
   useEffect(() => {
-    console.log('AudiencePicker: useEffect disparado');
-    console.log('AudiencePicker: selectedProduct =', selectedProduct);
-    console.log('AudiencePicker: selectedClient =', selectedClient);
-    console.log('AudiencePicker: dataSource =', dataSource);
-    
+                    
     // Só carregar se há produto selecionado
     if (selectedProduct && selectedProduct !== 'Todos os Produtos') {
-      console.log('AudiencePicker: Produto válido selecionado, carregando Ad Sets...');
-      
+            
       // Delay para garantir que o cache seja limpo
       const timer = setTimeout(() => {
-        console.log('AudiencePicker: Executando loadMetaAdsAdSets após delay');
-        loadMetaAdsAdSets();
+                loadMetaAdsAdSets();
       }, 300);
       
       return () => clearTimeout(timer);
     } else {
-      console.log('AudiencePicker: Produto inválido ou não selecionado, resetando públicos');
-      // Resetar públicos quando não há produto selecionado
+            // Resetar públicos quando não há produto selecionado
       setAudiences([{ id: '1', name: 'Todos os Públicos', productId: 'all', clientId: 'all' }]);
       setSelectedAudience('Todos os Públicos');
     }
@@ -221,13 +204,10 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
     const handleCampaignSelected = (event: Event) => {
       const customEvent = event as CustomEvent;
       const { campaign, productName, campaignId } = customEvent.detail;
-      console.log('AudiencePicker: Campanha selecionada:', campaign, productName);
-      console.log('AudiencePicker: Campaign ID:', campaignId);
-      
+                  
       // Forçar recarregamento dos Ad Sets após um delay
       setTimeout(() => {
-        console.log('AudiencePicker: Recarregando Ad Sets após seleção de campanha');
-        loadMetaAdsAdSets();
+                loadMetaAdsAdSets();
       }, 500);
     };
 
@@ -288,8 +268,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
   }, [selectedClient, selectedProduct, setSelectedAudience]);
 
   const handleAudienceSelect = (audience: Audience) => {
-    console.log('=== INICIANDO SELEÇÃO DE PÚBLICO ===');
-    console.log('Público selecionado:', audience);
+
     
     // Atualizar estado imediatamente
     setSelectedAudience(audience.name);
@@ -302,7 +281,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
     
     // Disparar evento customizado se for um Ad Set do Facebook
     if (audience.source === 'facebook' && audience.adSet) {
-      console.log(`Ad Set selecionado: ${audience.adSet.name} (${audience.adSet.id})`);
+
       
       // Salvar ID do Ad Set no localStorage
       localStorage.setItem('selectedAdSetId', audience.adSet.id);
@@ -315,7 +294,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         }
       });
       window.dispatchEvent(event);
-      console.log('Evento adSetSelected disparado com sucesso');
+
     } else {
       // Para públicos manuais, disparar evento também
       const event = new CustomEvent('audienceSelected', {
@@ -325,20 +304,17 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         }
       });
       window.dispatchEvent(event);
-      console.log('Evento audienceSelected disparado para público manual');
+
     }
     
-    console.log('=== SELEÇÃO DE PÚBLICO CONCLUÍDA ===');
-  };
+      };
 
   const handleClear = () => {
     setSelectedAudience('');
     setSearchTerm('');
     localStorage.removeItem('currentSelectedAudience');
     localStorage.removeItem('currentSelectedProduct'); // Remover produto selecionado
-    
-    console.log('AudiencePicker: Seleção limpa');
-    
+
     // Emitir evento para notificar outros componentes
     window.dispatchEvent(new CustomEvent('audienceCleared'));
   };

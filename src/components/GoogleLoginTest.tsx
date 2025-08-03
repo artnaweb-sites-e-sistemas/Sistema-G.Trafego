@@ -12,12 +12,12 @@ const GoogleLoginTest: React.FC = () => {
     setSuccess(null);
 
     try {
-      console.log('Testando login com Google...');
+
       const result = await authService.loginWithGoogle();
       
       if (result.success) {
         setSuccess(`Login bem-sucedido! Usuário: ${result.user?.name}`);
-        console.log('Login com Google funcionando:', result.user);
+
       } else {
         setError(result.error || 'Erro desconhecido');
         console.error('Erro no login com Google:', result.error);

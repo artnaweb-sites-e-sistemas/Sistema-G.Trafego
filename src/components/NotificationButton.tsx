@@ -44,7 +44,7 @@ const NotificationButton: React.FC<NotificationButtonProps> = ({
   }, [selectedClient, selectedProduct, selectedAudience, selectedCampaign]);
 
   const handleClick = () => {
-    console.log('NotificationButton clicado!');
+
     console.log('Estado atual:', {
       hasNotifications,
       notificationCount,

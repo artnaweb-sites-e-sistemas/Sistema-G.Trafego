@@ -6,6 +6,7 @@ import DailyControlTable from './DailyControlTable';
 import MonthlyDetailsTable from './MonthlyDetailsTable';
 import InsightsSection from './InsightsSection';
 import HistorySection from './HistorySection';
+import ShareReport from './ShareReport';
 import { User } from '../services/authService';
 import { metricsService, MetricData } from '../services/metricsService';
 
@@ -47,30 +48,26 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     const savedAudience = localStorage.getItem('selectedAudience');
     const savedCampaign = localStorage.getItem('selectedCampaignId');
     
-    console.log('Dashboard: Carregando estado salvo do localStorage');
-    console.log('Cliente salvo:', savedClient);
-    console.log('Produto salvo:', savedProduct);
-    console.log('Público salvo:', savedAudience);
-    console.log('Campanha salva:', savedCampaign);
+    
     
     if (savedClient && savedClient !== 'Todos os Clientes') {
       setSelectedClient(savedClient);
-      console.log('Dashboard: Cliente restaurado:', savedClient);
+  
     }
     
     if (savedProduct && savedProduct !== 'Todos os Produtos') {
       setSelectedProduct(savedProduct);
-      console.log('Dashboard: Produto restaurado:', savedProduct);
+  
     }
     
     if (savedAudience && savedAudience !== 'Todos os Públicos') {
       setSelectedAudience(savedAudience);
-      console.log('Dashboard: Público restaurado:', savedAudience);
+  
     }
     
     if (savedCampaign) {
       setSelectedCampaign(savedCampaign);
-      console.log('Dashboard: Campanha restaurada:', savedCampaign);
+  
     }
   }, []);
 
@@ -78,7 +75,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   useEffect(() => {
     const currentMonth = getCurrentMonth();
     if (selectedMonth !== currentMonth) {
-      console.log('Dashboard: Atualizando mês selecionado para mês atual:', currentMonth);
+    
       setSelectedMonth(currentMonth);
     }
   }, []);
@@ -86,13 +83,11 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Carregar métricas
   useEffect(() => {
     const loadMetrics = async () => {
-      console.log('🟡 Dashboard: loadMetrics chamado');
-      console.log('🟡 Dashboard: Estado atual - Cliente:', selectedClient, 'Produto:', selectedProduct, 'Público:', selectedAudience);
-      console.log('🟡 Dashboard: DataSource:', dataSource, 'Facebook Conectado:', isFacebookConnected);
+      
       
       // Não carregar métricas se não há cliente selecionado
       if (selectedClient === 'Selecione um cliente' || selectedClient === 'Todos os Clientes') {
-        console.log('🟡 Dashboard: Nenhum cliente selecionado - zerando métricas');
+
         setMetrics([]);
         setLoading(false);
         return;
@@ -100,25 +95,25 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
       // Não carregar métricas se não está conectado ao Meta Ads
       if (dataSource === 'facebook' && !isFacebookConnected) {
-        console.log('🟡 Dashboard: Meta Ads não conectado - zerando métricas');
+
         setMetrics([]);
         setLoading(false);
         return;
       }
 
       try {
-        console.log('🟡 Dashboard: Iniciando carregamento de métricas...');
+  
         setLoading(true);
 
         const data = await metricsService.getMetrics(selectedMonth, selectedClient, selectedProduct, selectedAudience, selectedCampaign);
-        console.log('🟡 Dashboard: Métricas carregadas:', data.length, 'registros');
+
         setMetrics(data);
       } catch (err: any) {
-        console.error('🔴 Dashboard: Erro ao carregar métricas:', err.message);
+        console.error('Erro ao carregar métricas:', err.message);
         setError(err.message);
       } finally {
         setLoading(false);
-        console.log('🟡 Dashboard: Carregamento de métricas concluído');
+
       }
     };
 
@@ -130,7 +125,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     const handleBusinessManagerSelected = (event: Event) => {
       const customEvent = event as CustomEvent;
       const { businessManager, clientName } = customEvent.detail;
-      console.log('Business Manager selecionada:', businessManager, clientName);
+  
       
       // Atualizar cliente selecionado
       setSelectedClient(clientName);
@@ -155,7 +150,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     const handleCampaignSelected = (event: Event) => {
       const customEvent = event as CustomEvent;
       const { campaign, productName, campaignId } = customEvent.detail;
-      console.log('Campanha selecionada:', campaign, productName, 'ID:', campaignId);
+  
       
       // Atualizar produto selecionado
       setSelectedProduct(productName);
@@ -185,7 +180,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     const handleAdSetSelected = (event: Event) => {
       const customEvent = event as CustomEvent;
       const { adSet, audienceName, adSetId } = customEvent.detail;
-      console.log('Ad Set selecionado:', adSet, audienceName, 'ID:', adSetId);
+  
       
       // Atualizar público selecionado
       setSelectedAudience(audienceName);
@@ -215,7 +210,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     const handleClientCleared = (event: Event) => {
       const customEvent = event as CustomEvent;
       const { clientName } = customEvent.detail;
-      console.log('Cliente limpo:', clientName);
+  
       
       // Atualizar cliente selecionado no Dashboard
       setSelectedClient('Selecione um cliente');
@@ -229,7 +224,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       // Forçar refresh das métricas para garantir que sejam zeradas
       setRefreshTrigger(prev => prev + 1);
       
-      console.log('Dashboard: Cliente e métricas zerados após limpeza');
+  
     };
 
     window.addEventListener('clientCleared', handleClientCleared);
@@ -244,7 +239,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     const handleNoProductsFound = (event: Event) => {
       const customEvent = event as CustomEvent;
       const { clientName } = customEvent.detail;
-      console.log('Nenhum produto encontrado para cliente:', clientName);
+  
       
       // Zerar métricas quando não há produtos
       setMetrics([]);
@@ -252,7 +247,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       setSelectedAudience('Todos os Públicos');
       setSelectedCampaign('');
       
-      console.log('Dashboard: Métricas zeradas - nenhum produto encontrado');
+  
     };
 
     window.addEventListener('noProductsFound', handleNoProductsFound);
@@ -267,12 +262,12 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     const handleMetaAdsDataRefreshed = (event: Event) => {
       const customEvent = event as CustomEvent;
       const { type, timestamp } = customEvent.detail;
-      console.log('Dados do Meta Ads atualizados:', type, timestamp);
+  
       
       // Forçar refresh das métricas quando dados são atualizados
       setRefreshTrigger(prev => prev + 1);
       
-      console.log('Dashboard: Refresh forçado após atualização do Meta Ads');
+  
     };
 
     window.addEventListener('metaAdsDataRefreshed', handleMetaAdsDataRefreshed);
@@ -287,7 +282,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     const handleMetaAdsLoggedOut = (event: Event) => {
       const customEvent = event as CustomEvent;
       const { timestamp } = customEvent.detail;
-      console.log('Logout do Meta Ads detectado:', timestamp);
+  
       
       // Limpar dados do dashboard quando Meta Ads desconecta
       setSelectedClient('Selecione um cliente');
@@ -301,7 +296,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       // Forçar refresh para garantir limpeza
       setRefreshTrigger(prev => prev + 1);
       
-      console.log('Dashboard: Dados limpos após logout do Meta Ads');
+  
     };
 
     window.addEventListener('metaAdsLoggedOut', handleMetaAdsLoggedOut);
@@ -317,17 +312,16 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       const customEvent = event as CustomEvent;
       const { clientName, source, adAccount } = customEvent.detail;
       
-      console.log('🟢 Dashboard: Evento loadAllCampaignsMetrics recebido');
-      console.log('🟢 Dashboard: Detalhes - Cliente:', clientName, 'Source:', source, 'AdAccount:', adAccount?.name);
+      
       
       try {
         const { metricsService } = await import('../services/metricsService');
         metricsService.clearCache();
-        console.log('🟢 Dashboard: Cache do metricsService limpo');
+
         
         // Forçar refresh das métricas
         setRefreshTrigger(prev => prev + 1);
-        console.log('🟢 Dashboard: RefreshTrigger incrementado');
+  
       } catch (error) {
         console.warn('🔴 Dashboard: Erro ao carregar métricas de todas as campanhas:', error);
       }
@@ -346,26 +340,25 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       const customEvent = event as CustomEvent;
       const { clientName, source, businessManager, adAccount } = customEvent.detail;
 
-      console.log('🟢 Dashboard: Evento clientChanged recebido');
-      console.log('🟢 Dashboard: Detalhes - Cliente:', clientName, 'Source:', source, 'BM:', businessManager?.name, 'AdAccount:', adAccount?.name);
+      
       
       // Atualizar o cliente selecionado
       setSelectedClient(clientName);
-      console.log('🟢 Dashboard: Cliente atualizado no estado:', clientName);
+
       
       // Atualizar dataSource baseado no tipo de cliente
       if (source === 'facebook') {
         setDataSource('facebook');
         setIsFacebookConnected(true);
-        console.log('🟢 Dashboard: DataSource definido como Facebook');
+  
         
         try {
           const { metricsService } = await import('../services/metricsService');
           metricsService.clearCache();
-          console.log('🟢 Dashboard: Cache do metricsService limpo');
+  
           
           // Forçar carregamento imediato das métricas para o cliente selecionado
-          console.log('🟢 Dashboard: Forçando carregamento de métricas para cliente:', clientName);
+    
           setRefreshTrigger(prev => prev + 1);
         } catch (error) {
           console.warn('🔴 Dashboard: Erro ao limpar cache:', error);
@@ -373,11 +366,11 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       } else if (source === 'manual') {
         setDataSource('manual');
         setIsFacebookConnected(false);
-        console.log('🟢 Dashboard: DataSource definido como Manual');
+  
         
         // Para clientes manuais, também forçar refresh
         setRefreshTrigger(prev => prev + 1);
-        console.log('🟢 Dashboard: RefreshTrigger incrementado para cliente manual');
+  
       }
     };
 
@@ -394,7 +387,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
   // Função para atualizar origem dos dados
   const handleDataSourceChange = (source: 'manual' | 'facebook' | null, connected: boolean) => {
-    console.log('Atualizando origem dos dados:', source, connected);
+
     setDataSource(source);
     setIsFacebookConnected(connected);
   };
@@ -444,6 +437,14 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         <InsightsSection />
         <DailyControlTable metrics={metrics} selectedCampaign={selectedCampaign} selectedMonth={selectedMonth} />
         <HistorySection selectedProduct={selectedProduct} />
+        <ShareReport
+          selectedAudience={selectedAudience}
+          selectedProduct={selectedProduct}
+          selectedClient={selectedClient}
+          selectedMonth={selectedMonth}
+          hasGeneratedLinks={false}
+          metrics={metrics}
+        />
       </main>
       
       <Toaster 

@@ -3,6 +3,7 @@ import { Share2, Copy, CheckCircle, ExternalLink, Link, RefreshCw } from 'lucide
 import { toast } from 'react-hot-toast';
 import { shareService, ShareLink } from '../services/shareService';
 import { createPortal } from 'react-dom';
+import { metricsService, MetricData } from '../services/metricsService';
 
 interface ShareReportProps {
   selectedAudience: string;
@@ -10,6 +11,7 @@ interface ShareReportProps {
   selectedClient: string;
   selectedMonth: string;
   hasGeneratedLinks?: boolean;
+  metrics: MetricData[]; // NOVO: Recebe as métricas do dashboard
 }
 
 const ShareReport: React.FC<ShareReportProps> = ({
@@ -17,7 +19,8 @@ const ShareReport: React.FC<ShareReportProps> = ({
   selectedProduct,
   selectedClient,
   selectedMonth,
-  hasGeneratedLinks = false
+  hasGeneratedLinks = false,
+  metrics // NOVO
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [generatedLink, setGeneratedLink] = useState<ShareLink | null>(null);
@@ -71,11 +74,15 @@ const ShareReport: React.FC<ShareReportProps> = ({
 
   const generateShareLink = async () => {
     setIsGenerating(true);
-    
     try {
+          // Salvar métricas atuais no Firebase
+    if (metrics && metrics.length > 0) {
+      for (const metric of metrics) {
+        await metricsService.addMetric(metric);
+      }
+    }
       // Simular geração de link (em produção, isso seria uma chamada para a API)
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
       // Criar link curto usando o serviço
       const shareLink = shareService.createShareLink({
         audience: selectedAudience,
@@ -83,10 +90,8 @@ const ShareReport: React.FC<ShareReportProps> = ({
         client: selectedClient,
         month: selectedMonth
       });
-      
       setGeneratedLink(shareLink);
       setHasLinkForCurrentSelection(true);
-      
       // Emitir evento para notificar que um link foi gerado
       window.dispatchEvent(new CustomEvent('linkGenerated', {
         detail: { shareLink }
@@ -119,13 +124,21 @@ const ShareReport: React.FC<ShareReportProps> = ({
 
   const updateShareLink = async () => {
     if (!generatedLink) return;
-    
     setIsUpdating(true);
-    
     try {
+          // Atualizar métricas no Firebase
+    if (metrics && metrics.length > 0) {
+      for (const metric of metrics) {
+        // Se já existe um id, atualiza; senão, adiciona
+        if (metric.id) {
+          await metricsService.updateMetric(metric.id, metric);
+        } else {
+          await metricsService.addMetric(metric);
+        }
+      }
+    }
       // Simular atualização (em produção, isso sincronizaria com Meta Ads)
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
       // Atualizar o link com os parâmetros atuais
       const updatedLink = shareService.updateShareLink(generatedLink.shortCode, {
         audience: selectedAudience,
@@ -133,7 +146,6 @@ const ShareReport: React.FC<ShareReportProps> = ({
         client: selectedClient,
         month: selectedMonth
       });
-      
       if (updatedLink) {
         setGeneratedLink(updatedLink);
         toast.success('Relatório atualizado com sucesso!');

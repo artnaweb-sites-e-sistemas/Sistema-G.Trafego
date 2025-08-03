@@ -824,10 +824,16 @@ export const metricsService = {
         );
 
         const snapshot = await getDocs(q);
-        const firebaseData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as MetricData[];
+        const firebaseData = snapshot.docs.map(doc => {
+          const data = doc.data();
+          // Converter timestamps do Firestore para Date
+          return {
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt
+          };
+        }) as MetricData[];
 
         // Se há dados no Firebase, filtrar e retornar
         if (firebaseData.length > 0) {
@@ -886,7 +892,7 @@ export const metricsService = {
   // Buscar métricas públicas (para links compartilhados)
   async getPublicMetrics(month: string, client: string, product: string, audience: string): Promise<MetricData[]> {
     try {
-      console.log('🔍 [PUBLIC] Buscando métricas públicas:', { month, client, product, audience });
+
       
       // Tentar buscar do Firebase primeiro
       try {
@@ -895,12 +901,16 @@ export const metricsService = {
         // Consulta simplificada para evitar erro de índice
         const q = query(metricsRef, where('month', '==', month));
         const snapshot = await getDocs(q);
-        const firebaseData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as MetricData[];
-
-        console.log('📊 [PUBLIC] Dados do Firebase encontrados:', firebaseData.length);
+        const firebaseData = snapshot.docs.map(doc => {
+          const data = doc.data();
+          // Converter timestamps do Firestore para Date
+          return {
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt
+          };
+        }) as MetricData[];
 
         // Filtrar dados por cliente, produto e público
         if (firebaseData.length > 0) {
@@ -908,28 +918,24 @@ export const metricsService = {
           
           if (client && client !== 'Todos os Clientes') {
             filteredData = filteredData.filter(item => item.client === client);
-            console.log('👥 [PUBLIC] Filtrado por cliente:', client, 'Resultado:', filteredData.length);
           }
 
           if (product && product !== '' && product !== 'Todos os Produtos') {
             filteredData = filteredData.filter(item => item.product === product);
-            console.log('📦 [PUBLIC] Filtrado por produto:', product, 'Resultado:', filteredData.length);
           }
 
           if (audience && audience !== '' && audience !== 'Todos os Públicos') {
             filteredData = filteredData.filter(item => item.audience === audience);
-            console.log('🎯 [PUBLIC] Filtrado por público:', audience, 'Resultado:', filteredData.length);
           }
           
-          console.log('✅ [PUBLIC] Retornando dados do Firebase:', filteredData.length);
           return filteredData;
         }
       } catch (firebaseError: any) {
-        console.warn('⚠️ [PUBLIC] Erro na consulta Firebase pública:', firebaseError.message);
+
       }
 
       // Se não há dados no Firebase, usar dados mockados específicos
-      console.log('🔄 [PUBLIC] Usando dados mockados para:', month);
+
       let filteredData = mockData.filter(item => item.month === month);
       
       if (client && client !== 'Todos os Clientes') {
@@ -950,10 +956,10 @@ export const metricsService = {
         service: item.service || 'Manual'
       }));
 
-      console.log('✅ [PUBLIC] Retornando dados mockados:', filteredData.length);
+
       return filteredData;
     } catch (error: any) {
-      console.error('❌ [PUBLIC] Erro ao buscar métricas públicas:', error.message);
+      console.error('Erro ao buscar métricas públicas:', error.message);
       return [];
     }
   },

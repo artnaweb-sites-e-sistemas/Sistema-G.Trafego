@@ -58,7 +58,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
         setManualData();
       }
     } else {
-      console.log('Usuário não encontrado ou não está conectado, iniciando em modo manual');
+  
       setManualData();
     }
 
@@ -71,7 +71,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
 
     // Listener para evento de login bem-sucedido
     const handleLoginSuccess = (event: CustomEvent) => {
-      console.log('Evento de login recebido:', event.detail);
+
       const user = event.detail;
       setUser(user);
       metaAdsService.setUser(user);
@@ -122,7 +122,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
   const checkLoginStatus = async () => {
     try {
       const status = await metaAdsService.getLoginStatus();
-      console.log('Status atual do login:', status);
+  
       
       if (status.status === 'connected') {
         // Usuário está logado, tentar carregar contas
@@ -144,11 +144,11 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
   const handleFacebookLogin = async () => {
     setIsLoading(true);
     try {
-      console.log('Iniciando login do Facebook...');
+
       
       // Usar o serviço para fazer login
       const user = await metaAdsService.loginWithFacebook();
-      console.log('Login bem-sucedido:', user);
+      
       
       setUser(user);
       
@@ -188,15 +188,15 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
 
   const loadBusinessManagers = async () => {
     try {
-      console.log('Carregando Business Managers...');
+      
       const managers = await metaAdsService.getBusinessManagers();
-      console.log('Business Managers carregados:', managers);
+      
       
       if (managers.length > 0) {
         setBusinessManagers(managers);
         setStep('selectBusiness');
       } else {
-        console.log('Nenhum Business Manager encontrado, tentando buscar contas diretamente...');
+
         // Se não tem Business Managers, tentar buscar contas diretamente
         await loadAdAccounts();
       }
@@ -208,7 +208,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
         setStep('permissionsRequired');
       } else {
         // Para outros erros, tentar buscar contas diretamente
-        console.log('Tentando buscar contas diretamente...');
+
         await loadAdAccounts();
       }
     }
@@ -216,7 +216,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
 
   const loadAdAccounts = async (businessId?: string) => {
     try {
-      console.log('Carregando contas de anúncios...');
+      
       let accounts: AdAccount[];
       
       if (businessId) {
@@ -225,7 +225,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
         accounts = await metaAdsService.getAdAccounts();
       }
       
-      console.log('Contas de anúncios carregadas:', accounts);
+      
       setAdAccounts(accounts);
       
       if (accounts.length > 0) {
@@ -276,7 +276,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
 
     try {
       setIsLoading(true);
-      console.log('Carregando campanhas...');
+      
       
       // Converter período para datas
       const { startDate, endDate } = getPeriodDates(selectedPeriod);
@@ -284,7 +284,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
       const campaignsData = await metaAdsService.getCampaigns(startDate, endDate);
       setCampaigns(campaignsData);
       
-      console.log('Campanhas carregadas:', campaignsData);
+      
     } catch (error: any) {
       console.error('Erro ao carregar campanhas:', error);
       alert(`Erro ao carregar campanhas: ${error.message}`);
@@ -298,7 +298,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
 
     try {
       setIsLoading(true);
-      console.log('Carregando conjuntos de anúncios...');
+      
       
       // Converter período para datas
       const { startDate, endDate } = getPeriodDates(selectedPeriod);
@@ -306,7 +306,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
       const adSetsData = await metaAdsService.getAdSets(campaignId, startDate, endDate);
       setAdSets(adSetsData);
       
-      console.log('Conjuntos de anúncios carregados:', adSetsData);
+      
     } catch (error: any) {
       console.error('Erro ao carregar conjuntos de anúncios:', error);
       alert(`Erro ao carregar conjuntos de anúncios: ${error.message}`);
@@ -331,7 +331,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
 
   const loadAdSetMetrics = async (adSetId: string) => {
     try {
-      console.log('Carregando métricas do conjunto de anúncios...');
+      
       
       // Converter período para datas
       const { startDate, endDate } = getPeriodDates(selectedPeriod);
@@ -339,7 +339,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
       const insights = await metaAdsService.getAdSetInsights(adSetId, startDate, endDate);
       
       // Aqui você pode processar os insights e atualizar as métricas do dashboard
-      console.log('Métricas carregadas:', insights);
+      
       
       // Chamar callback para atualizar o dashboard
       onConfigSaved();
@@ -467,13 +467,8 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
   };
 
   const handleLogout = () => {
-    console.log('=== INICIANDO LOGOUT COMPLETO ===');
-    console.log('Estado antes do logout:', {
-      user: !!user,
-      selectedAccount: !!selectedAccount,
-      isFacebookConnected,
-      dataSource
-    });
+
+
     
     // Fazer logout do Facebook primeiro (isso dispara o evento)
     metaAdsService.logout();
@@ -497,17 +492,12 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
     // Voltar para tela de login
     setStep('login');
     
-    console.log('=== LOGOUT COMPLETO REALIZADO ===');
-    console.log('Estado após logout:', {
-      user: null,
-      selectedAccount: null,
-      isFacebookConnected: false,
-      dataSource: null
-    });
+
+
   };
 
   const clearFacebookData = () => {
-    console.log('Limpando dados do Facebook...');
+
     
     // Limpar apenas dados do Facebook, mantendo dados manuais
     setUser(null);
@@ -532,7 +522,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
   };
 
   const setFacebookData = () => {
-    console.log('Configurando dados do Facebook...');
+
     setDataSource('facebook');
     setIsFacebookConnected(true);
     
@@ -544,7 +534,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
   };
 
   const setManualData = () => {
-    console.log('Configurando dados manuais...');
+
     setDataSource('manual');
     setIsFacebookConnected(false);
     

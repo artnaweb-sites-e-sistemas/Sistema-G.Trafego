@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Download, Info } from 'lucide-react';
 import { MetricData } from '../services/metricsService';
 
@@ -57,7 +57,15 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
   selectedMonth = 'Julho 2023',
   customRecordCount
 }) => {
+
   const [tooltipStates, setTooltipStates] = useState<{ [key: string]: boolean }>({});
+  const [dailyData, setDailyData] = useState<any[]>([]);
+
+  // Atualizar dados sempre que métricas ou mês mudarem
+  useEffect(() => {
+    const newData = generateDailyData();
+    setDailyData(newData);
+  }, [metrics, selectedMonth]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -160,20 +168,20 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
         const dayIndex = metricDate.getDate() - 1;
         
         if (dayIndex >= 0 && dayIndex < data.length) {
-          // Só atualizar se não for um dia futuro
-          if (!data[dayIndex].isFutureDay) {
-            data[dayIndex] = {
-              ...data[dayIndex],
-              investment: formatCurrency(metric.investment),
-              impressions: metric.impressions,
-              clicks: metric.clicks,
-              cpm: formatCurrency(metric.cpm),
-              ctr: `${metric.ctr.toFixed(2)}%`,
-              leads: metric.leads,
-              cpl: formatCurrency(metric.cpl),
-              status: metric.investment > 0 ? 'Ativo' : 'Inativo'
-            };
-          }
+          // Sempre atualizar com dados das métricas, independente se é dia futuro
+          // (o relatório pode ser de um mês futuro ou passado)
+          data[dayIndex] = {
+            ...data[dayIndex],
+            investment: formatCurrency(metric.investment),
+            impressions: metric.impressions,
+            clicks: metric.clicks,
+            cpm: formatCurrency(metric.cpm),
+            ctr: `${metric.ctr.toFixed(2)}%`,
+            leads: metric.leads,
+            cpl: formatCurrency(metric.cpl),
+            status: metric.investment > 0 ? 'Ativo' : 'Inativo'
+          };
+
         }
       }
     });
@@ -181,7 +189,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
     return data;
   };
 
-  const dailyData = generateDailyData();
+  // dailyData agora vem do estado, atualizado pelo useEffect
 
   const calculateTotals = () => {
     const totals = {

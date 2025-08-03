@@ -39,8 +39,7 @@ class AuthService {
   // Carregar dados do usuário do Firestore
   private async loadUserData(firebaseUser: FirebaseUser): Promise<void> {
     try {
-      console.log('Carregando dados do usuário:', firebaseUser.uid);
-      
+            
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       
       if (userDoc.exists()) {
@@ -213,8 +212,7 @@ class AuthService {
       
       console.log('Iniciando login com Google...');
       const userCredential: UserCredential = await signInWithPopup(auth, provider);
-      console.log('Login com Google bem-sucedido:', userCredential.user.email);
-      
+            
       await this.loadUserData(userCredential.user);
       
       return { 

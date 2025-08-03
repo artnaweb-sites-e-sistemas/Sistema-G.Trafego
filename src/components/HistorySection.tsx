@@ -35,6 +35,8 @@ const HistorySection: React.FC<HistorySectionProps> = ({ selectedProduct }) => {
     setTimeout(() => {
       const allShareLinks = shareService.getAllShareLinks();
       
+
+      
       // Gerar dados simulados baseados nos links compartilhados
       const mockReports: ReportData[] = allShareLinks.map((link, index) => {
         // Extrair informações do link (se disponível)
