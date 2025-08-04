@@ -738,8 +738,12 @@ const PublicReportView: React.FC = () => {
   // Listener para atualizações do relatório via localStorage
   useEffect(() => {
     let lastUpdateTimestamp = 0;
+    let isProcessingUpdate = false;
 
     const checkForUpdates = () => {
+      // Evitar processamento simultâneo
+      if (isProcessingUpdate) return;
+      
       try {
         const storedUpdate = localStorage.getItem('metaAdsDataRefreshed');
         if (storedUpdate) {
@@ -748,6 +752,7 @@ const PublicReportView: React.FC = () => {
           // Verificar se é uma atualização nova
           if (updateData.timestamp > lastUpdateTimestamp) {
             lastUpdateTimestamp = updateData.timestamp;
+            isProcessingUpdate = true;
             console.log('PublicReportView: Atualização detectada via localStorage:', updateData);
             
             // Aguardar um pouco para garantir que o Firebase foi atualizado
@@ -758,20 +763,25 @@ const PublicReportView: React.FC = () => {
                 console.log('PublicReportView: RefreshTrigger atualizado para:', newValue);
                 return newValue;
               });
+              // Reset do flag após processamento
+              setTimeout(() => {
+                isProcessingUpdate = false;
+              }, 1000);
             }, 2000);
           }
         }
       } catch (error) {
         console.error('PublicReportView: Erro ao verificar atualizações:', error);
+        isProcessingUpdate = false;
       }
     };
 
     // Verificar imediatamente
     checkForUpdates();
 
-    // Verificar a cada 3 segundos
-    const interval = setInterval(checkForUpdates, 3000);
-    console.log('PublicReportView: Monitoramento de localStorage iniciado');
+    // Verificar a cada 10 segundos (reduzido de 3 para evitar sobrecarga)
+    const interval = setInterval(checkForUpdates, 10000);
+    console.log('PublicReportView: Monitoramento de localStorage iniciado (10s)');
 
     return () => {
       clearInterval(interval);

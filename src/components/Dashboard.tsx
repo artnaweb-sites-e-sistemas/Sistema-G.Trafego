@@ -7,8 +7,11 @@ import MonthlyDetailsTable from './MonthlyDetailsTable';
 import InsightsSection from './InsightsSection';
 import HistorySection from './HistorySection';
 import ShareReport from './ShareReport';
+import AIBenchmark from './AIBenchmark';
 import { User } from '../services/authService';
 import { metricsService, MetricData } from '../services/metricsService';
+import { BenchmarkResults } from '../services/aiBenchmarkService';
+import { benchmarkStorage } from '../services/benchmarkStorage';
 
 interface DashboardProps {
   currentUser: User;
@@ -41,6 +44,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [monthlyDetailsValues, setMonthlyDetailsValues] = useState({ agendamentos: 0, vendas: 0 });
+  const [aiBenchmarkResults, setAiBenchmarkResults] = useState<BenchmarkResults | null>(null);
 
   // Garantir que o mês selecionado seja sempre válido
   useEffect(() => {
@@ -362,10 +366,45 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
   // Função para atualizar origem dos dados
   const handleDataSourceChange = (source: 'manual' | 'facebook' | null, connected: boolean) => {
-
     setDataSource(source);
     setIsFacebookConnected(connected);
   };
+
+  // Função para lidar com os resultados do benchmark de IA
+  const handleBenchmarkGenerated = (results: BenchmarkResults) => {
+    setAiBenchmarkResults(results);
+    
+    // Salvar benchmark no localStorage
+    if (selectedProduct && selectedProduct !== 'Todos os Produtos') {
+      benchmarkStorage.saveBenchmark(
+        selectedProduct, 
+        results, 
+        selectedClient !== 'Selecione um cliente' ? selectedClient : undefined,
+        selectedMonth
+      );
+    }
+    
+    toast.success('Benchmark aplicado! Os valores foram atualizados na tabela.');
+  };
+
+  // Carregar benchmark quando produto mudar
+  useEffect(() => {
+    if (selectedProduct && selectedProduct !== 'Todos os Produtos') {
+      const savedBenchmark = benchmarkStorage.loadBenchmark(
+        selectedProduct,
+        selectedClient !== 'Selecione um cliente' ? selectedClient : undefined,
+        selectedMonth
+      );
+      
+      if (savedBenchmark) {
+        setAiBenchmarkResults(savedBenchmark);
+      } else {
+        setAiBenchmarkResults(null);
+      }
+    } else {
+      setAiBenchmarkResults(null);
+    }
+  }, [selectedProduct, selectedClient, selectedMonth]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 text-white">
@@ -425,11 +464,17 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                   <DailyControlTable metrics={metrics} selectedCampaign={selectedCampaign} selectedMonth={selectedMonth} />
                 ) : selectedProduct && selectedProduct !== 'Todos os Produtos' ? (
                   <>
+                    <AIBenchmark 
+                      selectedProduct={selectedProduct}
+                      onBenchmarkGenerated={handleBenchmarkGenerated}
+                      savedResults={aiBenchmarkResults}
+                    />
                     <MonthlyDetailsTable 
                       metrics={metrics} 
                       selectedProduct={selectedProduct}
                       selectedMonth={selectedMonth}
                       onValuesChange={setMonthlyDetailsValues}
+                      aiBenchmarkResults={aiBenchmarkResults}
                     />
                     <InsightsSection />
                   </>

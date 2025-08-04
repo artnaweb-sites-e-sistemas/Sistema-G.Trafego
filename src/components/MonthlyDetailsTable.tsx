@@ -2,11 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, TrendingUp, TrendingDown, Minus, Edit3, Check, X, Info, Download } from 'lucide-react';
 import { MetricData, metricsService } from '../services/metricsService';
 
+import { BenchmarkResults } from '../services/aiBenchmarkService';
+
 interface MonthlyDetailsTableProps {
   metrics: MetricData[];
   selectedProduct?: string;
   selectedMonth?: string;
   onValuesChange?: (values: { agendamentos: number; vendas: number }) => void;
+  aiBenchmarkResults?: BenchmarkResults | null;
 }
 
 interface TableRow {
@@ -66,10 +69,151 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   metrics, 
   selectedProduct = '',
   selectedMonth = 'Janeiro 2025',
-  onValuesChange
+  onValuesChange,
+  aiBenchmarkResults
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [tooltipStates, setTooltipStates] = useState<{ [key: string]: boolean }>({});
+
+  // Controle se o campo de Vendas deve ser sincronizado automaticamente ou editado manualmente
+  const [salesAuto, setSalesAuto] = useState(true);
+
+  // Controle se o campo de Agendamentos deve ser sincronizado automaticamente ou editado manualmente
+  const [agendamentosAuto, setAgendamentosAuto] = useState(true);
+
+  // Controle para campos benchmark editáveis (automático vs manual)
+  const [benchmarkAuto, setBenchmarkAuto] = useState({
+    investimento: true,
+    cpm: true,
+    cpc: true,
+    ctr: true,
+    txMensagens: true,
+    txAgendamento: true,
+    txConversaoVendas: true
+  });
+
+  // UseEffect para aplicar valores de benchmark da IA
+  useEffect(() => {
+    if (aiBenchmarkResults) {
+      setTableData(prevData => {
+        const updatedData = prevData.map(row => {
+          let newBenchmark = row.benchmark;
+          
+          // Só aplicar valores da IA se o campo estiver em modo automático
+          const isAuto = (() => {
+            switch (row.metric) {
+              case 'Investimento pretendido (Mês)':
+                return benchmarkAuto.investimento;
+              case 'CPM':
+                return benchmarkAuto.cpm;
+              case 'CPC':
+                return benchmarkAuto.cpc;
+              case 'CTR':
+                return benchmarkAuto.ctr;
+              case 'Tx. Mensagens (Leads/Cliques)':
+                return benchmarkAuto.txMensagens;
+              case 'Tx. Agendamento (Agend./Leads)':
+                return benchmarkAuto.txAgendamento;
+              case 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)':
+                return benchmarkAuto.txConversaoVendas;
+              default:
+                return true;
+            }
+          })();
+          
+          if (isAuto) {
+            // Mapear os resultados da IA para os campos correspondentes
+            switch (row.metric) {
+              case 'CPM':
+                newBenchmark = formatCurrency(aiBenchmarkResults.cpm);
+                break;
+              case 'CPC':
+                newBenchmark = formatCurrency(aiBenchmarkResults.cpc);
+                break;
+              case 'CTR':
+                newBenchmark = formatPercentage(aiBenchmarkResults.ctr);
+                break;
+              case 'Tx. Mensagens (Leads/Cliques)':
+                newBenchmark = formatPercentage(aiBenchmarkResults.txMensagens);
+                break;
+              case 'Tx. Agendamento (Agend./Leads)':
+                newBenchmark = formatPercentage(aiBenchmarkResults.txAgendamento);
+                break;
+              case 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)':
+                newBenchmark = formatPercentage(aiBenchmarkResults.txConversaoVendas);
+                break;
+              default:
+                return row;
+            }
+          }
+          
+          return { ...row, benchmark: newBenchmark };
+        });
+
+        // Salvar os valores de benchmark no localStorage para persistência
+        saveBenchmarkValues(updatedData);
+        
+        return updatedData;
+      });
+    }
+  }, [aiBenchmarkResults, benchmarkAuto]);
+
+  // Função para salvar valores de benchmark
+  const saveBenchmarkValues = (data: any[]) => {
+    if (selectedProduct && selectedMonth) {
+      const benchmarkValues: { [key: string]: string } = {};
+      
+      data.forEach(row => {
+        if (row.benchmark && row.benchmark !== '--') {
+          benchmarkValues[row.metric] = row.benchmark;
+        }
+      });
+      
+      const storageKey = `benchmark_${selectedProduct}_${selectedMonth}`;
+      localStorage.setItem(storageKey, JSON.stringify(benchmarkValues));
+      console.log('Valores de benchmark salvos:', benchmarkValues);
+    }
+  };
+
+  // Função para carregar valores de benchmark salvos
+  const loadBenchmarkValues = () => {
+    if (selectedProduct && selectedMonth) {
+      const storageKey = `benchmark_${selectedProduct}_${selectedMonth}`;
+      const savedBenchmarks = localStorage.getItem(storageKey);
+      
+      if (savedBenchmarks) {
+        try {
+          const benchmarkValues = JSON.parse(savedBenchmarks);
+          console.log('Valores de benchmark carregados:', benchmarkValues);
+          
+          setTableData(prevData => {
+            return prevData.map(row => {
+              if (benchmarkValues[row.metric]) {
+                return { ...row, benchmark: benchmarkValues[row.metric] };
+              }
+              return row;
+            });
+          });
+        } catch (error) {
+          console.error('Erro ao carregar benchmarks salvos:', error);
+        }
+      }
+
+      // Carregar estados automáticos dos campos benchmark
+      const autoStatesKey = `benchmark_auto_${selectedProduct}_${selectedMonth}`;
+      const savedAutoStates = localStorage.getItem(autoStatesKey);
+      
+      if (savedAutoStates) {
+        try {
+          const autoStates = JSON.parse(savedAutoStates);
+          setBenchmarkAuto(autoStates);
+          console.log('Estados automáticos de benchmark carregados:', autoStates);
+        } catch (error) {
+          console.error('Erro ao carregar estados automáticos de benchmark:', error);
+        }
+      }
+    }
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -93,9 +237,6 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   const parseNumber = (value: string): number => {
     return parseFloat(value.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
   };
-
-  // Controle se o campo de Vendas deve ser sincronizado automaticamente ou editado manualmente
-  const [salesAuto, setSalesAuto] = useState(true);
 
   // Estado para o Ticket Médio editável
   const [ticketMedio, setTicketMedio] = useState(250);
@@ -234,7 +375,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     },
     {
       category: 'Resultados Finais da Venda',
-      metric: 'Tx. Conversão Vendas (Vendas/Comp.)',
+              metric: 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)',
       benchmark: '10.00%',
       realValue: '0.00%',
       status: 'Levemente abaixo da meta',
@@ -322,6 +463,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           );
           setSavedDetails(details);
           console.log('Dados carregados do Firebase para produto:', selectedProduct, details);
+          
+          // Carregar também os valores de benchmark salvos
+          loadBenchmarkValues();
         } catch (error) {
           console.error('Erro ao carregar detalhes salvos:', error);
           setSavedDetails({ agendamentos: 0, vendas: 0, ticketMedio: 0 });
@@ -502,7 +646,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       const ctr = parseNumber(data.find(r => r.metric === 'CTR')?.benchmark || '0');
       const txMensagens = parseNumber(data.find(r => r.metric === 'Tx. Mensagens (Leads/Cliques)')?.benchmark || '0');
       const txAgendamento = parseNumber(data.find(r => r.metric === 'Tx. Agendamento (Agend./Leads)')?.benchmark || '0');
-      const txConversaoVendas = parseNumber(data.find(r => r.metric === 'Tx. Conversão Vendas (Vendas/Comp.)')?.benchmark || '0');
+      const txConversaoVendas = parseNumber(data.find(r => r.metric === 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)')?.benchmark || '0');
 
       // Calcular valores automáticos da coluna VALORES REAIS
       switch (row.metric) {
@@ -537,9 +681,11 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             newRow.realValue = formatPercentage((agendamentos / leads) * 100);
           }
           break;
-        case 'Tx. Conversão Vendas (Vendas/Comp.)':
+        case 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)':
           if (vendas > 0) {
-            newRow.realValue = formatPercentage((vendas / agendamentos) * 100);
+            // 🎯 CORRIGIDO: Fluxo baseado na existência de agendamentos
+            const denominador = agendamentos > 0 ? agendamentos : leads; // Se há agendamentos, usa agendamentos; senão usa leads direto
+            newRow.realValue = formatPercentage((vendas / denominador) * 100);
           }
           break;
         case 'CPV (Custo por Venda)':
@@ -601,10 +747,20 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           }
           break;
         case 'Vendas':
-          const vendasBench = parseNumber(data.find(r => r.metric === 'Vendas')?.benchmark || '0');
-          const txConversaoVendasBench = parseNumber(data.find(r => r.metric === 'Tx. Conversão Vendas (Vendas/Comp.)')?.benchmark || '0');
+          const txConversaoVendasBench = parseNumber(data.find(r => r.metric === 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)')?.benchmark || '0');
+          const txAgendamentoBenchVendas = parseNumber(data.find(r => r.metric === 'Tx. Agendamento (Agend./Leads)')?.benchmark || '0');
+          const leadsBenchVendas = parseNumber(data.find(r => r.metric === 'Leads / Msgs')?.benchmark || '0');
+          const agendamentosBench = parseNumber(data.find(r => r.metric === 'Agendamentos')?.benchmark || '0');
+          
           if (txConversaoVendasBench > 0) {
-            newRow.benchmark = Math.round(vendasBench * txConversaoVendasBench / 100).toString();
+            // 🎯 CORRIGIDO: Fluxo baseado na existência de taxa de agendamento
+            if (txAgendamentoBenchVendas > 0 && agendamentosBench > 0) {
+              // Fluxo COM agendamento: Leads → Agendamentos → Vendas
+              newRow.benchmark = Math.round(agendamentosBench * txConversaoVendasBench / 100).toString();
+            } else {
+              // Fluxo SEM agendamento: Leads → Vendas (direto)
+              newRow.benchmark = Math.round(leadsBenchVendas * txConversaoVendasBench / 100).toString();
+            }
           }
           break;
         case 'CPL (Custo por Lead)':
@@ -819,6 +975,11 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       const recalculatedData = calculateValues(newData);
       setTableData(recalculatedData);
       
+      // Salvar benchmarks se foi editado na coluna benchmark
+      if (editingCell.field === 'benchmark') {
+        saveBenchmarkValues(recalculatedData);
+      }
+      
       // Salvar no Firebase e notificar sobre mudanças se for agendamentos ou vendas
       if (row.metric === 'Agendamentos' || row.metric === 'Vendas') {
         const agendamentos = parseNumber(recalculatedData.find(r => r.metric === 'Agendamentos')?.realValue || '0');
@@ -886,6 +1047,68 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     }
   };
 
+  // Função para obter o estado automático de um campo benchmark
+  const getBenchmarkAutoState = (metric: string): boolean => {
+    switch (metric) {
+      case 'Investimento pretendido (Mês)':
+        return benchmarkAuto.investimento;
+      case 'CPM':
+        return benchmarkAuto.cpm;
+      case 'CPC':
+        return benchmarkAuto.cpc;
+      case 'CTR':
+        return benchmarkAuto.ctr;
+      case 'Tx. Mensagens (Leads/Cliques)':
+        return benchmarkAuto.txMensagens;
+      case 'Tx. Agendamento (Agend./Leads)':
+        return benchmarkAuto.txAgendamento;
+      case 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)':
+        return benchmarkAuto.txConversaoVendas;
+      default:
+        return true;
+    }
+  };
+
+  // Função para alternar o estado automático de um campo benchmark
+  const toggleBenchmarkAuto = (metric: string) => {
+    setBenchmarkAuto(prev => {
+      const newState = { ...prev };
+      switch (metric) {
+        case 'Investimento pretendido (Mês)':
+          newState.investimento = !prev.investimento;
+          break;
+        case 'CPM':
+          newState.cpm = !prev.cpm;
+          break;
+        case 'CPC':
+          newState.cpc = !prev.cpc;
+          break;
+        case 'CTR':
+          newState.ctr = !prev.ctr;
+          break;
+        case 'Tx. Mensagens (Leads/Cliques)':
+          newState.txMensagens = !prev.txMensagens;
+          break;
+        case 'Tx. Agendamento (Agend./Leads)':
+          newState.txAgendamento = !prev.txAgendamento;
+          break;
+        case 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)':
+          newState.txConversaoVendas = !prev.txConversaoVendas;
+          break;
+      }
+      return newState;
+    });
+  };
+
+  // Salvar estados automáticos dos campos benchmark quando mudarem
+  useEffect(() => {
+    if (selectedProduct && selectedMonth) {
+      const autoStatesKey = `benchmark_auto_${selectedProduct}_${selectedMonth}`;
+      localStorage.setItem(autoStatesKey, JSON.stringify(benchmarkAuto));
+      console.log('Estados automáticos de benchmark salvos:', benchmarkAuto);
+    }
+  }, [benchmarkAuto, selectedProduct, selectedMonth]);
+
   // Função para obter tooltip de cada métrica
   const getMetricTooltip = (metric: string): string => {
     const tooltips: { [key: string]: string } = {
@@ -901,7 +1124,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       'Agendamentos': 'Número de consultas ou reuniões agendadas com clientes',
       'Tx. Agendamento (Agend./Leads)': 'Porcentagem de leads que viraram agendamentos',
       'Vendas': 'Número total de vendas realizadas através dos anúncios',
-      'Tx. Conversão Vendas (Vendas/Comp.)': 'Porcentagem de comparecimentos que viraram vendas',
+      'Tx. Conversão Vendas (Vendas/Leads ou Agend.)': 'Porcentagem de leads (venda direta) ou agendamentos (consultoria/demo) que viraram vendas',
       'CPV (Custo por Venda)': 'Quanto você gasta para conseguir cada venda',
       'Lucro': 'Receita total menos o investimento em anúncios',
       'ROI': 'Retorno sobre investimento. Quanto você ganha de volta para cada real investido'
@@ -961,13 +1184,21 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                 autoFocus
               />
             ) : (
-              <div className="group cursor-pointer relative" onClick={handleTicketClick}>
-                <span className="text-slate-100 font-bold text-xl group-hover:text-indigo-300 transition-all duration-200">
+              <div className="flex items-center space-x-2">
+                <span className="text-slate-100 font-bold text-xl">
                   {formatCurrency(ticketMedio)}
                 </span>
-                <div className="absolute right-0 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleTicketClick();
+                  }}
+                  className="inline-flex items-center justify-center rounded-full p-1.5 transition-all duration-200 bg-indigo-900/40 hover:bg-indigo-800/50 border border-indigo-500/30"
+                  title="Editar ticket médio"
+                >
                   <Edit3 className="w-4 h-4 text-indigo-400" />
-                </div>
+                </button>
               </div>
             )}
           </div>
@@ -1029,11 +1260,13 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                       
                       {/* Célula Benchmark editável */}
                       <td 
-                        className={`p-5 relative group w-1/5 text-left border-r border-slate-600/50 ${
+                        className={`p-5 relative group w-1/5 text-left border-r border-slate-600/50 border-l-4 border-purple-400 ${
                           row.benchmarkEditable 
                             ? editingCell?.rowIndex === globalIndex && editingCell?.field === 'benchmark'
-                              ? 'bg-indigo-900/40 cursor-pointer transition-all duration-200 border-l-4 border-indigo-400 shadow-sm'
-                              : 'bg-slate-700/60 cursor-pointer hover:bg-indigo-900/30 transition-all duration-200 border-l-4 border-transparent hover:border-indigo-400/60'
+                              ? 'bg-indigo-900/40 cursor-pointer transition-all duration-200 shadow-sm'
+                              : getBenchmarkAutoState(row.metric)
+                                ? 'bg-slate-800/40 cursor-pointer hover:bg-slate-800/60 transition-all duration-200'
+                                : 'bg-slate-700/60 cursor-pointer hover:bg-slate-700/80 transition-all duration-200'
                             : 'bg-slate-800/40'
                         }`}
                         onClick={() => handleCellClick(globalIndex, 'benchmark', row.benchmark)}
@@ -1053,11 +1286,37 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                             ref={inputRef}
                           />
                         ) : (
-                          <span className="text-base font-semibold text-slate-100">{row.benchmark}</span>
+                          <div className="flex items-center justify-between w-full">
+                            <span className="text-base font-semibold text-slate-100">{row.benchmark}</span>
+                            <div className="flex items-center space-x-2">
+                              {!row.benchmarkEditable && (
+                                <div className="flex items-center space-x-1">
+                                  <span className="text-xs text-purple-400 font-medium">Projeção</span>
+                                </div>
+                              )}
+                              {row.benchmarkEditable && (
+                                <div className="flex items-center space-x-2">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCellClick(globalIndex, 'benchmark', row.benchmark);
+                                    }}
+                                    className={`inline-flex items-center justify-center rounded-full p-1.5 transition-all duration-200 ${
+                                      getBenchmarkAutoState(row.metric)
+                                        ? 'bg-purple-900/40 hover:bg-purple-800/50 border border-purple-500/30' 
+                                        : 'bg-indigo-900/40 hover:bg-indigo-800/50 border border-indigo-500/30'
+                                    }`}
+                                    title={getBenchmarkAutoState(row.metric) ? 'Usando valores da IA (clique para editar manualmente)' : 'Editando manualmente (clique para usar valores da IA)'}
+                                  >
+                                    {getBenchmarkAutoState(row.metric) ? <Edit3 className="w-4 h-4 text-purple-400" /> : <TrendingUp className="w-4 h-4 text-indigo-400" />}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         )}
-                        {row.benchmarkEditable && isHovered?.rowIndex === globalIndex && isHovered?.field === 'benchmark' && !editingCell && (
-                          <Edit3 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-indigo-400 opacity-70" />
-                        )}
+
                       </td>
                       
                       {/* Célula Valores Reais editável */}
@@ -1091,8 +1350,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                             <div className="flex items-center space-x-2">
                               {!row.realValueEditable && (
                                 <div className="flex items-center space-x-1">
-                                  <Download className="w-3 h-3 text-blue-400" />
-                                  <span className="text-xs text-blue-400 font-medium">Auto</span>
+                                  <span className="text-xs text-blue-400 font-medium">Sincronizado</span>
                                 </div>
                               )}
                               {row.metric === 'Vendas' && (
@@ -1109,15 +1367,30 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                                   }`}
                                   title={salesAuto ? 'Sincronizando automaticamente (clique para editar manualmente)' : 'Editando manualmente (clique para sincronizar automaticamente)'}
                                 >
-                                  {salesAuto ? <Download className="w-4 h-4 text-blue-400" /> : <Edit3 className="w-4 h-4 text-emerald-400" />}
+                                  {salesAuto ? <Edit3 className="w-4 h-4 text-blue-400" /> : <Edit3 className="w-4 h-4 text-emerald-400" />}
+                                </button>
+                              )}
+                              {row.metric === 'Agendamentos' && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCellClick(globalIndex, 'realValue', row.realValue);
+                                  }}
+                                  className={`inline-flex items-center justify-center rounded-full p-1.5 transition-all duration-200 ${
+                                    agendamentosAuto 
+                                      ? 'bg-blue-900/40 hover:bg-blue-800/50 border border-blue-500/30' 
+                                      : 'bg-emerald-900/40 hover:bg-emerald-800/50 border border-emerald-500/30'
+                                  }`}
+                                  title={agendamentosAuto ? 'Sincronizando automaticamente (clique para editar manualmente)' : 'Editando manualmente (clique para sincronizar automaticamente)'}
+                                >
+                                  {agendamentosAuto ? <Edit3 className="w-4 h-4 text-blue-400" /> : <Edit3 className="w-4 h-4 text-emerald-400" />}
                                 </button>
                               )}
                             </div>
                           </div>
                         )}
-                        {row.realValueEditable && isHovered?.rowIndex === globalIndex && isHovered?.field === 'realValue' && !editingCell && (
-                          <Edit3 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-emerald-400 opacity-70" />
-                        )}
+
                       </td>
                       
                       {/* Célula Status */}

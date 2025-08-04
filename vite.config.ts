@@ -3,6 +3,11 @@ import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
 
+// Verificar se os certificados SSL existem
+const keyPath = path.resolve(__dirname, 'localhost-key.pem');
+const certPath = path.resolve(__dirname, 'localhost.pem');
+const hasSSLCerts = fs.existsSync(keyPath) && fs.existsSync(certPath);
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -10,10 +15,12 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   server: {
-    https: {
-      key: fs.readFileSync(path.resolve(__dirname, 'localhost-key.pem')),
-      cert: fs.readFileSync(path.resolve(__dirname, 'localhost.pem')),
-    },
+    ...(hasSSLCerts && {
+      https: {
+        key: fs.readFileSync(keyPath),
+        cert: fs.readFileSync(certPath),
+      },
+    }),
     port: 5173,
     host: true
   },
