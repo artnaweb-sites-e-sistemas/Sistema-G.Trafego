@@ -75,12 +75,6 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const [tooltipStates, setTooltipStates] = useState<{ [key: string]: boolean }>({});
 
-  // Controle se o campo de Vendas deve ser sincronizado automaticamente ou editado manualmente
-  const [salesAuto, setSalesAuto] = useState(true);
-
-  // Controle se o campo de Agendamentos deve ser sincronizado automaticamente ou editado manualmente
-  const [agendamentosAuto, setAgendamentosAuto] = useState(true);
-
   // Controle para campos benchmark editáveis (automático vs manual)
   const [benchmarkAuto, setBenchmarkAuto] = useState({
     investimento: true,
@@ -150,10 +144,13 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           return { ...row, benchmark: newBenchmark };
         });
 
-        // Salvar os valores de benchmark no localStorage para persistência
-        saveBenchmarkValues(updatedData);
+        // 🎯 CORREÇÃO: Recalcular valores dependentes após aplicar valores da IA
+        const calculatedData = calculateValues(updatedData);
         
-        return updatedData;
+        // Salvar os valores de benchmark no localStorage para persistência
+        saveBenchmarkValues(calculatedData);
+        
+        return calculatedData;
       });
     }
   }, [aiBenchmarkResults, benchmarkAuto]);
@@ -187,12 +184,16 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           console.log('Valores de benchmark carregados:', benchmarkValues);
           
           setTableData(prevData => {
-            return prevData.map(row => {
+            const updatedData = prevData.map(row => {
               if (benchmarkValues[row.metric]) {
                 return { ...row, benchmark: benchmarkValues[row.metric] };
               }
               return row;
             });
+            
+            // 🎯 CORREÇÃO: Recalcular valores dependentes após carregar valores salvos
+            const calculatedData = calculateValues(updatedData);
+            return calculatedData;
           });
         } catch (error) {
           console.error('Erro ao carregar benchmarks salvos:', error);
@@ -236,6 +237,23 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
   const parseNumber = (value: string): number => {
     return parseFloat(value.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
+  };
+
+  // Função específica para extrair ROI de formato "232% (3.3x)"
+  const parseROI = (value: string): number => {
+    // Extrair apenas o valor da porcentagem (antes do %)
+    const match = value.match(/(\d+(?:,\d+)?)%/);
+    if (match) {
+      return parseFloat(match[1].replace(',', '.')) || 0;
+    }
+    // Fallback para parseNumber normal
+    return parseNumber(value);
+  };
+
+  // Função para salvar o valor completo do ROI
+  const saveROIValue = (value: string): string => {
+    // Salvar o valor completo como string
+    return value || '0% (0.0x)';
   };
 
   // Estado para o Ticket Médio editável
@@ -407,7 +425,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     },
     {
       category: 'Financeiro',
-      metric: 'ROI',
+      metric: 'ROI / ROAS',
       benchmark: '-98% (0.0x)',
       realValue: '-100% (0.0x)',
       status: 'Levemente abaixo da meta',
@@ -449,6 +467,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   // Estado para armazenar dados editáveis salvos
   const [savedDetails, setSavedDetails] = useState({ agendamentos: 0, vendas: 0, ticketMedio: 0 });
 
+  // Estado para armazenar dados calculados dos públicos
+  const [audienceCalculatedValues, setAudienceCalculatedValues] = useState({ agendamentos: 0, vendas: 0 });
+
   // Carregar dados salvos do Firebase quando produto ou mês mudar
   useEffect(() => {
     const loadSavedDetails = async () => {
@@ -463,6 +484,24 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           );
           setSavedDetails(details);
           console.log('Dados carregados do Firebase para produto:', selectedProduct, details);
+          console.log('🔍 DEBUG - MonthlyDetailsTable - Dados salvos incluem CPV/ROI:', {
+            hasCPV: 'cpv' in details,
+            hasROI: 'roi' in details,
+            cpvValue: (details as any).cpv,
+            roiValue: (details as any).roi
+          });
+          
+          // Log adicional para verificar todos os campos da planilha
+          console.log('🔍 DEBUG - MonthlyDetailsTable - Todos os campos da planilha:', tableData.map(row => ({
+            metric: row.metric,
+            realValue: row.realValue
+          })));
+          
+          // Log específico para encontrar campos CPV e ROI
+          const cpvFields = tableData.filter(row => row.metric.toLowerCase().includes('cpv'));
+          const roiFields = tableData.filter(row => row.metric.toLowerCase().includes('roi') || row.metric.toLowerCase().includes('roas'));
+          console.log('🔍 DEBUG - MonthlyDetailsTable - Campos CPV encontrados:', cpvFields);
+          console.log('🔍 DEBUG - MonthlyDetailsTable - Campos ROI/ROAS encontrados:', roiFields);
           
           // Carregar também os valores de benchmark salvos
           loadBenchmarkValues();
@@ -479,38 +518,244 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     loadSavedDetails();
   }, [selectedMonth, selectedProduct]);
 
-  // Atualizar valores na tabela quando dados salvos carregarem
+  // Listener para atualizar valores quando dados dos públicos mudarem
   useEffect(() => {
-    if ((savedDetails.agendamentos > 0 || savedDetails.vendas > 0)) {
-      setTableData(prevData => {
-        const newData = prevData.map(row => {
-          const newRow = { ...row };
-          
-          if (row.metric === 'Agendamentos' && savedDetails.agendamentos > 0) {
-            newRow.realValue = savedDetails.agendamentos.toLocaleString('pt-BR');
-          }
-          
-          if (row.metric === 'Vendas' && savedDetails.vendas > 0 && !salesAuto) {
-            newRow.realValue = savedDetails.vendas.toLocaleString('pt-BR');
-          }
-          
-          return newRow;
-        });
+    const handleAudienceDetailsSaved = (event: CustomEvent) => {
+      console.log('🔍 DEBUG - MonthlyDetailsTable - Evento audienceDetailsSaved recebido:', event.detail);
+      
+      if (event.detail && event.detail.product === selectedProduct && event.detail.month === selectedMonth) {
+        console.log('🔍 DEBUG - MonthlyDetailsTable - Evento corresponde ao produto/mês atual, recarregando...');
         
-        // Recalcular valores dependentes
-        const calculatedData = calculateValues(newData);
+        // Recarregar dados dos públicos quando um público for salvo
+        const loadAudienceData = async () => {
+          try {
+            console.log('🔍 DEBUG - MonthlyDetailsTable - Recarregando dados após evento...');
+            const allAudienceDetails = await metricsService.getAllAudienceDetailsForProduct(selectedMonth, selectedProduct);
+            
+            console.log('🔍 DEBUG - MonthlyDetailsTable - Dados recarregados:', allAudienceDetails);
+            
+            const totalAgendamentos = allAudienceDetails.reduce((sum, detail) => {
+              const agendamentos = detail.agendamentos || 0;
+              console.log(`🔍 DEBUG - Evento - Público ${detail.audience}: agendamentos = ${agendamentos}`);
+              return sum + agendamentos;
+            }, 0);
+            
+            const totalVendas = allAudienceDetails.reduce((sum, detail) => {
+              const vendas = detail.vendas || 0;
+              console.log(`🔍 DEBUG - Evento - Público ${detail.audience}: vendas = ${vendas}`);
+              return sum + vendas;
+            }, 0);
+            
+            setAudienceCalculatedValues({
+              agendamentos: totalAgendamentos,
+              vendas: totalVendas
+            });
+            
+            console.log('🔍 DEBUG - MonthlyDetailsTable - Dados atualizados após salvar público (FINAL):', {
+              totalAgendamentos,
+              totalVendas,
+              audienceCount: allAudienceDetails.length
+            });
+          } catch (error) {
+            console.error('Erro ao recarregar dados dos públicos:', error);
+          }
+        };
         
-        // Notificar mudanças
-        if (onValuesChange) {
-          const agendamentos = parseNumber(calculatedData.find(r => r.metric === 'Agendamentos')?.realValue || '0');
-          const vendas = parseNumber(calculatedData.find(r => r.metric === 'Vendas')?.realValue || '0');
-          onValuesChange({ agendamentos, vendas });
+        // Adicionar pequeno delay para garantir que o Firebase foi atualizado
+        setTimeout(loadAudienceData, 100);
+      } else {
+        console.log('🔍 DEBUG - MonthlyDetailsTable - Evento não corresponde ao produto/mês atual, ignorando');
+      }
+    };
+
+    window.addEventListener('audienceDetailsSaved', handleAudienceDetailsSaved as EventListener);
+    
+    return () => {
+      window.removeEventListener('audienceDetailsSaved', handleAudienceDetailsSaved as EventListener);
+    };
+  }, [selectedMonth, selectedProduct]);
+
+  // Carregar dados de todos os públicos para calcular agendamentos e vendas
+  useEffect(() => {
+    const loadAudienceData = async () => {
+      if (selectedProduct && selectedMonth) {
+        try {
+          console.log('🔍 DEBUG - MonthlyDetailsTable - Carregando dados dos públicos para:', {
+            selectedMonth,
+            selectedProduct
+          });
+          
+          const allAudienceDetails = await metricsService.getAllAudienceDetailsForProduct(selectedMonth, selectedProduct);
+          
+          console.log('🔍 DEBUG - MonthlyDetailsTable - Dados brutos dos públicos:', allAudienceDetails);
+          
+          // Calcular soma de agendamentos e vendas de todos os públicos (já consolidados)
+          const totalAgendamentos = allAudienceDetails.reduce((sum, detail) => {
+            const agendamentos = detail.agendamentos || 0;
+            console.log(`🔍 DEBUG - Público ${detail.audience}: agendamentos = ${agendamentos}`);
+            return sum + agendamentos;
+          }, 0);
+          
+          const totalVendas = allAudienceDetails.reduce((sum, detail) => {
+            const vendas = detail.vendas || 0;
+            console.log(`🔍 DEBUG - Público ${detail.audience}: vendas = ${vendas}`);
+            return sum + vendas;
+          }, 0);
+          
+          const newValues = {
+            agendamentos: totalAgendamentos,
+            vendas: totalVendas
+          };
+          
+          console.log('🔍 DEBUG - MonthlyDetailsTable - Definindo novos valores calculados:', newValues);
+          setAudienceCalculatedValues(newValues);
+          
+          console.log('🔍 DEBUG - MonthlyDetailsTable - Dados calculados dos públicos (FINAL):', {
+            totalAgendamentos,
+            totalVendas,
+            audienceCount: allAudienceDetails.length,
+            publicos: allAudienceDetails.map(d => ({ 
+              audience: d.audience, 
+              agendamentos: d.agendamentos, 
+              vendas: d.vendas 
+            }))
+          });
+        } catch (error) {
+          console.error('Erro ao carregar dados dos públicos:', error);
+          setAudienceCalculatedValues({ agendamentos: 0, vendas: 0 });
+        }
+      } else {
+        console.log('🔍 DEBUG - MonthlyDetailsTable - Produto ou mês não selecionado, zerando valores');
+        setAudienceCalculatedValues({ agendamentos: 0, vendas: 0 });
+      }
+    };
+
+    loadAudienceData();
+  }, [selectedMonth, selectedProduct]);
+
+  // Recarregar dados quando o componente for montado ou quando houver mudança de foco
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && selectedProduct && selectedMonth) {
+        console.log('🔍 DEBUG - MonthlyDetailsTable - Página voltou ao foco, recarregando dados...');
+        const loadAudienceData = async () => {
+          try {
+            const allAudienceDetails = await metricsService.getAllAudienceDetailsForProduct(selectedMonth, selectedProduct);
+            const totalAgendamentos = allAudienceDetails.reduce((sum, detail) => sum + (detail.agendamentos || 0), 0);
+            const totalVendas = allAudienceDetails.reduce((sum, detail) => sum + (detail.vendas || 0), 0);
+            
+            setAudienceCalculatedValues({
+              agendamentos: totalAgendamentos,
+              vendas: totalVendas
+            });
+            
+            console.log('🔍 DEBUG - MonthlyDetailsTable - Dados recarregados após foco:', {
+              totalAgendamentos,
+              totalVendas
+            });
+          } catch (error) {
+            console.error('Erro ao recarregar dados após foco:', error);
+          }
+        };
+        
+        loadAudienceData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [selectedMonth, selectedProduct]);
+
+
+
+  // Atualizar valores na tabela quando dados calculados dos públicos mudarem
+  useEffect(() => {
+    console.log('🔍 DEBUG - MonthlyDetailsTable - Atualizando tabela com valores dos públicos:', audienceCalculatedValues);
+    
+    setTableData(prevData => {
+      const newData = prevData.map(row => {
+        const newRow = { ...row };
+        
+        if (row.metric === 'Agendamentos') {
+          const newValue = audienceCalculatedValues.agendamentos.toLocaleString('pt-BR');
+          console.log(`🔍 DEBUG - MonthlyDetailsTable - Atualizando Agendamentos: ${row.realValue} → ${newValue}`);
+          newRow.realValue = newValue;
         }
         
-        return calculatedData;
+        if (row.metric === 'Vendas') {
+          const newValue = audienceCalculatedValues.vendas.toLocaleString('pt-BR');
+          console.log(`🔍 DEBUG - MonthlyDetailsTable - Atualizando Vendas: ${row.realValue} → ${newValue}`);
+          newRow.realValue = newValue;
+        }
+        
+        return newRow;
       });
-    }
-  }, [savedDetails, salesAuto, onValuesChange]);
+      
+      // Recalcular valores dependentes
+      const calculatedData = calculateValues(newData);
+      
+      // Notificar mudanças
+      if (onValuesChange) {
+        const agendamentos = audienceCalculatedValues.agendamentos;
+        const vendas = audienceCalculatedValues.vendas;
+        
+        console.log(`🔍 DEBUG - MonthlyDetailsTable - Notificando mudanças finais: agendamentos=${agendamentos}, vendas=${vendas}`);
+        
+        // Salvar no Firebase quando os valores dos públicos mudam
+        if (selectedProduct && selectedMonth) {
+          // Calcular CPV e ROI para salvar
+          const cpvRow = tableData.find(r => r.metric === 'CPV' || r.metric === 'CPV (Custo por Venda)');
+          const roiRow = tableData.find(r => r.metric === 'ROI' || r.metric === 'ROI/ROAS' || r.metric === 'ROI / ROAS');
+          
+          const cpv = parseNumber(cpvRow?.realValue || '0');
+          const roiValue = saveROIValue(roiRow?.realValue || '0% (0.0x)');
+          
+          console.log('🔍 DEBUG - MonthlyDetailsTable - Buscando CPV/ROI na planilha:', {
+            cpvRow: cpvRow?.metric,
+            cpvValue: cpvRow?.realValue,
+            roiRow: roiRow?.metric,
+            roiValue: roiRow?.realValue,
+            allMetrics: tableData.map(r => r.metric)
+          });
+          
+          // Log adicional para verificar se os valores estão sendo calculados corretamente
+          console.log('🔍 DEBUG - MonthlyDetailsTable - Valores calculados para salvar:', {
+            cpv: cpv,
+            roi: roiValue,
+            cpvParsed: parseNumber(cpvRow?.realValue || '0'),
+            roiParsed: parseROI(roiRow?.realValue || '0')
+          });
+          
+          console.log('🔍 DEBUG - MonthlyDetailsTable - Salvando dados dos públicos com CPV/ROI:', {
+            agendamentos,
+            vendas,
+            cpv,
+            roi: roiValue,
+            ticketMedio
+          });
+          
+                           metricsService.saveMonthlyDetails({
+                   month: selectedMonth,
+                   product: selectedProduct,
+                   agendamentos: agendamentos,
+                   vendas: vendas,
+                   ticketMedio: ticketMedio,
+                   cpv: cpv,
+                   roi: roiValue
+                 }).catch(error => {
+                   console.error('Erro ao salvar valores dos públicos:', error);
+                 });
+        }
+        
+        onValuesChange({ agendamentos, vendas });
+      }
+      
+      return calculatedData;
+    });
+  }, [audienceCalculatedValues, onValuesChange]);
 
   // Carregar ticketMedio dos dados salvos
   useEffect(() => {
@@ -522,10 +767,18 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   // Atualizar métricas quando houver mudança no produto selecionado ou nas métricas
   useEffect(() => {
     if (!metrics || metrics.length === 0) {
+      console.log('🔴 MonthlyDetailsTable: Nenhuma métrica disponível');
       return;
     }
 
+    console.log(`🟡 MonthlyDetailsTable: Processando ${metrics.length} métricas`);
+    console.log('🟡 MonthlyDetailsTable: Primeira métrica:', metrics[0]);
+
     const aggregated = metricsService.calculateAggregatedMetrics(metrics);
+
+    console.log(`🟢 MonthlyDetailsTable: Métricas agregadas - totalLeads: ${aggregated.totalLeads}`);
+    console.log(`🔍 DEBUG - MonthlyDetailsTable: audienceCalculatedValues:`, audienceCalculatedValues);
+    
 
     setTableData(prevData => {
       const updated = prevData.map(row => {
@@ -548,7 +801,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           case 'CPC':
             // CPC calculado automaticamente: Investimento / Cliques
             if (aggregated.totalClicks > 0) {
-              newRow.realValue = formatCurrency(aggregated.totalInvestment / aggregated.totalClicks);
+              const avgCPC = aggregated.totalInvestment / aggregated.totalClicks;
+              newRow.realValue = formatCurrency(avgCPC);
             } else {
               newRow.realValue = formatCurrency(0);
             }
@@ -563,6 +817,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             newRow.realValueEditable = false;
             break;
           case 'Leads / Msgs':
+            console.log(`🟢 MonthlyDetailsTable: Definindo Leads / Msgs como: ${aggregated.totalLeads.toLocaleString('pt-BR')}`);
             newRow.realValue = aggregated.totalLeads.toLocaleString('pt-BR');
             newRow.realValueEditable = false;
             break;
@@ -571,32 +826,16 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             newRow.realValueEditable = false;
             break;
           case 'Agendamentos':
-            // Prioridade: 1. Valor salvo, 2. Valor atual (se editado), 3. Meta Ads (só na primeira carga)
-            if (savedDetails.agendamentos > 0) {
-              newRow.realValue = savedDetails.agendamentos.toLocaleString('pt-BR');
-            } else if (!hasInitialLoad) {
-              // Só usar Meta Ads na primeira carga
-              newRow.realValue = aggregated.totalAppointments.toLocaleString('pt-BR');
-            }
-            // Se já carregou uma vez e não há valor salvo, manter o valor atual (preservar edições)
-            newRow.realValueEditable = true;
+            // 🎯 CORREÇÃO: Sempre usar os valores calculados dos públicos
+            console.log(`🔍 DEBUG - MonthlyDetailsTable: Atualizando Agendamentos com valor dos públicos: ${audienceCalculatedValues.agendamentos}`);
+            newRow.realValue = audienceCalculatedValues.agendamentos.toLocaleString('pt-BR');
+            newRow.realValueEditable = false; // Não mais editável
             break;
           case 'Vendas':
-            // Vendas com toggle automático/manual
-            if (salesAuto) {
-              newRow.realValue = aggregated.totalSales.toLocaleString('pt-BR');
-              newRow.realValueEditable = false;
-            } else {
-              // Em modo manual, prioridade: 1. Valor salvo, 2. Valor atual, 3. Meta Ads (só na primeira carga)
-              if (savedDetails.vendas > 0) {
-                newRow.realValue = savedDetails.vendas.toLocaleString('pt-BR');
-              } else if (!hasInitialLoad) {
-                // Só usar Meta Ads na primeira carga
-                newRow.realValue = aggregated.totalSales.toLocaleString('pt-BR');
-              }
-              // Se já carregou uma vez e não há valor salvo, manter o valor atual (preservar edições)
-              newRow.realValueEditable = true;
-            }
+            // 🎯 CORREÇÃO: Sempre usar os valores calculados dos públicos
+            console.log(`🔍 DEBUG - MonthlyDetailsTable: Atualizando Vendas com valor dos públicos: ${audienceCalculatedValues.vendas}`);
+            newRow.realValue = audienceCalculatedValues.vendas.toLocaleString('pt-BR');
+            newRow.realValueEditable = false; // Não mais editável
             break;
           default:
             break;
@@ -608,18 +847,13 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       // Recalcular campos dependentes após a sincronização
       const calculatedData = calculateValues(updated);
       
-      // Notificar sobre mudanças nos valores de agendamentos e vendas apenas se necessário
-      if (onValuesChange && hasInitialLoad) {
-        const agendamentos = parseNumber(calculatedData.find(r => r.metric === 'Agendamentos')?.realValue || '0');
-        const vendas = parseNumber(calculatedData.find(r => r.metric === 'Vendas')?.realValue || '0');
+      // 🎯 CORREÇÃO: Sempre notificar mudanças dos valores de públicos
+      if (onValuesChange) {
+        const agendamentos = audienceCalculatedValues.agendamentos;
+        const vendas = audienceCalculatedValues.vendas;
         
-        // Só notificar se os valores realmente mudaram
-        const currentAgendamentos = parseNumber(prevData.find(r => r.metric === 'Agendamentos')?.realValue || '0');
-        const currentVendas = parseNumber(prevData.find(r => r.metric === 'Vendas')?.realValue || '0');
-        
-        if (agendamentos !== currentAgendamentos || vendas !== currentVendas) {
-          onValuesChange({ agendamentos, vendas });
-        }
+        console.log(`🔍 DEBUG - MonthlyDetailsTable: Notificando mudanças - agendamentos: ${agendamentos}, vendas: ${vendas}`);
+        onValuesChange({ agendamentos, vendas });
       }
       
       if (!hasInitialLoad) {
@@ -627,177 +861,217 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       }
       return calculatedData;
     });
-  }, [metrics, selectedProduct, salesAuto, savedDetails]);
+  }, [metrics, selectedProduct, savedDetails, audienceCalculatedValues]);
 
   // Função para calcular valores automaticamente
   const calculateValues = (data: TableRow[]): TableRow[] => {
-    return data.map(row => {
-      const newRow = { ...row };
+    // 🎯 CORREÇÃO: Implementar cálculo iterativo para resolver dependências circulares
+    let currentData = [...data];
+    let previousData: TableRow[] = [];
+    let iterations = 0;
+    const maxIterations = 5; // Limite para evitar loop infinito
+    
+    // Continuar recalculando até que não haja mais mudanças ou até o limite de iterações
+    while (iterations < maxIterations) {
+      previousData = JSON.parse(JSON.stringify(currentData)); // Deep copy
+      
+      currentData = currentData.map(row => {
+        const newRow = { ...row };
 
-      // Obter valores editáveis da coluna VALORES REAIS
-      const investment = parseCurrency(data.find(r => r.metric === 'Investimento pretendido (Mês)')?.realValue || '0');
-      const cpm = parseCurrency(data.find(r => r.metric === 'CPM')?.realValue || '0');
-      const cliques = parseNumber(data.find(r => r.metric === 'Cliques')?.realValue || '0');
-      const leads = parseNumber(data.find(r => r.metric === 'Leads / Msgs')?.realValue || '0');
-      const agendamentos = parseNumber(data.find(r => r.metric === 'Agendamentos')?.realValue || '0');
-      const vendas = parseNumber(data.find(r => r.metric === 'Vendas')?.realValue || '0');
+        // Obter valores editáveis da coluna VALORES REAIS
+        const investment = parseCurrency(currentData.find(r => r.metric === 'Investimento pretendido (Mês)')?.realValue || '0');
+        const cpm = parseCurrency(currentData.find(r => r.metric === 'CPM')?.realValue || '0');
+        const cliques = parseNumber(currentData.find(r => r.metric === 'Cliques')?.realValue || '0');
+        const leads = parseNumber(currentData.find(r => r.metric === 'Leads / Msgs')?.realValue || '0');
+        const agendamentos = parseNumber(currentData.find(r => r.metric === 'Agendamentos')?.realValue || '0');
+        const vendas = parseNumber(currentData.find(r => r.metric === 'Vendas')?.realValue || '0');
 
-      // Obter valores editáveis da coluna BENCHMARK/PROJEÇÃO
-      const ctr = parseNumber(data.find(r => r.metric === 'CTR')?.benchmark || '0');
-      const txMensagens = parseNumber(data.find(r => r.metric === 'Tx. Mensagens (Leads/Cliques)')?.benchmark || '0');
-      const txAgendamento = parseNumber(data.find(r => r.metric === 'Tx. Agendamento (Agend./Leads)')?.benchmark || '0');
-      const txConversaoVendas = parseNumber(data.find(r => r.metric === 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)')?.benchmark || '0');
+        // Obter valores editáveis da coluna BENCHMARK/PROJEÇÃO
+        const ctr = parseNumber(currentData.find(r => r.metric === 'CTR')?.benchmark || '0');
+        const txMensagens = parseNumber(currentData.find(r => r.metric === 'Tx. Mensagens (Leads/Cliques)')?.benchmark || '0');
+        const txAgendamento = parseNumber(currentData.find(r => r.metric === 'Tx. Agendamento (Agend./Leads)')?.benchmark || '0');
+        const txConversaoVendas = parseNumber(currentData.find(r => r.metric === 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)')?.benchmark || '0');
 
-      // Calcular valores automáticos da coluna VALORES REAIS
-      switch (row.metric) {
-        case 'Impressões':
-          if (cpm > 0) {
-            newRow.realValue = Math.round(investment * 1000 / cpm).toString();
-          }
-          break;
-        case 'CPC':
-          if (cliques > 0) {
-            newRow.realValue = formatCurrency(investment / cliques);
-          }
-          break;
-        case 'CTR':
-          const impressoes = parseNumber(data.find(r => r.metric === 'Impressões')?.realValue || '0');
-          if (impressoes > 0) {
-            newRow.realValue = formatPercentage((cliques / impressoes) * 100);
-          }
-          break;
-        case 'Tx. Mensagens (Leads/Cliques)':
-          if (cliques > 0) {
-            newRow.realValue = formatPercentage((leads / cliques) * 100);
-          }
-          break;
-        case 'CPL (Custo por Lead)':
-          if (leads > 0) {
-            newRow.realValue = formatCurrency(investment / leads);
-          }
-          break;
-        case 'Tx. Agendamento (Agend./Leads)':
-          if (leads > 0) {
-            newRow.realValue = formatPercentage((agendamentos / leads) * 100);
-          }
-          break;
-        case 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)':
-          if (vendas > 0) {
-            // 🎯 CORRIGIDO: Fluxo baseado na existência de agendamentos
-            const denominador = agendamentos > 0 ? agendamentos : leads; // Se há agendamentos, usa agendamentos; senão usa leads direto
-            newRow.realValue = formatPercentage((vendas / denominador) * 100);
-          }
-          break;
-        case 'CPV (Custo por Venda)':
-          if (vendas > 0) {
-            newRow.realValue = formatCurrency(investment / vendas);
-          }
-          break;
-        case 'Lucro':
-          const receita = vendas * ticketMedio;
-          newRow.realValue = formatCurrency(receita - investment);
-          break;
-        case 'ROI':
-          const lucro = parseCurrency(data.find(r => r.metric === 'Lucro')?.realValue || '0');
-          if (investment > 0) {
-            const receita = vendas * ticketMedio;
-            const roiPercent = (lucro / investment) * 100;
-            const roiMultiplier = (receita / investment);
-            newRow.realValue = `${roiPercent.toFixed(0)}% (${roiMultiplier.toFixed(1)}x)`;
-          }
-          break;
-      }
-
-      // Calcular valores automáticos da coluna BENCHMARK/PROJEÇÃO
-      switch (row.metric) {
-        case 'Impressões':
-          const investmentBench = parseCurrency(data.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
-          const cpmBench = parseCurrency(data.find(r => r.metric === 'CPM')?.benchmark || '0');
-          if (cpmBench > 0) {
-            newRow.benchmark = Math.round(investmentBench * 1000 / cpmBench).toString();
-          }
-          break;
-        // CPC é editável, não calculado automaticamente
-        // case 'CPC':
-        //   const investmentBench2 = parseCurrency(data.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
-        //   const cliquesBench = parseNumber(data.find(r => r.metric === 'Cliques')?.benchmark || '0');
-        //   if (cliquesBench > 0) {
-        //     newRow.benchmark = formatCurrency(investmentBench2 / cliquesBench);
-        //   }
-        //   break;
-        case 'Cliques':
-          const impressoesBench = parseNumber(data.find(r => r.metric === 'Impressões')?.benchmark || '0');
-          const ctrBench = parseNumber(data.find(r => r.metric === 'CTR')?.benchmark || '0');
-          if (ctrBench > 0) {
-            newRow.benchmark = Math.round(impressoesBench * ctrBench / 100).toString();
-          }
-          break;
-        case 'Leads / Msgs':
-          const cliquesBench2 = parseNumber(data.find(r => r.metric === 'Cliques')?.benchmark || '0');
-          const txMensagensBench = parseNumber(data.find(r => r.metric === 'Tx. Mensagens (Leads/Cliques)')?.benchmark || '0');
-          if (txMensagensBench > 0) {
-            newRow.benchmark = Math.round(cliquesBench2 * txMensagensBench / 100).toString();
-          }
-          break;
-        case 'Agendamentos':
-          const leadsBench = parseNumber(data.find(r => r.metric === 'Leads / Msgs')?.benchmark || '0');
-          const txAgendamentoBench = parseNumber(data.find(r => r.metric === 'Tx. Agendamento (Agend./Leads)')?.benchmark || '0');
-          if (txAgendamentoBench > 0) {
-            newRow.benchmark = Math.round(leadsBench * txAgendamentoBench / 100).toString();
-          }
-          break;
-        case 'Vendas':
-          const txConversaoVendasBench = parseNumber(data.find(r => r.metric === 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)')?.benchmark || '0');
-          const txAgendamentoBenchVendas = parseNumber(data.find(r => r.metric === 'Tx. Agendamento (Agend./Leads)')?.benchmark || '0');
-          const leadsBenchVendas = parseNumber(data.find(r => r.metric === 'Leads / Msgs')?.benchmark || '0');
-          const agendamentosBench = parseNumber(data.find(r => r.metric === 'Agendamentos')?.benchmark || '0');
-          
-          if (txConversaoVendasBench > 0) {
-            // 🎯 CORRIGIDO: Fluxo baseado na existência de taxa de agendamento
-            if (txAgendamentoBenchVendas > 0 && agendamentosBench > 0) {
-              // Fluxo COM agendamento: Leads → Agendamentos → Vendas
-              newRow.benchmark = Math.round(agendamentosBench * txConversaoVendasBench / 100).toString();
-            } else {
-              // Fluxo SEM agendamento: Leads → Vendas (direto)
-              newRow.benchmark = Math.round(leadsBenchVendas * txConversaoVendasBench / 100).toString();
+        // Calcular valores automáticos da coluna VALORES REAIS
+        switch (row.metric) {
+          case 'Impressões':
+            if (cpm > 0) {
+              newRow.realValue = Math.round(investment * 1000 / cpm).toString();
             }
-          }
-          break;
-        case 'CPL (Custo por Lead)':
-          const investmentBench3 = parseCurrency(data.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
-          const leadsBench2 = parseNumber(data.find(r => r.metric === 'Leads / Msgs')?.benchmark || '0');
-          if (leadsBench2 > 0) {
-            newRow.benchmark = formatCurrency(investmentBench3 / leadsBench2);
-          }
-          break;
-        case 'CPV (Custo por Venda)':
-          const investmentBench4 = parseCurrency(data.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
-          const vendasBench2 = parseNumber(data.find(r => r.metric === 'Vendas')?.benchmark || '0');
-          if (vendasBench2 > 0) {
-            newRow.benchmark = formatCurrency(investmentBench4 / vendasBench2);
-          }
-          break;
-        case 'Lucro':
-          const vendasBench3 = parseNumber(data.find(r => r.metric === 'Vendas')?.benchmark || '0');
-          const investmentBench5 = parseCurrency(data.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
-          const receitaBench = vendasBench3 * ticketMedio;
-          newRow.benchmark = formatCurrency(receitaBench - investmentBench5);
-          break;
-        case 'ROI':
-          const lucroBench = parseCurrency(data.find(r => r.metric === 'Lucro')?.benchmark || '0');
-          const investmentBench6 = parseCurrency(data.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
-          if (investmentBench6 > 0) {
-            const vendasBench4 = parseNumber(data.find(r => r.metric === 'Vendas')?.benchmark || '0');
-            const receitaBench2 = vendasBench4 * ticketMedio;
-            const roiPercentBench = (lucroBench / investmentBench6) * 100;
-            const roiMultiplierBench = (receitaBench2 / investmentBench6);
-            newRow.benchmark = `${roiPercentBench.toFixed(0)}% (${roiMultiplierBench.toFixed(1)}x)`;
-          }
-          break;
-      }
+            break;
+          case 'CPC':
+            if (cliques > 0) {
+              newRow.realValue = formatCurrency(investment / cliques);
+            }
+            break;
+          case 'CTR':
+            const impressoes = parseNumber(currentData.find(r => r.metric === 'Impressões')?.realValue || '0');
+            if (impressoes > 0) {
+              newRow.realValue = formatPercentage((cliques / impressoes) * 100);
+            }
+            break;
+          case 'Tx. Mensagens (Leads/Cliques)':
+            if (cliques > 0) {
+              newRow.realValue = formatPercentage((leads / cliques) * 100);
+            }
+            break;
+          case 'CPL (Custo por Lead)':
+            if (leads > 0) {
+              newRow.realValue = formatCurrency(investment / leads);
+            }
+            break;
+          case 'Tx. Agendamento (Agend./Leads)':
+            if (leads > 0) {
+              newRow.realValue = formatPercentage((agendamentos / leads) * 100);
+            }
+            break;
+          case 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)':
+            if (vendas > 0) {
+              // 🎯 CORRIGIDO: Fluxo baseado na existência de agendamentos
+              const denominador = agendamentos > 0 ? agendamentos : leads; // Se há agendamentos, usa agendamentos; senão usa leads direto
+              newRow.realValue = formatPercentage((vendas / denominador) * 100);
+            }
+            break;
+          case 'CPV (Custo por Venda)':
+            if (vendas > 0) {
+              newRow.realValue = formatCurrency(investment / vendas);
+            }
+            break;
+          case 'Lucro':
+            const receita = vendas * ticketMedio;
+            newRow.realValue = formatCurrency(receita - investment);
+            break;
+          case 'ROI / ROAS':
+            if (investment > 0) {
+              const receita = vendas * ticketMedio;
+              const lucro = receita - investment;
+              const roiPercent = (lucro / investment) * 100;
+              const roiMultiplier = (receita / investment);
+              newRow.realValue = `${roiPercent.toFixed(0)}% (${roiMultiplier.toFixed(1)}x)`;
+            }
+            break;
+        }
 
-      return newRow;
-    });
+        // Calcular valores automáticos da coluna BENCHMARK/PROJEÇÃO
+        switch (row.metric) {
+          case 'Impressões':
+            const investmentBench = parseCurrency(currentData.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
+            const cpmBench = parseCurrency(currentData.find(r => r.metric === 'CPM')?.benchmark || '0');
+            if (cpmBench > 0) {
+              newRow.benchmark = Math.round(investmentBench * 1000 / cpmBench).toString();
+            }
+            break;
+          // CPC é editável, não calculado automaticamente
+          // case 'CPC':
+          //   const investmentBench2 = parseCurrency(currentData.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
+          //   const cliquesBench = parseNumber(currentData.find(r => r.metric === 'Cliques')?.benchmark || '0');
+          //   if (cliquesBench > 0) {
+          //     newRow.benchmark = formatCurrency(investmentBench2 / cliquesBench);
+          //   }
+          //   break;
+          case 'Cliques':
+            const investmentBench2 = parseCurrency(currentData.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
+            const cpcBench = parseCurrency(currentData.find(r => r.metric === 'CPC')?.benchmark || '0');
+            
+            // 🎯 CORREÇÃO: Calcular Cliques baseado no CPC editado
+            if (cpcBench > 0) {
+              // Se CPC foi editado, calcular Cliques baseado no CPC
+              newRow.benchmark = Math.round(investmentBench2 / cpcBench).toString();
+            } else {
+              // Se CPC não foi editado, calcular baseado em Impressões e CTR (fluxo original)
+              const impressoesBench = parseNumber(currentData.find(r => r.metric === 'Impressões')?.benchmark || '0');
+              const ctrBench = parseNumber(currentData.find(r => r.metric === 'CTR')?.benchmark || '0');
+              if (ctrBench > 0) {
+                newRow.benchmark = Math.round(impressoesBench * ctrBench / 100).toString();
+              }
+            }
+            break;
+
+          case 'Leads / Msgs':
+            const cliquesBench2 = parseNumber(currentData.find(r => r.metric === 'Cliques')?.benchmark || '0');
+            const txMensagensBench = parseNumber(currentData.find(r => r.metric === 'Tx. Mensagens (Leads/Cliques)')?.benchmark || '0');
+            if (txMensagensBench > 0) {
+              newRow.benchmark = Math.round(cliquesBench2 * txMensagensBench / 100).toString();
+            }
+            break;
+          case 'Agendamentos':
+            const leadsBench = parseNumber(currentData.find(r => r.metric === 'Leads / Msgs')?.benchmark || '0');
+            const txAgendamentoBench = parseNumber(currentData.find(r => r.metric === 'Tx. Agendamento (Agend./Leads)')?.benchmark || '0');
+            if (txAgendamentoBench > 0) {
+              newRow.benchmark = Math.round(leadsBench * txAgendamentoBench / 100).toString();
+            }
+            break;
+          case 'Vendas':
+            const txConversaoVendasBench = parseNumber(currentData.find(r => r.metric === 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)')?.benchmark || '0');
+            const txAgendamentoBenchVendas = parseNumber(currentData.find(r => r.metric === 'Tx. Agendamento (Agend./Leads)')?.benchmark || '0');
+            const leadsBenchVendas = parseNumber(currentData.find(r => r.metric === 'Leads / Msgs')?.benchmark || '0');
+            const agendamentosBench = parseNumber(currentData.find(r => r.metric === 'Agendamentos')?.benchmark || '0');
+            
+            if (txConversaoVendasBench > 0) {
+              // 🎯 CORRIGIDO: Fluxo baseado na existência de taxa de agendamento
+              if (txAgendamentoBenchVendas > 0 && agendamentosBench > 0) {
+                // Fluxo COM agendamento: Leads → Agendamentos → Vendas
+                newRow.benchmark = Math.round(agendamentosBench * txConversaoVendasBench / 100).toString();
+              } else {
+                // Fluxo SEM agendamento: Leads → Vendas (direto)
+                newRow.benchmark = Math.round(leadsBenchVendas * txConversaoVendasBench / 100).toString();
+              }
+            }
+            break;
+          case 'CPL (Custo por Lead)':
+            const investmentBench3 = parseCurrency(currentData.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
+            const leadsBench2 = parseNumber(currentData.find(r => r.metric === 'Leads / Msgs')?.benchmark || '0');
+            if (leadsBench2 > 0) {
+              newRow.benchmark = formatCurrency(investmentBench3 / leadsBench2);
+            }
+            break;
+          case 'CPV (Custo por Venda)':
+            const investmentBench4 = parseCurrency(currentData.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
+            const vendasBench2 = parseNumber(currentData.find(r => r.metric === 'Vendas')?.benchmark || '0');
+            if (vendasBench2 > 0) {
+              newRow.benchmark = formatCurrency(investmentBench4 / vendasBench2);
+            }
+            break;
+          case 'Lucro':
+            const vendasBench3 = parseNumber(currentData.find(r => r.metric === 'Vendas')?.benchmark || '0');
+            const investmentBench5 = parseCurrency(currentData.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
+            const receitaBench = vendasBench3 * ticketMedio;
+            newRow.benchmark = formatCurrency(receitaBench - investmentBench5);
+            break;
+          case 'ROI / ROAS':
+            const investmentBench6 = parseCurrency(currentData.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
+            if (investmentBench6 > 0) {
+              const vendasBench4 = parseNumber(currentData.find(r => r.metric === 'Vendas')?.benchmark || '0');
+              const receitaBench2 = vendasBench4 * ticketMedio;
+              const lucroBench = receitaBench2 - investmentBench6;
+              const roiPercentBench = (lucroBench / investmentBench6) * 100;
+              const roiMultiplierBench = (receitaBench2 / investmentBench6);
+              newRow.benchmark = `${roiPercentBench.toFixed(0)}% (${roiMultiplierBench.toFixed(1)}x)`;
+            }
+            break;
+        }
+
+        return newRow;
+      });
+      
+      // Verificar se houve mudanças significativas
+      const hasChanges = currentData.some((row, index) => {
+        const prevRow = previousData[index];
+        return row.benchmark !== prevRow.benchmark || row.realValue !== prevRow.realValue;
+      });
+      
+      if (!hasChanges) {
+        break; // Parar se não houve mudanças
+      }
+      
+      iterations++;
+    }
+    
+    if (iterations >= maxIterations) {
+      console.warn('Cálculo de valores atingiu o limite máximo de iterações');
+    }
+    
+    return currentData;
   };
 
   // Recalcular valores quando ticket médio mudar
@@ -811,13 +1085,30 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     // Só salvar se não for o valor padrão inicial e se há produto/mês selecionado
     if (ticketMedio !== 250 && selectedProduct && selectedMonth) {
       const timeoutId = setTimeout(() => {
-        metricsService.saveMonthlyDetails({
-          month: selectedMonth,
-          product: selectedProduct,
+        // Calcular CPV e ROI para salvar
+        const cpvRow = tableData.find(r => r.metric === 'CPV' || r.metric === 'CPV (Custo por Venda)');
+        const roiRow = tableData.find(r => r.metric === 'ROI' || r.metric === 'ROI/ROAS' || r.metric === 'ROI / ROAS');
+        
+        const cpv = parseNumber(cpvRow?.realValue || '0');
+        const roiValue = saveROIValue(roiRow?.realValue || '0% (0.0x)');
+        
+        console.log('🔍 DEBUG - MonthlyDetailsTable - Salvando ticket médio com CPV/ROI:', {
           agendamentos: savedDetails.agendamentos,
           vendas: savedDetails.vendas,
-          ticketMedio: ticketMedio
-        }).catch(error => {
+          ticketMedio: ticketMedio,
+          cpv,
+          roi: roiValue
+        });
+        
+                           metricsService.saveMonthlyDetails({
+                     month: selectedMonth,
+                     product: selectedProduct,
+                     agendamentos: savedDetails.agendamentos,
+                     vendas: savedDetails.vendas,
+                     ticketMedio: ticketMedio,
+                     cpv: cpv,
+                     roi: roiValue
+                   }).catch(error => {
           console.error('Erro ao salvar ticket médio:', error);
         });
       }, 500); // Debounce de 500ms
@@ -980,28 +1271,52 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         saveBenchmarkValues(recalculatedData);
       }
       
-      // Salvar no Firebase e notificar sobre mudanças se for agendamentos ou vendas
+      // Notificar mudanças se for agendamentos ou vendas (agora calculados automaticamente)
       if (row.metric === 'Agendamentos' || row.metric === 'Vendas') {
         const agendamentos = parseNumber(recalculatedData.find(r => r.metric === 'Agendamentos')?.realValue || '0');
         const vendas = parseNumber(recalculatedData.find(r => r.metric === 'Vendas')?.realValue || '0');
         
-        // Salvar no Firebase (vinculado apenas ao produto)
+        // Calcular CPV e ROI para salvar
+        const cpvRow = recalculatedData.find(r => r.metric === 'CPV' || r.metric === 'CPV (Custo por Venda)');
+        const roiRow = recalculatedData.find(r => r.metric === 'ROI' || r.metric === 'ROI/ROAS' || r.metric === 'ROI / ROAS');
+        
+        const cpv = parseNumber(cpvRow?.realValue || '0');
+        const roiValue = saveROIValue(roiRow?.realValue || '0% (0.0x)');
+        
+        console.log('🔍 DEBUG - MonthlyDetailsTable - Salvando dados com CPV/ROI:', {
+          agendamentos,
+          vendas,
+          cpv,
+          roi: roiValue,
+          ticketMedio
+        });
+        
+        // Salvar no Firebase
         if (selectedProduct && selectedMonth) {
-          metricsService.saveMonthlyDetails({
+          console.log('🔍 DEBUG - MonthlyDetailsTable - Salvando dados FINAIS:', {
             month: selectedMonth,
             product: selectedProduct,
-            agendamentos,
-            vendas,
-            ticketMedio
-          }).catch(error => {
-            console.error('Erro ao salvar detalhes:', error);
+            agendamentos: agendamentos,
+            vendas: vendas,
+            ticketMedio: ticketMedio,
+            cpv: cpv,
+            roi: roi
+          });
+          
+                           metricsService.saveMonthlyDetails({
+                   month: selectedMonth,
+                   product: selectedProduct,
+                   agendamentos: agendamentos,
+                   vendas: vendas,
+                   ticketMedio: ticketMedio,
+                   cpv: cpv,
+                   roi: roiValue
+                 }).catch(error => {
+            console.error('Erro ao salvar valores de agendamentos/vendas:', error);
           });
         }
         
-        // Atualizar estado local
-        setSavedDetails({ agendamentos, vendas, ticketMedio });
-        
-        // Notificar componente pai
+        // Notificar componente pai (valores agora vêm dos públicos)
         if (onValuesChange) {
           onValuesChange({ agendamentos, vendas });
         }
@@ -1127,7 +1442,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       'Tx. Conversão Vendas (Vendas/Leads ou Agend.)': 'Porcentagem de leads (venda direta) ou agendamentos (consultoria/demo) que viraram vendas',
       'CPV (Custo por Venda)': 'Quanto você gasta para conseguir cada venda',
       'Lucro': 'Receita total menos o investimento em anúncios',
-      'ROI': 'Retorno sobre investimento. Quanto você ganha de volta para cada real investido'
+      'ROI / ROAS': 'Retorno sobre investimento / Return on Ad Spend. Quanto você ganha de volta para cada real investido'
     };
     return tooltips[metric] || 'Informação sobre esta métrica';
   };
@@ -1170,24 +1485,24 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               ? 'bg-indigo-900/40 border-indigo-400/60 shadow-lg shadow-indigo-500/10' 
               : 'bg-slate-800/80 border-slate-600/50 hover:bg-slate-800/90 hover:border-slate-500/60'
           }`}>
-            <div className="text-sm text-slate-400 font-medium mb-2">Ticket Médio (Bench)</div>
-            
-            {isEditingTicket ? (
-              <input
-                type="text"
-                value={ticketEditValue}
-                onChange={handleTicketInputChange}
-                onKeyDown={handleTicketKeyPress}
-                onBlur={handleTicketSave}
-                className="w-full bg-transparent text-slate-100 border-none outline-none text-lg font-semibold"
-                placeholder="R$ 0,00"
-                autoFocus
-              />
-            ) : (
-              <div className="flex items-center space-x-2">
-                <span className="text-slate-100 font-bold text-xl">
-                  {formatCurrency(ticketMedio)}
-                </span>
+              <div className="text-sm text-slate-400 font-medium mb-2">Ticket Médio (Bench)</div>
+              
+              {isEditingTicket ? (
+                <input
+                  type="text"
+                  value={ticketEditValue}
+                  onChange={handleTicketInputChange}
+                  onKeyDown={handleTicketKeyPress}
+                  onBlur={handleTicketSave}
+                  className="w-full bg-transparent text-slate-100 border-none outline-none text-lg font-semibold"
+                  placeholder="R$ 0,00"
+                  autoFocus
+                />
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <span className="text-slate-100 font-bold text-xl">
+                    {formatCurrency(ticketMedio)}
+                  </span>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -1328,9 +1643,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                               : 'bg-slate-700/60 cursor-pointer hover:bg-emerald-900/30 transition-all duration-200 border-l-4 border-transparent hover:border-emerald-400/60'
                             : 'bg-slate-800/40 border-l-4 border-blue-500/30'
                         }`}
-                        onClick={() => handleCellClick(globalIndex, 'realValue', row.realValue)}
-                        onMouseEnter={() => row.realValueEditable && setIsHovered({rowIndex: globalIndex, field: 'realValue'})}
-                        onMouseLeave={() => setIsHovered(null)}
+                        onClick={row.realValueEditable ? () => handleCellClick(globalIndex, 'realValue', row.realValue) : undefined}
+                        onMouseEnter={row.realValueEditable ? () => setIsHovered({rowIndex: globalIndex, field: 'realValue'}) : undefined}
+                        onMouseLeave={row.realValueEditable ? () => setIsHovered(null) : undefined}
                       >
                         {editingCell?.rowIndex === globalIndex && editingCell?.field === 'realValue' ? (
                           <input
@@ -1351,41 +1666,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                               {!row.realValueEditable && (
                                 <div className="flex items-center space-x-1">
                                   <span className="text-xs text-blue-400 font-medium">Sincronizado</span>
+                                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
                                 </div>
-                              )}
-                              {row.metric === 'Vendas' && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSalesAuto(prev => !prev);
-                                  }}
-                                  className={`inline-flex items-center justify-center rounded-full p-1.5 transition-all duration-200 ${
-                                    salesAuto 
-                                      ? 'bg-blue-900/40 hover:bg-blue-800/50 border border-blue-500/30' 
-                                      : 'bg-emerald-900/40 hover:bg-emerald-800/50 border border-emerald-500/30'
-                                  }`}
-                                  title={salesAuto ? 'Sincronizando automaticamente (clique para editar manualmente)' : 'Editando manualmente (clique para sincronizar automaticamente)'}
-                                >
-                                  {salesAuto ? <Edit3 className="w-4 h-4 text-blue-400" /> : <Edit3 className="w-4 h-4 text-emerald-400" />}
-                                </button>
-                              )}
-                              {row.metric === 'Agendamentos' && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleCellClick(globalIndex, 'realValue', row.realValue);
-                                  }}
-                                  className={`inline-flex items-center justify-center rounded-full p-1.5 transition-all duration-200 ${
-                                    agendamentosAuto 
-                                      ? 'bg-blue-900/40 hover:bg-blue-800/50 border border-blue-500/30' 
-                                      : 'bg-emerald-900/40 hover:bg-emerald-800/50 border border-emerald-500/30'
-                                  }`}
-                                  title={agendamentosAuto ? 'Sincronizando automaticamente (clique para editar manualmente)' : 'Editando manualmente (clique para sincronizar automaticamente)'}
-                                >
-                                  {agendamentosAuto ? <Edit3 className="w-4 h-4 text-blue-400" /> : <Edit3 className="w-4 h-4 text-emerald-400" />}
-                                </button>
                               )}
                             </div>
                           </div>

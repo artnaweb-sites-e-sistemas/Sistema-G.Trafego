@@ -11,7 +11,7 @@ interface ShareReportProps {
   selectedClient: string;
   selectedMonth: string;
   hasGeneratedLinks?: boolean;
-  metrics: MetricData[]; // NOVO: Recebe as métricas do dashboard
+  metrics: MetricData[];
   monthlyDetailsValues?: { agendamentos: number; vendas: number };
 }
 
@@ -21,7 +21,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
   selectedClient,
   selectedMonth,
   hasGeneratedLinks = false,
-  metrics, // NOVO
+  metrics,
   monthlyDetailsValues = { agendamentos: 0, vendas: 0 }
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -40,7 +40,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
   // Verificar se já existe um link para a seleção atual
   useEffect(() => {
     const checkExistingLink = () => {
-      if (!selectedAudience || selectedAudience === 'Todos os Públicos') {
+      if (!selectedProduct || selectedProduct === 'Todos os Produtos') {
         setHasLinkForCurrentSelection(false);
         return;
       }
@@ -49,13 +49,11 @@ const ShareReport: React.FC<ShareReportProps> = ({
       const existingLink = allLinks.find(link => {
         try {
           const urlParams = new URLSearchParams(link.originalUrl.split('?')[1] || '');
-          const linkAudience = urlParams.get('audience');
           const linkProduct = urlParams.get('product');
           const linkClient = urlParams.get('client');
           const linkMonth = urlParams.get('month');
 
-          return linkAudience === selectedAudience &&
-                 linkProduct === selectedProduct &&
+          return linkProduct === selectedProduct &&
                  linkClient === selectedClient &&
                  linkMonth === selectedMonth;
         } catch {
@@ -72,39 +70,42 @@ const ShareReport: React.FC<ShareReportProps> = ({
     };
 
     checkExistingLink();
-  }, [selectedAudience, selectedProduct, selectedClient, selectedMonth]);
+  }, [selectedProduct, selectedClient, selectedMonth]);
 
   const generateShareLink = async () => {
     setIsGenerating(true);
     try {
-          // Salvar métricas atuais no Firebase
-    if (metrics && metrics.length > 0) {
-      for (const metric of metrics) {
-        await metricsService.addMetric(metric);
+      // Salvar métricas atuais no Firebase
+      if (metrics && metrics.length > 0) {
+        for (const metric of metrics) {
+          await metricsService.addMetric(metric);
+        }
       }
-    }
-    
-    // Salvar detalhes mensais atuais no Firebase (vinculado apenas ao produto)
-    if (monthlyDetailsValues && selectedProduct && selectedProduct !== 'Todos os Produtos' && (monthlyDetailsValues.agendamentos > 0 || monthlyDetailsValues.vendas > 0)) {
-      await metricsService.saveMonthlyDetails({
-        month: selectedMonth,
-        product: selectedProduct,
-        agendamentos: monthlyDetailsValues.agendamentos,
-        vendas: monthlyDetailsValues.vendas
-      });
-    }
+      
+      // Salvar detalhes mensais atuais no Firebase (vinculado apenas ao produto)
+      if (monthlyDetailsValues && selectedProduct && selectedProduct !== 'Todos os Produtos' && (monthlyDetailsValues.agendamentos > 0 || monthlyDetailsValues.vendas > 0)) {
+        await metricsService.saveMonthlyDetails({
+          month: selectedMonth,
+          product: selectedProduct,
+          agendamentos: monthlyDetailsValues.agendamentos,
+          vendas: monthlyDetailsValues.vendas
+        });
+      }
+      
       // Simular geração de link (em produção, isso seria uma chamada para a API)
       await new Promise(resolve => setTimeout(resolve, 1000));
+      
       // Criar link curto usando o serviço com valores dos detalhes mensais
       const shareLink = shareService.createShareLink({
-        audience: selectedAudience,
         product: selectedProduct,
         client: selectedClient,
         month: selectedMonth,
         monthlyDetails: monthlyDetailsValues
       });
+      
       setGeneratedLink(shareLink);
       setHasLinkForCurrentSelection(true);
+      
       // Emitir evento para notificar que um link foi gerado
       window.dispatchEvent(new CustomEvent('linkGenerated', {
         detail: { shareLink }
@@ -164,30 +165,45 @@ const ShareReport: React.FC<ShareReportProps> = ({
         }
       }
     
-    // Atualizar detalhes mensais no Firebase (vinculado apenas ao produto)
-    if (monthlyDetailsValues && selectedProduct && selectedProduct !== 'Todos os Produtos' && (monthlyDetailsValues.agendamentos > 0 || monthlyDetailsValues.vendas > 0)) {
-      await metricsService.saveMonthlyDetails({
-        month: selectedMonth,
-        product: selectedProduct,
-        agendamentos: monthlyDetailsValues.agendamentos,
-        vendas: monthlyDetailsValues.vendas
-      });
-    }
+      // Atualizar detalhes mensais no Firebase (vinculado apenas ao produto)
+      if (monthlyDetailsValues && selectedProduct && selectedProduct !== 'Todos os Produtos' && (monthlyDetailsValues.agendamentos > 0 || monthlyDetailsValues.vendas > 0)) {
+        await metricsService.saveMonthlyDetails({
+          month: selectedMonth,
+          product: selectedProduct,
+          agendamentos: monthlyDetailsValues.agendamentos,
+          vendas: monthlyDetailsValues.vendas
+        });
+      }
+      
       // Simular atualização (em produção, isso sincronizaria com Meta Ads)
       await new Promise(resolve => setTimeout(resolve, 1000));
+      
       // Atualizar o link com os parâmetros atuais e valores dos detalhes mensais
       const updatedLink = shareService.updateShareLink(generatedLink.shortCode, {
-        audience: selectedAudience,
         product: selectedProduct,
         client: selectedClient,
         month: selectedMonth,
         monthlyDetails: monthlyDetailsValues
       });
+      
       if (updatedLink) {
         setGeneratedLink(updatedLink);
 
         // Limpar cache de métricas e notificar o Dashboard para recarregar
         metricsService.clearCache();
+        
+        // Disparar evento para notificar que o relatório foi atualizado
+        window.dispatchEvent(new CustomEvent('reportUpdated', {
+          detail: {
+            type: 'reportUpdated',
+            timestamp: Date.now(),
+            source: 'shareReport',
+            month: selectedMonth,
+            client: selectedClient,
+            product: selectedProduct
+          }
+        }));
+        console.log('ShareReport: Evento reportUpdated disparado após atualização');
         
         // Aguardar um pouco para garantir que os dados foram persistidos no Firebase
         setTimeout(() => {
@@ -216,9 +232,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
     }
   };
 
-  const isDisabled = selectedAudience === 'Todos os Públicos' ||
-                    selectedAudience === '' ||
-                    selectedProduct === 'Todos os Produtos' || 
+  const isDisabled = selectedProduct === 'Todos os Produtos' || 
                     selectedProduct === '' ||
                     selectedClient === 'Todos os Clientes' ||
                     selectedClient === '';
@@ -268,10 +282,6 @@ const ShareReport: React.FC<ShareReportProps> = ({
               <h3 className="text-slate-100 font-medium mb-3">Relatório Selecionado</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex flex-col">
-                  <span className="text-slate-400">Público:</span>
-                  <span className="text-slate-200 font-medium">{selectedAudience}</span>
-                </div>
-                <div className="flex flex-col">
                   <span className="text-slate-400">Produto:</span>
                   <span className="text-slate-200 font-medium">{selectedProduct}</span>
                 </div>
@@ -286,13 +296,11 @@ const ShareReport: React.FC<ShareReportProps> = ({
               </div>
             </div>
 
-
-
             {/* Geração do Link */}
             {!generatedLink ? (
               <div className="space-y-4">
                 <div className="text-center">
-                  <p className="text-slate-400 mb-4">Gere um link personalizado para compartilhar este relatório</p>
+                  <p className="text-slate-400 mb-4">Gere um link personalizado para compartilhar o relatório desta campanha</p>
                   <button
                     onClick={generateShareLink}
                     disabled={isGenerating}
@@ -310,7 +318,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
                     ) : (
                       <>
                         <Link className="w-4 h-4" />
-                        <span>Gerar Link de Compartilhamento</span>
+                        <span>Gerar Link da Campanha</span>
                       </>
                     )}
                   </button>
@@ -419,7 +427,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
             ? 'bg-green-600 hover:bg-green-700 text-white'
             : 'bg-gray-600 hover:bg-gray-700 text-gray-300 hover:text-white'
         }`}
-        title={isDisabled ? 'Selecione um público específico para compartilhar' : 'Compartilhar Relatório'}
+        title={isDisabled ? 'Selecione um produto específico para compartilhar' : 'Compartilhar Relatório'}
       >
         <Share2 className="w-5 h-5" />
         
@@ -438,4 +446,4 @@ const ShareReport: React.FC<ShareReportProps> = ({
   );
 };
 
-export default ShareReport; 
+export default ShareReport;

@@ -699,11 +699,25 @@ const PublicReportView: React.FC = () => {
             }
         });
         
-        // Carregar métricas públicas
+        // Carregar métricas públicas - priorizar dados da campanha (produto)
         console.log('PublicReportView: Carregando métricas para:', { month, client, product, audience });
-        const data = await metricsService.getPublicMetrics(month, client, product, audience);
-        console.log('PublicReportView: Métricas carregadas:', data.length, 'registros');
-        setMetrics(data);
+        
+        // Se temos um produto específico, carregar dados da campanha
+        if (product && product !== 'Todos os Produtos' && product !== '') {
+          const data = await metricsService.getPublicMetrics(month, client, product, 'Todos os Públicos');
+          console.log('PublicReportView: Métricas da campanha carregadas:', data.length, 'registros');
+          setMetrics(data);
+        } else if (audience && audience !== 'Todos os Públicos' && audience !== '') {
+          // Fallback para dados do público se não há produto específico
+          const data = await metricsService.getPublicMetrics(month, client, 'Todos os Produtos', audience);
+          console.log('PublicReportView: Métricas do público carregadas:', data.length, 'registros');
+          setMetrics(data);
+        } else {
+          // Carregar dados gerais
+          const data = await metricsService.getPublicMetrics(month, client, 'Todos os Produtos', 'Todos os Públicos');
+          console.log('PublicReportView: Métricas gerais carregadas:', data.length, 'registros');
+          setMetrics(data);
+        }
         
         // Sempre tentar buscar detalhes mensais mais recentes salvos no Firebase
         if (product && month) {
@@ -799,9 +813,9 @@ const PublicReportView: React.FC = () => {
         // Tratar diferentes formatos de data que podem vir do Firebase
         if (m.updatedAt instanceof Date) {
           date = m.updatedAt;
-        } else if (typeof m.updatedAt === 'object' && m.updatedAt.toDate) {
+        } else if (m.updatedAt && typeof m.updatedAt === 'object' && 'toDate' in m.updatedAt) {
           // Timestamp do Firestore
-          date = m.updatedAt.toDate();
+          date = (m.updatedAt as any).toDate();
         } else if (typeof m.updatedAt === 'string' || typeof m.updatedAt === 'number') {
           // String ou timestamp em milliseconds
           date = new Date(m.updatedAt);
@@ -885,17 +899,12 @@ const PublicReportView: React.FC = () => {
         <div className="bg-slate-800/20 rounded-lg p-4 mb-6 border border-slate-700/10">
           <div className="flex items-center space-x-2 mb-4">
             <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-            <h1 className="text-lg font-medium text-slate-300">Relatório Compartilhado</h1>
+            <h1 className="text-lg font-medium text-slate-300">Relatório da Campanha</h1>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             <div className="p-3 bg-slate-700/10 rounded-lg border border-slate-600/5">
-              <p className="text-slate-500 text-xs mb-1">Público</p>
-              <p className="text-slate-300 font-medium text-sm leading-relaxed">{reportInfo.audience}</p>
-            </div>
-            
-            <div className="p-3 bg-slate-700/10 rounded-lg border border-slate-600/5">
-              <p className="text-slate-500 text-xs mb-1">Produto</p>
+              <p className="text-slate-500 text-xs mb-1">Campanha</p>
               <p className="text-slate-300 font-medium text-sm leading-relaxed">{reportInfo.product}</p>
             </div>
             

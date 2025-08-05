@@ -32,10 +32,36 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
   // Estados para controlar origem dos dados
   const [dataSource, setDataSource] = useState<'manual' | 'facebook' | null>(null);
   const [isFacebookConnected, setIsFacebookConnected] = useState(false);
+  
+  // Estados para rate limit
+  const [rateLimitStatus, setRateLimitStatus] = useState<{
+    attempts: number;
+    maxAttempts: number;
+    canAttempt: boolean;
+    nextAttemptDelay?: number;
+    facebookRateLimit?: boolean;
+    facebookRateLimitUntil?: number;
+  } | null>(null);
 
   useEffect(() => {
     setMounted(true);
     return () => setMounted(false);
+  }, []);
+
+  // Atualizar status do rate limit periodicamente
+  useEffect(() => {
+    const updateRateLimitStatus = async () => {
+      const status = await metaAdsService.getOAuthRateLimitStatus();
+      setRateLimitStatus(status);
+    };
+
+    // Atualizar imediatamente
+    updateRateLimitStatus();
+
+    // Atualizar a cada 30 segundos
+    const interval = setInterval(updateRateLimitStatus, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -144,11 +170,18 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
   const handleFacebookLogin = async () => {
     setIsLoading(true);
     try {
-
+      // Verificar rate limit antes de tentar login
+      const rateLimitStatus = await metaAdsService.getOAuthRateLimitStatus();
+      
+      if (!rateLimitStatus.canAttempt) {
+        const minutes = Math.ceil((rateLimitStatus.nextAttemptDelay || 0) / 60000);
+        alert(`Rate limit do OAuth excedido. Tente novamente em ${minutes} minutos.`);
+        setIsLoading(false);
+        return;
+      }
       
       // Usar o serviço para fazer login
       const user = await metaAdsService.loginWithFacebook();
-      
       
       setUser(user);
       
@@ -168,7 +201,11 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
       // Mostrar mensagem de erro mais amigável
       let errorMessage = 'Erro ao fazer login com o Facebook.';
       
-      if (error.message.includes('não autorizado')) {
+      if (error.message.includes('rate limit') || error.message.includes('exceeded')) {
+        const rateLimitStatus = metaAdsService.getOAuthRateLimitStatus();
+        const minutes = Math.ceil((rateLimitStatus.nextAttemptDelay || 0) / 60000);
+        errorMessage = `Rate limit do OAuth excedido. Tente novamente em ${minutes} minutos.`;
+      } else if (error.message.includes('não autorizado')) {
         errorMessage = 'Login não autorizado. Verifique se você concedeu as permissões necessárias.';
       } else if (error.message.includes('cancelado')) {
         errorMessage = 'Login cancelado pelo usuário.';
@@ -644,10 +681,62 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
                     </p>
                   </div>
 
+                  {/* Informações sobre Rate Limit */}
+                  {rateLimitStatus && !rateLimitStatus.canAttempt && (
+                    <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-4 mb-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-yellow-500 font-medium">
+                          {rateLimitStatus.facebookRateLimit ? 'Rate Limit do Facebook' : 'Rate Limit Local'}
+                        </span>
+                      </div>
+                      
+                      {rateLimitStatus.facebookRateLimit ? (
+                        <div>
+                          <p className="text-yellow-400 text-sm mb-3">
+                            O Facebook está limitando as tentativas de login. Aguarde 30 minutos antes de tentar novamente.
+                          </p>
+                          <p className="text-yellow-300 text-xs mb-3">
+                            ⚠️ Este é um limite do Facebook, não do nosso sistema. Fazer logout/reconectar não resolve.
+                          </p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-yellow-400 text-sm mb-3">
+                            Você atingiu o limite local de tentativas. Tente novamente em {Math.ceil((rateLimitStatus.nextAttemptDelay || 0) / 60000)} minutos.
+                          </p>
+                          <button
+                            onClick={() => metaAdsService.resetOAuthRateLimit()}
+                            className="text-yellow-400 hover:text-yellow-300 text-sm underline"
+                          >
+                            Resetar contador (apenas se necessário)
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Status do Rate Limit */}
+                  {rateLimitStatus && rateLimitStatus.canAttempt && rateLimitStatus.attempts > 0 && (
+                    <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-3 mb-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-blue-400">Tentativas de login: {rateLimitStatus.attempts}/{rateLimitStatus.maxAttempts}</span>
+                        <div className="w-20 bg-gray-700 rounded-full h-2">
+                          <div 
+                            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${(rateLimitStatus.attempts / rateLimitStatus.maxAttempts) * 100}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Botão de Login */}
                   <button
                     onClick={handleFacebookLogin}
-                    disabled={isLoading}
+                    disabled={isLoading || (rateLimitStatus && !rateLimitStatus.canAttempt)}
                     className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-4 rounded-xl flex items-center justify-center space-x-3 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] facebook-modal-btn"
                   >
                     {isLoading ? (

@@ -4,6 +4,7 @@ import Header from './Header';
 import MetricsGrid from './MetricsGrid';
 import DailyControlTable from './DailyControlTable';
 import MonthlyDetailsTable from './MonthlyDetailsTable';
+import AudienceDetailsTable from './AudienceDetailsTable';
 import InsightsSection from './InsightsSection';
 import HistorySection from './HistorySection';
 import ShareReport from './ShareReport';
@@ -36,6 +37,11 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Estados para filtros do dashboard
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
   const [selectedClient, setSelectedClient] = useState('Selecione um cliente');
+
+  // Debug: verificar mudanças no selectedClient
+  useEffect(() => {
+    console.log('🔍 DEBUG - Dashboard - selectedClient alterado para:', selectedClient);
+  }, [selectedClient]);
   const [selectedProduct, setSelectedProduct] = useState('');
   const [selectedAudience, setSelectedAudience] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState('');
@@ -44,6 +50,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [monthlyDetailsValues, setMonthlyDetailsValues] = useState({ agendamentos: 0, vendas: 0 });
+  const [realValuesForClient, setRealValuesForClient] = useState({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0%' });
+  const [realValuesRefreshTrigger, setRealValuesRefreshTrigger] = useState(0);
   const [aiBenchmarkResults, setAiBenchmarkResults] = useState<BenchmarkResults | null>(null);
 
   // Garantir que o mês selecionado seja sempre válido
@@ -94,6 +102,203 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
     loadMetrics();
   }, [selectedMonth, selectedClient, selectedProduct, selectedAudience, selectedCampaign, refreshTrigger, dataSource, isFacebookConnected]);
+
+  // Carregar valores reais de agendamentos e vendas do cliente
+  useEffect(() => {
+    console.log('🔍 DEBUG - Dashboard - useEffect loadRealValuesForClient INICIADO');
+    console.log('🔍 DEBUG - Dashboard - Estados atuais:', { selectedClient, selectedMonth, realValuesRefreshTrigger });
+    console.log('🔍 DEBUG - Dashboard - Stack trace:', new Error().stack?.split('\n').slice(1, 4).join('\n'));
+    
+    const loadRealValuesForClient = async () => {
+      console.log('🔍 DEBUG - Dashboard - useEffect loadRealValuesForClient executado');
+      console.log('🔍 DEBUG - Dashboard - selectedClient:', selectedClient);
+      console.log('🔍 DEBUG - Dashboard - selectedMonth:', selectedMonth);
+      console.log('🔍 DEBUG - Dashboard - realValuesRefreshTrigger:', realValuesRefreshTrigger);
+      
+      if (selectedClient && selectedClient !== 'Selecione um cliente' && selectedClient !== 'Todos os Clientes') {
+        try {
+          console.log('🔍 DEBUG - Dashboard - Carregando valores reais para cliente:', selectedClient);
+          
+          // Debug: verificar dados na coleção monthlyDetails
+          console.log('🔍 DEBUG - Dashboard - Verificando dados na coleção monthlyDetails...');
+          await metricsService.debugMonthlyDetails(selectedMonth);
+          
+          console.log('🔍 DEBUG - Dashboard - Chamando getRealValuesForClient...');
+          const realValues = await metricsService.getRealValuesForClient(selectedMonth, selectedClient);
+          console.log('🔍 DEBUG - Dashboard - Resultado da busca:', realValues);
+          console.log('🔍 DEBUG - Dashboard - Tipo do resultado:', typeof realValues);
+          console.log('🔍 DEBUG - Dashboard - Estrutura do resultado:', JSON.stringify(realValues, null, 2));
+          console.log('🔍 DEBUG - Dashboard - Valores CPV e ROI:', {
+            cpv: realValues.cpv,
+            roi: realValues.roi,
+            cpvType: typeof realValues.cpv,
+            roiType: typeof realValues.roi
+          });
+          
+          // Se não há dados para o mês atual, verificar outros meses
+          if (realValues.agendamentos === 0 && realValues.vendas === 0) {
+            console.log('🔍 DEBUG - Dashboard - Nenhum dado encontrado para o mês atual, verificando outros meses...');
+            const monthsWithData = await metricsService.checkClientDataInOtherMonths(selectedClient);
+            
+            if (monthsWithData.length > 0) {
+              console.log('🔍 DEBUG - Dashboard - Dados encontrados em outros meses:', monthsWithData);
+              // Usar dados do primeiro mês disponível
+              const firstMonth = monthsWithData[0];
+              const realValuesFromOtherMonth = await metricsService.getRealValuesForClient(firstMonth, selectedClient);
+              console.log('🔍 DEBUG - Dashboard - Definindo valores do outro mês:', realValuesFromOtherMonth);
+              setRealValuesForClient(realValuesFromOtherMonth);
+              console.log('🔍 DEBUG - Dashboard - Usando dados do mês:', firstMonth, realValuesFromOtherMonth);
+            } else {
+              console.log('🔍 DEBUG - Dashboard - Nenhum dado encontrado em nenhum mês, criando dados de teste...');
+              // Criar dados de teste
+              await metricsService.createTestDataForClient(selectedClient, selectedMonth);
+              const testValues = await metricsService.getRealValuesForClient(selectedMonth, selectedClient);
+              console.log('🔍 DEBUG - Dashboard - Definindo valores de teste:', testValues);
+              setRealValuesForClient(testValues);
+              console.log('🔍 DEBUG - Dashboard - Dados de teste criados:', testValues);
+            }
+          } else {
+            console.log('🔍 DEBUG - Dashboard - Definindo valores reais:', realValues);
+            setRealValuesForClient({
+          agendamentos: realValues.agendamentos,
+          vendas: realValues.vendas,
+          cpv: realValues.cpv,
+          roi: typeof realValues.roi === 'string' ? realValues.roi : `${realValues.roi}%`
+        });
+            console.log('🔍 DEBUG - Dashboard - Valores reais carregados:', realValues);
+          }
+        } catch (error) {
+          console.error('🔍 DEBUG - Dashboard - Erro ao carregar valores reais do cliente:', error);
+          console.error('🔍 DEBUG - Dashboard - Stack trace do erro:', error instanceof Error ? error.stack : 'N/A');
+          setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: 0 });
+        }
+      } else {
+        console.log('🔍 DEBUG - Dashboard - Cliente não selecionado ou inválido');
+        console.log('🔍 DEBUG - Dashboard - selectedClient:', selectedClient);
+        setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: 0 });
+      }
+    };
+
+    loadRealValuesForClient();
+  }, [selectedMonth, selectedClient, realValuesRefreshTrigger]);
+
+  // Listener para atualizar valores reais quando dados dos públicos mudarem
+  useEffect(() => {
+    const handleAudienceDetailsSaved = (event: CustomEvent) => {
+      console.log('🔍 DEBUG - Dashboard - Evento audienceDetailsSaved recebido:', event.detail);
+      
+      if (event.detail && event.detail.client === selectedClient && event.detail.month === selectedMonth) {
+        console.log('🔍 DEBUG - Dashboard - Evento corresponde ao cliente/mês atual, recarregando valores reais...');
+        
+        // Forçar recarregamento dos valores reais usando o trigger
+        setRealValuesRefreshTrigger(prev => prev + 1);
+        console.log('🔍 DEBUG - Dashboard - Trigger de refresh dos valores reais acionado');
+      }
+    };
+
+    window.addEventListener('audienceDetailsSaved', handleAudienceDetailsSaved as EventListener);
+    
+    return () => {
+      window.removeEventListener('audienceDetailsSaved', handleAudienceDetailsSaved as EventListener);
+    };
+  }, [selectedMonth, selectedClient]);
+
+  // Listener para mudanças na planilha detalhes mensais
+  useEffect(() => {
+    const handleMonthlyDetailsChanged = (event: CustomEvent) => {
+      console.log('🔍 DEBUG - Dashboard - Evento monthlyDetailsChanged recebido:', event.detail);
+
+      if (event.detail && event.detail.month === selectedMonth) {
+        console.log('🔍 DEBUG - Dashboard - Planilha detalhes mensais alterada, recarregando valores reais...');
+
+        // Forçar recarregamento dos valores reais usando o trigger
+        setRealValuesRefreshTrigger(prev => prev + 1);
+        console.log('🔍 DEBUG - Dashboard - Trigger de refresh dos valores reais acionado (planilha)');
+      }
+    };
+
+    window.addEventListener('monthlyDetailsChanged', handleMonthlyDetailsChanged as EventListener);
+
+    return () => {
+      window.removeEventListener('monthlyDetailsChanged', handleMonthlyDetailsChanged as EventListener);
+    };
+  }, [selectedMonth, selectedClient]);
+
+  // Listener para mudanças nas campanhas (valores editados na planilha)
+  useEffect(() => {
+    const handleCampaignValuesChanged = (event: CustomEvent) => {
+      console.log('🔍 DEBUG - Dashboard - Evento campaignValuesChanged recebido:', event.detail);
+      console.log('🔍 DEBUG - Dashboard - Mês do evento:', event.detail?.month);
+      console.log('🔍 DEBUG - Dashboard - Mês selecionado:', selectedMonth);
+      console.log('🔍 DEBUG - Dashboard - Cliente selecionado:', selectedClient);
+
+      if (event.detail && event.detail.month === selectedMonth) {
+        console.log('🔍 DEBUG - Dashboard - Valores das campanhas alterados, recarregando valores reais...');
+
+        // Forçar recarregamento dos valores reais usando o trigger
+        setRealValuesRefreshTrigger(prev => {
+          const newValue = prev + 1;
+          console.log('🔍 DEBUG - Dashboard - Trigger incrementado de', prev, 'para', newValue, '(campanhas)');
+          return newValue;
+        });
+        console.log('🔍 DEBUG - Dashboard - Trigger de refresh dos valores reais acionado (campanhas)');
+      } else {
+        console.log('🔍 DEBUG - Dashboard - Evento não corresponde ao mês/cliente atual');
+      }
+    };
+
+    console.log('🔍 DEBUG - Dashboard - Registrando listener para campaignValuesChanged');
+    window.addEventListener('campaignValuesChanged', handleCampaignValuesChanged as EventListener);
+
+    return () => {
+      console.log('🔍 DEBUG - Dashboard - Removendo listener para campaignValuesChanged');
+      window.removeEventListener('campaignValuesChanged', handleCampaignValuesChanged as EventListener);
+    };
+  }, [selectedMonth, selectedClient]);
+
+  // Listener para quando o relatório é atualizado
+  useEffect(() => {
+    const handleReportUpdated = (event: CustomEvent) => {
+      console.log('🔍 DEBUG - Dashboard - Evento reportUpdated recebido:', event.detail);
+
+      console.log('🔍 DEBUG - Dashboard - Relatório atualizado, recarregando valores reais...');
+
+      // Forçar recarregamento dos valores reais usando o trigger
+      setRealValuesRefreshTrigger(prev => prev + 1);
+      console.log('🔍 DEBUG - Dashboard - Trigger de refresh dos valores reais acionado (relatório atualizado)');
+    };
+
+    window.addEventListener('reportUpdated', handleReportUpdated as EventListener);
+
+    return () => {
+      window.removeEventListener('reportUpdated', handleReportUpdated as EventListener);
+    };
+  }, []);
+
+  // Listener para quando o cliente é selecionado/changado
+  useEffect(() => {
+    const handleClientSelectionChanged = () => {
+      console.log('🔍 DEBUG - Dashboard - Cliente selecionado/changado, forçando refresh dos valores reais...');
+      console.log('🔍 DEBUG - Dashboard - Cliente selecionado:', selectedClient);
+      console.log('🔍 DEBUG - Dashboard - Mês selecionado:', selectedMonth);
+      
+      // Forçar recarregamento dos valores reais usando o trigger
+      setRealValuesRefreshTrigger(prev => {
+        const newValue = prev + 1;
+        console.log('🔍 DEBUG - Dashboard - Trigger incrementado de', prev, 'para', newValue);
+        return newValue;
+      });
+      console.log('🔍 DEBUG - Dashboard - Trigger de refresh dos valores reais acionado (seleção de cliente)');
+    };
+
+    // Disparar evento quando selectedClient mudar
+    if (selectedClient && selectedClient !== 'Selecione um cliente' && selectedClient !== 'Todos os Clientes') {
+      console.log('🔍 DEBUG - Dashboard - Cliente válido selecionado, executando handleClientSelectionChanged...');
+      handleClientSelectionChanged();
+    } else {
+      console.log('🔍 DEBUG - Dashboard - Cliente inválido ou não selecionado:', selectedClient);
+    }
+  }, [selectedClient]);
 
   // Listener para seleção de Business Manager
   useEffect(() => {
@@ -235,14 +440,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Listener para atualizações do Meta Ads
   useEffect(() => {
     const handleMetaAdsDataRefreshed = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { type, timestamp } = customEvent.detail;
-  
-      
       // Forçar refresh das métricas quando dados são atualizados
       setRefreshTrigger(prev => prev + 1);
-      
-  
     };
 
     window.addEventListener('metaAdsDataRefreshed', handleMetaAdsDataRefreshed);
@@ -255,10 +454,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Listener para logout do Meta Ads
   useEffect(() => {
     const handleMetaAdsLoggedOut = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { timestamp } = customEvent.detail;
-  
-      
       // Limpar dados do dashboard quando Meta Ads desconecta
       setSelectedClient('Selecione um cliente');
       setSelectedProduct('Todos os Produtos');
@@ -274,8 +469,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       localStorage.removeItem('selectedCampaignId');
       // Forçar refresh para garantir limpeza
       setRefreshTrigger(prev => prev + 1);
-      
-  
     };
 
     window.addEventListener('metaAdsLoggedOut', handleMetaAdsLoggedOut);
@@ -288,19 +481,12 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Listener para carregar métricas de todas as campanhas
   useEffect(() => {
     const handleLoadAllCampaignsMetrics = async (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { clientName, source, adAccount } = customEvent.detail;
-      
-      
-      
       try {
         const { metricsService } = await import('../services/metricsService');
         metricsService.clearCache();
 
-        
         // Forçar refresh das métricas
         setRefreshTrigger(prev => prev + 1);
-  
       } catch (error) {
         console.warn('🔴 Dashboard: Erro ao carregar métricas de todas as campanhas:', error);
       }
@@ -461,7 +647,21 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
               <>
                 {/* Lógica condicional para renderização das seções */}
                 {selectedAudience && selectedAudience !== 'Todos os Públicos' ? (
-                  <DailyControlTable metrics={metrics} selectedCampaign={selectedCampaign} selectedMonth={selectedMonth} />
+                  <>
+                    <AudienceDetailsTable 
+                      metrics={metrics} 
+                      selectedAudience={selectedAudience} 
+                      selectedProduct={selectedProduct}
+                      selectedClient={selectedClient}
+                      selectedMonth={selectedMonth} 
+                    />
+                    <DailyControlTable 
+                      metrics={metrics} 
+                      selectedCampaign={selectedCampaign} 
+                      selectedMonth={selectedMonth}
+                      selectedAudience={selectedAudience}
+                    />
+                  </>
                 ) : selectedProduct && selectedProduct !== 'Todos os Produtos' ? (
                   <>
                     <AIBenchmark 
@@ -479,7 +679,15 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                     <InsightsSection />
                   </>
                 ) : (
-                  <MetricsGrid metrics={metrics} />
+                              <MetricsGrid 
+              metrics={metrics} 
+              selectedClient={selectedClient}
+              selectedMonth={selectedMonth}
+              realAgendamentos={realValuesForClient.agendamentos}
+              realVendas={realValuesForClient.vendas}
+              realCPV={realValuesForClient.cpv}
+              realROI={realValuesForClient.roi}
+            />
                 )}
               </>
             )}

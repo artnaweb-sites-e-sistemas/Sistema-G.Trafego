@@ -6,7 +6,10 @@ import {
   updateDoc, 
   query, 
   where, 
-  orderBy 
+  orderBy,
+  getDoc,
+  setDoc,
+  deleteDoc
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { metaAdsService } from './metaAdsService';
@@ -708,6 +711,15 @@ export const metricsService = {
     }
   },
 
+  // Função para sanitizar IDs de documentos (remover caracteres especiais)
+  sanitizeDocumentId(str: string): string {
+    return str
+      .replace(/[\[\]|]/g, '') // Remove [, ], |
+      .replace(/\s+/g, '_') // Substitui espaços por _
+      .replace(/[^a-zA-Z0-9_-]/g, '') // Remove outros caracteres especiais
+      .toLowerCase();
+  },
+
   // Buscar métricas por mês e serviço
   async getMetrics(month: string, client: string = 'Todos os Clientes', product: string = 'Todos os Produtos', audience: string = 'Todos os Públicos', campaignId?: string) {
     // Se não foi passado campaignId, tentar pegar do localStorage
@@ -753,6 +765,8 @@ export const metricsService = {
           
           const startDate = firstDayOfMonth.toISOString().split('T')[0];
           const endDate = lastDayOfMonth.toISOString().split('T')[0];
+          
+
           
           // Se um cliente específico foi selecionado (Business Manager), buscar dados específicos
           let metaAdsData;
@@ -809,8 +823,22 @@ export const metricsService = {
           return metaAdsData;
           
         } catch (error: any) {
-          console.warn('Erro ao sincronizar Meta Ads, usando dados mockados:', error.message);
-          // Continue para usar dados mockados
+          console.log('🟡 MetricsService: Erro ao sincronizar Meta Ads, usando dados mockados:', error.message);
+          
+          // Se for erro de token expirado, mostrar mensagem mais clara
+          if (error.message.includes('Session has expired') || error.message.includes('access token')) {
+            console.log('🟡 MetricsService: Token do Meta Ads expirado - reconecte sua conta para sincronizar dados');
+          }
+          
+          // Retornar dados mockados em caso de erro
+          return mockData.filter(data => {
+            const monthMatch = data.month === month;
+            const clientMatch = client === 'Todos os Clientes' || data.client === client;
+            const productMatch = product === 'Todos os Produtos' || data.product === product;
+            const audienceMatch = audience === 'Todos os Públicos' || data.audience === audience;
+            
+            return monthMatch && clientMatch && productMatch && audienceMatch;
+          });
         }
       }
 
@@ -855,9 +883,14 @@ export const metricsService = {
           this.setCache(cacheKey, filteredData);
           return filteredData;
         }
-      } catch (firebaseError: any) {
-        console.warn('Erro na consulta Firebase (possível problema de índice):', firebaseError.message);
-        // Continua para usar dados mockados
+      } catch (error: any) {
+        if (error.message.includes('requires an index')) {
+          console.log('🟡 MetricsService: Índice Firebase necessário - criando automaticamente...');
+          // O link para criar o índice já foi fornecido no erro
+        } else {
+          console.log('🟡 MetricsService: Erro na consulta Firebase:', error.message);
+        }
+        return [];
       }
 
       // Caso contrário, retorna dados mockados
@@ -973,6 +1006,11 @@ export const metricsService = {
     }
 
     try {
+      console.log(`🟡 MetricsService: syncMetaAdsData - Iniciando sincronização para ${month}`);
+      console.log(`🟡 MetricsService: syncMetaAdsData - CampaignId: ${campaignId || 'Nenhuma'}`);
+      console.log(`🟡 MetricsService: syncMetaAdsData - Client: ${client || 'Nenhum'}`);
+      console.log(`🟡 MetricsService: syncMetaAdsData - Product: ${product || 'Nenhum'}`);
+      
       const today = new Date();
       const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -980,7 +1018,20 @@ export const metricsService = {
       const startDate = firstDayOfMonth.toISOString().split('T')[0];
       const endDate = lastDayOfMonth.toISOString().split('T')[0];
       
+      console.log(`🟡 MetricsService: syncMetaAdsData - Período: ${startDate} até ${endDate}`);
+      
       const metaAdsData = await metaAdsService.syncMetrics(month, startDate, endDate, campaignId, client, product, audience);
+      
+      console.log(`🟢 MetricsService: syncMetaAdsData - Dados recebidos do Meta Ads: ${metaAdsData.length} registros`);
+      
+      // Log detalhado dos dados recebidos
+      if (metaAdsData.length > 0) {
+        console.log('🟢 MetricsService: syncMetaAdsData - Primeiro registro:', metaAdsData[0]);
+        
+        // Verificar total de leads
+        const totalLeads = metaAdsData.reduce((sum, metric) => sum + metric.leads, 0);
+        console.log(`🟢 MetricsService: syncMetaAdsData - Total de leads nos dados: ${totalLeads}`);
+      }
       
       // Salvar no Firebase
       const savedIds = [];
@@ -989,9 +1040,11 @@ export const metricsService = {
           const id = await this.addMetric(metric);
           savedIds.push(id);
         } catch (error) {
-          console.error('Erro ao salvar métrica:', error);
+          console.error('🔴 MetricsService: syncMetaAdsData - Erro ao salvar métrica:', error);
         }
       }
+      
+      console.log(`🟢 MetricsService: syncMetaAdsData - Registros salvos no Firebase: ${savedIds.length}`);
       
       return {
         success: true,
@@ -999,7 +1052,7 @@ export const metricsService = {
         data: metaAdsData
       };
     } catch (error: any) {
-      console.error('Erro na sincronização do Meta Ads:', error);
+      console.error('🔴 MetricsService: syncMetaAdsData - Erro na sincronização do Meta Ads:', error);
       throw new Error(`Erro na sincronização: ${error.message}`);
     }
   },
@@ -1040,6 +1093,8 @@ export const metricsService = {
     agendamentos: number;
     vendas: number;
     ticketMedio?: number;
+    cpv?: number;
+    roi?: string; // Changed to string to save full ROI value
   }) {
     try {
       const detailsRef = collection(db, 'monthlyDetails');
@@ -1074,8 +1129,52 @@ export const metricsService = {
           updateData.ticketMedio = data.ticketMedio;
         }
         
+        // Incluir CPV e ROI se foram fornecidos
+        if (data.cpv !== undefined) {
+          updateData.cpv = data.cpv;
+        }
+        if (data.roi !== undefined) {
+          updateData.roi = data.roi;
+        }
+        
         await updateDoc(docRef, updateData);
       }
+      
+      console.log('🔍 DEBUG - saveMonthlyDetails - Dados sendo salvos:', {
+        month: data.month,
+        product: data.product,
+        agendamentos: data.agendamentos,
+        vendas: data.vendas,
+        ticketMedio: data.ticketMedio,
+        hasCPV: 'cpv' in data,
+        hasROI: 'roi' in data,
+        cpvValue: data.cpv,
+        roiValue: data.roi,
+        dataKeys: Object.keys(data)
+      });
+
+      // Disparar evento para notificar mudanças na planilha detalhes mensais
+      window.dispatchEvent(new CustomEvent('monthlyDetailsChanged', {
+        detail: {
+          month: data.month,
+          product: data.product,
+          agendamentos: data.agendamentos,
+          vendas: data.vendas,
+          ticketMedio: data.ticketMedio
+        }
+      }));
+
+      // Disparar evento específico para mudanças nas campanhas
+      window.dispatchEvent(new CustomEvent('campaignValuesChanged', {
+        detail: {
+          month: data.month,
+          product: data.product,
+          agendamentos: data.agendamentos,
+          vendas: data.vendas,
+          ticketMedio: data.ticketMedio
+        }
+      }));
+      
     } catch (error) {
       console.error('Erro ao salvar detalhes mensais:', error);
       throw new Error('Não foi possível salvar os detalhes mensais.');
@@ -1112,7 +1211,10 @@ export const metricsService = {
 
   // Calcular métricas agregadas
   calculateAggregatedMetrics(metrics: MetricData[]) {
-    if (metrics.length === 0) {
+    console.log(`🟡 MetricsService: calculateAggregatedMetrics - Iniciando cálculo para ${metrics.length} métricas`);
+    
+    if (!metrics || metrics.length === 0) {
+      console.log('🟡 MetricsService: calculateAggregatedMetrics - Nenhuma métrica encontrada, retornando valores padrão');
       return {
         totalLeads: 0,
         totalRevenue: 0,
@@ -1127,6 +1229,12 @@ export const metricsService = {
         totalAppointments: 0,
         totalSales: 0
       };
+    }
+
+    // Log das primeiras métricas para debug
+    if (metrics.length > 0) {
+      console.log('🟢 MetricsService: calculateAggregatedMetrics - Primeira métrica:', metrics[0]);
+      console.log(`🟢 MetricsService: calculateAggregatedMetrics - Leads na primeira métrica: ${metrics[0].leads}`);
     }
 
     const totals = metrics.reduce((acc, metric) => {
@@ -1148,6 +1256,8 @@ export const metricsService = {
       totalSales: 0
     });
 
+    console.log(`🟢 MetricsService: calculateAggregatedMetrics - Total de leads calculado: ${totals.totalLeads}`);
+
     const avgCTR = totals.totalImpressions > 0 
       ? (totals.totalClicks / totals.totalImpressions) * 100 
       : 0;
@@ -1159,6 +1269,12 @@ export const metricsService = {
     const avgCPL = totals.totalLeads > 0 
       ? totals.totalInvestment / totals.totalLeads 
       : 0;
+    
+    const avgCPC = totals.totalClicks > 0 
+      ? totals.totalInvestment / totals.totalClicks 
+      : 0;
+    
+    
     
     const totalROAS = totals.totalInvestment > 0 
       ? totals.totalRevenue / totals.totalInvestment 
@@ -1173,8 +1289,493 @@ export const metricsService = {
       avgCTR: Number(avgCTR.toFixed(2)),
       avgCPM: Number(avgCPM.toFixed(2)),
       avgCPL: Number(avgCPL.toFixed(2)),
+      avgCPC: Number(avgCPC.toFixed(2)),
       totalROAS: Number(totalROAS.toFixed(2)),
       totalROI: Number(totalROI.toFixed(2))
     };
+  },
+
+  // Salvar detalhes do público (conjunto de anúncio)
+  async saveAudienceDetails(data: {
+    month: string;
+    product: string;
+    audience: string;
+    agendamentos: number;
+    vendas: number;
+    ticketMedio?: number;
+    vendasAuto?: boolean; // New field to save the mode
+    manualVendasValue?: number; // New field to save manual value
+  }) {
+    try {
+      console.log('🔍 DEBUG - metricsService.saveAudienceDetails - Iniciando salvamento:', {
+        month: data.month,
+        product: data.product,
+        audience: data.audience,
+        agendamentos: data.agendamentos,
+        vendas: data.vendas,
+        vendasAuto: data.vendasAuto,
+        manualVendasValue: data.manualVendasValue
+      });
+
+      const docId = this.sanitizeDocumentId(`${data.month}_${data.product}_${data.audience}`);
+      console.log('🔍 DEBUG - metricsService.saveAudienceDetails - Document ID:', docId);
+      
+      const docRef = doc(db, 'audienceDetails', docId);
+
+      const docSnap = await getDoc(docRef);
+      console.log('🔍 DEBUG - metricsService.saveAudienceDetails - Documento existe:', docSnap.exists());
+
+      if (docSnap.exists()) {
+        console.log('🔍 DEBUG - metricsService.saveAudienceDetails - Atualizando documento existente');
+        await updateDoc(docRef, {
+          agendamentos: data.agendamentos,
+          vendas: data.vendas,
+          ticketMedio: data.ticketMedio || 250,
+          vendasAuto: data.vendasAuto !== undefined ? data.vendasAuto : true, // Save the mode
+          manualVendasValue: data.manualVendasValue !== undefined ? data.manualVendasValue : 0, // Save manual value
+          updatedAt: new Date()
+        });
+        console.log('🔍 DEBUG - metricsService.saveAudienceDetails - Detalhes do público atualizados com sucesso:', data);
+      } else {
+        console.log('🔍 DEBUG - metricsService.saveAudienceDetails - Criando novo documento');
+        await setDoc(docRef, {
+          ...data,
+          ticketMedio: data.ticketMedio || 250,
+          vendasAuto: data.vendasAuto !== undefined ? data.vendasAuto : true, // Save the mode
+          manualVendasValue: data.manualVendasValue !== undefined ? data.manualVendasValue : 0, // Save manual value
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        console.log('🔍 DEBUG - metricsService.saveAudienceDetails - Novos detalhes do público salvos com sucesso:', data);
+      }
+      
+      console.log('🔍 DEBUG - metricsService.saveAudienceDetails - Salvamento concluído com sucesso');
+    } catch (error) {
+      console.error('🔍 DEBUG - metricsService.saveAudienceDetails - Erro ao salvar detalhes do público:', error);
+      throw new Error('Não foi possível salvar os detalhes do público.');
+    }
+  },
+
+  // Buscar detalhes de um público específico
+  async getAudienceDetails(month: string, product: string, audience: string) {
+    try {
+      console.log('🔍 DEBUG - metricsService.getAudienceDetails - Buscando detalhes:', {
+        month,
+        product,
+        audience
+      });
+
+      const docId = this.sanitizeDocumentId(`${month}_${product}_${audience}`);
+      console.log('🔍 DEBUG - metricsService.getAudienceDetails - Document ID:', docId);
+      
+      const docRef = doc(db, 'audienceDetails', docId);
+      const docSnap = await getDoc(docRef);
+      
+      console.log('🔍 DEBUG - metricsService.getAudienceDetails - Documento existe:', docSnap.exists());
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        console.log('🔍 DEBUG - metricsService.getAudienceDetails - Dados encontrados:', data);
+        return data;
+      } else {
+        console.log('🔍 DEBUG - metricsService.getAudienceDetails - Nenhum dado encontrado');
+        return null;
+      }
+    } catch (error) {
+      console.error('🔍 DEBUG - metricsService.getAudienceDetails - Erro ao buscar detalhes do público:', error);
+      return null;
+    }
+  },
+
+  // Buscar todos os dados de públicos de um produto específico
+  async getAllAudienceDetailsForProduct(month: string, product: string) {
+    try {
+      const q = query(
+        collection(db, 'audienceDetails'),
+        where('month', '==', month),
+        where('product', '==', product)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const audienceDetails: any[] = [];
+      const audienceMap = new Map(); // Para consolidar duplicatas
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        const audienceKey = data.audience;
+        
+        console.log('🔍 DEBUG - getAllAudienceDetailsForProduct - Processando documento:', {
+          docId: doc.id,
+          audience: audienceKey,
+          agendamentos: data.agendamentos,
+          vendas: data.vendas,
+          updatedAt: data.updatedAt
+        });
+        
+        // Se já existe um registro para este público, manter o mais recente
+        if (audienceMap.has(audienceKey)) {
+          const existing = audienceMap.get(audienceKey);
+          const existingDate = existing.updatedAt?.toDate?.() || new Date(0);
+          const newDate = data.updatedAt?.toDate?.() || new Date(0);
+          
+          console.log('🔍 DEBUG - getAllAudienceDetailsForProduct - Duplicata encontrada:', {
+            audience: audienceKey,
+            existingDate,
+            newDate,
+            keeping: newDate > existingDate ? 'new' : 'existing'
+          });
+          
+          if (newDate > existingDate) {
+            audienceMap.set(audienceKey, data);
+          }
+        } else {
+          audienceMap.set(audienceKey, data);
+        }
+      });
+      
+      // Converter Map para array
+      const consolidatedDetails = Array.from(audienceMap.values());
+      
+      console.log('🔍 DEBUG - getAllAudienceDetailsForProduct - Resultado consolidado:', {
+        month,
+        product,
+        originalCount: querySnapshot.size,
+        consolidatedCount: consolidatedDetails.length,
+        details: consolidatedDetails.map(d => ({
+          audience: d.audience,
+          agendamentos: d.agendamentos,
+          vendas: d.vendas,
+          updatedAt: d.updatedAt
+        }))
+      });
+      
+      return consolidatedDetails;
+    } catch (error) {
+      console.error('Erro ao buscar todos os detalhes de públicos:', error);
+      return [];
+    }
+  },
+
+  // Função para limpar dados duplicados (usar com cuidado)
+  async cleanupDuplicateAudienceDetails(month: string, product: string) {
+    try {
+      console.log('🔧 DEBUG - cleanupDuplicateAudienceDetails - Iniciando limpeza:', { month, product });
+      
+      const q = query(
+        collection(db, 'audienceDetails'),
+        where('month', '==', month),
+        where('product', '==', product)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const audienceMap = new Map();
+      const documentsToDelete: string[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        const audienceKey = data.audience;
+        
+        if (audienceMap.has(audienceKey)) {
+          // Documento duplicado encontrado
+          const existing = audienceMap.get(audienceKey);
+          const existingDate = existing.updatedAt?.toDate?.() || new Date(0);
+          const newDate = data.updatedAt?.toDate?.() || new Date(0);
+          
+          if (newDate > existingDate) {
+            // Manter o novo, deletar o antigo
+            documentsToDelete.push(existing.docId);
+            audienceMap.set(audienceKey, { ...data, docId: doc.id });
+          } else {
+            // Manter o antigo, deletar o novo
+            documentsToDelete.push(doc.id);
+          }
+        } else {
+          audienceMap.set(audienceKey, { ...data, docId: doc.id });
+        }
+      });
+      
+      console.log('🔧 DEBUG - cleanupDuplicateAudienceDetails - Documentos para deletar:', documentsToDelete);
+      
+      // Deletar documentos duplicados
+      for (const docId of documentsToDelete) {
+        const docRef = doc(db, 'audienceDetails', docId);
+        await deleteDoc(docRef);
+        console.log('🔧 DEBUG - cleanupDuplicateAudienceDetails - Documento deletado:', docId);
+      }
+      
+      console.log('🔧 DEBUG - cleanupDuplicateAudienceDetails - Limpeza concluída. Documentos deletados:', documentsToDelete.length);
+      return documentsToDelete.length;
+    } catch (error) {
+      console.error('Erro ao limpar dados duplicados:', error);
+      throw new Error('Não foi possível limpar os dados duplicados.');
+    }
+  },
+
+  // Buscar valores reais de agendamentos e vendas de todos os produtos de um cliente
+  async getRealValuesForClient(month: string, client: string) {
+    try {
+      console.log('🔍 DEBUG - getRealValuesForClient - Buscando valores reais para:', { month, client });
+      
+      // Primeiro, buscar dados da coleção monthlyDetails (dados reais da planilha)
+      const monthlyDetailsQuery = query(
+        collection(db, 'monthlyDetails'),
+        where('month', '==', month)
+      );
+      
+      const monthlyDetailsSnapshot = await getDocs(monthlyDetailsQuery);
+      console.log('🔍 DEBUG - getRealValuesForClient - MonthlyDetails encontrados:', monthlyDetailsSnapshot.size);
+      
+      let totalAgendamentos = 0;
+      let totalVendas = 0;
+      let totalCPV = 0;
+      let totalROI = 0;
+      let productCount = 0;
+      const productsWithData: string[] = [];
+      
+      monthlyDetailsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        console.log('🔍 DEBUG - getRealValuesForClient - MonthlyDetail:', {
+          product: data.product,
+          agendamentos: data.agendamentos,
+          vendas: data.vendas,
+          cpv: data.cpv,
+          roi: data.roi,
+          ticketMedio: data.ticketMedio
+        });
+        
+        // Somar valores de todos os produtos
+        totalAgendamentos += (data.agendamentos || 0);
+        totalVendas += (data.vendas || 0);
+        totalCPV += (data.cpv || 0);
+        totalROI += (data.roi || 0);
+        productCount++;
+        productsWithData.push(data.product);
+        
+        console.log('🔍 DEBUG - getRealValuesForClient - Acumuladores após produto:', {
+          totalAgendamentos,
+          totalVendas,
+          totalCPV,
+          totalROI,
+          productCount
+        });
+      });
+      
+      // Calcular médias para CPV e ROI
+      const avgCPV = productCount > 0 ? totalCPV / productCount : 0;
+      const avgROI = productCount > 0 ? totalROI / productCount : 0;
+      
+      console.log('🔍 DEBUG - getRealValuesForClient - Cálculo das médias:', {
+        totalCPV,
+        totalROI,
+        productCount,
+        avgCPV,
+        avgROI
+      });
+      
+      console.log('🔍 DEBUG - getRealValuesForClient - Resultado da monthlyDetails:', {
+        month,
+        client,
+        totalAgendamentos,
+        totalVendas,
+        avgCPV,
+        avgROI,
+        productsCount: productsWithData.length,
+        products: productsWithData
+      });
+      
+      // Se não há dados na monthlyDetails, tentar audienceDetails como fallback
+      if (totalAgendamentos === 0 && totalVendas === 0) {
+        console.log('🔍 DEBUG - getRealValuesForClient - Nenhum dado em monthlyDetails, tentando audienceDetails...');
+        
+        const audienceDetailsQuery = query(
+          collection(db, 'audienceDetails'),
+          where('month', '==', month),
+          where('client', '==', client)
+        );
+        
+        const audienceDetailsSnapshot = await getDocs(audienceDetailsQuery);
+        const audienceMap = new Map(); // Para consolidar duplicatas
+        
+        audienceDetailsSnapshot.forEach((doc) => {
+          const data = doc.data();
+          const audienceKey = data.audience;
+          
+          // Se já existe um registro para este público, manter o mais recente
+          if (audienceMap.has(audienceKey)) {
+            const existing = audienceMap.get(audienceKey);
+            const existingDate = existing.updatedAt?.toDate?.() || new Date(0);
+            const newDate = data.updatedAt?.toDate?.() || new Date(0);
+            
+            if (newDate > existingDate) {
+              audienceMap.set(audienceKey, data);
+            }
+          } else {
+            audienceMap.set(audienceKey, data);
+          }
+        });
+        
+        // Converter Map para array
+        const consolidatedDetails = Array.from(audienceMap.values());
+        
+        // Calcular totais
+        totalAgendamentos = consolidatedDetails.reduce((sum, detail) => sum + (detail.agendamentos || 0), 0);
+        totalVendas = consolidatedDetails.reduce((sum, detail) => sum + (detail.vendas || 0), 0);
+        
+        console.log('🔍 DEBUG - getRealValuesForClient - Resultado da audienceDetails (fallback):', {
+          month,
+          client,
+          totalAgendamentos,
+          totalVendas,
+          audienceCount: consolidatedDetails.length,
+          details: consolidatedDetails.map(d => ({
+            audience: d.audience,
+            product: d.product,
+            agendamentos: d.agendamentos,
+            vendas: d.vendas
+          }))
+        });
+      }
+      
+      const result = {
+        agendamentos: totalAgendamentos,
+        vendas: totalVendas,
+        cpv: avgCPV,
+        roi: avgROI.toString() + '%' // Convert to string format
+      };
+      
+      console.log('🔍 DEBUG - getRealValuesForClient - Retornando resultado:', result);
+      
+      return result;
+    } catch (error) {
+      console.error('Erro ao buscar valores reais do cliente:', error);
+      return { agendamentos: 0, vendas: 0, cpv: 0, roi: 0 };
+    }
+  },
+
+  // Função para verificar se há dados em outros meses para o cliente
+  async checkClientDataInOtherMonths(client: string) {
+    try {
+      console.log('🔍 DEBUG - checkClientDataInOtherMonths - Verificando dados para cliente:', client);
+      
+      // Verificar na coleção monthlyDetails primeiro
+      const monthlyDetailsQuery = query(collection(db, 'monthlyDetails'));
+      const monthlyDetailsSnapshot = await getDocs(monthlyDetailsQuery);
+      const monthsWithData: string[] = [];
+      
+      monthlyDetailsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.month && !monthsWithData.includes(data.month)) {
+          monthsWithData.push(data.month);
+        }
+      });
+      
+      console.log('🔍 DEBUG - checkClientDataInOtherMonths - Meses com dados em monthlyDetails:', monthsWithData);
+      
+      // Se não há dados em monthlyDetails, verificar audienceDetails
+      if (monthsWithData.length === 0) {
+        console.log('🔍 DEBUG - checkClientDataInOtherMonths - Nenhum dado em monthlyDetails, verificando audienceDetails...');
+        
+        const audienceDetailsQuery = query(
+          collection(db, 'audienceDetails'),
+          where('client', '==', client)
+        );
+        
+        const audienceDetailsSnapshot = await getDocs(audienceDetailsQuery);
+        
+        audienceDetailsSnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.month && !monthsWithData.includes(data.month)) {
+            monthsWithData.push(data.month);
+          }
+        });
+        
+        console.log('🔍 DEBUG - checkClientDataInOtherMonths - Meses com dados em audienceDetails:', monthsWithData);
+      }
+      
+      return monthsWithData;
+    } catch (error) {
+      console.error('Erro ao verificar dados do cliente em outros meses:', error);
+      return [];
+    }
+  },
+
+  // Função para verificar dados na coleção monthlyDetails (debug)
+  async debugMonthlyDetails(month: string) {
+    try {
+      console.log('🔍 DEBUG - debugMonthlyDetails - Verificando dados para mês:', month);
+      
+      const q = query(collection(db, 'monthlyDetails'));
+      const querySnapshot = await getDocs(q);
+      
+      console.log('🔍 DEBUG - debugMonthlyDetails - Total de documentos encontrados:', querySnapshot.size);
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        console.log('🔍 DEBUG - debugMonthlyDetails - Documento:', {
+          id: doc.id,
+          month: data.month,
+          product: data.product,
+          agendamentos: data.agendamentos,
+          vendas: data.vendas,
+          client: data.client
+        });
+      });
+      
+      return querySnapshot.size;
+    } catch (error) {
+      console.error('Erro ao verificar monthlyDetails:', error);
+      return 0;
+    }
+  },
+
+
+
+  // Função para criar dados de teste (temporária)
+  async createTestDataForClient(client: string, month: string) {
+    try {
+      console.log('🔧 DEBUG - createTestDataForClient - Criando dados de teste para:', { client, month });
+      
+      const testData = [
+        {
+          month: month,
+          client: client,
+          product: 'Produto Teste 1',
+          audience: 'Público Teste 1',
+          agendamentos: 150,
+          vendas: 75,
+          vendasAuto: false,
+          manualVendasValue: 75,
+          ticketMedio: 250,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        {
+          month: month,
+          client: client,
+          product: 'Produto Teste 2',
+          audience: 'Público Teste 2',
+          agendamentos: 200,
+          vendas: 100,
+          vendasAuto: false,
+          manualVendasValue: 100,
+          ticketMedio: 250,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      ];
+
+      for (const data of testData) {
+        const docId = this.sanitizeDocumentId(`${data.month}_${data.product}_${data.audience}`);
+        const docRef = doc(db, 'audienceDetails', docId);
+        await setDoc(docRef, data);
+        console.log('🔧 DEBUG - createTestDataForClient - Dados criados:', docId);
+      }
+      
+      console.log('🔧 DEBUG - createTestDataForClient - Dados de teste criados com sucesso');
+      return true;
+    } catch (error) {
+      console.error('Erro ao criar dados de teste:', error);
+      return false;
+    }
   }
 };

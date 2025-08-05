@@ -88,7 +88,7 @@ class ShareService {
   }
 
   public createShareLink(params: {
-    audience: string;
+    audience?: string;
     product: string;
     client: string;
     month: string;
@@ -102,7 +102,7 @@ class ShareService {
     
     // Criar URL com parâmetros
     const searchParams = new URLSearchParams({
-      audience: params.audience,
+      audience: params.audience || '', // Make audience optional
       product: params.product,
       client: params.client,
       month: params.month,
@@ -132,7 +132,7 @@ class ShareService {
   }
 
   public updateShareLink(shortCode: string, newParams: {
-    audience: string;
+    audience?: string;
     product: string;
     client: string;
     month: string;
@@ -150,7 +150,7 @@ class ShareService {
     // Criar nova URL com parâmetros atualizados
     const baseUrl = window.location.origin;
     const searchParams = new URLSearchParams({
-      audience: newParams.audience,
+      audience: newParams.audience || '', // Make audience optional
       product: newParams.product,
       client: newParams.client,
       month: newParams.month,

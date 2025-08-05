@@ -13,6 +13,12 @@ interface MetricCardProps {
 
 interface MetricsGridProps {
   metrics: MetricData[];
+  selectedClient?: string;
+  selectedMonth?: string;
+  realAgendamentos?: number;
+  realVendas?: number;
+  realCPV?: number;
+  realROI?: string;
 }
 
 // Componente de Tooltip customizado
@@ -86,8 +92,33 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, subtitle, trend, 
   );
 };
 
-const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics }) => {
+const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, selectedMonth, realAgendamentos, realVendas, realCPV, realROI }) => {
+  console.log('🔍 DEBUG - MetricsGrid - Props recebidas:', {
+    selectedClient,
+    selectedMonth,
+    realAgendamentos,
+    realVendas,
+    realCPV,
+    realROI,
+    metricsCount: metrics.length
+  });
+  
   const aggregated = metricsService.calculateAggregatedMetrics(metrics);
+  
+  console.log('🔍 DEBUG - MetricsGrid - Valores agregados:', aggregated);
+  console.log('🔍 DEBUG - MetricsGrid - Valores reais para cards:', {
+    agendamentos: realAgendamentos,
+    vendas: realVendas,
+    cpv: realCPV,
+    roi: realROI
+  });
+  
+  console.log('🔍 DEBUG - MetricsGrid - Tipos dos valores:', {
+    agendamentosType: typeof realAgendamentos,
+    vendasType: typeof realVendas,
+    cpvType: typeof realCPV,
+    roiType: typeof realROI
+  });
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -127,16 +158,34 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics }) => {
     },
     { 
       title: 'CPV', 
-      value: formatCurrency(aggregated.totalSales > 0 ? aggregated.totalInvestment / aggregated.totalSales : 0), 
-      trend: aggregated.totalSales > 0 ? 'neutral' as const : 'neutral' as const,
-      tooltip: 'Custo por venda. Quanto você gasta para conseguir cada venda'
+      value: (() => {
+        const cpvValue = realCPV !== undefined ? realCPV : (aggregated.totalSales > 0 ? aggregated.totalInvestment / aggregated.totalSales : 0);
+        console.log('🔍 DEBUG - MetricsGrid - Card CPV - Valor calculado:', {
+          realCPV,
+          aggregatedTotalSales: aggregated.totalSales,
+          aggregatedTotalInvestment: aggregated.totalInvestment,
+          calculatedValue: aggregated.totalSales > 0 ? aggregated.totalInvestment / aggregated.totalSales : 0,
+          finalValue: cpvValue
+        });
+        return formatCurrency(cpvValue);
+      })(), 
+      trend: (realCPV !== undefined ? realCPV : aggregated.totalSales) > 0 ? 'neutral' as const : 'neutral' as const,
+      tooltip: 'Custo por venda. Quanto você gasta para conseguir cada venda (valores reais da planilha de detalhes mensais)'
     },
     { 
-      title: 'ROI', 
-      value: `${aggregated.totalROI.toFixed(2)}%`, 
-      trend: aggregated.totalROI > 0 ? 'up' as const : 'neutral' as const,
-      trendValue: aggregated.totalROI > 0 ? '+12.4%' : undefined,
-      tooltip: 'Retorno sobre investimento. Quanto você ganha de volta para cada real investido'
+      title: 'ROI/ROAS', 
+      value: (() => {
+        const roiValue = realROI !== undefined ? realROI : `${aggregated.totalROI.toFixed(2)}%`;
+        console.log('🔍 DEBUG - MetricsGrid - Card ROI/ROAS - Valor calculado:', {
+          realROI,
+          aggregatedTotalROI: aggregated.totalROI,
+          finalValue: roiValue
+        });
+        return roiValue;
+      })(), 
+      trend: (realROI !== undefined ? parseFloat(realROI.replace(/[^\d.-]/g, '')) : aggregated.totalROI) > 0 ? 'up' as const : 'neutral' as const,
+      trendValue: (realROI !== undefined ? parseFloat(realROI.replace(/[^\d.-]/g, '')) : aggregated.totalROI) > 0 ? '+12.4%' : undefined,
+      tooltip: 'Retorno sobre investimento. Quanto você ganha de volta para cada real investido (valores reais da planilha de detalhes mensais)'
     },
     { 
       title: 'CTR', 
@@ -147,17 +196,17 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics }) => {
     },
     { 
       title: 'Agendamentos', 
-      value: aggregated.totalAppointments.toString(), 
-      trend: aggregated.totalAppointments > 0 ? 'up' as const : 'neutral' as const,
-      trendValue: aggregated.totalAppointments > 0 ? '+6.8%' : undefined,
-      tooltip: 'Número de consultas ou reuniões agendadas com clientes'
+      value: (realAgendamentos !== undefined ? realAgendamentos : aggregated.totalAppointments).toString(), 
+      trend: (realAgendamentos !== undefined ? realAgendamentos : aggregated.totalAppointments) > 0 ? 'up' as const : 'neutral' as const,
+      trendValue: (realAgendamentos !== undefined ? realAgendamentos : aggregated.totalAppointments) > 0 ? '+6.8%' : undefined,
+      tooltip: 'Número de consultas ou reuniões agendadas com clientes (valores reais da planilha de detalhes mensais)'
     },
     { 
       title: 'Quantidade de Vendas', 
-      value: aggregated.totalSales.toString(), 
-      trend: aggregated.totalSales > 0 ? 'up' as const : 'neutral' as const,
-      trendValue: aggregated.totalSales > 0 ? '+9.2%' : undefined,
-      tooltip: 'Número total de vendas realizadas através dos anúncios'
+      value: (realVendas !== undefined ? realVendas : aggregated.totalSales).toString(), 
+      trend: (realVendas !== undefined ? realVendas : aggregated.totalSales) > 0 ? 'up' as const : 'neutral' as const,
+      trendValue: (realVendas !== undefined ? realVendas : aggregated.totalSales) > 0 ? '+9.2%' : undefined,
+      tooltip: 'Número total de vendas realizadas através dos anúncios (valores reais da planilha de detalhes mensais)'
     }
   ];
 

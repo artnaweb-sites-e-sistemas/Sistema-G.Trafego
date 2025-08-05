@@ -7,6 +7,7 @@ interface DailyControlTableProps {
   selectedCampaign?: string;
   selectedMonth?: string;
   customRecordCount?: number;
+  selectedAudience?: string;
 }
 
 // Componente de Tooltip customizado
@@ -55,7 +56,8 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
   metrics, 
   selectedCampaign,
   selectedMonth = 'Julho 2023',
-  customRecordCount
+  customRecordCount,
+  selectedAudience
 }) => {
 
   const [tooltipStates, setTooltipStates] = useState<{ [key: string]: boolean }>({});
@@ -333,6 +335,14 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
               <p className="text-sm text-slate-400 mt-1">
                 Anúncio selecionado: {selectedCampaign}
               </p>
+            )}
+            {selectedAudience && (
+              <div className="flex items-center mt-2 space-x-2">
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                <p className="text-sm text-blue-400 font-medium">
+                  Público: {selectedAudience}
+                </p>
+              </div>
             )}
           </div>
           {metrics.length > 0 && (
