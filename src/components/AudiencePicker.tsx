@@ -139,7 +139,6 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         }
         
       } catch (error: any) {
-        console.error('Erro ao carregar Ad Sets do Meta Ads:', error.message);
         setAudiences([]);
       } finally {
         setIsLoading(false);
@@ -252,7 +251,6 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
 
   const handleAudienceSelect = (audience: Audience) => {
 
-    
     // Atualizar estado imediatamente
     setSelectedAudience(audience.name);
     setIsOpen(false);
@@ -265,7 +263,6 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
     // Disparar evento customizado se for um Ad Set do Facebook
     if (audience.source === 'facebook' && audience.adSet) {
 
-      
       // Salvar ID do Ad Set no localStorage
       localStorage.setItem('selectedAdSetId', audience.adSet.id);
       

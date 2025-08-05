@@ -46,7 +46,6 @@ export class AIBenchmarkService {
     const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
     
     if (!apiKey) {
-      console.warn('VITE_OPENAI_API_KEY não encontrada nas variáveis de ambiente. Funcionalidade de IA será limitada.');
       // Não lançar erro, apenas marcar como não configurado
       this.openai = null as any;
       return;
@@ -69,23 +68,19 @@ export class AIBenchmarkService {
         historicalData = await this.getHistoricalData(data.selectedProduct, data.selectedCampaign);
         if (historicalData) {
           confidence = 95; // Alta confiança com dados reais
-          console.info('🎯 Usando dados históricos reais para benchmark');
-        }
+          }
       }
     } catch (error) {
-      console.warn('Erro ao buscar dados históricos:', error);
-    }
+      }
 
     // Verificar se o OpenAI está configurado
     if (!this.openai) {
-      console.info('OpenAI não configurado, usando valores simulados');
       return this.generateSimulatedBenchmark(data, historicalData, confidence);
     }
 
     // Verificar se já sabemos que a quota está esgotada
     const now = Date.now();
     if (this.isQuotaExhausted && (now - this.lastQuotaCheck) < this.QUOTA_CHECK_INTERVAL) {
-      console.info('Quota da OpenAI esgotada, usando valores simulados (cache)');
       return this.generateSimulatedBenchmark(data, historicalData, confidence);
     }
 
@@ -127,17 +122,14 @@ export class AIBenchmarkService {
       if (error?.status === 429 || error?.message?.includes('quota') || error?.message?.includes('rate limit')) {
         this.isQuotaExhausted = true;
         this.lastQuotaCheck = now;
-        console.info('Quota da OpenAI esgotada, usando valores simulados');
         return this.generateSimulatedBenchmark(data, historicalData, confidence);
       }
       
       // Outros erros da API
       if (error?.status >= 400 && error?.status < 500) {
-        console.warn('Erro de API, usando valores simulados');
         return this.generateSimulatedBenchmark(data, historicalData, confidence);
       }
       
-      console.error('Erro ao gerar benchmark com IA:', error);
       throw new Error('Erro ao gerar benchmark. Tente novamente.');
     }
   }
@@ -305,8 +297,6 @@ export class AIBenchmarkService {
     }
   }
 
-
-
   private parseAIResponse(response: string): BenchmarkResults {
     try {
       // Limpar response case tenha caracteres extras
@@ -337,8 +327,6 @@ export class AIBenchmarkService {
         insights: Array.isArray(parsed.insights) ? parsed.insights : []
       };
     } catch (error) {
-      console.error('Erro ao fazer parse da resposta da IA:', error);
-      
       // Retorna valores padrão em caso de erro
       return {
         cpm: 20.0,
@@ -385,8 +373,7 @@ export class AIBenchmarkService {
           const metrics = await metricsService.getMetrics(month, 'Todos os Clientes', selectedProduct);
           allMetrics.push(...metrics);
         } catch (error) {
-          console.warn(`Erro ao buscar métricas para ${month}:`, error);
-        }
+          }
       }
 
       if (allMetrics.length === 0) {
@@ -412,7 +399,6 @@ export class AIBenchmarkService {
         dataQuality: 'real'
       };
     } catch (error) {
-      console.error('Erro ao buscar dados históricos:', error);
       return null;
     }
   }

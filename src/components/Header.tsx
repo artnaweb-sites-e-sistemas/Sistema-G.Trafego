@@ -65,7 +65,6 @@ const Header: React.FC<HeaderProps> = ({
       const links = shareService.getAllShareLinks();
       setHasGeneratedLinks(links.length > 0);
     } catch (error) {
-      console.error('Erro ao carregar links gerados:', error);
       setHasGeneratedLinks(false);
     }
   }, []);
@@ -88,7 +87,6 @@ const Header: React.FC<HeaderProps> = ({
       window.removeEventListener('noLinksRemaining', handleNoLinksRemaining);
     };
   }, []);
-
 
   return (
     <header className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700/50 shadow-xl">

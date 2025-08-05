@@ -79,7 +79,6 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
         // Verificar status atual no Facebook
         checkLoginStatus();
       } catch (error) {
-        console.error('Erro ao carregar usuário salvo:', error);
         localStorage.removeItem('facebookUser');
         setManualData();
       }
@@ -138,7 +137,6 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
       
       alert('Token configurado com sucesso!');
     } catch (error: any) {
-      console.error('Erro ao configurar token:', error);
       alert(`Erro ao configurar token: ${error.message}`);
     } finally {
       setIsLoading(false);
@@ -148,8 +146,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
   const checkLoginStatus = async () => {
     try {
       const status = await metaAdsService.getLoginStatus();
-  
-      
+
       if (status.status === 'connected') {
         // Usuário está logado, tentar carregar contas
         await loadBusinessManagers();
@@ -163,8 +160,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
         setStep('login');
       }
     } catch (error) {
-      console.error('Erro ao verificar status de login:', error);
-    }
+      }
   };
 
   const handleFacebookLogin = async () => {
@@ -196,8 +192,6 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
       }, 500);
       
     } catch (error: any) {
-      console.error('Erro no login:', error);
-      
       // Mostrar mensagem de erro mais amigável
       let errorMessage = 'Erro ao fazer login com o Facebook.';
       
@@ -227,8 +221,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
     try {
       
       const managers = await metaAdsService.getBusinessManagers();
-      
-      
+
       if (managers.length > 0) {
         setBusinessManagers(managers);
         setStep('selectBusiness');
@@ -238,8 +231,6 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
         await loadAdAccounts();
       }
     } catch (error: any) {
-      console.error('Erro ao carregar Business Managers:', error);
-      
       // Se for erro de permissão, mostrar mensagem específica
       if (error.message.includes('Permissões de anúncios não concedidas')) {
         setStep('permissionsRequired');
@@ -261,8 +252,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
       } else {
         accounts = await metaAdsService.getAdAccounts();
       }
-      
-      
+
       setAdAccounts(accounts);
       
       if (accounts.length > 0) {
@@ -272,8 +262,6 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
         setStep('tokenConfig');
       }
     } catch (error: any) {
-      console.error('Erro ao carregar contas de anúncios:', error);
-      
       // Se for erro de permissão, mostrar opção de configurar token
       if (error.message.includes('Token de acesso não configurado') || 
           error.message.includes('Permissões de anúncios não concedidas')) {
@@ -303,7 +291,6 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
         onConfigSaved();
       }, 500); // 500ms para feedback visual mínimo
     } catch (error) {
-      console.error('Erro ao selecionar conta:', error);
       setIsSelectingAccount(false);
     }
   };
@@ -313,17 +300,14 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
 
     try {
       setIsLoading(true);
-      
-      
+
       // Converter período para datas
       const { startDate, endDate } = getPeriodDates(selectedPeriod);
       
       const campaignsData = await metaAdsService.getCampaigns(startDate, endDate);
       setCampaigns(campaignsData);
-      
-      
+
     } catch (error: any) {
-      console.error('Erro ao carregar campanhas:', error);
       alert(`Erro ao carregar campanhas: ${error.message}`);
     } finally {
       setIsLoading(false);
@@ -335,17 +319,14 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
 
     try {
       setIsLoading(true);
-      
-      
+
       // Converter período para datas
       const { startDate, endDate } = getPeriodDates(selectedPeriod);
       
       const adSetsData = await metaAdsService.getAdSets(campaignId, startDate, endDate);
       setAdSets(adSetsData);
-      
-      
+
     } catch (error: any) {
-      console.error('Erro ao carregar conjuntos de anúncios:', error);
       alert(`Erro ao carregar conjuntos de anúncios: ${error.message}`);
     } finally {
       setIsLoading(false);
@@ -368,21 +349,18 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
 
   const loadAdSetMetrics = async (adSetId: string) => {
     try {
-      
-      
+
       // Converter período para datas
       const { startDate, endDate } = getPeriodDates(selectedPeriod);
       
       const insights = await metaAdsService.getAdSetInsights(adSetId, startDate, endDate);
       
       // Aqui você pode processar os insights e atualizar as métricas do dashboard
-      
-      
+
       // Chamar callback para atualizar o dashboard
       onConfigSaved();
       
     } catch (error: any) {
-      console.error('Erro ao carregar métricas:', error);
       alert(`Erro ao carregar métricas: ${error.message}`);
     }
   };
@@ -505,8 +483,6 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
 
   const handleLogout = () => {
 
-
-    
     // Fazer logout do Facebook primeiro (isso dispara o evento)
     metaAdsService.logout();
     
@@ -528,14 +504,11 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
     
     // Voltar para tela de login
     setStep('login');
-    
-
 
   };
 
   const clearFacebookData = () => {
 
-    
     // Limpar apenas dados do Facebook, mantendo dados manuais
     setUser(null);
     setSelectedAccount(null);

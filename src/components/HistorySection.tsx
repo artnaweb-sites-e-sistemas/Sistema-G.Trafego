@@ -35,9 +35,7 @@ const HistorySection: React.FC<HistorySectionProps> = ({ selectedProduct }) => {
     // Simular carregamento de dados
     setTimeout(() => {
       const allShareLinks = shareService.getAllShareLinks();
-      
 
-      
       // Gerar dados simulados baseados nos links compartilhados
       const mockReports: ReportData[] = allShareLinks.map((link, index) => {
         // Extrair informações do link (se disponível)
@@ -163,12 +161,10 @@ const HistorySection: React.FC<HistorySectionProps> = ({ selectedProduct }) => {
               
               // Limpar cache de métricas para o período/cliente específico
               if (month && client) {
-                console.log('🔍 DEBUG - HistorySection - Limpando cache para:', { month, client });
                 metricsService.clearCacheByPeriod(month, client);
               }
             } catch (error) {
-              console.warn('Erro ao extrair parâmetros do relatório para limpar cache:', error);
-            }
+              }
           }
           
           // Remover do estado local
@@ -191,7 +187,6 @@ const HistorySection: React.FC<HistorySectionProps> = ({ selectedProduct }) => {
           toast.error('Erro ao excluir relatório');
         }
       } catch (error) {
-        console.error('Erro ao excluir relatório:', error);
         toast.error('Erro ao excluir relatório');
       }
     }

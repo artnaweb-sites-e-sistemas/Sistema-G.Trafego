@@ -52,8 +52,7 @@ class AuthService {
           photoURL: firebaseUser.photoURL || undefined,
           createdAt: userData.createdAt?.toDate() || new Date()
         };
-        console.log('Usuário carregado do Firestore:', this.currentUser.name);
-      } else {
+        } else {
         // Criar novo usuário no Firestore
         const newUser: User = {
           uid: firebaseUser.uid,
@@ -64,7 +63,6 @@ class AuthService {
           createdAt: new Date()
         };
         
-        console.log('Criando novo usuário no Firestore:', newUser.name);
         await setDoc(doc(db, 'users', firebaseUser.uid), {
           name: newUser.name,
           email: newUser.email,
@@ -74,13 +72,10 @@ class AuthService {
         });
         
         this.currentUser = newUser;
-        console.log('Novo usuário criado com sucesso');
-      }
+        }
       
       localStorage.setItem('gtrafego_user', JSON.stringify(this.currentUser));
     } catch (error) {
-      console.error('Erro ao carregar dados do usuário:', error);
-      
       // Se houver erro no Firestore, criar usuário básico
       if (firebaseUser) {
         this.currentUser = {
@@ -92,8 +87,7 @@ class AuthService {
           createdAt: new Date()
         };
         localStorage.setItem('gtrafego_user', JSON.stringify(this.currentUser));
-        console.log('Usuário criado localmente devido a erro no Firestore');
-      }
+        }
     }
   }
 
@@ -105,7 +99,6 @@ class AuthService {
   // Fazer login com email e senha
   async login(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
     try {
-      console.log('Tentando login com:', email);
       const userCredential: UserCredential = await signInWithEmailAndPassword(auth, email, password);
       await this.loadUserData(userCredential.user);
       
@@ -114,7 +107,6 @@ class AuthService {
         user: this.currentUser || undefined
       };
     } catch (error: any) {
-      console.error('Erro no login:', error);
       let errorMessage = 'Erro ao fazer login';
       
       switch (error.code) {
@@ -147,7 +139,6 @@ class AuthService {
   // Criar conta com email e senha
   async signUp(email: string, password: string, name: string): Promise<{ success: boolean; user?: User; error?: string }> {
     try {
-      console.log('Tentando criar conta para:', email);
       const userCredential: UserCredential = await createUserWithEmailAndPassword(auth, email, password);
       
       // Criar perfil do usuário no Firestore
@@ -159,7 +150,6 @@ class AuthService {
         createdAt: new Date()
       };
       
-      console.log('Criando perfil no Firestore:', newUser.name);
       await setDoc(doc(db, 'users', userCredential.user.uid), {
         name: newUser.name,
         email: newUser.email,
@@ -170,13 +160,11 @@ class AuthService {
       this.currentUser = newUser;
       localStorage.setItem('gtrafego_user', JSON.stringify(this.currentUser));
       
-      console.log('Conta criada com sucesso');
       return { 
         success: true, 
         user: this.currentUser 
       };
     } catch (error: any) {
-      console.error('Erro ao criar conta:', error);
       let errorMessage = 'Erro ao criar conta';
       
       switch (error.code) {
@@ -210,7 +198,6 @@ class AuthService {
       provider.addScope('email');
       provider.addScope('profile');
       
-      console.log('Iniciando login com Google...');
       const userCredential: UserCredential = await signInWithPopup(auth, provider);
             
       await this.loadUserData(userCredential.user);
@@ -220,7 +207,6 @@ class AuthService {
         user: this.currentUser || undefined
       };
     } catch (error: any) {
-      console.error('Erro no login com Google:', error);
       let errorMessage = 'Erro ao fazer login com Google';
       
       switch (error.code) {
@@ -260,8 +246,7 @@ class AuthService {
       this.currentUser = null;
       localStorage.removeItem('gtrafego_user');
     } catch (error) {
-      console.error('Erro ao fazer logout:', error);
-    }
+      }
   }
 
   // Obter usuário atual

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Info } from 'lucide-react';
+import { Download, Info, Calendar, Gift, Heart, Star, Sun, Moon, ShoppingBag, GraduationCap, Flag } from 'lucide-react';
 import { MetricData } from '../services/metricsService';
 
 interface DailyControlTableProps {
@@ -52,6 +52,44 @@ const Tooltip: React.FC<{ children: React.ReactNode; content: string; isVisible:
   );
 };
 
+// Interface para épocas sazonais
+interface SeasonalEvent {
+  icon: React.ReactNode;
+  tooltip: string;
+  color: string;
+}
+
+// Função utilitária para calcular o segundo domingo de um mês
+function getSecondSunday(year: number, month: number): number {
+  // month: 0 = janeiro
+  const firstDay = new Date(year, month, 1).getDay();
+  // Se o primeiro dia do mês for domingo, o segundo domingo é dia 8
+  // Caso contrário, é o primeiro domingo após o dia 1 + 7 dias
+  return firstDay === 0 ? 8 : (15 - firstDay);
+}
+
+// Função utilitária para calcular a data da Páscoa (algoritmo de Meeus/Jones/Butcher)
+function getEasterDate(year: number): Date {
+  const f = Math.floor,
+    G = year % 19,
+    C = f(year / 100),
+    H = (C - f(C / 4) - f((8 * C + 13) / 25) + 19 * G + 15) % 30,
+    I = H - f(H / 28) * (1 - f(29 / (H + 1)) * f((21 - G) / 11)),
+    J = (year + f(year / 4) + I + 2 - C + f(C / 4)) % 7,
+    L = I - J,
+    month = 3 + f((L + 40) / 44),
+    day = L + 28 - 31 * f(month / 4);
+  return new Date(year, month - 1, day);
+}
+
+// Função utilitária para calcular a data do Carnaval (47 dias antes da Páscoa)
+function getCarnivalDate(year: number): Date {
+  const easter = getEasterDate(year);
+  const carnival = new Date(easter);
+  carnival.setDate(easter.getDate() - 47);
+  return carnival;
+}
+
 const DailyControlTable: React.FC<DailyControlTableProps> = ({ 
   metrics, 
   selectedCampaign,
@@ -74,6 +112,252 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       style: 'currency',
       currency: 'BRL'
     }).format(value);
+  };
+
+  // Função para obter épocas sazonais por data
+  const getSeasonalEvents = (date: Date): SeasonalEvent[] => {
+    const events: SeasonalEvent[] = [];
+    const day = date.getDate();
+    const month = date.getMonth() + 1;
+    const year = date.getFullYear();
+    const dayOfWeek = date.getDay(); // 0 = Domingo
+
+    // Janeiro
+    if (month === 1) {
+      if (day === 1) {
+        events.push({
+          icon: <Calendar className="w-3 h-3" />,
+          tooltip: "Ano Novo - Feriado nacional",
+          color: "text-blue-400"
+        });
+      }
+      if (day === 6) {
+        events.push({
+          icon: <Star className="w-3 h-3" />,
+          tooltip: "Dia de Reis - Tradição católica",
+          color: "text-yellow-400"
+        });
+      }
+    }
+
+    // Fevereiro
+    if (month === 2) {
+      if (day === 14) {
+        events.push({
+          icon: <Heart className="w-3 h-3" />,
+          tooltip: "Dia dos Namorados - Data comercial importante",
+          color: "text-pink-400"
+        });
+      }
+      if (day >= 20 && day <= 26) {
+        events.push({
+          icon: <Calendar className="w-3 h-3" />,
+          tooltip: "Carnaval - Feriado nacional (data móvel)",
+          color: "text-purple-400"
+        });
+      }
+    }
+
+    // Março
+    if (month === 3) {
+      if (day === 8) {
+        events.push({
+          icon: <Heart className="w-3 h-3" />,
+          tooltip: "Dia Internacional da Mulher",
+          color: "text-pink-400"
+        });
+      }
+      if (day === 15) {
+        events.push({
+          icon: <ShoppingBag className="w-3 h-3" />,
+          tooltip: "Dia do Consumidor - Campanhas promocionais",
+          color: "text-green-400"
+        });
+      }
+    }
+
+    // Abril
+    if (month === 4) {
+      if (day === 21) {
+        events.push({
+          icon: <Flag className="w-3 h-3" />,
+          tooltip: "Tiradentes - Feriado nacional",
+          color: "text-green-400"
+        });
+      }
+      // Páscoa
+      const easter = getEasterDate(year);
+      if (month === (easter.getMonth() + 1) && day === easter.getDate()) {
+        events.push({
+          icon: <Calendar className="w-3 h-3" />,
+          tooltip: "Páscoa - Feriado nacional (data móvel)",
+          color: "text-yellow-400"
+        });
+      }
+    }
+
+    // Maio
+    if (month === 5) {
+      if (day === 1) {
+        events.push({
+          icon: <Calendar className="w-3 h-3" />,
+          tooltip: "Dia do Trabalho - Feriado nacional",
+          color: "text-red-400"
+        });
+      }
+      // Dia das Mães: segundo domingo de maio
+      if (day === getSecondSunday(year, 4)) {
+        events.push({
+          icon: <Heart className="w-3 h-3" />,
+          tooltip: "Dia das Mães - Data comercial importante",
+          color: "text-pink-400"
+        });
+      }
+    }
+
+    // Junho
+    if (month === 6) {
+      if (day === 12) {
+        events.push({
+          icon: <Heart className="w-3 h-3" />,
+          tooltip: "Dia dos Namorados - Data comercial importante",
+          color: "text-pink-400"
+        });
+      }
+      if (day === 24) {
+        events.push({
+          icon: <Calendar className="w-3 h-3" />,
+          tooltip: "São João - Festas juninas",
+          color: "text-orange-400"
+        });
+      }
+    }
+
+    // Julho
+    if (month === 7) {
+      if (day === 9) {
+        events.push({
+          icon: <Flag className="w-3 h-3" />,
+          tooltip: "Independência da Bahia - Feriado estadual",
+          color: "text-green-400"
+        });
+      }
+    }
+
+    // Agosto
+    if (month === 8) {
+      // Dia dos Pais: segundo domingo de agosto
+      if (day === getSecondSunday(year, 7)) {
+        events.push({
+          icon: <Heart className="w-3 h-3" />,
+          tooltip: "Dia dos Pais - Data comercial importante",
+          color: "text-blue-400"
+        });
+      }
+      if (day === 15) {
+        events.push({
+          icon: <Flag className="w-3 h-3" />,
+          tooltip: "Dia da Assunção de Nossa Senhora",
+          color: "text-purple-400"
+        });
+      }
+    }
+
+    // Setembro
+    if (month === 9) {
+      if (day === 7) {
+        events.push({
+          icon: <Flag className="w-3 h-3" />,
+          tooltip: "Independência do Brasil - Feriado nacional",
+          color: "text-green-400"
+        });
+      }
+    }
+
+    // Outubro
+    if (month === 10) {
+      if (day === 12) {
+        events.push({
+          icon: <Heart className="w-3 h-3" />,
+          tooltip: "Nossa Senhora Aparecida - Feriado nacional",
+          color: "text-purple-400"
+        });
+      }
+      if (day === 15) {
+        events.push({
+          icon: <GraduationCap className="w-3 h-3" />,
+          tooltip: "Dia do Professor",
+          color: "text-blue-400"
+        });
+      }
+      if (day === 31) {
+        events.push({
+          icon: <Moon className="w-3 h-3" />,
+          tooltip: "Halloween - Influência cultural",
+          color: "text-orange-400"
+        });
+      }
+    }
+
+    // Novembro
+    if (month === 11) {
+      if (day === 2) {
+        events.push({
+          icon: <Calendar className="w-3 h-3" />,
+          tooltip: "Finados - Feriado nacional",
+          color: "text-gray-400"
+        });
+      }
+      if (day === 15) {
+        events.push({
+          icon: <Flag className="w-3 h-3" />,
+          tooltip: "Proclamação da República - Feriado nacional",
+          color: "text-green-400"
+        });
+      }
+      if (day === 20) {
+        events.push({
+          icon: <Flag className="w-3 h-3" />,
+          tooltip: "Dia da Consciência Negra",
+          color: "text-yellow-400"
+        });
+      }
+    }
+
+    // Dezembro
+    if (month === 12) {
+      if (day === 8) {
+        events.push({
+          icon: <Heart className="w-3 h-3" />,
+          tooltip: "Nossa Senhora da Conceição",
+          color: "text-purple-400"
+        });
+      }
+             if (day === 25) {
+         events.push({
+           icon: <Star className="w-3 h-3" />,
+           tooltip: "Natal - Feriado nacional",
+           color: "text-green-400"
+         });
+       }
+      if (day === 31) {
+        events.push({
+          icon: <Calendar className="w-3 h-3" />,
+          tooltip: "Réveillon - Feriado nacional",
+          color: "text-blue-400"
+        });
+      }
+      // Black Friday (última sexta-feira de novembro)
+      if (day >= 25 && day <= 30) {
+        events.push({
+          icon: <ShoppingBag className="w-3 h-3" />,
+          tooltip: "Black Friday - Campanhas promocionais",
+          color: "text-red-400"
+        });
+      }
+    }
+
+    return events;
   };
 
   // Função para obter tooltip de cada coluna
@@ -130,6 +414,12 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                      currentDate.getFullYear() === today.getFullYear();
       const isFutureDay = currentDate > new Date(today.getFullYear(), today.getMonth(), today.getDate());
       
+      // Verificar se é domingo
+      const isSunday = currentDate.getDay() === 0;
+      
+      // Obter eventos sazonais
+      const seasonalEvents = getSeasonalEvents(currentDate);
+      
       data.push({
         date: `${dayStr}/${monthStr}/${yearStr}`,
         dateISO: currentDate.toISOString().split('T')[0], // Para comparação
@@ -143,7 +433,9 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
         status: 'Inativo',
         isPastDay,
         isToday,
-        isFutureDay
+        isFutureDay,
+        isSunday,
+        seasonalEvents
       });
     }
     
@@ -375,7 +667,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
               </th>
               <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
                 <div className="flex items-center space-x-2">
-                  <span>INVESTIMENTO ($$$)</span>
+                  <span>INVESTIMENTO</span>
                   <Tooltip content={getColumnTooltip('Investimento')} isVisible={tooltipStates['Investimento'] || false} position="bottom">
                     <div
                       className="cursor-default group/tooltip"
@@ -417,7 +709,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
               </th>
               <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
                 <div className="flex items-center space-x-2">
-                  <span>CPM ($$$)</span>
+                  <span>CPM</span>
                   <Tooltip content={getColumnTooltip('CPM')} isVisible={tooltipStates['CPM'] || false} position="bottom">
                     <div
                       className="cursor-default group/tooltip"
@@ -459,7 +751,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
               </th>
               <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
                 <div className="flex items-center space-x-2">
-                  <span>CPL ($$$)</span>
+                  <span>CPL</span>
                   <Tooltip content={getColumnTooltip('CPL')} isVisible={tooltipStates['CPL'] || false} position="bottom">
                     <div
                       className="cursor-default group/tooltip"
@@ -499,6 +791,35 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                       <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
                     )}
                     <span className={row.isToday ? 'text-blue-300 font-semibold' : ''}>{row.date}</span>
+                    
+                    {/* Indicador de domingo */}
+                    {row.isSunday && (
+                      <span className="text-xs text-yellow-400 font-bold bg-yellow-900/30 px-1 py-0.5 rounded">
+                        D
+                      </span>
+                    )}
+                    
+                    {/* Ícones de épocas sazonais */}
+                    {row.seasonalEvents && row.seasonalEvents.length > 0 && (
+                      <div className="flex items-center space-x-1">
+                        {row.seasonalEvents.map((event: SeasonalEvent, eventIndex: number) => (
+                          <Tooltip 
+                            key={eventIndex}
+                            content={event.tooltip} 
+                            isVisible={tooltipStates[`${row.date}-${eventIndex}`] || false} 
+                            position="right"
+                          >
+                            <div
+                              className={`cursor-default group/tooltip ${event.color} hover:scale-110 transition-all duration-200`}
+                              onMouseEnter={() => setTooltipStates(prev => ({ ...prev, [`${row.date}-${eventIndex}`]: true }))}
+                              onMouseLeave={() => setTooltipStates(prev => ({ ...prev, [`${row.date}-${eventIndex}`]: false }))}
+                            >
+                              {event.icon}
+                            </div>
+                          </Tooltip>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </td>
                 <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.investment}</td>

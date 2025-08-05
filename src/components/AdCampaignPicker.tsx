@@ -41,8 +41,7 @@ const AdCampaignPicker: React.FC<AdCampaignPickerProps> = ({
       }
     } catch (err: any) {
       setError(err.message);
-      console.error('Erro ao carregar campanhas:', err);
-    } finally {
+      } finally {
       setLoading(false);
     }
   };

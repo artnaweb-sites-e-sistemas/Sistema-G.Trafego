@@ -93,33 +93,12 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, subtitle, trend, 
 };
 
 const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, selectedMonth, realAgendamentos, realVendas, realCPV, realROI }) => {
-  console.log('🔍 DEBUG - MetricsGrid - Props recebidas:', {
-    selectedClient,
-    selectedMonth,
-    realAgendamentos,
-    realVendas,
-    realCPV,
-    realROI,
-    metricsCount: metrics.length
-  });
+  // CORREÇÃO: Garantir que aggregated seja calculado corretamente mesmo sem métricas
+  const aggregated = metricsService.calculateAggregatedMetrics(metrics || []);
   
-  const aggregated = metricsService.calculateAggregatedMetrics(metrics);
+  // CORREÇÃO: Se não há métricas, garantir que todos os valores sejam zerados
+  const hasMetrics = metrics && metrics.length > 0;
   
-  console.log('🔍 DEBUG - MetricsGrid - Valores agregados:', aggregated);
-  console.log('🔍 DEBUG - MetricsGrid - Valores reais para cards:', {
-    agendamentos: realAgendamentos,
-    vendas: realVendas,
-    cpv: realCPV,
-    roi: realROI
-  });
-  
-  console.log('🔍 DEBUG - MetricsGrid - Tipos dos valores:', {
-    agendamentosType: typeof realAgendamentos,
-    vendasType: typeof realVendas,
-    cpvType: typeof realCPV,
-    roiType: typeof realROI
-  });
-
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -129,31 +108,31 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
 
   const metricsCards = [
     { 
-      title: 'Impressões', 
-      value: aggregated.totalImpressions.toLocaleString('pt-BR'), 
-      trend: aggregated.totalImpressions > 0 ? 'up' as const : 'neutral' as const,
-      trendValue: aggregated.totalImpressions > 0 ? '+15.2%' : undefined,
-      tooltip: 'Número total de vezes que seu anúncio foi exibido para pessoas'
+      title: 'Valor Investido', 
+      value: hasMetrics ? formatCurrency(aggregated.totalInvestment) : formatCurrency(0), 
+      trend: hasMetrics && aggregated.totalInvestment > 0 ? 'up' as const : 'neutral' as const,
+      trendValue: hasMetrics && aggregated.totalInvestment > 0 ? '+12.5%' : undefined,
+      tooltip: 'Valor total gasto em todas as campanhas do período selecionado'
     },
     { 
       title: 'CPM', 
-      value: formatCurrency(aggregated.avgCPM), 
-      trend: aggregated.avgCPM > 30 ? 'up' as const : 'neutral' as const,
-      trendValue: aggregated.avgCPM > 30 ? '+2.1%' : undefined,
+      value: hasMetrics ? formatCurrency(aggregated.avgCPM) : formatCurrency(0), 
+      trend: hasMetrics && aggregated.avgCPM > 30 ? 'up' as const : 'neutral' as const,
+      trendValue: hasMetrics && aggregated.avgCPM > 30 ? '+2.1%' : undefined,
       tooltip: 'Custo por mil impressões. Quanto você paga para mostrar seu anúncio 1000 vezes'
     },
     { 
-      title: 'Leads / Msgs', 
-      value: aggregated.totalLeads.toString(), 
-      trend: aggregated.totalLeads > 0 ? 'up' as const : 'neutral' as const,
-      trendValue: aggregated.totalLeads > 0 ? '+8.7%' : undefined,
-      tooltip: 'Número de pessoas que enviaram mensagem ou se interessaram pelo seu produto'
+      title: 'Impressões', 
+      value: hasMetrics ? aggregated.totalImpressions.toLocaleString('pt-BR') : '0', 
+      trend: hasMetrics && aggregated.totalImpressions > 0 ? 'up' as const : 'neutral' as const,
+      trendValue: hasMetrics && aggregated.totalImpressions > 0 ? '+15.2%' : undefined,
+      tooltip: 'Número total de vezes que seu anúncio foi exibido para pessoas'
     },
     { 
       title: 'CPL', 
-      value: formatCurrency(aggregated.avgCPL), 
-      trend: aggregated.avgCPL < 100 ? 'up' as const : 'neutral' as const,
-      trendValue: aggregated.avgCPL < 100 ? '-5.3%' : undefined,
+      value: hasMetrics ? formatCurrency(aggregated.avgCPL) : formatCurrency(0), 
+      trend: hasMetrics && aggregated.avgCPL < 100 ? 'up' as const : 'neutral' as const,
+      trendValue: hasMetrics && aggregated.avgCPL < 100 ? '-5.3%' : undefined,
       tooltip: 'Custo por lead. Quanto você gasta para conseguir cada pessoa interessada'
     },
     { 
@@ -161,12 +140,10 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
       value: (() => {
         // CORREÇÃO: Se temos um valor real do CPV da planilha, usar ele
         if (realCPV !== undefined && realCPV > 0) {
-          console.log('🔍 DEBUG - MetricsGrid - Card CPV - Usando valor real:', realCPV);
           return formatCurrency(realCPV);
         }
         
         // CORREÇÃO: Se não temos valor real, retornar valor zerado
-        console.log('🔍 DEBUG - MetricsGrid - Card CPV - Nenhum valor real, retornando zerado');
         return formatCurrency(0);
       })(), 
       trend: 'neutral' as const, // CORREÇÃO: Sempre neutral para CPV
@@ -177,12 +154,10 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
       value: (() => {
         // CORREÇÃO: Se temos um valor real do ROI da planilha, usar ele
         if (realROI !== undefined && realROI !== 'NaN%' && realROI !== '0% (0.0x)') {
-          console.log('🔍 DEBUG - MetricsGrid - Card ROI/ROAS - Usando valor real:', realROI);
           return realROI;
         }
         
         // CORREÇÃO: Se não temos valor real, retornar valor zerado
-        console.log('🔍 DEBUG - MetricsGrid - Card ROI/ROAS - Nenhum valor real, retornando zerado');
         return '0% (0.0x)';
       })(), 
       trend: (() => {
@@ -204,23 +179,21 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
       tooltip: 'Retorno sobre investimento. Quanto você ganha de volta para cada real investido (valores reais da planilha de detalhes mensais)'
     },
     { 
-      title: 'CTR', 
-      value: `${aggregated.avgCTR.toFixed(2)}%`, 
-      trend: aggregated.avgCTR > 2 ? 'up' as const : 'neutral' as const,
-      trendValue: aggregated.avgCTR > 2 ? '+0.3%' : undefined,
-      tooltip: 'Taxa de cliques. Porcentagem de pessoas que clicaram no seu anúncio'
+      title: 'Leads / Msg', 
+      value: hasMetrics ? aggregated.totalLeads.toString() : '0', 
+      trend: hasMetrics && aggregated.totalLeads > 0 ? 'up' as const : 'neutral' as const,
+      trendValue: hasMetrics && aggregated.totalLeads > 0 ? '+8.7%' : undefined,
+      tooltip: 'Número de pessoas que enviaram mensagem ou se interessaram pelo seu produto'
     },
     { 
       title: 'Agendamentos', 
       value: (() => {
         // CORREÇÃO: Se temos um valor real da planilha, usar ele
         if (realAgendamentos !== undefined && realAgendamentos > 0) {
-          console.log('🔍 DEBUG - MetricsGrid - Card Agendamentos - Usando valor real:', realAgendamentos);
           return realAgendamentos.toString();
         }
         
         // CORREÇÃO: Se não temos valor real, retornar zero
-        console.log('🔍 DEBUG - MetricsGrid - Card Agendamentos - Nenhum valor real, retornando zero');
         return '0';
       })(), 
       trend: (() => {
@@ -244,12 +217,10 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
       value: (() => {
         // CORREÇÃO: Se temos um valor real da planilha, usar ele
         if (realVendas !== undefined && realVendas > 0) {
-          console.log('🔍 DEBUG - MetricsGrid - Card Quantidade de Vendas - Usando valor real:', realVendas);
           return realVendas.toString();
         }
         
         // CORREÇÃO: Se não temos valor real, retornar zero
-        console.log('🔍 DEBUG - MetricsGrid - Card Quantidade de Vendas - Nenhum valor real, retornando zero');
         return '0';
       })(), 
       trend: (() => {

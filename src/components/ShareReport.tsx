@@ -67,16 +67,10 @@ const ShareReport: React.FC<ShareReportProps> = ({
       // Se encontrou um link existente, carregar ele
       if (existingLink) {
         setGeneratedLink(existingLink);
-        console.log('🔍 DEBUG - ShareReport - Link existente encontrado:', existingLink.shortCode);
-      } else {
+        } else {
         // Se não encontrou, limpar o link gerado (relatório foi excluído)
         setGeneratedLink(null);
-        console.log('🔍 DEBUG - ShareReport - Nenhum link encontrado para:', {
-          product: selectedProduct,
-          client: selectedClient,
-          month: selectedMonth
-        });
-      }
+        }
     };
 
     checkExistingLink();
@@ -91,8 +85,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
       if (generatedLink && generatedLink.shortCode === shortCode) {
         setGeneratedLink(null);
         setHasLinkForCurrentSelection(false);
-        console.log('🔍 DEBUG - ShareReport - Relatório excluído detectado, limpando estado');
-      }
+        }
     };
 
     window.addEventListener('reportDeleted', handleReportDeleted as EventListener);
@@ -114,13 +107,6 @@ const ShareReport: React.FC<ShareReportProps> = ({
       
       // Salvar detalhes mensais atuais no Firebase (vinculado ao cliente, produto e mês)
       if (monthlyDetailsValues && selectedProduct && selectedProduct !== 'Todos os Produtos' && selectedClient && selectedClient !== 'Todos os Clientes') {
-        console.log('🔍 DEBUG - ShareReport - Salvando detalhes mensais:', {
-          month: selectedMonth,
-          product: selectedProduct,
-          client: selectedClient,
-          agendamentos: monthlyDetailsValues.agendamentos,
-          vendas: monthlyDetailsValues.vendas
-        });
         await metricsService.saveMonthlyDetails({
           month: selectedMonth,
           product: selectedProduct,
@@ -134,13 +120,6 @@ const ShareReport: React.FC<ShareReportProps> = ({
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // CORREÇÃO: Criar link curto usando o serviço com valores dos detalhes mensais
-      console.log('🔍 DEBUG - ShareReport - Gerando link personalizado:', {
-        product: selectedProduct,
-        client: selectedClient,
-        month: selectedMonth,
-        monthlyDetails: monthlyDetailsValues
-      });
-      
       const shareLink = shareService.createShareLink({
         product: selectedProduct,
         client: selectedClient,
@@ -156,8 +135,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
         detail: { shareLink }
       }));
     } catch (error) {
-      console.error('Erro ao gerar link:', error);
-    } finally {
+      } finally {
       setIsGenerating(false);
     }
   };
@@ -171,8 +149,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error('Erro ao copiar link:', error);
-    }
+      }
   };
 
   const openShareLink = () => {
@@ -189,17 +166,13 @@ const ShareReport: React.FC<ShareReportProps> = ({
       let syncedSuccessfully = false;
       try {
         const campaignId = localStorage.getItem('selectedCampaignId') || undefined;
-        console.log('ShareReport: Iniciando sincronização do Meta Ads...');
         await metricsService.syncMetaAdsData(selectedMonth, campaignId, selectedClient, selectedProduct, selectedAudience);
-        console.log('ShareReport: Sincronização do Meta Ads concluída com sucesso');
         syncedSuccessfully = true;
       } catch (syncError) {
-        console.warn('Falha ao sincronizar dados do Meta Ads:', syncError);
-      }
+        }
 
       // Se a sincronização falhou, tentar salvar as métricas existentes
       if (!syncedSuccessfully && metrics && metrics.length > 0) {
-        console.log('ShareReport: Salvando métricas existentes como fallback...');
         for (const metric of metrics) {
           // Se já existe um id, atualiza; senão, adiciona
           if (metric.id) {
@@ -212,13 +185,6 @@ const ShareReport: React.FC<ShareReportProps> = ({
     
       // Atualizar detalhes mensais no Firebase (vinculado ao cliente, produto e mês)
       if (monthlyDetailsValues && selectedProduct && selectedProduct !== 'Todos os Produtos' && selectedClient && selectedClient !== 'Todos os Clientes') {
-        console.log('🔍 DEBUG - ShareReport - Atualizando detalhes mensais:', {
-          month: selectedMonth,
-          product: selectedProduct,
-          client: selectedClient,
-          agendamentos: monthlyDetailsValues.agendamentos,
-          vendas: monthlyDetailsValues.vendas
-        });
         await metricsService.saveMonthlyDetails({
           month: selectedMonth,
           product: selectedProduct,
@@ -246,8 +212,6 @@ const ShareReport: React.FC<ShareReportProps> = ({
         metricsService.clearPublicCache(selectedMonth, selectedClient, selectedProduct);
         
         // CORREÇÃO: Notificar página pública sobre atualização
-        console.log('ShareReport: Relatório atualizado com sucesso - notificando página pública');
-        
         // Salvar no localStorage para a página pública
         const eventDetail = { 
           type: 'insights', 
@@ -258,8 +222,6 @@ const ShareReport: React.FC<ShareReportProps> = ({
           month: selectedMonth
         };
         localStorage.setItem('metaAdsDataRefreshed', JSON.stringify(eventDetail));
-        console.log('ShareReport: Sinal de atualização salvo no localStorage:', eventDetail);
-        
         // Disparar evento customizado para notificar outras abas
         window.dispatchEvent(new StorageEvent('storage', {
           key: 'metaAdsDataRefreshed',
@@ -272,7 +234,6 @@ const ShareReport: React.FC<ShareReportProps> = ({
         toast.error('Erro ao atualizar relatório');
       }
     } catch (error) {
-      console.error('Erro ao atualizar link:', error);
       toast.error('Erro ao atualizar relatório');
     } finally {
       setIsUpdating(false);

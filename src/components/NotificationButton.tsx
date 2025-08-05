@@ -32,28 +32,10 @@ const NotificationButton: React.FC<NotificationButtonProps> = ({
     setHasNotifications(hasSpecificSelections);
     setNotificationCount(count);
     
-    console.log('NotificationButton - Status:', {
-      selectedClient,
-      selectedProduct,
-      selectedAudience,
-      selectedCampaign,
-      hasSpecificSelections,
-      count,
-      hasNotifications
-    });
-  }, [selectedClient, selectedProduct, selectedAudience, selectedCampaign]);
+    }, [selectedClient, selectedProduct, selectedAudience, selectedCampaign]);
 
   const handleClick = () => {
 
-    console.log('Estado atual:', {
-      hasNotifications,
-      notificationCount,
-      selectedClient,
-      selectedProduct,
-      selectedAudience,
-      selectedCampaign
-    });
-    
     alert(`Notificações: ${hasNotifications ? 'ATIVAS' : 'INATIVAS'}\nContagem: ${notificationCount}\n\nSeleções:\n- Cliente: ${selectedClient}\n- Produto: ${selectedProduct}\n- Público: ${selectedAudience}\n- Anúncio: ${selectedCampaign || 'Nenhum'}`);
   };
 

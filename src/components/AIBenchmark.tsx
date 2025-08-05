@@ -123,7 +123,6 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
       
       setShowForm(false);
     } catch (error) {
-      console.error('Erro ao gerar benchmark:', error);
       toast.error('Erro ao gerar benchmark. Verifique sua conexão e tente novamente.');
     } finally {
       setIsLoading(false);

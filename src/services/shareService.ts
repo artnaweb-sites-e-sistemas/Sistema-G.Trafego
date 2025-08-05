@@ -56,8 +56,7 @@ class ShareService {
         this.shareLinks = new Map(Object.entries(processedLinks));
       }
     } catch (error) {
-      console.error('Erro ao carregar links salvos:', error);
-    }
+      }
   }
 
   private saveToStorage(): void {
@@ -65,8 +64,7 @@ class ShareService {
       const linksObj = Object.fromEntries(this.shareLinks);
       localStorage.setItem('shareLinks', JSON.stringify(linksObj));
     } catch (error) {
-      console.error('Erro ao salvar links:', error);
-    }
+      }
   }
 
   private generateShortCode(): string {

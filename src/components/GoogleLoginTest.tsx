@@ -20,12 +20,10 @@ const GoogleLoginTest: React.FC = () => {
 
       } else {
         setError(result.error || 'Erro desconhecido');
-        console.error('Erro no login com Google:', result.error);
-      }
+        }
     } catch (err: any) {
       setError(`Erro inesperado: ${err.message}`);
-      console.error('Erro inesperado:', err);
-    } finally {
+      } finally {
       setIsLoading(false);
     }
   };

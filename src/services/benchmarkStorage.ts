@@ -32,8 +32,7 @@ class BenchmarkStorageService {
 
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(stored));
     } catch (error) {
-      console.warn('Erro ao salvar benchmark no localStorage:', error);
-    }
+      }
   }
 
   // Carregar benchmark para um produto específico
@@ -53,7 +52,6 @@ class BenchmarkStorageService {
 
       return null;
     } catch (error) {
-      console.warn('Erro ao carregar benchmark do localStorage:', error);
       return null;
     }
   }
@@ -81,8 +79,7 @@ class BenchmarkStorageService {
       delete stored[key];
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(stored));
     } catch (error) {
-      console.warn('Erro ao remover benchmark do localStorage:', error);
-    }
+      }
   }
 
   // Listar todos os benchmarks salvos
@@ -93,7 +90,6 @@ class BenchmarkStorageService {
         .filter(this.isValidBenchmark)
         .sort((a, b) => b.timestamp - a.timestamp); // Mais recentes primeiro
     } catch (error) {
-      console.warn('Erro ao listar benchmarks:', error);
       return [];
     }
   }
@@ -116,8 +112,7 @@ class BenchmarkStorageService {
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(stored));
       }
     } catch (error) {
-      console.warn('Erro ao limpar benchmarks antigos:', error);
-    }
+      }
   }
 
   // Obter estatísticas de uso
@@ -142,7 +137,6 @@ class BenchmarkStorageService {
         avgConfidence: Math.round(avgConfidence)
       };
     } catch (error) {
-      console.warn('Erro ao calcular estatísticas:', error);
       return { total: 0, thisMonth: 0, avgConfidence: 0 };
     }
   }
@@ -159,7 +153,6 @@ class BenchmarkStorageService {
       const stored = localStorage.getItem(this.STORAGE_KEY);
       return stored ? JSON.parse(stored) : {};
     } catch (error) {
-      console.warn('Erro ao ler localStorage:', error);
       return {};
     }
   }

@@ -52,16 +52,13 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
   // Carregar Business Managers do Meta Ads quando conectado
   useEffect(() => {
     const loadBusinessManagers = async () => {
-      
-      
+
       if (dataSource === 'facebook') {
         try {
           setIsLoading(true);
-    
-          
+
           const businessManagers = await metaAdsService.getBusinessManagers();
-    
-          
+
           // Converter Business Managers para formato de clientes
           const facebookClients: Client[] = businessManagers.map((bm, index) => ({
             id: `fb-${bm.id}`,
@@ -70,14 +67,11 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
             source: 'facebook' as const,
             businessManager: bm
           }));
-          
-    
-          
+
           // Definir Business Managers como clientes (sem "Todos os Clientes")
           setClients(facebookClients);
           
         } catch (error: any) {
-          console.error('Erro ao carregar Business Managers:', error.message);
           // Se não conseguiu carregar e não há dados salvos, mostrar mensagem
           if (!metaAdsService.hasStoredData('business_managers')) {
       
@@ -118,7 +112,6 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
 
   const handleClientSelect = async (client: Client) => {
 
-    
     setSelectedClient(client.name);
     setIsOpen(false);
     setSearchTerm('');
@@ -130,7 +123,6 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
     
     localStorage.setItem('currentSelectedClient', client.name);
 
-    
     if (client.source === 'facebook') {
 
       metaAdsService.clearAllCache();
@@ -193,7 +185,6 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
           window.dispatchEvent(event);
         }
       } catch (error) {
-        console.error('🔴 ClientPicker: Erro ao configurar conta:', error);
         const event = new CustomEvent('clientChanged', {
           detail: {
             clientName: client.name,
@@ -213,7 +204,6 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
       });
       window.dispatchEvent(event);
     }
-    
 
   };
 
@@ -250,7 +240,6 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
     
     setIsOpen(false);
     setSearchTerm('');
-    
 
   };
 
@@ -276,9 +265,7 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
       
       // Limpa o termo de busca se estiver filtrando
       setSearchTerm('');
-      
 
-      
       // Em uma implementação real, aqui você faria a chamada para a API
       // await api.deleteClient(clientId);
     }
