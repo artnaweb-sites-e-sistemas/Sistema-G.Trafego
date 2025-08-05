@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Info, Calendar, Gift, Heart, Star, Sun, Moon, ShoppingBag, GraduationCap, Flag } from 'lucide-react';
 import { MetricData } from '../services/metricsService';
+import { metaAdsService, MetaAdsAd } from '../services/metaAdsService';
 
 interface DailyControlTableProps {
   metrics: MetricData[];
@@ -637,47 +638,69 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
   // Componente para preview do anúncio
   const AdPreview: React.FC<{ ad: AdPerformance }> = ({ ad }) => {
     const [showTooltip, setShowTooltip] = useState(false);
+    const [imageError, setImageError] = useState(false);
+
+    const handleImageError = () => {
+      setImageError(true);
+    };
 
     return (
       <div className="relative">
         <div 
-          className="w-16 h-16 bg-slate-700 rounded-lg border-2 border-slate-600 overflow-hidden cursor-pointer hover:border-blue-400 transition-all duration-200"
+          className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg cursor-pointer hover:scale-105 transition-transform duration-200 flex items-center justify-center overflow-hidden border-2 border-slate-600"
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
         >
-          {ad.imageUrl ? (
+          {ad.imageUrl && !imageError ? (
             <img 
               src={ad.imageUrl} 
               alt={ad.name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover rounded-lg"
+              onError={handleImageError}
+              loading="lazy"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-600 to-slate-700">
-              <div className="text-slate-400 text-xs text-center">
-                <div className="font-bold">AD</div>
-                <div className="text-[10px]">Preview</div>
-              </div>
+            <div className="text-white text-xs font-bold text-center p-2">
+              <div className="text-lg mb-1">📱</div>
+              <div className="text-[10px] leading-tight">Ad</div>
             </div>
           )}
         </div>
-        
-        {/* Tooltip com detalhes do anúncio */}
+
         {showTooltip && (
-          <div className="absolute z-50 top-full left-0 mt-2 w-80 bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-4">
-            <div className="space-y-3">
-              <div>
-                <h4 className="font-semibold text-slate-200 text-sm mb-1">Título</h4>
-                <p className="text-slate-300 text-xs">{ad.title}</p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-slate-200 text-sm mb-1">Descrição</h4>
-                <p className="text-slate-300 text-xs">{ad.description}</p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-slate-200 text-sm mb-1">CTA</h4>
-                <span className="inline-block px-2 py-1 bg-blue-600 text-white text-xs rounded">
-                  {ad.cta}
-                </span>
+          <div className="absolute z-50 left-0 top-full mt-2 w-80 bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-4">
+            <div className="flex items-start space-x-3">
+              {ad.imageUrl && !imageError ? (
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg overflow-hidden flex-shrink-0">
+                  <img 
+                    src={ad.imageUrl} 
+                    alt={ad.name}
+                    className="w-full h-full object-cover"
+                    onError={handleImageError}
+                  />
+                </div>
+              ) : (
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <div className="text-white text-center">
+                    <div className="text-2xl mb-1">📱</div>
+                    <div className="text-xs">Ad</div>
+                  </div>
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <h4 className="font-semibold text-slate-100 text-sm mb-2 line-clamp-2">{ad.title}</h4>
+                <p className="text-slate-300 text-xs mb-3 line-clamp-3">{ad.description}</p>
+                <div className="flex items-center justify-between">
+                  <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                    {ad.cta}
+                  </span>
+                  <span className="text-slate-400 text-xs truncate">{ad.name}</span>
+                </div>
+                {ad.imageUrl && (
+                  <div className="mt-2 text-xs text-slate-500">
+                    Imagem carregada do Meta Ads
+                  </div>
+                )}
               </div>
             </div>
             <div className="absolute -top-2 left-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-slate-800"></div>
@@ -694,6 +717,35 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
     metrics: MetricData[];
   }> = ({ selectedAudience, selectedMonth, metrics }) => {
     const [adPerformances, setAdPerformances] = useState<AdPerformance[]>([]);
+    const [adsData, setAdsData] = useState<MetaAdsAd[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    // Buscar dados dos anúncios do Meta Ads
+    useEffect(() => {
+      const fetchAdsData = async () => {
+        if (!metaAdsService.isConfigured()) {
+          console.log('Meta Ads não configurado, usando dados simulados');
+          return;
+        }
+
+        try {
+          setLoading(true);
+          console.log('Buscando anúncios do Meta Ads...');
+          
+          // Buscar todos os anúncios da conta
+          const ads = await metaAdsService.getAds();
+          console.log('Anúncios encontrados:', ads.length);
+          
+          setAdsData(ads);
+        } catch (error) {
+          console.error('Erro ao buscar anúncios:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchAdsData();
+    }, []);
 
     useEffect(() => {
       if (!selectedAudience || !selectedMonth || !metrics.length) {
@@ -704,38 +756,41 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       // Agrupar métricas por anúncio
       const adMap = new Map<string, AdPerformance>();
       
-             metrics.forEach(metric => {
-         if (metric.month !== selectedMonth || metric.audience !== selectedAudience) return;
-         
-         const adId = metric.id || metric.service || 'unknown';
-         const existing = adMap.get(adId);
-         
-         if (existing) {
-           // Acumular métricas
-           existing.impressions += metric.impressions || 0;
-           existing.clicks += metric.clicks || 0;
-           existing.spend += metric.investment || 0;
-           existing.conversions += metric.leads || 0;
-         } else {
-           // Criar novo anúncio
-           adMap.set(adId, {
-             id: adId,
-             name: metric.service || 'Anúncio sem nome',
-             imageUrl: undefined, // Não disponível no MetricData atual
-             title: 'Título não disponível',
-             description: 'Descrição não disponível',
-             cta: 'Saiba mais',
-             cpa: 0,
-             ctr: 0,
-             cpc: 0,
-             frequency: 0,
-             impressions: metric.impressions || 0,
-             clicks: metric.clicks || 0,
-             spend: metric.investment || 0,
-             conversions: metric.leads || 0
-           });
-         }
-       });
+      metrics.forEach(metric => {
+        if (metric.month !== selectedMonth || metric.audience !== selectedAudience) return;
+        
+        const adId = metric.id || metric.service || 'unknown';
+        const existing = adMap.get(adId);
+        
+        if (existing) {
+          // Acumular métricas
+          existing.impressions += metric.impressions || 0;
+          existing.clicks += metric.clicks || 0;
+          existing.spend += metric.investment || 0;
+          existing.conversions += metric.leads || 0;
+        } else {
+          // Buscar dados do anúncio no Meta Ads
+          const adData = adsData.find(ad => ad.id === adId || ad.name.includes(adId));
+          
+          // Criar novo anúncio
+          adMap.set(adId, {
+            id: adId,
+            name: adData?.name || metric.service || 'Anúncio sem nome',
+            imageUrl: adData?.creative?.thumbnail_url || adData?.creative?.image_url,
+            title: adData?.creative?.title || 'Título não disponível',
+            description: adData?.creative?.body || 'Descrição não disponível',
+            cta: adData?.creative?.call_to_action_type || 'Saiba mais',
+            cpa: 0,
+            ctr: 0,
+            cpc: 0,
+            frequency: 0,
+            impressions: metric.impressions || 0,
+            clicks: metric.clicks || 0,
+            spend: metric.investment || 0,
+            conversions: metric.leads || 0
+          });
+        }
+      });
 
       // Calcular métricas derivadas
       const performances = Array.from(adMap.values()).map(ad => ({
@@ -750,7 +805,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       performances.sort((a, b) => a.cpa - b.cpa);
       
       setAdPerformances(performances);
-    }, [selectedAudience, selectedMonth, metrics]);
+    }, [selectedAudience, selectedMonth, metrics, adsData]);
 
     if (!selectedAudience || !metrics.length) {
       return null;
@@ -801,6 +856,12 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
               <p className="text-slate-500 text-xs mt-1">
                 Ordenados por CPA (menor = melhor performance)
               </p>
+              {loading && (
+                <div className="flex items-center mt-2 space-x-2">
+                  <div className="w-3 h-3 bg-blue-400 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-blue-400">Carregando imagens dos anúncios...</span>
+                </div>
+              )}
             </div>
             <div className="bg-blue-900/30 rounded-lg p-3 border border-blue-600/30">
               <p className="text-sm text-blue-400 font-medium">

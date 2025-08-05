@@ -53,6 +53,24 @@ export interface MetaAdsCampaign {
   updated_time: string;
 }
 
+export interface MetaAdsAd {
+  id: string;
+  name: string;
+  status: string;
+  creative?: {
+    id: string;
+    name: string;
+    thumbnail_url?: string;
+    image_url?: string;
+    image_hash?: string;
+    title?: string;
+    body?: string;
+    call_to_action_type?: string;
+  };
+  adset_id: string;
+  campaign_id: string;
+}
+
 class MetaAdsService {
   private baseURL = 'https://graph.facebook.com/v18.0';
   private user: FacebookUser | null = null;
@@ -1618,6 +1636,64 @@ class MetaAdsService {
   // Salvar dados automaticamente quando carregados
   private saveDataAfterLoad(type: string, data: any): void {
     this.saveDataToStorage(type, data);
+  }
+
+  async getAds(adSetId?: string, campaignId?: string): Promise<MetaAdsAd[]> {
+    if (!this.selectedAccount || !this.accessToken) {
+      throw new Error('Conta não selecionada ou token não disponível');
+    }
+
+    const cacheKey = this.getCacheKey('ads', { adSetId, campaignId });
+    return this.makeCachedRequest('ads', async () => {
+      let fields = 'id,name,status,creative{id,name,thumbnail_url,image_url,image_hash,title,body,call_to_action_type},adset_id,campaign_id';
+      
+      let url = `${this.baseURL}/act_${this.selectedAccount!.account_id}/ads`;
+      let params: any = {
+        access_token: this.accessToken,
+        fields: fields,
+        limit: 100
+      };
+
+      if (adSetId) {
+        params.adset_id = adSetId;
+      }
+      if (campaignId) {
+        params.campaign_id = campaignId;
+      }
+
+      try {
+        const response = await axios.get(url, { params });
+        return response.data.data || [];
+      } catch (error: any) {
+        console.error('Erro ao buscar anúncios:', error.response?.data || error.message);
+        throw new Error('Falha ao buscar anúncios do Meta Ads');
+      }
+    }, this.CACHE_TTL.AD_SETS, { adSetId, campaignId });
+  }
+
+  async getAdCreative(creativeId: string): Promise<any> {
+    if (!this.accessToken) {
+      throw new Error('Token não disponível');
+    }
+
+    const cacheKey = this.getCacheKey('creative', { creativeId });
+    return this.makeCachedRequest('creative', async () => {
+      const fields = 'id,name,thumbnail_url,image_url,image_hash,title,body,call_to_action_type,object_story_spec';
+      
+      const url = `${this.baseURL}/${creativeId}`;
+      const params = {
+        access_token: this.accessToken,
+        fields: fields
+      };
+
+      try {
+        const response = await axios.get(url, { params });
+        return response.data;
+      } catch (error: any) {
+        console.error('Erro ao buscar criativo:', error.response?.data || error.message);
+        throw new Error('Falha ao buscar criativo do Meta Ads');
+      }
+    }, this.CACHE_TTL.AD_SETS, { creativeId });
   }
 }
 
