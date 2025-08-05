@@ -19,6 +19,7 @@ interface ProductPickerProps {
   selectedClient: string; // Cliente selecionado
   dataSource?: 'manual' | 'facebook' | null;
   selectedMonth?: string; // Mês selecionado para filtrar campanhas
+  isFacebookConnected?: boolean;
 }
 
 const ProductPicker: React.FC<ProductPickerProps> = ({ 
@@ -26,21 +27,12 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
   setSelectedProduct, 
   selectedClient,
   dataSource,
-  selectedMonth
+  selectedMonth,
+  isFacebookConnected = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [products, setProducts] = useState<Product[]>([
-    { id: '2', name: 'Pacote Básico', description: 'Serviços essenciais', price: 500, category: 'Marketing', clientId: '2', source: 'manual' },
-    { id: '3', name: 'Pacote Premium', description: 'Serviços completos', price: 1200, category: 'Marketing', clientId: '2', source: 'manual' },
-    { id: '4', name: 'Consultoria Mensal', description: 'Acompanhamento especializado', price: 800, category: 'Consultoria', clientId: '3', source: 'manual' },
-    { id: '5', name: 'Gestão de Redes Sociais', description: 'Criação e gestão de conteúdo', price: 600, category: 'Social Media', clientId: '3', source: 'manual' },
-    { id: '6', name: 'Campanha Google Ads', description: 'Gestão de campanhas', price: 900, category: 'Publicidade', clientId: '4', source: 'manual' },
-    { id: '7', name: 'Website Institucional', description: 'Desenvolvimento de site', price: 2500, category: 'Desenvolvimento', clientId: '5', source: 'manual' },
-    { id: '8', name: 'E-commerce Completo', description: 'Loja virtual completa', price: 3500, category: 'Desenvolvimento', clientId: '6', source: 'manual' },
-    { id: '9', name: 'SEO Básico', description: 'Otimização para buscadores', price: 400, category: 'SEO', clientId: '7', source: 'manual' },
-    { id: '10', name: 'SEO Avançado', description: 'SEO completo e monitoramento', price: 800, category: 'SEO', clientId: '8', source: 'manual' },
-  ]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
@@ -134,17 +126,8 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
         setIsLoading(false);
       }
     } else if (dataSource === 'manual') {
-      setProducts([
-        { id: '2', name: 'Pacote Básico', description: 'Serviços essenciais', price: 500, category: 'Marketing', clientId: '2', source: 'manual' },
-        { id: '3', name: 'Pacote Premium', description: 'Serviços completos', price: 1200, category: 'Marketing', clientId: '2', source: 'manual' },
-        { id: '4', name: 'Consultoria Mensal', description: 'Acompanhamento especializado', price: 800, category: 'Consultoria', clientId: '3', source: 'manual' },
-        { id: '5', name: 'Gestão de Redes Sociais', description: 'Criação e gestão de conteúdo', price: 600, category: 'Social Media', clientId: '3', source: 'manual' },
-        { id: '6', name: 'Campanha Google Ads', description: 'Gestão de campanhas', price: 900, category: 'Publicidade', clientId: '4', source: 'manual' },
-        { id: '7', name: 'Website Institucional', description: 'Desenvolvimento de site', price: 2500, category: 'Desenvolvimento', clientId: '5', source: 'manual' },
-        { id: '8', name: 'E-commerce Completo', description: 'Loja virtual completa', price: 3500, category: 'Desenvolvimento', clientId: '6', source: 'manual' },
-        { id: '9', name: 'SEO Básico', description: 'Otimização para buscadores', price: 400, category: 'SEO', clientId: '7', source: 'manual' },
-        { id: '10', name: 'SEO Avançado', description: 'SEO completo e monitoramento', price: 800, category: 'SEO', clientId: '8', source: 'manual' },
-      ]);
+      // Não carregar produtos manuais - só devem vir do Meta
+      setProducts([]);
     } else {
       console.log('ProductPicker: DataSource não é facebook ou usuário não está logado');
       setProducts([]);
@@ -326,17 +309,8 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
         setIsLoading(false);
       }
     } else if (source === 'manual') {
-      setProducts([
-        { id: '2', name: 'Pacote Básico', description: 'Serviços essenciais', price: 500, category: 'Marketing', clientId: '2', source: 'manual' },
-        { id: '3', name: 'Pacote Premium', description: 'Serviços completos', price: 1200, category: 'Marketing', clientId: '2', source: 'manual' },
-        { id: '4', name: 'Consultoria Mensal', description: 'Acompanhamento especializado', price: 800, category: 'Consultoria', clientId: '3', source: 'manual' },
-        { id: '5', name: 'Gestão de Redes Sociais', description: 'Criação e gestão de conteúdo', price: 600, category: 'Social Media', clientId: '3', source: 'manual' },
-        { id: '6', name: 'Campanha Google Ads', description: 'Gestão de campanhas', price: 900, category: 'Publicidade', clientId: '4', source: 'manual' },
-        { id: '7', name: 'Website Institucional', description: 'Desenvolvimento de site', price: 2500, category: 'Desenvolvimento', clientId: '5', source: 'manual' },
-        { id: '8', name: 'E-commerce Completo', description: 'Loja virtual completa', price: 3500, category: 'Desenvolvimento', clientId: '6', source: 'manual' },
-        { id: '9', name: 'SEO Básico', description: 'Otimização para buscadores', price: 400, category: 'SEO', clientId: '7', source: 'manual' },
-        { id: '10', name: 'SEO Avançado', description: 'SEO completo e monitoramento', price: 800, category: 'SEO', clientId: '8', source: 'manual' },
-      ]);
+      // Não carregar produtos manuais - só devem vir do Meta
+      setProducts([]);
     } else {
       console.log('ProductPicker: DataSource não é facebook ou usuário não está logado');
       setProducts([]);
@@ -413,8 +387,8 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
     return objectives[objective] || objective;
   };
 
-  // Verificar se o picker deve estar ativo
-  const isPickerActive = selectedClient && selectedClient !== 'Todos os Clientes' && selectedClient !== 'Selecione um cliente';
+  // Verificar se o picker deve estar ativo - só ativo se Meta estiver conectado e cliente selecionado
+  const isPickerActive = dataSource === 'facebook' && isFacebookConnected && selectedClient && selectedClient !== 'Todos os Clientes' && selectedClient !== 'Selecione um cliente';
 
   // Filtrar produtos baseado no termo de busca
   const filteredProducts = products.filter(product =>
@@ -435,15 +409,17 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
             ? 'bg-gray-700 text-white border-gray-600 focus:border-purple-500 focus:outline-none' 
             : 'bg-gray-800 text-gray-500 border-gray-700'
         }`}>
-          <span className="truncate block">
-            {isPickerActive ? getDisplayText() : 'Selecione um cliente primeiro'}
-          </span>
+                  <span className="truncate block">
+          {isPickerActive ? getDisplayText() : 
+            !isFacebookConnected ? 'Conecte-se ao Meta primeiro' : 
+            'Selecione um cliente primeiro'}
+        </span>
         </div>
         <ChevronDown className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isPickerActive ? 'text-gray-400' : 'text-gray-600'}`} />
         
         {/* Indicador de Status */}
         <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 dropdown-indicator ${
-          selectedClient && selectedClient !== 'Selecione um cliente' && selectedClient !== '' && selectedClient !== undefined && selectedClient !== null && selectedProduct && selectedProduct !== '' && selectedProduct !== undefined && selectedProduct !== null && selectedProduct !== 'Todos os Produtos'
+          isPickerActive && selectedProduct && selectedProduct !== '' && selectedProduct !== undefined && selectedProduct !== null && selectedProduct !== 'Todos os Produtos'
             ? 'bg-green-500 shadow-lg shadow-green-500/50'
             : 'bg-gray-500'
         }`}></div>
@@ -463,12 +439,13 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
                 Limpar
               </button>
 
-              <button
+              {/* Remover botão de adicionar produto - só deve ser feito via Meta */}
+              {/* <button
                 className="flex items-center px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-md transition-all duration-200 ease-in-out shadow-sm hover:shadow-md"
               >
                 <Plus className="w-4 h-4 mr-1" />
                 Novo Produto
-              </button>
+              </button> */}
             </div>
           </div>
 

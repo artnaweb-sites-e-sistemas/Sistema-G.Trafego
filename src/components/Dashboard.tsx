@@ -146,7 +146,12 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
               const firstMonth = monthsWithData[0];
               const realValuesFromOtherMonth = await metricsService.getRealValuesForClient(firstMonth, selectedClient);
               console.log('🔍 DEBUG - Dashboard - Definindo valores do outro mês:', realValuesFromOtherMonth);
-              setRealValuesForClient(realValuesFromOtherMonth);
+              setRealValuesForClient({
+                agendamentos: realValuesFromOtherMonth.agendamentos,
+                vendas: realValuesFromOtherMonth.vendas,
+                cpv: realValuesFromOtherMonth.cpv,
+                roi: typeof realValuesFromOtherMonth.roi === 'string' ? realValuesFromOtherMonth.roi : `${realValuesFromOtherMonth.roi}%`
+              });
               console.log('🔍 DEBUG - Dashboard - Usando dados do mês:', firstMonth, realValuesFromOtherMonth);
             } else {
               console.log('🔍 DEBUG - Dashboard - Nenhum dado encontrado em nenhum mês, criando dados de teste...');
@@ -154,7 +159,12 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
               await metricsService.createTestDataForClient(selectedClient, selectedMonth);
               const testValues = await metricsService.getRealValuesForClient(selectedMonth, selectedClient);
               console.log('🔍 DEBUG - Dashboard - Definindo valores de teste:', testValues);
-              setRealValuesForClient(testValues);
+              setRealValuesForClient({
+                agendamentos: testValues.agendamentos,
+                vendas: testValues.vendas,
+                cpv: testValues.cpv,
+                roi: typeof testValues.roi === 'string' ? testValues.roi : `${testValues.roi}%`
+              });
               console.log('🔍 DEBUG - Dashboard - Dados de teste criados:', testValues);
             }
           } else {
@@ -170,12 +180,12 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         } catch (error) {
           console.error('🔍 DEBUG - Dashboard - Erro ao carregar valores reais do cliente:', error);
           console.error('🔍 DEBUG - Dashboard - Stack trace do erro:', error instanceof Error ? error.stack : 'N/A');
-          setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: 0 });
+          setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0%' });
         }
       } else {
         console.log('🔍 DEBUG - Dashboard - Cliente não selecionado ou inválido');
         console.log('🔍 DEBUG - Dashboard - selectedClient:', selectedClient);
-        setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: 0 });
+        setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0%' });
       }
     };
 
@@ -554,6 +564,22 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const handleDataSourceChange = (source: 'manual' | 'facebook' | null, connected: boolean) => {
     setDataSource(source);
     setIsFacebookConnected(connected);
+    
+    // Se não está conectado ao Meta, limpar todas as seleções
+    if (!connected) {
+      setSelectedClient('Selecione um cliente');
+      setSelectedProduct('');
+      setSelectedAudience('');
+      setSelectedCampaign('');
+      setMetrics([]);
+      
+      // Limpar localStorage
+      localStorage.removeItem('currentSelectedClient');
+      localStorage.removeItem('currentSelectedProduct');
+      localStorage.removeItem('currentSelectedAudience');
+      localStorage.removeItem('selectedCampaignId');
+      localStorage.removeItem('selectedAdSetId');
+    }
   };
 
   // Função para lidar com os resultados do benchmark de IA

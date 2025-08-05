@@ -175,6 +175,7 @@ const Header: React.FC<HeaderProps> = ({
                   selectedClient={selectedClient}
                   setSelectedClient={setSelectedClient}
                   dataSource={dataSource}
+                  isFacebookConnected={isFacebookConnected}
                 />
               </div>
             </div>
@@ -188,6 +189,7 @@ const Header: React.FC<HeaderProps> = ({
                   selectedClient={selectedClient}
                   dataSource={dataSource}
                   selectedMonth={selectedMonth}
+                  isFacebookConnected={isFacebookConnected}
                 />
               </div>
             </div>
@@ -202,6 +204,7 @@ const Header: React.FC<HeaderProps> = ({
                   selectedClient={selectedClient}
                   dataSource={dataSource}
                   selectedMonth={selectedMonth}
+                  isFacebookConnected={isFacebookConnected}
                 />
               </div>
             </div>

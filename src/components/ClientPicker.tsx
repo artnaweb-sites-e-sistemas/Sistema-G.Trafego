@@ -15,18 +15,18 @@ interface ClientPickerProps {
   selectedClient: string;
   setSelectedClient: (client: string) => void;
   dataSource?: 'manual' | 'facebook' | null;
+  isFacebookConnected?: boolean;
 }
 
 const ClientPicker: React.FC<ClientPickerProps> = ({ 
   selectedClient, 
   setSelectedClient,
-  dataSource 
+  dataSource,
+  isFacebookConnected = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [clients, setClients] = useState<Client[]>([
-    { id: '1', name: 'Todos os Clientes', company: 'Sistema', source: 'manual' },
-  ]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
   
@@ -86,17 +86,8 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
           setIsLoading(false);
         }
       } else if (dataSource === 'manual') {
-  
-        // Carregar clientes manuais (sem "Todos os Clientes")
-        setClients([
-          { id: '2', name: 'João Silva', email: 'joao@empresa.com', company: 'Empresa ABC', source: 'manual' },
-          { id: '3', name: 'Maria Santos', email: 'maria@startup.com', company: 'Startup XYZ', source: 'manual' },
-          { id: '4', name: 'Pedro Costa', email: 'pedro@consultoria.com', company: 'Consultoria 123', source: 'manual' },
-          { id: '5', name: 'Ana Oliveira', email: 'ana@tech.com', company: 'Tech Solutions', source: 'manual' },
-          { id: '6', name: 'Carlos Ferreira', email: 'carlos@digital.com', company: 'Digital Marketing', source: 'manual' },
-          { id: '7', name: 'Lucia Mendes', email: 'lucia@ecommerce.com', company: 'E-commerce Plus', source: 'manual' },
-          { id: '8', name: 'Roberto Lima', email: 'roberto@agencia.com', company: 'Agência Criativa', source: 'manual' },
-        ]);
+        // Não carregar clientes manuais - só devem vir do Meta
+        setClients([]);
       } else {
     
       }
@@ -312,31 +303,39 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
     return <Users className="w-4 h-4 text-gray-400" />;
   };
 
+  // Verificar se o picker deve estar ativo - só ativo se Meta estiver conectado
+  const isPickerActive = dataSource === 'facebook' && isFacebookConnected;
   const isClientSelected = selectedClient && selectedClient !== 'Selecione um cliente' && selectedClient !== 'Todos os Clientes' && selectedClient !== '' && selectedClient !== undefined && selectedClient !== null;
 
   return (
     <div className="relative dropdown-container" ref={pickerRef}>
       {/* Input field */}
       <div 
-        className={`relative cursor-pointer dropdown-trigger`}
-        onClick={() => setIsOpen(!isOpen)}
+        className={`relative ${isPickerActive ? 'cursor-pointer dropdown-trigger' : 'cursor-not-allowed'}`}
+        onClick={() => isPickerActive && setIsOpen(!isOpen)}
       >
-        <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <div className="pl-10 pr-8 py-2 rounded-lg border w-full bg-gray-700 text-white border-gray-600 focus:border-purple-500 focus:outline-none">
-          <span className="truncate block">{getDisplayText()}</span>
+        <Users className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isPickerActive ? 'text-gray-400' : 'text-gray-600'}`} />
+        <div className={`pl-10 pr-8 py-2 rounded-lg border w-full ${
+          isPickerActive 
+            ? 'bg-gray-700 text-white border-gray-600 focus:border-purple-500 focus:outline-none' 
+            : 'bg-gray-800 text-gray-500 border-gray-700'
+        }`}>
+          <span className="truncate block">
+            {isPickerActive ? getDisplayText() : 'Conecte-se ao Meta primeiro'}
+          </span>
         </div>
         <ChevronDown className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isClientSelected ? 'text-gray-400' : 'text-gray-600'}`} />
         
         {/* Indicador de Status */}
         <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 dropdown-indicator ${
-          selectedClient === 'Todos os Clientes' || selectedClient === 'Selecione um cliente'
-            ? 'bg-gray-500' 
-            : 'bg-green-500 shadow-lg shadow-green-500/50'
+          isPickerActive && isClientSelected
+            ? 'bg-green-500 shadow-lg shadow-green-500/50' 
+            : 'bg-gray-500'
         }`}></div>
       </div>
 
       {/* Dropdown */}
-      {isOpen && (
+      {isOpen && isPickerActive && (
         <div className="dropdown-menu dropdown-menu-large z-dropdown-high bg-slate-900 border border-slate-700 rounded-xl shadow-2xl" style={{ zIndex: 2147483647 }}>
           {/* Action buttons - Fixed at top */}
           <div className="border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-700">
@@ -348,12 +347,13 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
                 <X className="w-4 h-4 mr-1" />
                 Limpar
               </button>
-              <button
+              {/* Remover botão de adicionar cliente - só deve ser feito via Meta */}
+              {/* <button
                 className="flex items-center px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-md transition-all duration-200 ease-in-out shadow-sm hover:shadow-md"
               >
                 <Plus className="w-4 h-4 mr-1" />
                 Novo Cliente
-              </button>
+              </button> */}
             </div>
           </div>
 

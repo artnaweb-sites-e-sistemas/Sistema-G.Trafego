@@ -23,6 +23,7 @@ interface AudiencePickerProps {
   selectedClient: string; // Cliente selecionado
   dataSource?: 'manual' | 'facebook' | null;
   selectedMonth?: string; // Mês selecionado para filtrar Ad Sets
+  isFacebookConnected?: boolean;
 }
 
 const AudiencePicker: React.FC<AudiencePickerProps> = ({ 
@@ -31,21 +32,12 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
   selectedProduct,
   selectedClient,
   dataSource,
-  selectedMonth
+  selectedMonth,
+  isFacebookConnected = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [audiences, setAudiences] = useState<Audience[]>([
-    { id: '2', name: 'Executivos 30-50', description: 'Profissionais de alto nível', ageRange: '30-50', interests: ['Negócios', 'Tecnologia'], location: 'São Paulo', size: 15000, productId: '2', clientId: '2', source: 'manual' },
-    { id: '3', name: 'Empreendedores', description: 'Donos de pequenas empresas', ageRange: '25-45', interests: ['Empreendedorismo', 'Marketing'], location: 'Brasil', size: 25000, productId: '3', clientId: '2', source: 'manual' },
-    { id: '4', name: 'Startups', description: 'Empresas em crescimento', ageRange: '20-40', interests: ['Inovação', 'Tecnologia'], location: 'São Paulo', size: 8000, productId: '4', clientId: '3', source: 'manual' },
-    { id: '5', name: 'Consultores', description: 'Profissionais independentes', ageRange: '28-55', interests: ['Consultoria', 'Estratégia'], location: 'Brasil', size: 12000, productId: '5', clientId: '3', source: 'manual' },
-    { id: '6', name: 'Agencias de Marketing', description: 'Agencias digitais', ageRange: '25-45', interests: ['Marketing Digital', 'Publicidade'], location: 'São Paulo', size: 5000, productId: '6', clientId: '4', source: 'manual' },
-    { id: '7', name: 'E-commerce', description: 'Lojas online', ageRange: '25-50', interests: ['E-commerce', 'Vendas'], location: 'Brasil', size: 18000, productId: '7', clientId: '5', source: 'manual' },
-    { id: '8', name: 'Tech Companies', description: 'Empresas de tecnologia', ageRange: '22-45', interests: ['Tecnologia', 'Inovação'], location: 'São Paulo', size: 10000, productId: '8', clientId: '6', source: 'manual' },
-    { id: '9', name: 'Profissionais Liberais', description: 'Advogados, médicos, etc.', ageRange: '30-60', interests: ['Profissional', 'Serviços'], location: 'Brasil', size: 30000, productId: '9', clientId: '7', source: 'manual' },
-    { id: '10', name: 'Agencias Criativas', description: 'Design e comunicação', ageRange: '23-40', interests: ['Design', 'Criatividade'], location: 'São Paulo', size: 7000, productId: '10', clientId: '8', source: 'manual' },
-  ]);
+  const [audiences, setAudiences] = useState<Audience[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
@@ -153,17 +145,8 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         setIsLoading(false);
       }
     } else if (dataSource === 'manual') {
-      setAudiences([
-        { id: '2', name: 'Executivos 30-50', description: 'Profissionais de alto nível', ageRange: '30-50', interests: ['Negócios', 'Tecnologia'], location: 'São Paulo', size: 15000, productId: '2', clientId: '2', source: 'manual' },
-        { id: '3', name: 'Empreendedores', description: 'Donos de pequenas empresas', ageRange: '25-45', interests: ['Empreendedorismo', 'Marketing'], location: 'Brasil', size: 25000, productId: '3', clientId: '2', source: 'manual' },
-        { id: '4', name: 'Startups', description: 'Empresas em crescimento', ageRange: '20-40', interests: ['Inovação', 'Tecnologia'], location: 'São Paulo', size: 8000, productId: '4', clientId: '3', source: 'manual' },
-        { id: '5', name: 'Consultores', description: 'Profissionais independentes', ageRange: '28-55', interests: ['Consultoria', 'Estratégia'], location: 'Brasil', size: 12000, productId: '5', clientId: '3', source: 'manual' },
-        { id: '6', name: 'Agencias de Marketing', description: 'Agencias digitais', ageRange: '25-45', interests: ['Marketing Digital', 'Publicidade'], location: 'São Paulo', size: 5000, productId: '6', clientId: '4', source: 'manual' },
-        { id: '7', name: 'E-commerce', description: 'Lojas online', ageRange: '25-50', interests: ['E-commerce', 'Vendas'], location: 'Brasil', size: 18000, productId: '7', clientId: '5', source: 'manual' },
-        { id: '8', name: 'Tech Companies', description: 'Empresas de tecnologia', ageRange: '22-45', interests: ['Tecnologia', 'Inovação'], location: 'São Paulo', size: 10000, productId: '8', clientId: '6', source: 'manual' },
-        { id: '9', name: 'Profissionais Liberais', description: 'Advogados, médicos, etc.', ageRange: '30-60', interests: ['Profissional', 'Serviços'], location: 'Brasil', size: 30000, productId: '9', clientId: '7', source: 'manual' },
-        { id: '10', name: 'Agencias Criativas', description: 'Design e comunicação', ageRange: '23-40', interests: ['Design', 'Criatividade'], location: 'São Paulo', size: 7000, productId: '10', clientId: '8', source: 'manual' },
-      ]);
+      // Não carregar públicos manuais - só devem vir do Meta
+      setAudiences([]);
     } else {
             setAudiences([]);
     }
@@ -365,8 +348,8 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
     return <Users className="w-4 h-4 text-gray-400" />;
   };
 
-  // Verificar se o picker deve estar ativo
-  const isPickerActive = selectedProduct && selectedProduct !== 'Todos os Produtos' && selectedClient && selectedClient !== 'Selecione um cliente';
+  // Verificar se o picker deve estar ativo - só ativo se Meta estiver conectado e produto/cliente selecionados
+  const isPickerActive = dataSource === 'facebook' && isFacebookConnected && selectedProduct && selectedProduct !== 'Todos os Produtos' && selectedClient && selectedClient !== 'Selecione um cliente';
 
   return (
     <div className="relative dropdown-container" ref={pickerRef}>
@@ -383,6 +366,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         }`}>
           <span className="truncate block">
             {isPickerActive ? getDisplayText() : 
+              !isFacebookConnected ? 'Conecte-se ao Meta primeiro' :
               selectedClient === 'Selecione um cliente' ? 'Selecione um cliente primeiro' : 
               'Selecione um produto primeiro'}
           </span>
@@ -391,9 +375,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         
         {/* Indicador de Status */}
         <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 dropdown-indicator ${
-          selectedClient && selectedClient !== 'Selecione um cliente' && selectedClient !== '' && selectedClient !== undefined && selectedClient !== null &&
-          selectedProduct && selectedProduct !== '' && selectedProduct !== undefined && selectedProduct !== null &&
-          selectedAudience && selectedAudience !== '' && selectedAudience !== undefined && selectedAudience !== null && selectedAudience !== 'Selecione um público' && selectedAudience !== 'Todos os Públicos'
+          isPickerActive && selectedAudience && selectedAudience !== '' && selectedAudience !== undefined && selectedAudience !== null && selectedAudience !== 'Selecione um público' && selectedAudience !== 'Todos os Públicos'
             ? 'bg-green-500 shadow-lg shadow-green-500/50'
             : 'bg-gray-500'
         }`}></div>
@@ -412,12 +394,13 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
                 <X className="w-4 h-4 mr-1" />
                 Limpar
               </button>
-              <button
+              {/* Remover botão de adicionar público - só deve ser feito via Meta */}
+              {/* <button
                 className="flex items-center px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-md transition-all duration-200 ease-in-out shadow-sm hover:shadow-md"
               >
                 <Plus className="w-4 h-4 mr-1" />
                 Novo Público
-              </button>
+              </button> */}
             </div>
           </div>
 
