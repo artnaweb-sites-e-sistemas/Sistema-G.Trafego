@@ -711,6 +711,22 @@ export const metricsService = {
     }
   },
 
+  // CORREÇÃO: Método para limpar cache por período específico
+  clearCacheByPeriod(month: string, client?: string): void {
+    console.log(`Limpando cache de métricas para período: ${month}${client ? ` - cliente: ${client}` : ''}`);
+    
+    // Limpar todas as chaves de cache que contêm o período
+    for (const key of this.cache.keys()) {
+      if (key.includes(month)) {
+        // Se cliente foi especificado, limpar apenas se a chave contém o cliente
+        if (!client || key.includes(client)) {
+          this.cache.delete(key);
+          console.log(`Cache de métricas removido: ${key}`);
+        }
+      }
+    }
+  },
+
   // Função para sanitizar IDs de documentos (remover caracteres especiais)
   sanitizeDocumentId(str: string): string {
     return str
@@ -1188,19 +1204,39 @@ export const metricsService = {
   },
 
   // Buscar detalhes mensais editáveis - vinculado apenas ao produto
-  async getMonthlyDetails(month: string, product: string) {
+  async getMonthlyDetails(month: string, product: string, client?: string) {
     try {
       const detailsRef = collection(db, 'monthlyDetails');
-      const q = query(
-        detailsRef,
-        where('month', '==', month),
-        where('product', '==', product)
-      );
+      let q;
+      
+      // CORREÇÃO: Incluir filtro por cliente se fornecido
+      if (client) {
+        q = query(
+          detailsRef,
+          where('month', '==', month),
+          where('product', '==', product),
+          where('client', '==', client)
+        );
+      } else {
+        q = query(
+          detailsRef,
+          where('month', '==', month),
+          where('product', '==', product)
+        );
+      }
       
       const snapshot = await getDocs(q);
       
       if (!snapshot.empty) {
         const data = snapshot.docs[0].data();
+        console.log('🔍 DEBUG - getMonthlyDetails - Dados encontrados:', {
+          month,
+          product,
+          client,
+          agendamentos: data.agendamentos,
+          vendas: data.vendas,
+          ticketMedio: data.ticketMedio
+        });
         return {
           agendamentos: data.agendamentos || 0,
           vendas: data.vendas || 0,
@@ -1208,6 +1244,7 @@ export const metricsService = {
         };
       }
       
+      console.log('🔍 DEBUG - getMonthlyDetails - Nenhum dado encontrado para:', { month, product, client });
       return { agendamentos: 0, vendas: 0, ticketMedio: 0 };
     } catch (error) {
       console.error('Erro ao buscar detalhes mensais:', error);

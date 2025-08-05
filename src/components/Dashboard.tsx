@@ -138,6 +138,10 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       try {
         console.log('🔍 DEBUG - Dashboard - Carregando valores reais para cliente:', selectedClient);
         
+        // CORREÇÃO: Limpar cache quando período muda para evitar dados incorretos
+        console.log('🔍 DEBUG - Dashboard - Limpando cache para novo período...');
+        metricsService.clearCacheByPeriod(selectedMonth, selectedClient);
+        
         // Debug: verificar dados na coleção monthlyDetails
         console.log('🔍 DEBUG - Dashboard - Verificando dados na coleção monthlyDetails...');
         await metricsService.debugMonthlyDetails(selectedMonth);

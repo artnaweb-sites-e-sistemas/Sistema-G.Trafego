@@ -189,10 +189,18 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       const storageKey = `benchmark_${clientForBenchmarks}_${selectedProduct}_${selectedMonth}`;
       const savedBenchmarks = localStorage.getItem(storageKey);
       
+      console.log('🔍 DEBUG - MonthlyDetailsTable - Tentando carregar benchmarks:', {
+        storageKey,
+        clientForBenchmarks,
+        selectedProduct,
+        selectedMonth,
+        hasSavedData: !!savedBenchmarks
+      });
+      
       if (savedBenchmarks) {
         try {
           const benchmarkValues = JSON.parse(savedBenchmarks);
-          console.log('Valores de benchmark carregados:', benchmarkValues);
+          console.log('🔍 DEBUG - MonthlyDetailsTable - Benchmarks carregados:', benchmarkValues);
           
           setTableData(prevData => {
             const updatedData = prevData.map(row => {
@@ -208,7 +216,13 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           });
         } catch (error) {
           console.error('Erro ao carregar benchmarks salvos:', error);
+          // CORREÇÃO: Em caso de erro, manter valores zerados
+          setTableData(getInitialTableData());
         }
+      } else {
+        // CORREÇÃO: Se não há dados salvos, manter valores zerados
+        console.log('🔍 DEBUG - MonthlyDetailsTable - Nenhum benchmark salvo encontrado, mantendo valores zerados');
+        setTableData(getInitialTableData());
       }
 
       // Carregar estados automáticos dos campos benchmark
@@ -275,14 +289,14 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   const [ticketEditValue, setTicketEditValue] = useState('');
   const [ticketEditRawValue, setTicketEditRawValue] = useState('');
 
-  // Estado para controlar os dados editáveis
-  const [tableData, setTableData] = useState<TableRow[]>([
+  // Função para gerar dados iniciais zerados
+  const getInitialTableData = (): TableRow[] => [
     // Geral e Drivers Primários
     {
       category: 'Geral e Drivers Primários',
       metric: 'Investimento pretendido (Mês)',
-      benchmark: formatCurrency(300),
-      realValue: formatCurrency(16),
+      benchmark: formatCurrency(0),
+      realValue: formatCurrency(0),
       status: '',
       statusColor: 'neutral',
       benchmarkEditable: true,
@@ -293,8 +307,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     {
       category: 'Desempenho do Anúncio e Custo por Lead',
       metric: 'CPM',
-      benchmark: formatCurrency(56.47),
-      realValue: formatCurrency(56.47),
+      benchmark: formatCurrency(0),
+      realValue: formatCurrency(0),
       status: '',
       statusColor: 'neutral',
       benchmarkEditable: true,
@@ -303,8 +317,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     {
       category: 'Desempenho do Anúncio e Custo por Lead',
       metric: 'Impressões',
-      benchmark: '5.313',
-      realValue: '283',
+      benchmark: '0',
+      realValue: '0',
       status: '',
       statusColor: 'neutral',
       benchmarkEditable: false,
@@ -313,8 +327,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     {
       category: 'Desempenho do Anúncio e Custo por Lead',
       metric: 'CPC',
-      benchmark: formatCurrency(2.67),
-      realValue: formatCurrency(2.67),
+      benchmark: formatCurrency(0),
+      realValue: formatCurrency(0),
       status: '',
       statusColor: 'neutral',
       benchmarkEditable: true,
@@ -323,8 +337,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     {
       category: 'Desempenho do Anúncio e Custo por Lead',
       metric: 'Cliques',
-      benchmark: '112',
-      realValue: '6',
+      benchmark: '0',
+      realValue: '0',
       status: '',
       statusColor: 'neutral',
       benchmarkEditable: false,
@@ -333,8 +347,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     {
       category: 'Desempenho do Anúncio e Custo por Lead',
       metric: 'CTR',
-      benchmark: '2.11%',
-      realValue: '2.12%',
+      benchmark: '0.00%',
+      realValue: '0.00%',
       status: '',
       statusColor: 'neutral',
       benchmarkEditable: true,
@@ -343,7 +357,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     {
       category: 'Desempenho do Anúncio e Custo por Lead',
       metric: 'Leads / Msgs',
-      benchmark: '6',
+      benchmark: '0',
       realValue: '0',
       status: '',
       statusColor: 'neutral',
@@ -353,7 +367,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     {
       category: 'Desempenho do Anúncio e Custo por Lead',
       metric: 'Tx. Mensagens (Leads/Cliques)',
-      benchmark: '5.00%',
+      benchmark: '40.00%', // Taxa padrão: 40% dos cliques convertem em leads
       realValue: '0.00%',
       status: '',
       statusColor: 'neutral',
@@ -363,7 +377,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     {
       category: 'Desempenho do Anúncio e Custo por Lead',
       metric: 'CPL (Custo por Lead)',
-      benchmark: formatCurrency(53.53),
+      benchmark: formatCurrency(0),
       realValue: formatCurrency(0),
       status: '',
       statusColor: 'neutral',
@@ -375,17 +389,17 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     {
       category: 'Funil de Agendamento',
       metric: 'Agendamentos',
-      benchmark: '1',
+      benchmark: '0',
       realValue: '0',
       status: '',
       statusColor: 'neutral',
       benchmarkEditable: false,
-      realValueEditable: false // CORREÇÃO: Sempre não editável
+      realValueEditable: false
     },
     {
       category: 'Funil de Agendamento',
       metric: 'Tx. Agendamento (Agend./Leads)',
-      benchmark: '10.00%',
+      benchmark: '30.00%', // Taxa padrão: 30% dos leads agendam
       realValue: '0.00%',
       status: '',
       statusColor: 'neutral',
@@ -402,12 +416,12 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       status: '',
       statusColor: 'neutral',
       benchmarkEditable: false,
-      realValueEditable: false // CORREÇÃO: Sempre não editável
+      realValueEditable: false
     },
     {
       category: 'Resultados Finais da Venda',
       metric: 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)',
-      benchmark: '10.00%',
+      benchmark: '20.00%', // Taxa padrão: 20% dos agendamentos convertem em vendas
       realValue: '0.00%',
       status: '',
       statusColor: 'neutral',
@@ -417,7 +431,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     {
       category: 'Resultados Finais da Venda',
       metric: 'CPV (Custo por Venda)',
-      benchmark: formatCurrency(300),
+      benchmark: formatCurrency(0),
       realValue: formatCurrency(0),
       status: '',
       statusColor: 'neutral',
@@ -444,7 +458,10 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       benchmarkEditable: false,
       realValueEditable: false
     }
-  ]);
+  ];
+
+  // Estado para controlar os dados editáveis
+  const [tableData, setTableData] = useState<TableRow[]>(getInitialTableData());
 
   // Estado para controlar qual célula está sendo editada
   const [editingCell, setEditingCell] = useState<{rowIndex: number, field: 'benchmark' | 'realValue'} | null>(null);
@@ -1388,6 +1405,29 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     } else {
       setEditValue(e.target.value);
     }
+    
+    // CORREÇÃO: Atualizar status em tempo real durante a digitação
+    if (row) {
+      const newData = [...tableData];
+      let tempValue = e.target.value;
+      
+      // Formatar valor temporário para cálculo
+      if (row.metric.includes('CPM') || row.metric.includes('CPC') || row.metric.includes('CPL') || 
+          row.metric.includes('CPV') || row.metric.includes('Investimento') || row.metric.includes('Lucro')) {
+        const digits = e.target.value.replace(/\D/g, '');
+        tempValue = formatBRLFromDigits(digits);
+      } else if (row.metric.includes('CTR') || row.metric.includes('Tx.')) {
+        const digits = e.target.value.replace(/\D/g, '');
+        tempValue = formatPercentFromDigits(digits);
+      }
+      
+      // Atualizar valor temporário na linha
+      newData[editingCell!.rowIndex][editingCell!.field] = tempValue;
+      
+      // Recalcular status em tempo real
+      const recalculatedData = calculateValues(newData);
+      setTableData(recalculatedData);
+    }
   };
 
   // Ajustar handleSave para moeda
@@ -1405,9 +1445,17 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       
       newData[editingCell.rowIndex][editingCell.field] = finalValue;
       
-      // Recalcular valores dependentes
+      // CORREÇÃO: Recalcular valores dependentes e status
       const recalculatedData = calculateValues(newData);
       setTableData(recalculatedData);
+      
+      console.log('🔍 DEBUG - MonthlyDetailsTable - Status recalculado após edição:', {
+        metric: row.metric,
+        field: editingCell.field,
+        newValue: finalValue,
+        status: recalculatedData[editingCell.rowIndex].status,
+        statusColor: recalculatedData[editingCell.rowIndex].statusColor
+      });
       
       // Salvar benchmarks se foi editado na coluna benchmark
       if (editingCell.field === 'benchmark') {

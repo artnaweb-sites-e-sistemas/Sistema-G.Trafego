@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, FileText, ExternalLink, Copy, Info, Eye } from 'lucide-react';
+import { Clock, FileText, ExternalLink, Copy, Info, Eye, Trash2 } from 'lucide-react';
 import { shareService, ShareLink } from '../services/shareService';
+import { metricsService } from '../services/metricsService';
 import { toast } from 'react-hot-toast';
 
 interface HistorySectionProps {
@@ -142,6 +143,58 @@ const HistorySection: React.FC<HistorySectionProps> = ({ selectedProduct }) => {
   const openReport = (shortCode: string) => {
     const shortUrl = shareService.getShortUrl(shortCode);
     window.open(shortUrl, '_blank');
+  };
+
+  const deleteReport = (shortCode: string, reportIndex: number) => {
+    // Confirmar exclusão
+    if (window.confirm('Tem certeza que deseja excluir este relatório? Esta ação não pode ser desfeita.')) {
+      try {
+        // Excluir o link do serviço
+        const deleted = shareService.deleteLink(shortCode);
+        
+        if (deleted) {
+          // CORREÇÃO: Extrair informações do relatório para limpar cache
+          const report = filteredReports[reportIndex];
+          if (report) {
+            try {
+              const urlParams = new URLSearchParams(report.shareLink.originalUrl.split('?')[1] || '');
+              const month = urlParams.get('month');
+              const client = urlParams.get('client');
+              
+              // Limpar cache de métricas para o período/cliente específico
+              if (month && client) {
+                console.log('🔍 DEBUG - HistorySection - Limpando cache para:', { month, client });
+                metricsService.clearCacheByPeriod(month, client);
+              }
+            } catch (error) {
+              console.warn('Erro ao extrair parâmetros do relatório para limpar cache:', error);
+            }
+          }
+          
+          // Remover do estado local
+          const newReports = [...reports];
+          newReports.splice(reportIndex, 1);
+          setReports(newReports);
+          
+          // Atualizar relatórios filtrados
+          const newFilteredReports = [...filteredReports];
+          newFilteredReports.splice(reportIndex, 1);
+          setFilteredReports(newFilteredReports);
+          
+          toast.success('Relatório excluído com sucesso!');
+          
+          // Disparar evento para notificar que um relatório foi excluído
+          window.dispatchEvent(new CustomEvent('reportDeleted', {
+            detail: { shortCode, reportIndex }
+          }));
+        } else {
+          toast.error('Erro ao excluir relatório');
+        }
+      } catch (error) {
+        console.error('Erro ao excluir relatório:', error);
+        toast.error('Erro ao excluir relatório');
+      }
+    }
   };
 
   const getAudienceFromLink = (link: ShareLink): string => {
@@ -287,6 +340,13 @@ const HistorySection: React.FC<HistorySectionProps> = ({ selectedProduct }) => {
                         title="Abrir em nova aba"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => deleteReport(report.shareLink.shortCode, index)}
+                        className="p-1.5 text-slate-400 hover:text-red-400 transition-colors bg-slate-700/50 rounded hover:bg-slate-600/50"
+                        title="Excluir relatório"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>

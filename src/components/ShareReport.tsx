@@ -42,6 +42,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
     const checkExistingLink = () => {
       if (!selectedProduct || selectedProduct === 'Todos os Produtos') {
         setHasLinkForCurrentSelection(false);
+        setGeneratedLink(null);
         return;
       }
 
@@ -66,11 +67,40 @@ const ShareReport: React.FC<ShareReportProps> = ({
       // Se encontrou um link existente, carregar ele
       if (existingLink) {
         setGeneratedLink(existingLink);
+        console.log('🔍 DEBUG - ShareReport - Link existente encontrado:', existingLink.shortCode);
+      } else {
+        // Se não encontrou, limpar o link gerado (relatório foi excluído)
+        setGeneratedLink(null);
+        console.log('🔍 DEBUG - ShareReport - Nenhum link encontrado para:', {
+          product: selectedProduct,
+          client: selectedClient,
+          month: selectedMonth
+        });
       }
     };
 
     checkExistingLink();
   }, [selectedProduct, selectedClient, selectedMonth]);
+
+  // CORREÇÃO: Escutar evento de exclusão de relatório
+  useEffect(() => {
+    const handleReportDeleted = (event: CustomEvent) => {
+      const { shortCode } = event.detail;
+      
+      // Se o relatório excluído é o mesmo que está sendo exibido, limpar o estado
+      if (generatedLink && generatedLink.shortCode === shortCode) {
+        setGeneratedLink(null);
+        setHasLinkForCurrentSelection(false);
+        console.log('🔍 DEBUG - ShareReport - Relatório excluído detectado, limpando estado');
+      }
+    };
+
+    window.addEventListener('reportDeleted', handleReportDeleted as EventListener);
+    
+    return () => {
+      window.removeEventListener('reportDeleted', handleReportDeleted as EventListener);
+    };
+  }, [generatedLink]);
 
   const generateShareLink = async () => {
     setIsGenerating(true);
@@ -95,7 +125,14 @@ const ShareReport: React.FC<ShareReportProps> = ({
       // Simular geração de link (em produção, isso seria uma chamada para a API)
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Criar link curto usando o serviço com valores dos detalhes mensais
+      // CORREÇÃO: Criar link curto usando o serviço com valores dos detalhes mensais
+      console.log('🔍 DEBUG - ShareReport - Gerando link personalizado:', {
+        product: selectedProduct,
+        client: selectedClient,
+        month: selectedMonth,
+        monthlyDetails: monthlyDetailsValues
+      });
+      
       const shareLink = shareService.createShareLink({
         product: selectedProduct,
         client: selectedClient,
