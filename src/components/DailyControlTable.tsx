@@ -616,242 +616,575 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
     </tr>
   );
 
-  return (
-    <div className="bg-slate-900 rounded-xl border border-slate-700 shadow-xl">
-      <div className="p-6 border-b border-slate-700 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-100 mb-1">Controle Diário</h2>
-            <p className="text-slate-400 text-sm">{selectedMonth}</p>
-            {selectedCampaign && (
-              <p className="text-sm text-slate-400 mt-1">
-                Anúncio selecionado: {selectedCampaign}
+  // Interface para dados de anúncio
+  interface AdPerformance {
+    id: string;
+    name: string;
+    imageUrl?: string;
+    title: string;
+    description: string;
+    cta: string;
+    cpa: number;
+    ctr: number;
+    cpc: number;
+    frequency: number;
+    impressions: number;
+    clicks: number;
+    spend: number;
+    conversions: number;
+  }
+
+  // Componente para preview do anúncio
+  const AdPreview: React.FC<{ ad: AdPerformance }> = ({ ad }) => {
+    const [showTooltip, setShowTooltip] = useState(false);
+
+    return (
+      <div className="relative">
+        <div 
+          className="w-16 h-16 bg-slate-700 rounded-lg border-2 border-slate-600 overflow-hidden cursor-pointer hover:border-blue-400 transition-all duration-200"
+          onMouseEnter={() => setShowTooltip(true)}
+          onMouseLeave={() => setShowTooltip(false)}
+        >
+          {ad.imageUrl ? (
+            <img 
+              src={ad.imageUrl} 
+              alt={ad.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-600 to-slate-700">
+              <div className="text-slate-400 text-xs text-center">
+                <div className="font-bold">AD</div>
+                <div className="text-[10px]">Preview</div>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Tooltip com detalhes do anúncio */}
+        {showTooltip && (
+          <div className="absolute z-50 top-full left-0 mt-2 w-80 bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-4">
+            <div className="space-y-3">
+              <div>
+                <h4 className="font-semibold text-slate-200 text-sm mb-1">Título</h4>
+                <p className="text-slate-300 text-xs">{ad.title}</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-slate-200 text-sm mb-1">Descrição</h4>
+                <p className="text-slate-300 text-xs">{ad.description}</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-slate-200 text-sm mb-1">CTA</h4>
+                <span className="inline-block px-2 py-1 bg-blue-600 text-white text-xs rounded">
+                  {ad.cta}
+                </span>
+              </div>
+            </div>
+            <div className="absolute -top-2 left-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-slate-800"></div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Componente para ranking de anúncios
+  const AdPerformanceSection: React.FC<{ 
+    selectedAudience?: string; 
+    selectedMonth?: string;
+    metrics: MetricData[];
+  }> = ({ selectedAudience, selectedMonth, metrics }) => {
+    const [adPerformances, setAdPerformances] = useState<AdPerformance[]>([]);
+
+    useEffect(() => {
+      if (!selectedAudience || !selectedMonth || !metrics.length) {
+        setAdPerformances([]);
+        return;
+      }
+
+      // Agrupar métricas por anúncio
+      const adMap = new Map<string, AdPerformance>();
+      
+             metrics.forEach(metric => {
+         if (metric.month !== selectedMonth || metric.audience !== selectedAudience) return;
+         
+         const adId = metric.id || metric.service || 'unknown';
+         const existing = adMap.get(adId);
+         
+         if (existing) {
+           // Acumular métricas
+           existing.impressions += metric.impressions || 0;
+           existing.clicks += metric.clicks || 0;
+           existing.spend += metric.investment || 0;
+           existing.conversions += metric.leads || 0;
+         } else {
+           // Criar novo anúncio
+           adMap.set(adId, {
+             id: adId,
+             name: metric.service || 'Anúncio sem nome',
+             imageUrl: undefined, // Não disponível no MetricData atual
+             title: 'Título não disponível',
+             description: 'Descrição não disponível',
+             cta: 'Saiba mais',
+             cpa: 0,
+             ctr: 0,
+             cpc: 0,
+             frequency: 0,
+             impressions: metric.impressions || 0,
+             clicks: metric.clicks || 0,
+             spend: metric.investment || 0,
+             conversions: metric.leads || 0
+           });
+         }
+       });
+
+      // Calcular métricas derivadas
+      const performances = Array.from(adMap.values()).map(ad => ({
+        ...ad,
+        cpa: ad.conversions > 0 ? ad.spend / ad.conversions : 0,
+        ctr: ad.impressions > 0 ? (ad.clicks / ad.impressions) * 100 : 0,
+        cpc: ad.clicks > 0 ? ad.spend / ad.clicks : 0,
+        frequency: ad.impressions > 0 ? ad.impressions / Math.max(1, ad.conversions) : 0
+      }));
+
+      // Ordenar por CPA (menor é melhor)
+      performances.sort((a, b) => a.cpa - b.cpa);
+      
+      setAdPerformances(performances);
+    }, [selectedAudience, selectedMonth, metrics]);
+
+    if (!selectedAudience || !metrics.length) {
+      return null;
+    }
+
+    const formatCurrency = (value: number) => {
+      return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(value);
+    };
+
+    const formatPercentage = (value: number) => {
+      return `${value.toFixed(2)}%`;
+    };
+
+    const getRankingBadge = (index: number) => {
+      const badges = [
+        { bg: 'bg-yellow-500', text: 'text-yellow-900', icon: '🥇' },
+        { bg: 'bg-gray-400', text: 'text-gray-900', icon: '🥈' },
+        { bg: 'bg-orange-500', text: 'text-orange-900', icon: '🥉' }
+      ];
+      
+      if (index < 3) {
+        return (
+          <div className={`${badges[index].bg} ${badges[index].text} w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold`}>
+            {badges[index].icon}
+          </div>
+        );
+      }
+      
+      return (
+        <div className="w-6 h-6 rounded-full bg-slate-600 text-slate-300 flex items-center justify-center text-xs font-bold">
+          {index + 1}
+        </div>
+      );
+    };
+
+    return (
+      <div className="bg-slate-900 rounded-xl border border-slate-700 shadow-xl mt-6">
+        <div className="p-6 border-b border-slate-700 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-100 mb-1">Anúncios por Performance</h2>
+              <p className="text-slate-400 text-sm">
+                Público: {selectedAudience} • {selectedMonth}
               </p>
-            )}
-            {selectedAudience && (
-              <div className="flex items-center mt-2 space-x-2">
-                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                <p className="text-sm text-blue-400 font-medium">
-                  Público: {selectedAudience}
+              <p className="text-slate-500 text-xs mt-1">
+                Ordenados por CPA (menor = melhor performance)
+              </p>
+            </div>
+            <div className="bg-blue-900/30 rounded-lg p-3 border border-blue-600/30">
+              <p className="text-sm text-blue-400 font-medium">
+                {adPerformances.length} anúncios analisados
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {adPerformances.length === 0 ? (
+          <div className="p-8 text-center">
+            <div className="text-slate-500 text-sm">
+              Nenhum anúncio encontrado para este público e período
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-750">
+                  <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                    <div className="flex items-center space-x-2">
+                      <span>Ranking</span>
+                    </div>
+                  </th>
+                  <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                    <div className="flex items-center space-x-2">
+                      <span>Preview</span>
+                    </div>
+                  </th>
+                  <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                    <div className="flex items-center space-x-2">
+                      <span>Anúncio</span>
+                    </div>
+                  </th>
+                  <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                    <div className="flex items-center space-x-2">
+                      <span>CPA</span>
+                    </div>
+                  </th>
+                  <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                    <div className="flex items-center space-x-2">
+                      <span>CTR</span>
+                    </div>
+                  </th>
+                  <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                    <div className="flex items-center space-x-2">
+                      <span>CPC</span>
+                    </div>
+                  </th>
+                  <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                    <div className="flex items-center space-x-2">
+                      <span>Frequência</span>
+                    </div>
+                  </th>
+                  <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide">
+                    <div className="flex items-center space-x-2">
+                      <span>Métricas</span>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {adPerformances.map((ad, index) => (
+                  <tr key={ad.id} className={`hover:bg-slate-800/40 transition-all duration-200 ${
+                    index < 3 ? 'bg-gradient-to-r from-blue-900/10 via-indigo-900/5 to-blue-900/10' : ''
+                  } ${index === adPerformances.length - 1 ? 'border-b-2 border-slate-600' : 'border-b border-slate-700/30'}`}>
+                    <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">
+                      <div className="flex items-center space-x-2">
+                        {getRankingBadge(index)}
+                        {index < 3 && (
+                          <span className={`text-xs font-bold px-2 py-1 rounded ${
+                            index === 0 ? 'bg-yellow-900/30 text-yellow-400' :
+                            index === 1 ? 'bg-gray-900/30 text-gray-400' :
+                            'bg-orange-900/30 text-orange-400'
+                          }`}>
+                            {index === 0 ? '1º Lugar' : index === 1 ? '2º Lugar' : '3º Lugar'}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">
+                      <AdPreview ad={ad} />
+                    </td>
+                    <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">
+                      <div>
+                        <div className="font-semibold text-slate-100">{ad.name}</div>
+                        <div className="text-xs text-slate-400 mt-1">ID: {ad.id}</div>
+                      </div>
+                    </td>
+                    <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">
+                      <div className={`font-bold ${
+                        index === 0 ? 'text-yellow-400' :
+                        index === 1 ? 'text-gray-400' :
+                        index === 2 ? 'text-orange-400' :
+                        'text-slate-300'
+                      }`}>
+                        {formatCurrency(ad.cpa)}
+                      </div>
+                    </td>
+                    <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">
+                      {formatPercentage(ad.ctr)}
+                    </td>
+                    <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">
+                      {formatCurrency(ad.cpc)}
+                    </td>
+                    <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">
+                      {ad.frequency.toFixed(2)}
+                    </td>
+                    <td className="p-4">
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="bg-slate-800/50 rounded p-2">
+                          <div className="text-slate-400">Impressões</div>
+                          <div className="font-semibold text-slate-200">{ad.impressions.toLocaleString()}</div>
+                        </div>
+                        <div className="bg-slate-800/50 rounded p-2">
+                          <div className="text-slate-400">Cliques</div>
+                          <div className="font-semibold text-slate-200">{ad.clicks.toLocaleString()}</div>
+                        </div>
+                        <div className="bg-slate-800/50 rounded p-2">
+                          <div className="text-slate-400">Conversões</div>
+                          <div className="font-semibold text-slate-200">{ad.conversions.toLocaleString()}</div>
+                        </div>
+                        <div className="bg-slate-800/50 rounded p-2">
+                          <div className="text-slate-400">Investimento</div>
+                          <div className="font-semibold text-slate-200">{formatCurrency(ad.spend)}</div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <div className="bg-slate-900 rounded-xl border border-slate-700 shadow-xl">
+        <div className="p-6 border-b border-slate-700 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-100 mb-1">Controle Diário</h2>
+              <p className="text-slate-400 text-sm">{selectedMonth}</p>
+              {selectedCampaign && (
+                <p className="text-sm text-slate-400 mt-1">
+                  Anúncio selecionado: {selectedCampaign}
+                </p>
+              )}
+              {selectedAudience && (
+                <div className="flex items-center mt-2 space-x-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                  <p className="text-sm text-blue-400 font-medium">
+                    Público: {selectedAudience}
+                  </p>
+                </div>
+              )}
+            </div>
+            {metrics.length > 0 && (
+              <div className="bg-emerald-900/30 rounded-lg p-3 border border-emerald-600/30">
+                <p className="text-sm text-emerald-400 font-medium">
+                  ✓ {customRecordCount || metrics.length} registros carregados do Meta Ads
                 </p>
               </div>
             )}
           </div>
-          {metrics.length > 0 && (
-            <div className="bg-emerald-900/30 rounded-lg p-3 border border-emerald-600/30">
-              <p className="text-sm text-emerald-400 font-medium">
-                ✓ {customRecordCount || metrics.length} registros carregados do Meta Ads
-              </p>
-            </div>
-          )}
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-750">
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                  <div className="flex items-center space-x-2">
+                    <span>DIA</span>
+                    <Tooltip content={getColumnTooltip('Data')} isVisible={tooltipStates['Data'] || false} position="bottom">
+                      <div
+                        className="cursor-default group/tooltip"
+                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Data': true }))}
+                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Data': false }))}
+                      >
+                        <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                      </div>
+                    </Tooltip>
+                  </div>
+                </th>
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                  <div className="flex items-center space-x-2">
+                    <span>INVESTIMENTO</span>
+                    <Tooltip content={getColumnTooltip('Investimento')} isVisible={tooltipStates['Investimento'] || false} position="bottom">
+                      <div
+                        className="cursor-default group/tooltip"
+                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Investimento': true }))}
+                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Investimento': false }))}
+                      >
+                        <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                      </div>
+                    </Tooltip>
+                  </div>
+                </th>
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                  <div className="flex items-center space-x-2">
+                    <span>IMPRESSÕES</span>
+                    <Tooltip content={getColumnTooltip('Impressões')} isVisible={tooltipStates['Impressões'] || false} position="bottom">
+                      <div
+                        className="cursor-default group/tooltip"
+                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Impressões': true }))}
+                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Impressões': false }))}
+                      >
+                        <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                      </div>
+                    </Tooltip>
+                  </div>
+                </th>
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                  <div className="flex items-center space-x-2">
+                    <span>CLIQUES</span>
+                    <Tooltip content={getColumnTooltip('Cliques')} isVisible={tooltipStates['Cliques'] || false} position="bottom">
+                      <div
+                        className="cursor-default group/tooltip"
+                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Cliques': true }))}
+                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Cliques': false }))}
+                      >
+                        <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                      </div>
+                    </Tooltip>
+                  </div>
+                </th>
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                  <div className="flex items-center space-x-2">
+                    <span>CPM</span>
+                    <Tooltip content={getColumnTooltip('CPM')} isVisible={tooltipStates['CPM'] || false} position="bottom">
+                      <div
+                        className="cursor-default group/tooltip"
+                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'CPM': true }))}
+                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'CPM': false }))}
+                      >
+                        <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                      </div>
+                    </Tooltip>
+                  </div>
+                </th>
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                  <div className="flex items-center space-x-2">
+                    <span>CTR (%)</span>
+                    <Tooltip content={getColumnTooltip('CTR')} isVisible={tooltipStates['CTR'] || false} position="bottom">
+                      <div
+                        className="cursor-default group/tooltip"
+                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'CTR': true }))}
+                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'CTR': false }))}
+                      >
+                        <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                      </div>
+                    </Tooltip>
+                  </div>
+                </th>
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                  <div className="flex items-center space-x-2">
+                    <span>LEADS</span>
+                    <Tooltip content={getColumnTooltip('Leads')} isVisible={tooltipStates['Leads'] || false} position="bottom">
+                      <div
+                        className="cursor-default group/tooltip"
+                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Leads': true }))}
+                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Leads': false }))}
+                      >
+                        <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                      </div>
+                    </Tooltip>
+                  </div>
+                </th>
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                  <div className="flex items-center space-x-2">
+                    <span>CPL</span>
+                    <Tooltip content={getColumnTooltip('CPL')} isVisible={tooltipStates['CPL'] || false} position="bottom">
+                      <div
+                        className="cursor-default group/tooltip"
+                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'CPL': true }))}
+                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'CPL': false }))}
+                      >
+                        <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                      </div>
+                    </Tooltip>
+                  </div>
+                </th>
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide">
+                  <div className="flex items-center space-x-2">
+                    <span>STATUS</span>
+                    <Tooltip content={getColumnTooltip('Status')} isVisible={tooltipStates['Status'] || false} position="bottom">
+                      <div
+                        className="cursor-default group/tooltip"
+                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Status': true }))}
+                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Status': false }))}
+                      >
+                        <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                      </div>
+                    </Tooltip>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <TotalsRow isHeader />
+              {dailyData.map((row, index) => (
+                <tr key={index} className={`hover:bg-slate-800/40 transition-all duration-200 ${
+                  row.isToday ? 'bg-gradient-to-r from-blue-900/15 via-indigo-900/10 to-blue-900/15 border-l-4 border-l-blue-400 shadow-lg relative' : ''
+                } ${index === dailyData.length - 1 ? 'border-b-2 border-slate-600' : 'border-b border-slate-700/30'}`}>
+                  <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">
+                    <div className="flex items-center space-x-2">
+                      {row.isToday && (
+                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                      )}
+                      <span className={row.isToday ? 'text-blue-300 font-semibold' : ''}>{row.date}</span>
+                      
+                      {/* Indicador de domingo */}
+                      {row.isSunday && (
+                        <span className="text-xs text-yellow-400 font-bold bg-yellow-900/30 px-1 py-0.5 rounded">
+                          D
+                        </span>
+                      )}
+                      
+                      {/* Ícones de épocas sazonais */}
+                      {row.seasonalEvents && row.seasonalEvents.length > 0 && (
+                        <div className="flex items-center space-x-1">
+                          {row.seasonalEvents.map((event: SeasonalEvent, eventIndex: number) => (
+                            <Tooltip 
+                              key={eventIndex}
+                              content={event.tooltip} 
+                              isVisible={tooltipStates[`${row.date}-${eventIndex}`] || false} 
+                              position="right"
+                            >
+                              <div
+                                className={`cursor-default group/tooltip ${event.color} hover:scale-110 transition-all duration-200`}
+                                onMouseEnter={() => setTooltipStates(prev => ({ ...prev, [`${row.date}-${eventIndex}`]: true }))}
+                                onMouseLeave={() => setTooltipStates(prev => ({ ...prev, [`${row.date}-${eventIndex}`]: false }))}
+                              >
+                                {event.icon}
+                              </div>
+                            </Tooltip>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.investment}</td>
+                  <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.impressions}</td>
+                  <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.clicks}</td>
+                  <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.cpm}</td>
+                  <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.ctr}</td>
+                  <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.leads}</td>
+                  <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.cpl}</td>
+                  <td className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        row.status === 'Ativo' 
+                          ? row.isToday 
+                            ? 'bg-emerald-900/80 text-emerald-300 border-2 border-emerald-400 shadow-lg' 
+                            : 'bg-emerald-900/60 text-emerald-400 border border-emerald-600/50'
+                          : row.isToday
+                            ? 'bg-rose-900/80 text-rose-300 border-2 border-rose-400 shadow-lg'
+                            : 'bg-rose-900/60 text-rose-400 border border-rose-600/50'
+                      }`}>
+                        {row.status}
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              <TotalsRow />
+            </tbody>
+          </table>
         </div>
       </div>
       
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-750">
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
-                <div className="flex items-center space-x-2">
-                  <span>DIA</span>
-                  <Tooltip content={getColumnTooltip('Data')} isVisible={tooltipStates['Data'] || false} position="bottom">
-                    <div
-                      className="cursor-default group/tooltip"
-                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Data': true }))}
-                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Data': false }))}
-                    >
-                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
-                    </div>
-                  </Tooltip>
-                </div>
-              </th>
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
-                <div className="flex items-center space-x-2">
-                  <span>INVESTIMENTO</span>
-                  <Tooltip content={getColumnTooltip('Investimento')} isVisible={tooltipStates['Investimento'] || false} position="bottom">
-                    <div
-                      className="cursor-default group/tooltip"
-                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Investimento': true }))}
-                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Investimento': false }))}
-                    >
-                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
-                    </div>
-                  </Tooltip>
-                </div>
-              </th>
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
-                <div className="flex items-center space-x-2">
-                  <span>IMPRESSÕES</span>
-                  <Tooltip content={getColumnTooltip('Impressões')} isVisible={tooltipStates['Impressões'] || false} position="bottom">
-                    <div
-                      className="cursor-default group/tooltip"
-                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Impressões': true }))}
-                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Impressões': false }))}
-                    >
-                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
-                    </div>
-                  </Tooltip>
-                </div>
-              </th>
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
-                <div className="flex items-center space-x-2">
-                  <span>CLIQUES</span>
-                  <Tooltip content={getColumnTooltip('Cliques')} isVisible={tooltipStates['Cliques'] || false} position="bottom">
-                    <div
-                      className="cursor-default group/tooltip"
-                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Cliques': true }))}
-                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Cliques': false }))}
-                    >
-                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
-                    </div>
-                  </Tooltip>
-                </div>
-              </th>
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
-                <div className="flex items-center space-x-2">
-                  <span>CPM</span>
-                  <Tooltip content={getColumnTooltip('CPM')} isVisible={tooltipStates['CPM'] || false} position="bottom">
-                    <div
-                      className="cursor-default group/tooltip"
-                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'CPM': true }))}
-                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'CPM': false }))}
-                    >
-                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
-                    </div>
-                  </Tooltip>
-                </div>
-              </th>
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
-                <div className="flex items-center space-x-2">
-                  <span>CTR (%)</span>
-                  <Tooltip content={getColumnTooltip('CTR')} isVisible={tooltipStates['CTR'] || false} position="bottom">
-                    <div
-                      className="cursor-default group/tooltip"
-                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'CTR': true }))}
-                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'CTR': false }))}
-                    >
-                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
-                    </div>
-                  </Tooltip>
-                </div>
-              </th>
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
-                <div className="flex items-center space-x-2">
-                  <span>LEADS</span>
-                  <Tooltip content={getColumnTooltip('Leads')} isVisible={tooltipStates['Leads'] || false} position="bottom">
-                    <div
-                      className="cursor-default group/tooltip"
-                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Leads': true }))}
-                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Leads': false }))}
-                    >
-                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
-                    </div>
-                  </Tooltip>
-                </div>
-              </th>
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
-                <div className="flex items-center space-x-2">
-                  <span>CPL</span>
-                  <Tooltip content={getColumnTooltip('CPL')} isVisible={tooltipStates['CPL'] || false} position="bottom">
-                    <div
-                      className="cursor-default group/tooltip"
-                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'CPL': true }))}
-                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'CPL': false }))}
-                    >
-                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
-                    </div>
-                  </Tooltip>
-                </div>
-              </th>
-              <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide">
-                <div className="flex items-center space-x-2">
-                  <span>STATUS</span>
-                  <Tooltip content={getColumnTooltip('Status')} isVisible={tooltipStates['Status'] || false} position="bottom">
-                    <div
-                      className="cursor-default group/tooltip"
-                      onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Status': true }))}
-                      onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Status': false }))}
-                    >
-                      <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
-                    </div>
-                  </Tooltip>
-                </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <TotalsRow isHeader />
-            {dailyData.map((row, index) => (
-              <tr key={index} className={`hover:bg-slate-800/40 transition-all duration-200 ${
-                row.isToday ? 'bg-gradient-to-r from-blue-900/15 via-indigo-900/10 to-blue-900/15 border-l-4 border-l-blue-400 shadow-lg relative' : ''
-              } ${index === dailyData.length - 1 ? 'border-b-2 border-slate-600' : 'border-b border-slate-700/30'}`}>
-                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">
-                  <div className="flex items-center space-x-2">
-                    {row.isToday && (
-                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                    )}
-                    <span className={row.isToday ? 'text-blue-300 font-semibold' : ''}>{row.date}</span>
-                    
-                    {/* Indicador de domingo */}
-                    {row.isSunday && (
-                      <span className="text-xs text-yellow-400 font-bold bg-yellow-900/30 px-1 py-0.5 rounded">
-                        D
-                      </span>
-                    )}
-                    
-                    {/* Ícones de épocas sazonais */}
-                    {row.seasonalEvents && row.seasonalEvents.length > 0 && (
-                      <div className="flex items-center space-x-1">
-                        {row.seasonalEvents.map((event: SeasonalEvent, eventIndex: number) => (
-                          <Tooltip 
-                            key={eventIndex}
-                            content={event.tooltip} 
-                            isVisible={tooltipStates[`${row.date}-${eventIndex}`] || false} 
-                            position="right"
-                          >
-                            <div
-                              className={`cursor-default group/tooltip ${event.color} hover:scale-110 transition-all duration-200`}
-                              onMouseEnter={() => setTooltipStates(prev => ({ ...prev, [`${row.date}-${eventIndex}`]: true }))}
-                              onMouseLeave={() => setTooltipStates(prev => ({ ...prev, [`${row.date}-${eventIndex}`]: false }))}
-                            >
-                              {event.icon}
-                            </div>
-                          </Tooltip>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.investment}</td>
-                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.impressions}</td>
-                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.clicks}</td>
-                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.cpm}</td>
-                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.ctr}</td>
-                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.leads}</td>
-                <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.cpl}</td>
-                <td className="p-4">
-                  <div className="flex items-center space-x-2">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      row.status === 'Ativo' 
-                        ? row.isToday 
-                          ? 'bg-emerald-900/80 text-emerald-300 border-2 border-emerald-400 shadow-lg' 
-                          : 'bg-emerald-900/60 text-emerald-400 border border-emerald-600/50'
-                        : row.isToday
-                          ? 'bg-rose-900/80 text-rose-300 border-2 border-rose-400 shadow-lg'
-                          : 'bg-rose-900/60 text-rose-400 border border-rose-600/50'
-                    }`}>
-                      {row.status}
-                    </span>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            <TotalsRow />
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
+             {/* Nova seção de performance dos anúncios */}
+       <AdPerformanceSection 
+         selectedAudience={selectedAudience}
+         selectedMonth={selectedMonth}
+         metrics={metrics}
+       />
+     </>
+   );
+ };
 
 export default DailyControlTable;
