@@ -1545,6 +1545,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       case 'up': return 'text-green-500';
       case 'down': return 'text-red-500';
       case 'neutral': return 'text-yellow-500';
+      case 'yellow': return 'text-yellow-500';
       default: return 'text-gray-400';
     }
   };
@@ -1554,6 +1555,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       case 'up': return <TrendingUp className={`w-4 h-4 ${getStatusColor(status)}`} />;
       case 'down': return <TrendingDown className={`w-4 h-4 ${getStatusColor(status)}`} />;
       case 'neutral': return <Minus className={`w-4 h-4 ${getStatusColor(status)}`} />;
+      case 'yellow': return <Minus className={`w-4 h-4 ${getStatusColor(status)}`} />;
       default: return null;
     }
   };
@@ -1656,6 +1658,11 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
   // Função para calcular o status baseado na comparação entre valores reais e benchmarks
   const calculateStatus = (metric: string, realValue: string, benchmark: string): { status: string; statusColor: string } => {
+    // CORREÇÃO: Tratamento especial para CPV quando valor real é EXATAMENTE R$ 0,00
+    if (metric === 'CPV (Custo por Venda)' && realValue === 'R$ 0,00') {
+      return { status: '-', statusColor: 'yellow' };
+    }
+
     // Campos que não devem ter status (mantêm "-")
     const noStatusFields = [
       'Investimento pretendido (Mês)',

@@ -229,32 +229,15 @@ const ShareReport: React.FC<ShareReportProps> = ({
         // Limpar cache de métricas e notificar o Dashboard para recarregar
         metricsService.clearCache();
         
-        // Disparar evento para notificar que o relatório foi atualizado
-        window.dispatchEvent(new CustomEvent('reportUpdated', {
-          detail: {
-            type: 'reportUpdated',
-            timestamp: Date.now(),
-            source: 'shareReport',
-            month: selectedMonth,
-            client: selectedClient,
-            product: selectedProduct
-          }
-        }));
-        console.log('ShareReport: Evento reportUpdated disparado após atualização');
+        // CORREÇÃO: Não disparar eventos que causam loops infinitos
+        // O relatório já foi atualizado, não precisamos disparar eventos adicionais
+        console.log('ShareReport: Relatório atualizado com sucesso - eventos de refresh desabilitados para evitar loops');
         
-        // Aguardar um pouco para garantir que os dados foram persistidos no Firebase
+        // Apenas salvar no localStorage para a página pública (sem disparar eventos)
         setTimeout(() => {
           const eventDetail = { type: 'insights', timestamp: Date.now(), source: 'shareReport' };
-          
-          // Usar localStorage como ponte entre dashboard e página pública
           localStorage.setItem('metaAdsDataRefreshed', JSON.stringify(eventDetail));
-          console.log('ShareReport: Sinal de atualização salvo no localStorage:', eventDetail);
-          
-          // Também disparar evento local (para dashboard)
-          window.dispatchEvent(new CustomEvent('metaAdsDataRefreshed', {
-            detail: eventDetail
-          }));
-          console.log('ShareReport: Evento metaAdsDataRefreshed disparado após atualização:', eventDetail);
+          console.log('ShareReport: Sinal de atualização salvo no localStorage (apenas para página pública):', eventDetail);
         }, 1000);
 
         toast.success('Relatório atualizado com sucesso!');
