@@ -46,7 +46,10 @@ export class AIBenchmarkService {
     const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
     
     if (!apiKey) {
-      throw new Error('VITE_OPENAI_API_KEY não encontrada nas variáveis de ambiente');
+      console.warn('VITE_OPENAI_API_KEY não encontrada nas variáveis de ambiente. Funcionalidade de IA será limitada.');
+      // Não lançar erro, apenas marcar como não configurado
+      this.openai = null as any;
+      return;
     }
 
     this.openai = new OpenAI({
@@ -71,6 +74,12 @@ export class AIBenchmarkService {
       }
     } catch (error) {
       console.warn('Erro ao buscar dados históricos:', error);
+    }
+
+    // Verificar se o OpenAI está configurado
+    if (!this.openai) {
+      console.info('OpenAI não configurado, usando valores simulados');
+      return this.generateSimulatedBenchmark(data, historicalData, confidence);
     }
 
     // Verificar se já sabemos que a quota está esgotada
@@ -508,7 +517,8 @@ IMPORTANTE sobre txAgendamento:
 
   // Método para validar se a API key está configurada
   static validateConfiguration(): boolean {
-    return !!import.meta.env.VITE_OPENAI_API_KEY;
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    return !!apiKey && apiKey.trim() !== '';
   }
 }
 

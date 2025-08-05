@@ -166,8 +166,17 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         }
       });
       
-      const storageKey = `benchmark_${selectedProduct}_${selectedMonth}`;
-      localStorage.setItem(storageKey, JSON.stringify(benchmarkValues));
+          // CORREÇÃO: Incluir cliente na chave para vincular ao período específico
+    const selectedClient = localStorage.getItem('selectedClient') || 'Cliente Padrão';
+    const storageKey = `benchmark_${selectedClient}_${selectedProduct}_${selectedMonth}`;
+    console.log('🔍 DEBUG - MonthlyDetailsTable - Salvando benchmarks:', {
+      storageKey,
+      selectedClient,
+      selectedProduct,
+      selectedMonth,
+      dataCount: benchmarkValues.length
+    });
+    localStorage.setItem(storageKey, JSON.stringify(benchmarkValues));
       console.log('Valores de benchmark salvos:', benchmarkValues);
     }
   };
@@ -175,7 +184,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   // Função para carregar valores de benchmark salvos
   const loadBenchmarkValues = () => {
     if (selectedProduct && selectedMonth) {
-      const storageKey = `benchmark_${selectedProduct}_${selectedMonth}`;
+      // CORREÇÃO: Incluir cliente na chave para vincular ao período específico
+      const clientForBenchmarks = localStorage.getItem('selectedClient') || 'Cliente Padrão';
+      const storageKey = `benchmark_${clientForBenchmarks}_${selectedProduct}_${selectedMonth}`;
       const savedBenchmarks = localStorage.getItem(storageKey);
       
       if (savedBenchmarks) {
@@ -201,7 +212,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       }
 
       // Carregar estados automáticos dos campos benchmark
-      const autoStatesKey = `benchmark_auto_${selectedProduct}_${selectedMonth}`;
+      // CORREÇÃO: Incluir cliente na chave para vincular ao período específico
+      const clientForAutoStates = localStorage.getItem('selectedClient') || 'Cliente Padrão';
+      const autoStatesKey = `benchmark_auto_${clientForAutoStates}_${selectedProduct}_${selectedMonth}`;
       const savedAutoStates = localStorage.getItem(autoStatesKey);
       
       if (savedAutoStates) {
@@ -1553,7 +1566,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   // Salvar estados automáticos dos campos benchmark quando mudarem
   useEffect(() => {
     if (selectedProduct && selectedMonth) {
-      const autoStatesKey = `benchmark_auto_${selectedProduct}_${selectedMonth}`;
+      // CORREÇÃO: Incluir cliente na chave para vincular ao período específico
+    const clientForToggle = localStorage.getItem('selectedClient') || 'Cliente Padrão';
+    const autoStatesKey = `benchmark_auto_${clientForToggle}_${selectedProduct}_${selectedMonth}`;
       localStorage.setItem(autoStatesKey, JSON.stringify(benchmarkAuto));
       console.log('Estados automáticos de benchmark salvos:', benchmarkAuto);
     }
