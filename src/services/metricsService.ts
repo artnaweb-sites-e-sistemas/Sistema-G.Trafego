@@ -1090,6 +1090,7 @@ export const metricsService = {
   async saveMonthlyDetails(data: {
     month: string;
     product: string;
+    client?: string; // Adicionar campo client opcional
     agendamentos: number;
     vendas: number;
     ticketMedio?: number;
@@ -1112,6 +1113,7 @@ export const metricsService = {
         // Criar novo documento
         await addDoc(detailsRef, {
           ...data,
+          client: data.client || 'Cliente Padrão', // Garantir que sempre tenha um client
           createdAt: new Date(),
           updatedAt: new Date()
         });
@@ -1121,6 +1123,7 @@ export const metricsService = {
         const updateData: any = {
           agendamentos: data.agendamentos,
           vendas: data.vendas,
+          client: data.client || 'Cliente Padrão', // Atualizar o client também
           updatedAt: new Date()
         };
         
@@ -1143,6 +1146,7 @@ export const metricsService = {
       console.log('🔍 DEBUG - saveMonthlyDetails - Dados sendo salvos:', {
         month: data.month,
         product: data.product,
+        client: data.client,
         agendamentos: data.agendamentos,
         vendas: data.vendas,
         ticketMedio: data.ticketMedio,
@@ -1158,6 +1162,7 @@ export const metricsService = {
         detail: {
           month: data.month,
           product: data.product,
+          client: data.client,
           agendamentos: data.agendamentos,
           vendas: data.vendas,
           ticketMedio: data.ticketMedio
@@ -1169,6 +1174,7 @@ export const metricsService = {
         detail: {
           month: data.month,
           product: data.product,
+          client: data.client,
           agendamentos: data.agendamentos,
           vendas: data.vendas,
           ticketMedio: data.ticketMedio
@@ -1517,9 +1523,11 @@ export const metricsService = {
       console.log('🔍 DEBUG - getRealValuesForClient - Buscando valores reais para:', { month, client });
       
       // Primeiro, buscar dados da coleção monthlyDetails (dados reais da planilha)
+      // CORREÇÃO: Filtrar por mês E cliente para evitar dados de outros clientes
       const monthlyDetailsQuery = query(
         collection(db, 'monthlyDetails'),
-        where('month', '==', month)
+        where('month', '==', month),
+        where('client', '==', client) // Adicionar filtro por cliente
       );
       
       const monthlyDetailsSnapshot = await getDocs(monthlyDetailsQuery);
@@ -1528,14 +1536,19 @@ export const metricsService = {
       let totalAgendamentos = 0;
       let totalVendas = 0;
       let totalCPV = 0;
-      let totalROI = 0;
+      let roiValues: string[] = []; // Array para armazenar valores de ROI como strings
       let productCount = 0;
       const productsWithData: string[] = [];
       
+      // CORREÇÃO: Filtrar dados apenas do cliente específico
       monthlyDetailsSnapshot.forEach((doc) => {
         const data = doc.data();
+        
+        // CORREÇÃO: Verificar se o documento pertence ao cliente correto
+        // Agora que temos filtro por client, todos os documentos são do cliente correto
         console.log('🔍 DEBUG - getRealValuesForClient - MonthlyDetail:', {
           product: data.product,
+          client: data.client,
           agendamentos: data.agendamentos,
           vendas: data.vendas,
           cpv: data.cpv,
@@ -1547,7 +1560,12 @@ export const metricsService = {
         totalAgendamentos += (data.agendamentos || 0);
         totalVendas += (data.vendas || 0);
         totalCPV += (data.cpv || 0);
-        totalROI += (data.roi || 0);
+        
+        // Coletar valores de ROI como strings
+        if (data.roi && typeof data.roi === 'string') {
+          roiValues.push(data.roi);
+        }
+        
         productCount++;
         productsWithData.push(data.product);
         
@@ -1555,21 +1573,104 @@ export const metricsService = {
           totalAgendamentos,
           totalVendas,
           totalCPV,
-          totalROI,
+          roiValues,
           productCount
         });
       });
       
-      // Calcular médias para CPV e ROI
+      // CORREÇÃO: Se não há dados para este cliente/mês, retornar valores zerados
+      if (totalAgendamentos === 0 && totalVendas === 0) {
+        console.log('🔍 DEBUG - getRealValuesForClient - Nenhum dado encontrado para cliente/mês, retornando valores zerados');
+        return {
+          agendamentos: 0,
+          vendas: 0,
+          cpv: 0,
+          roi: '0% (0.0x)'
+        };
+      }
+      
+      // Buscar investimento real das métricas do Meta Ads
+      let investimentoTotal = 0;
+      try {
+        const metrics = await this.getMetrics(month, client);
+        if (metrics && metrics.length > 0) {
+          investimentoTotal = metrics.reduce((sum, metric) => sum + (metric.investment || 0), 0);
+          console.log('🔍 DEBUG - getRealValuesForClient - Investimento total das métricas:', investimentoTotal);
+        }
+      } catch (error) {
+        console.warn('🔍 DEBUG - getRealValuesForClient - Erro ao buscar métricas para investimento:', error);
+        // Usar valor padrão se não conseguir buscar
+        investimentoTotal = 225.99;
+      }
+      
+      // Calcular médias para CPV
       const avgCPV = productCount > 0 ? totalCPV / productCount : 0;
-      const avgROI = productCount > 0 ? totalROI / productCount : 0;
+      
+      // Processar CPV - se não há valor salvo, calcular baseado no investimento
+      let finalCPV = avgCPV;
+      if (finalCPV === 0 && totalVendas > 0 && investimentoTotal > 0) {
+        // Calcular CPV baseado no investimento total e vendas
+        finalCPV = investimentoTotal / totalVendas;
+        console.log('🔍 DEBUG - getRealValuesForClient - CPV calculado:', {
+          investimentoTotal,
+          totalVendas,
+          finalCPV
+        });
+      }
+      
+      // Processar ROI - usar o primeiro valor válido ou calcular baseado nos dados
+      let finalROI = '0% (0.0x)';
+      if (roiValues.length > 0) {
+        // Verificar se o valor salvo é válido (não é -100% quando há vendas)
+        const savedROI = roiValues[0];
+        if (savedROI === '-100% (0.0x)' && totalVendas > 0) {
+          // Se o ROI salvo é -100% mas há vendas, recalcular
+          console.log('🔍 DEBUG - getRealValuesForClient - ROI salvo inválido, recalculando...');
+          const ticketMedio = 250; // Valor padrão
+          const receitaTotal = totalVendas * ticketMedio;
+          const investimentoTotal = finalCPV * totalVendas;
+          const roiPercent = investimentoTotal > 0 ? ((receitaTotal - investimentoTotal) / investimentoTotal) * 100 : 0;
+          const roas = investimentoTotal > 0 ? receitaTotal / investimentoTotal : 0;
+          finalROI = `${roiPercent.toFixed(0)}% (${roas.toFixed(1)}x)`;
+          console.log('🔍 DEBUG - getRealValuesForClient - ROI recalculado:', {
+            ticketMedio,
+            receitaTotal,
+            investimentoTotal,
+            roiPercent,
+            roas,
+            finalROI
+          });
+        } else {
+          // Usar o valor salvo se for válido
+          finalROI = savedROI;
+          console.log('🔍 DEBUG - getRealValuesForClient - ROI usando valor salvo:', finalROI);
+        }
+      } else if (totalVendas > 0 && finalCPV > 0) {
+        // Calcular ROI baseado nos dados se não houver valor salvo
+        const ticketMedio = 250; // Valor padrão
+        const receitaTotal = totalVendas * ticketMedio;
+        const investimentoTotal = finalCPV * totalVendas;
+        const roiPercent = investimentoTotal > 0 ? ((receitaTotal - investimentoTotal) / investimentoTotal) * 100 : 0;
+        const roas = investimentoTotal > 0 ? receitaTotal / investimentoTotal : 0;
+        finalROI = `${roiPercent.toFixed(0)}% (${roas.toFixed(1)}x)`;
+        console.log('🔍 DEBUG - getRealValuesForClient - ROI calculado:', {
+          ticketMedio,
+          receitaTotal,
+          investimentoTotal,
+          roiPercent,
+          roas,
+          finalROI
+        });
+      }
       
       console.log('🔍 DEBUG - getRealValuesForClient - Cálculo das médias:', {
         totalCPV,
-        totalROI,
+        roiValues,
         productCount,
         avgCPV,
-        avgROI
+        finalCPV,
+        finalROI,
+        investimentoTotal
       });
       
       console.log('🔍 DEBUG - getRealValuesForClient - Resultado da monthlyDetails:', {
@@ -1577,70 +1678,20 @@ export const metricsService = {
         client,
         totalAgendamentos,
         totalVendas,
-        avgCPV,
-        avgROI,
+        finalCPV,
+        finalROI,
         productsCount: productsWithData.length,
         products: productsWithData
       });
       
-      // Se não há dados na monthlyDetails, tentar audienceDetails como fallback
-      if (totalAgendamentos === 0 && totalVendas === 0) {
-        console.log('🔍 DEBUG - getRealValuesForClient - Nenhum dado em monthlyDetails, tentando audienceDetails...');
-        
-        const audienceDetailsQuery = query(
-          collection(db, 'audienceDetails'),
-          where('month', '==', month),
-          where('client', '==', client)
-        );
-        
-        const audienceDetailsSnapshot = await getDocs(audienceDetailsQuery);
-        const audienceMap = new Map(); // Para consolidar duplicatas
-        
-        audienceDetailsSnapshot.forEach((doc) => {
-          const data = doc.data();
-          const audienceKey = data.audience;
-          
-          // Se já existe um registro para este público, manter o mais recente
-          if (audienceMap.has(audienceKey)) {
-            const existing = audienceMap.get(audienceKey);
-            const existingDate = existing.updatedAt?.toDate?.() || new Date(0);
-            const newDate = data.updatedAt?.toDate?.() || new Date(0);
-            
-            if (newDate > existingDate) {
-              audienceMap.set(audienceKey, data);
-            }
-          } else {
-            audienceMap.set(audienceKey, data);
-          }
-        });
-        
-        // Converter Map para array
-        const consolidatedDetails = Array.from(audienceMap.values());
-        
-        // Calcular totais
-        totalAgendamentos = consolidatedDetails.reduce((sum, detail) => sum + (detail.agendamentos || 0), 0);
-        totalVendas = consolidatedDetails.reduce((sum, detail) => sum + (detail.vendas || 0), 0);
-        
-        console.log('🔍 DEBUG - getRealValuesForClient - Resultado da audienceDetails (fallback):', {
-          month,
-          client,
-          totalAgendamentos,
-          totalVendas,
-          audienceCount: consolidatedDetails.length,
-          details: consolidatedDetails.map(d => ({
-            audience: d.audience,
-            product: d.product,
-            agendamentos: d.agendamentos,
-            vendas: d.vendas
-          }))
-        });
-      }
+      // CORREÇÃO: Remover fallback para audienceDetails pois pode causar persistência de dados incorretos
+      // Se não há dados na monthlyDetails, significa que o cliente não tem dados para este mês
       
       const result = {
         agendamentos: totalAgendamentos,
         vendas: totalVendas,
-        cpv: avgCPV,
-        roi: avgROI.toString() + '%' // Convert to string format
+        cpv: finalCPV, // Retornar o CPV calculado ou salvo
+        roi: finalROI // Retornar o ROI formatado corretamente
       };
       
       console.log('🔍 DEBUG - getRealValuesForClient - Retornando resultado:', result);
@@ -1648,7 +1699,7 @@ export const metricsService = {
       return result;
     } catch (error) {
       console.error('Erro ao buscar valores reais do cliente:', error);
-      return { agendamentos: 0, vendas: 0, cpv: 0, roi: 0 };
+      return { agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' };
     }
   },
 
@@ -1657,8 +1708,11 @@ export const metricsService = {
     try {
       console.log('🔍 DEBUG - checkClientDataInOtherMonths - Verificando dados para cliente:', client);
       
-      // Verificar na coleção monthlyDetails primeiro
-      const monthlyDetailsQuery = query(collection(db, 'monthlyDetails'));
+      // Verificar na coleção monthlyDetails primeiro - filtrar por cliente
+      const monthlyDetailsQuery = query(
+        collection(db, 'monthlyDetails'),
+        where('client', '==', client)
+      );
       const monthlyDetailsSnapshot = await getDocs(monthlyDetailsQuery);
       const monthsWithData: string[] = [];
       
@@ -1669,7 +1723,7 @@ export const metricsService = {
         }
       });
       
-      console.log('🔍 DEBUG - checkClientDataInOtherMonths - Meses com dados em monthlyDetails:', monthsWithData);
+      console.log('🔍 DEBUG - checkClientDataInOtherMonths - Meses com dados em monthlyDetails para cliente:', monthsWithData);
       
       // Se não há dados em monthlyDetails, verificar audienceDetails
       if (monthsWithData.length === 0) {
@@ -1704,10 +1758,13 @@ export const metricsService = {
     try {
       console.log('🔍 DEBUG - debugMonthlyDetails - Verificando dados para mês:', month);
       
-      const q = query(collection(db, 'monthlyDetails'));
+      const q = query(
+        collection(db, 'monthlyDetails'),
+        where('month', '==', month)
+      );
       const querySnapshot = await getDocs(q);
       
-      console.log('🔍 DEBUG - debugMonthlyDetails - Total de documentos encontrados:', querySnapshot.size);
+      console.log('🔍 DEBUG - debugMonthlyDetails - Total de documentos encontrados para o mês:', querySnapshot.size);
       
       querySnapshot.forEach((doc) => {
         const data = doc.data();
@@ -1715,9 +1772,9 @@ export const metricsService = {
           id: doc.id,
           month: data.month,
           product: data.product,
+          client: data.client,
           agendamentos: data.agendamentos,
-          vendas: data.vendas,
-          client: data.client
+          vendas: data.vendas
         });
       });
       

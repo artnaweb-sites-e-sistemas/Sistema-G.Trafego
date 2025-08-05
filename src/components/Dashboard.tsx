@@ -41,6 +41,13 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Debug: verificar mudanças no selectedClient
   useEffect(() => {
     console.log('🔍 DEBUG - Dashboard - selectedClient alterado para:', selectedClient);
+    
+    // Salvar cliente selecionado no localStorage para uso em outros componentes
+    if (selectedClient && selectedClient !== 'Selecione um cliente') {
+      localStorage.setItem('selectedClient', selectedClient);
+    } else {
+      localStorage.removeItem('selectedClient');
+    }
   }, [selectedClient]);
   const [selectedProduct, setSelectedProduct] = useState('');
   const [selectedAudience, setSelectedAudience] = useState('');
@@ -50,7 +57,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [monthlyDetailsValues, setMonthlyDetailsValues] = useState({ agendamentos: 0, vendas: 0 });
-  const [realValuesForClient, setRealValuesForClient] = useState({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0%' });
+  const [realValuesForClient, setRealValuesForClient] = useState({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
   const [realValuesRefreshTrigger, setRealValuesRefreshTrigger] = useState(0);
   const [aiBenchmarkResults, setAiBenchmarkResults] = useState<BenchmarkResults | null>(null);
 
@@ -109,83 +116,58 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     console.log('🔍 DEBUG - Dashboard - Estados atuais:', { selectedClient, selectedMonth, realValuesRefreshTrigger });
     console.log('🔍 DEBUG - Dashboard - Stack trace:', new Error().stack?.split('\n').slice(1, 4).join('\n'));
     
+    // Evitar execução desnecessária se não há cliente selecionado
+    if (!selectedClient || selectedClient === 'Selecione um cliente' || selectedClient === 'Todos os Clientes') {
+      console.log('🔍 DEBUG - Dashboard - Cliente não selecionado, pulando carregamento');
+      setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
+      return;
+    }
+    
+    // Evitar loop infinito - limitar o número de chamadas consecutivas
+    if (realValuesRefreshTrigger > 300) {
+      console.log('🔍 DEBUG - Dashboard - Muitas chamadas consecutivas detectadas, pausando...');
+      return;
+    }
+    
     const loadRealValuesForClient = async () => {
       console.log('🔍 DEBUG - Dashboard - useEffect loadRealValuesForClient executado');
       console.log('🔍 DEBUG - Dashboard - selectedClient:', selectedClient);
       console.log('🔍 DEBUG - Dashboard - selectedMonth:', selectedMonth);
       console.log('🔍 DEBUG - Dashboard - realValuesRefreshTrigger:', realValuesRefreshTrigger);
       
-      if (selectedClient && selectedClient !== 'Selecione um cliente' && selectedClient !== 'Todos os Clientes') {
-        try {
-          console.log('🔍 DEBUG - Dashboard - Carregando valores reais para cliente:', selectedClient);
-          
-          // Debug: verificar dados na coleção monthlyDetails
-          console.log('🔍 DEBUG - Dashboard - Verificando dados na coleção monthlyDetails...');
-          await metricsService.debugMonthlyDetails(selectedMonth);
-          
-          console.log('🔍 DEBUG - Dashboard - Chamando getRealValuesForClient...');
-          const realValues = await metricsService.getRealValuesForClient(selectedMonth, selectedClient);
-          console.log('🔍 DEBUG - Dashboard - Resultado da busca:', realValues);
-          console.log('🔍 DEBUG - Dashboard - Tipo do resultado:', typeof realValues);
-          console.log('🔍 DEBUG - Dashboard - Estrutura do resultado:', JSON.stringify(realValues, null, 2));
-          console.log('🔍 DEBUG - Dashboard - Valores CPV e ROI:', {
-            cpv: realValues.cpv,
-            roi: realValues.roi,
-            cpvType: typeof realValues.cpv,
-            roiType: typeof realValues.roi
-          });
-          
-          // Se não há dados para o mês atual, verificar outros meses
-          if (realValues.agendamentos === 0 && realValues.vendas === 0) {
-            console.log('🔍 DEBUG - Dashboard - Nenhum dado encontrado para o mês atual, verificando outros meses...');
-            const monthsWithData = await metricsService.checkClientDataInOtherMonths(selectedClient);
-            
-            if (monthsWithData.length > 0) {
-              console.log('🔍 DEBUG - Dashboard - Dados encontrados em outros meses:', monthsWithData);
-              // Usar dados do primeiro mês disponível
-              const firstMonth = monthsWithData[0];
-              const realValuesFromOtherMonth = await metricsService.getRealValuesForClient(firstMonth, selectedClient);
-              console.log('🔍 DEBUG - Dashboard - Definindo valores do outro mês:', realValuesFromOtherMonth);
-              setRealValuesForClient({
-                agendamentos: realValuesFromOtherMonth.agendamentos,
-                vendas: realValuesFromOtherMonth.vendas,
-                cpv: realValuesFromOtherMonth.cpv,
-                roi: typeof realValuesFromOtherMonth.roi === 'string' ? realValuesFromOtherMonth.roi : `${realValuesFromOtherMonth.roi}%`
-              });
-              console.log('🔍 DEBUG - Dashboard - Usando dados do mês:', firstMonth, realValuesFromOtherMonth);
-            } else {
-              console.log('🔍 DEBUG - Dashboard - Nenhum dado encontrado em nenhum mês, criando dados de teste...');
-              // Criar dados de teste
-              await metricsService.createTestDataForClient(selectedClient, selectedMonth);
-              const testValues = await metricsService.getRealValuesForClient(selectedMonth, selectedClient);
-              console.log('🔍 DEBUG - Dashboard - Definindo valores de teste:', testValues);
-              setRealValuesForClient({
-                agendamentos: testValues.agendamentos,
-                vendas: testValues.vendas,
-                cpv: testValues.cpv,
-                roi: typeof testValues.roi === 'string' ? testValues.roi : `${testValues.roi}%`
-              });
-              console.log('🔍 DEBUG - Dashboard - Dados de teste criados:', testValues);
-            }
-          } else {
-            console.log('🔍 DEBUG - Dashboard - Definindo valores reais:', realValues);
-            setRealValuesForClient({
-          agendamentos: realValues.agendamentos,
-          vendas: realValues.vendas,
+      try {
+        console.log('🔍 DEBUG - Dashboard - Carregando valores reais para cliente:', selectedClient);
+        
+        // Debug: verificar dados na coleção monthlyDetails
+        console.log('🔍 DEBUG - Dashboard - Verificando dados na coleção monthlyDetails...');
+        await metricsService.debugMonthlyDetails(selectedMonth);
+        
+        console.log('🔍 DEBUG - Dashboard - Chamando getRealValuesForClient...');
+        const realValues = await metricsService.getRealValuesForClient(selectedMonth, selectedClient);
+        console.log('🔍 DEBUG - Dashboard - Resultado da busca:', realValues);
+        console.log('🔍 DEBUG - Dashboard - Tipo do resultado:', typeof realValues);
+        console.log('🔍 DEBUG - Dashboard - Estrutura do resultado:', JSON.stringify(realValues, null, 2));
+        console.log('🔍 DEBUG - Dashboard - Valores CPV e ROI:', {
           cpv: realValues.cpv,
-          roi: typeof realValues.roi === 'string' ? realValues.roi : `${realValues.roi}%`
+          roi: realValues.roi,
+          cpvType: typeof realValues.cpv,
+          roiType: typeof realValues.roi
         });
-            console.log('🔍 DEBUG - Dashboard - Valores reais carregados:', realValues);
-          }
-        } catch (error) {
-          console.error('🔍 DEBUG - Dashboard - Erro ao carregar valores reais do cliente:', error);
-          console.error('🔍 DEBUG - Dashboard - Stack trace do erro:', error instanceof Error ? error.stack : 'N/A');
-          setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0%' });
-        }
-      } else {
-        console.log('🔍 DEBUG - Dashboard - Cliente não selecionado ou inválido');
-        console.log('🔍 DEBUG - Dashboard - selectedClient:', selectedClient);
-        setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0%' });
+        
+        // CORREÇÃO: Se não há dados para o mês atual, retornar valores zerados
+        // Não buscar dados de outros meses nem criar dados de teste automaticamente
+        console.log('🔍 DEBUG - Dashboard - Definindo valores reais:', realValues);
+        setRealValuesForClient({
+          agendamentos: realValues.agendamentos || 0,
+          vendas: realValues.vendas || 0,
+          cpv: realValues.cpv || 0,
+          roi: typeof realValues.roi === 'string' ? realValues.roi : '0% (0.0x)'
+        });
+        console.log('🔍 DEBUG - Dashboard - Valores reais carregados:', realValues);
+      } catch (error) {
+        console.error('🔍 DEBUG - Dashboard - Erro ao carregar valores reais do cliente:', error);
+        console.error('🔍 DEBUG - Dashboard - Stack trace do erro:', error instanceof Error ? error.stack : 'N/A');
+        setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
       }
     };
 
@@ -398,23 +380,17 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Listener para limpeza de cliente
   useEffect(() => {
     const handleClientCleared = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { clientName } = customEvent.detail;
-  
-      
-      // Atualizar cliente selecionado no Dashboard
+      console.log('🔍 DEBUG - Dashboard - Cliente limpo');
       setSelectedClient('Selecione um cliente');
-      
-      // Zerar métricas quando cliente for limpo
-      setMetrics([]);
-      setSelectedProduct('Todos os Produtos');
-      setSelectedAudience('Todos os Públicos');
+      setSelectedProduct('');
+      setSelectedAudience('');
       setSelectedCampaign('');
-      
-      // Forçar refresh das métricas para garantir que sejam zeradas
-      setRefreshTrigger(prev => prev + 1);
-      
-  
+      setMetrics([]);
+      setLoading(false);
+      setError(null);
+      setRefreshTrigger(0);
+      setRealValuesRefreshTrigger(0);
+      setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
     };
 
     window.addEventListener('clientCleared', handleClientCleared);
@@ -430,6 +406,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       const customEvent = event as CustomEvent;
       const { clientName } = customEvent.detail;
   
+      console.log('🔍 DEBUG - Dashboard - Evento noProductsFound recebido para cliente:', clientName);
       
       // Zerar métricas quando não há produtos
       setMetrics([]);
@@ -437,7 +414,10 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       setSelectedAudience('Todos os Públicos');
       setSelectedCampaign('');
       
-  
+      // Zerar valores reais quando não há produtos
+      setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0%' });
+      
+      console.log('🔍 DEBUG - Dashboard - Valores zerados devido à ausência de produtos');
     };
 
     window.addEventListener('noProductsFound', handleNoProductsFound);

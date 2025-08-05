@@ -115,6 +115,10 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
         if (facebookProducts.length === 0) {
           console.log('ProductPicker: Nenhuma campanha encontrada para este cliente');
           setProducts([]);
+          // Disparar evento quando não há campanhas
+          window.dispatchEvent(new CustomEvent('noProductsFound', {
+            detail: { clientName: selectedClient }
+          }));
         } else {
           setProducts(facebookProducts);
         }
@@ -178,6 +182,14 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
   useEffect(() => {
     if (selectedClient && selectedClient !== 'Todos os Clientes') {
       loadMetaAdsCampaigns();
+    } else {
+      // Se não há cliente selecionado, zerar produtos e disparar evento
+      setProducts([]);
+      if (selectedClient === 'Todos os Clientes') {
+        window.dispatchEvent(new CustomEvent('noProductsFound', {
+          detail: { clientName: selectedClient }
+        }));
+      }
     }
   }, [selectedClient, dataSource, selectedMonth]);
 
@@ -292,6 +304,14 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
         
         setProducts(facebookProducts);
         
+        // Se não há produtos encontrados, disparar evento
+        if (facebookProducts.length === 0) {
+          console.log('ProductPicker: Nenhum produto encontrado para o cliente:', clientName);
+          window.dispatchEvent(new CustomEvent('noProductsFound', {
+            detail: { clientName }
+          }));
+        }
+        
       } catch (error: any) {
         if (error.message.includes('Nenhuma conta de anúncios selecionada') || 
             error.message.includes('Conta de anúncios não configurada')) {
@@ -300,10 +320,20 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
               await loadMetaAdsCampaignsForClient(clientName, source, adAccount);
             } catch (retryError: any) {
               setProducts([]);
+              // Disparar evento quando não há produtos após retry
+              console.log('ProductPicker: Nenhum produto encontrado após retry para o cliente:', clientName);
+              window.dispatchEvent(new CustomEvent('noProductsFound', {
+                detail: { clientName }
+              }));
             }
           }, 3000);
         } else {
           setProducts([]);
+          // Disparar evento quando há erro e não há produtos
+          console.log('ProductPicker: Erro ao carregar produtos para o cliente:', clientName);
+          window.dispatchEvent(new CustomEvent('noProductsFound', {
+            detail: { clientName }
+          }));
         }
       } finally {
         setIsLoading(false);
@@ -311,9 +341,18 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
     } else if (source === 'manual') {
       // Não carregar produtos manuais - só devem vir do Meta
       setProducts([]);
+      // Disparar evento para clientes manuais sem produtos
+      console.log('ProductPicker: Cliente manual sem produtos:', clientName);
+      window.dispatchEvent(new CustomEvent('noProductsFound', {
+        detail: { clientName }
+      }));
     } else {
       console.log('ProductPicker: DataSource não é facebook ou usuário não está logado');
       setProducts([]);
+      // Disparar evento quando não há dataSource válido
+      window.dispatchEvent(new CustomEvent('noProductsFound', {
+        detail: { clientName }
+      }));
     }
   };
 

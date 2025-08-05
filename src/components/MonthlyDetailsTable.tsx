@@ -282,8 +282,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       metric: 'CPM',
       benchmark: formatCurrency(56.47),
       realValue: formatCurrency(56.47),
-      status: 'Dentro da meta',
-      statusColor: 'up',
+      status: '',
+      statusColor: 'neutral',
       benchmarkEditable: true,
       realValueEditable: false
     },
@@ -302,8 +302,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       metric: 'CPC',
       benchmark: formatCurrency(2.67),
       realValue: formatCurrency(2.67),
-      status: 'Bom (Baixo)',
-      statusColor: 'up',
+      status: '',
+      statusColor: 'neutral',
       benchmarkEditable: true,
       realValueEditable: false
     },
@@ -322,8 +322,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       metric: 'CTR',
       benchmark: '2.11%',
       realValue: '2.12%',
-      status: 'Bom',
-      statusColor: 'up',
+      status: '',
+      statusColor: 'neutral',
       benchmarkEditable: true,
       realValueEditable: false
     },
@@ -342,8 +342,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       metric: 'Tx. Mensagens (Leads/Cliques)',
       benchmark: '5.00%',
       realValue: '0.00%',
-      status: 'Levemente abaixo da meta',
-      statusColor: 'down',
+      status: '',
+      statusColor: 'neutral',
       benchmarkEditable: true,
       realValueEditable: false
     },
@@ -352,8 +352,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       metric: 'CPL (Custo por Lead)',
       benchmark: formatCurrency(53.53),
       realValue: formatCurrency(0),
-      status: 'Ótimo (Baixo)',
-      statusColor: 'up',
+      status: '',
+      statusColor: 'neutral',
       benchmarkEditable: false,
       realValueEditable: false
     },
@@ -367,15 +367,15 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       status: '',
       statusColor: 'neutral',
       benchmarkEditable: false,
-      realValueEditable: true
+      realValueEditable: false // CORREÇÃO: Sempre não editável
     },
     {
       category: 'Funil de Agendamento',
       metric: 'Tx. Agendamento (Agend./Leads)',
       benchmark: '10.00%',
       realValue: '0.00%',
-      status: 'Muito abaixo da meta',
-      statusColor: 'down',
+      status: '',
+      statusColor: 'neutral',
       benchmarkEditable: true,
       realValueEditable: false
     },
@@ -389,47 +389,45 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       status: '',
       statusColor: 'neutral',
       benchmarkEditable: false,
-      realValueEditable: true
+      realValueEditable: false // CORREÇÃO: Sempre não editável
     },
     {
       category: 'Resultados Finais da Venda',
-              metric: 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)',
+      metric: 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)',
       benchmark: '10.00%',
       realValue: '0.00%',
-      status: 'Levemente abaixo da meta',
-      statusColor: 'down',
+      status: '',
+      statusColor: 'neutral',
       benchmarkEditable: true,
       realValueEditable: false
     },
     {
       category: 'Resultados Finais da Venda',
       metric: 'CPV (Custo por Venda)',
-      benchmark: formatCurrency(10705.21),
+      benchmark: formatCurrency(300),
       realValue: formatCurrency(0),
       status: '',
       statusColor: 'neutral',
       benchmarkEditable: false,
       realValueEditable: false
     },
-
-    // Financeiro
     {
-      category: 'Financeiro',
+      category: 'Resultados Finais da Venda',
       metric: 'Lucro',
-      benchmark: formatCurrency(-292.99),
-      realValue: formatCurrency(-16),
-      status: 'Ótimo',
-      statusColor: 'up',
+      benchmark: formatCurrency(0),
+      realValue: formatCurrency(0),
+      status: '',
+      statusColor: 'neutral',
       benchmarkEditable: false,
       realValueEditable: false
     },
     {
-      category: 'Financeiro',
+      category: 'Resultados Finais da Venda',
       metric: 'ROI / ROAS',
-      benchmark: '-98% (0.0x)',
-      realValue: '-100% (0.0x)',
-      status: 'Levemente abaixo da meta',
-      statusColor: 'down',
+      benchmark: '0% (0.0x)',
+      realValue: '0% (0.0x)',
+      status: '',
+      statusColor: 'neutral',
       benchmarkEditable: false,
       realValueEditable: false
     }
@@ -482,7 +480,12 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             selectedMonth,
             selectedProduct
           );
-          setSavedDetails(details);
+          // CORREÇÃO: Garantir que sempre tenham valores válidos
+          setSavedDetails({
+            agendamentos: details.agendamentos || 0,
+            vendas: details.vendas || 0,
+            ticketMedio: details.ticketMedio || 250
+          });
           console.log('Dados carregados do Firebase para produto:', selectedProduct, details);
           console.log('🔍 DEBUG - MonthlyDetailsTable - Dados salvos incluem CPV/ROI:', {
             hasCPV: 'cpv' in details,
@@ -507,11 +510,13 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           loadBenchmarkValues();
         } catch (error) {
           console.error('Erro ao carregar detalhes salvos:', error);
-          setSavedDetails({ agendamentos: 0, vendas: 0, ticketMedio: 0 });
+          // CORREÇÃO: Garantir valores padrão em caso de erro
+          setSavedDetails({ agendamentos: 0, vendas: 0, ticketMedio: 250 });
         }
       } else {
         // Limpar dados salvos se não há produto selecionado
-        setSavedDetails({ agendamentos: 0, vendas: 0, ticketMedio: 0 });
+        // CORREÇÃO: Garantir valores padrão quando não há seleção
+        setSavedDetails({ agendamentos: 0, vendas: 0, ticketMedio: 250 });
       }
     };
 
@@ -622,10 +627,12 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           });
         } catch (error) {
           console.error('Erro ao carregar dados dos públicos:', error);
+          // CORREÇÃO: Garantir valores zerados em caso de erro
           setAudienceCalculatedValues({ agendamentos: 0, vendas: 0 });
         }
       } else {
         console.log('🔍 DEBUG - MonthlyDetailsTable - Produto ou mês não selecionado, zerando valores');
+        // CORREÇÃO: Garantir valores zerados quando não há seleção
         setAudienceCalculatedValues({ agendamentos: 0, vendas: 0 });
       }
     };
@@ -737,17 +744,21 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             ticketMedio
           });
           
-                           metricsService.saveMonthlyDetails({
-                   month: selectedMonth,
-                   product: selectedProduct,
-                   agendamentos: agendamentos,
-                   vendas: vendas,
-                   ticketMedio: ticketMedio,
-                   cpv: cpv,
-                   roi: roiValue
-                 }).catch(error => {
-                   console.error('Erro ao salvar valores dos públicos:', error);
-                 });
+          // CORREÇÃO: Incluir o cliente selecionado ao salvar
+          const selectedClient = localStorage.getItem('selectedClient') || 'Cliente Padrão';
+          
+          metricsService.saveMonthlyDetails({
+            month: selectedMonth,
+            product: selectedProduct,
+            client: selectedClient, // Adicionar cliente
+            agendamentos: agendamentos,
+            vendas: vendas,
+            ticketMedio: ticketMedio,
+            cpv: cpv,
+            roi: roiValue
+          }).catch(error => {
+            console.error('Erro ao salvar valores dos públicos:', error);
+          });
         }
         
         onValuesChange({ agendamentos, vendas });
@@ -767,7 +778,72 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   // Atualizar métricas quando houver mudança no produto selecionado ou nas métricas
   useEffect(() => {
     if (!metrics || metrics.length === 0) {
-      console.log('🔴 MonthlyDetailsTable: Nenhuma métrica disponível');
+      console.log('🔴 MonthlyDetailsTable: Nenhuma métrica disponível - zerando valores');
+      
+      // CORREÇÃO: Quando não há métricas, zerar todos os valores sincronizados
+      setTableData(prevData => {
+        const updated = prevData.map(row => {
+          const newRow: TableRow = { ...row };
+
+          // Zerar valores que são sincronizados com Meta Ads
+          switch (row.metric) {
+            case 'Investimento pretendido (Mês)':
+              newRow.realValue = formatCurrency(0);
+              newRow.realValueEditable = false;
+              break;
+            case 'CPM':
+              newRow.realValue = formatCurrency(0);
+              newRow.realValueEditable = false;
+              break;
+            case 'Impressões':
+              newRow.realValue = '0';
+              newRow.realValueEditable = false;
+              break;
+            case 'CPC':
+              newRow.realValue = formatCurrency(0);
+              newRow.realValueEditable = false;
+              break;
+            case 'Cliques':
+              newRow.realValue = '0';
+              newRow.realValueEditable = false;
+              break;
+            case 'CTR':
+              newRow.realValue = '0.00%';
+              newRow.realValueEditable = false;
+              break;
+            case 'Leads / Msgs':
+              newRow.realValue = '0';
+              newRow.realValueEditable = false;
+              break;
+            case 'CPL (Custo por Lead)':
+              newRow.realValue = formatCurrency(0);
+              newRow.realValueEditable = false;
+              break;
+            case 'Agendamentos':
+              newRow.realValue = audienceCalculatedValues.agendamentos.toLocaleString('pt-BR');
+              newRow.realValueEditable = false; // CORREÇÃO: Sempre não editável
+              break;
+            case 'Vendas':
+              newRow.realValue = audienceCalculatedValues.vendas.toLocaleString('pt-BR');
+              newRow.realValueEditable = false; // CORREÇÃO: Sempre não editável
+              break;
+            default:
+              break;
+          }
+
+          // CORREÇÃO: Calcular status dinamicamente baseado nos valores reais vs benchmark
+          const statusResult = calculateStatus(row.metric, newRow.realValue, newRow.benchmark);
+          newRow.status = statusResult.status;
+          newRow.statusColor = statusResult.statusColor;
+
+          return newRow;
+        });
+
+        // Recalcular campos dependentes
+        const calculatedData = calculateValues(updated);
+        return calculatedData;
+      });
+      
       return;
     }
 
@@ -784,23 +860,41 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       const updated = prevData.map(row => {
         const newRow: TableRow = { ...row };
 
+        // CORREÇÃO: Verificar se há dados reais antes de sincronizar
+        const hasRealData = aggregated.totalInvestment > 0 || aggregated.totalLeads > 0 || aggregated.totalClicks > 0;
+
         // Definir quais campos são sincronizados automaticamente com Meta Ads
         switch (row.metric) {
           case 'Investimento pretendido (Mês)':
-            newRow.realValue = formatCurrency(aggregated.totalInvestment);
+            // CORREÇÃO: Só sincronizar se há dados reais
+            if (hasRealData) {
+              newRow.realValue = formatCurrency(aggregated.totalInvestment);
+            } else {
+              newRow.realValue = formatCurrency(0);
+            }
             newRow.realValueEditable = false;
             break;
           case 'CPM':
-            newRow.realValue = formatCurrency(aggregated.avgCPM);
+            // CORREÇÃO: Só sincronizar se há dados reais
+            if (hasRealData) {
+              newRow.realValue = formatCurrency(aggregated.avgCPM);
+            } else {
+              newRow.realValue = formatCurrency(0);
+            }
             newRow.realValueEditable = false;
             break;
           case 'Impressões':
-            newRow.realValue = aggregated.totalImpressions.toLocaleString('pt-BR');
+            // CORREÇÃO: Só sincronizar se há dados reais
+            if (hasRealData) {
+              newRow.realValue = aggregated.totalImpressions.toLocaleString('pt-BR');
+            } else {
+              newRow.realValue = '0';
+            }
             newRow.realValueEditable = false;
             break;
           case 'CPC':
             // CPC calculado automaticamente: Investimento / Cliques
-            if (aggregated.totalClicks > 0) {
+            if (hasRealData && aggregated.totalClicks > 0) {
               const avgCPC = aggregated.totalInvestment / aggregated.totalClicks;
               newRow.realValue = formatCurrency(avgCPC);
             } else {
@@ -809,37 +903,63 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             newRow.realValueEditable = false;
             break;
           case 'Cliques':
-            newRow.realValue = aggregated.totalClicks.toLocaleString('pt-BR');
+            // CORREÇÃO: Só sincronizar se há dados reais
+            if (hasRealData) {
+              newRow.realValue = aggregated.totalClicks.toLocaleString('pt-BR');
+            } else {
+              newRow.realValue = '0';
+            }
             newRow.realValueEditable = false;
             break;
           case 'CTR':
-            newRow.realValue = `${aggregated.avgCTR.toFixed(2)}%`;
+            // CORREÇÃO: Só sincronizar se há dados reais
+            if (hasRealData) {
+              newRow.realValue = `${aggregated.avgCTR.toFixed(2)}%`;
+            } else {
+              newRow.realValue = '0.00%';
+            }
             newRow.realValueEditable = false;
             break;
           case 'Leads / Msgs':
-            console.log(`🟢 MonthlyDetailsTable: Definindo Leads / Msgs como: ${aggregated.totalLeads.toLocaleString('pt-BR')}`);
-            newRow.realValue = aggregated.totalLeads.toLocaleString('pt-BR');
+            // CORREÇÃO: Só sincronizar se há dados reais
+            if (hasRealData) {
+              console.log(`🟢 MonthlyDetailsTable: Definindo Leads / Msgs como: ${aggregated.totalLeads.toLocaleString('pt-BR')}`);
+              newRow.realValue = aggregated.totalLeads.toLocaleString('pt-BR');
+            } else {
+              console.log(`🟢 MonthlyDetailsTable: Definindo Leads / Msgs como: 0 (sem dados reais)`);
+              newRow.realValue = '0';
+            }
             newRow.realValueEditable = false;
             break;
           case 'CPL (Custo por Lead)':
-            newRow.realValue = formatCurrency(aggregated.avgCPL);
+            // CORREÇÃO: Só sincronizar se há dados reais
+            if (hasRealData) {
+              newRow.realValue = formatCurrency(aggregated.avgCPL);
+            } else {
+              newRow.realValue = formatCurrency(0);
+            }
             newRow.realValueEditable = false;
             break;
           case 'Agendamentos':
             // 🎯 CORREÇÃO: Sempre usar os valores calculados dos públicos
             console.log(`🔍 DEBUG - MonthlyDetailsTable: Atualizando Agendamentos com valor dos públicos: ${audienceCalculatedValues.agendamentos}`);
             newRow.realValue = audienceCalculatedValues.agendamentos.toLocaleString('pt-BR');
-            newRow.realValueEditable = false; // Não mais editável
+            newRow.realValueEditable = false; // CORREÇÃO: Sempre não editável
             break;
           case 'Vendas':
             // 🎯 CORREÇÃO: Sempre usar os valores calculados dos públicos
             console.log(`🔍 DEBUG - MonthlyDetailsTable: Atualizando Vendas com valor dos públicos: ${audienceCalculatedValues.vendas}`);
             newRow.realValue = audienceCalculatedValues.vendas.toLocaleString('pt-BR');
-            newRow.realValueEditable = false; // Não mais editável
+            newRow.realValueEditable = false; // CORREÇÃO: Sempre não editável
             break;
           default:
             break;
         }
+
+        // CORREÇÃO: Calcular status dinamicamente baseado nos valores reais vs benchmark
+        const statusResult = calculateStatus(row.metric, newRow.realValue, newRow.benchmark);
+        newRow.status = statusResult.status;
+        newRow.statusColor = statusResult.statusColor;
 
         return newRow;
       });
@@ -1051,6 +1171,11 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             break;
         }
 
+        // CORREÇÃO: Calcular status dinamicamente após recalcular valores
+        const statusResult = calculateStatus(row.metric, newRow.realValue, newRow.benchmark);
+        newRow.status = statusResult.status;
+        newRow.statusColor = statusResult.statusColor;
+
         return newRow;
       });
       
@@ -1092,23 +1217,28 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         const cpv = parseNumber(cpvRow?.realValue || '0');
         const roiValue = saveROIValue(roiRow?.realValue || '0% (0.0x)');
         
+        // CORREÇÃO: Incluir o cliente selecionado ao salvar
+        const selectedClient = localStorage.getItem('selectedClient') || 'Cliente Padrão';
+        
         console.log('🔍 DEBUG - MonthlyDetailsTable - Salvando ticket médio com CPV/ROI:', {
           agendamentos: savedDetails.agendamentos,
           vendas: savedDetails.vendas,
           ticketMedio: ticketMedio,
           cpv,
-          roi: roiValue
+          roi: roiValue,
+          client: selectedClient
         });
         
-                           metricsService.saveMonthlyDetails({
-                     month: selectedMonth,
-                     product: selectedProduct,
-                     agendamentos: savedDetails.agendamentos,
-                     vendas: savedDetails.vendas,
-                     ticketMedio: ticketMedio,
-                     cpv: cpv,
-                     roi: roiValue
-                   }).catch(error => {
+        metricsService.saveMonthlyDetails({
+          month: selectedMonth,
+          product: selectedProduct,
+          client: selectedClient, // Adicionar cliente
+          agendamentos: savedDetails.agendamentos,
+          vendas: savedDetails.vendas,
+          ticketMedio: ticketMedio,
+          cpv: cpv,
+          roi: roiValue
+        }).catch(error => {
           console.error('Erro ao salvar ticket médio:', error);
         });
       }, 500); // Debounce de 500ms
@@ -1293,25 +1423,30 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         
         // Salvar no Firebase
         if (selectedProduct && selectedMonth) {
+          // CORREÇÃO: Incluir o cliente selecionado ao salvar
+          const selectedClient = localStorage.getItem('selectedClient') || 'Cliente Padrão';
+          
           console.log('🔍 DEBUG - MonthlyDetailsTable - Salvando dados FINAIS:', {
             month: selectedMonth,
             product: selectedProduct,
+            client: selectedClient,
             agendamentos: agendamentos,
             vendas: vendas,
             ticketMedio: ticketMedio,
             cpv: cpv,
-            roi: roi
+            roi: roiValue
           });
           
-                           metricsService.saveMonthlyDetails({
-                   month: selectedMonth,
-                   product: selectedProduct,
-                   agendamentos: agendamentos,
-                   vendas: vendas,
-                   ticketMedio: ticketMedio,
-                   cpv: cpv,
-                   roi: roiValue
-                 }).catch(error => {
+          metricsService.saveMonthlyDetails({
+            month: selectedMonth,
+            product: selectedProduct,
+            client: selectedClient, // Adicionar cliente
+            agendamentos: agendamentos,
+            vendas: vendas,
+            ticketMedio: ticketMedio,
+            cpv: cpv,
+            roi: roiValue
+          }).catch(error => {
             console.error('Erro ao salvar valores de agendamentos/vendas:', error);
           });
         }
@@ -1346,18 +1481,18 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'up': return 'text-green-400';
-      case 'down': return 'text-red-400';
-      case 'neutral': return 'text-yellow-400';
+      case 'up': return 'text-green-500';
+      case 'down': return 'text-red-500';
+      case 'neutral': return 'text-yellow-500';
       default: return 'text-gray-400';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'up': return <TrendingUp className="w-4 h-4" />;
-      case 'down': return <TrendingDown className="w-4 h-4" />;
-      case 'neutral': return <Minus className="w-4 h-4" />;
+      case 'up': return <TrendingUp className={`w-4 h-4 ${getStatusColor(status)}`} />;
+      case 'down': return <TrendingDown className={`w-4 h-4 ${getStatusColor(status)}`} />;
+      case 'neutral': return <Minus className={`w-4 h-4 ${getStatusColor(status)}`} />;
       default: return null;
     }
   };
@@ -1455,6 +1590,74 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     acc[item.category].push(item);
     return acc;
   }, {} as Record<string, TableRow[]>);
+
+  // Função para calcular o status baseado na comparação entre valores reais e benchmarks
+  const calculateStatus = (metric: string, realValue: string, benchmark: string): { status: string; statusColor: string } => {
+    // Campos que não devem ter status (mantêm "-")
+    const noStatusFields = [
+      'Investimento pretendido (Mês)',
+      'Impressões',
+      'Cliques',
+      'Leads / Msgs',
+      'Agendamentos',
+      'Vendas'
+    ];
+
+    if (noStatusFields.includes(metric)) {
+      return { status: '', statusColor: 'neutral' };
+    }
+
+    // Extrair valores numéricos baseado no tipo de campo
+    let realNum = 0;
+    let benchmarkNum = 0;
+
+    // Para valores monetários (CPM, CPC, CPL, CPV)
+    if (metric.includes('CPM') || metric.includes('CPC') || metric.includes('CPL') || metric.includes('CPV')) {
+      realNum = parseCurrency(realValue);
+      benchmarkNum = parseCurrency(benchmark);
+    }
+    // Para porcentagens (CTR, Tx. Mensagens, Tx. Agendamento, Tx. Conversão Vendas, ROI)
+    else if (metric.includes('CTR') || metric.includes('Tx.') || metric.includes('ROI')) {
+      realNum = parseNumber(realValue.replace('%', '').replace('(', '').replace(')', '').replace('x', ''));
+      benchmarkNum = parseNumber(benchmark.replace('%', '').replace('(', '').replace(')', '').replace('x', ''));
+    }
+    // Para outros valores numéricos
+    else {
+      realNum = parseNumber(realValue);
+      benchmarkNum = parseNumber(benchmark);
+    }
+
+    // Se não conseguiu extrair valores válidos
+    if (isNaN(realNum) || isNaN(benchmarkNum) || benchmarkNum === 0) {
+      return { status: '', statusColor: 'neutral' };
+    }
+
+    // Calcular diferença percentual
+    const difference = ((realNum - benchmarkNum) / benchmarkNum) * 100;
+
+    // CORREÇÃO: Para custos (CPM, CPC, CPL, CPV), quanto mais baixo, melhor
+    const isCostMetric = metric.includes('CPM') || metric.includes('CPC') || metric.includes('CPL') || metric.includes('CPV');
+    
+    // Se é métrica de custo, inverter a lógica (diferença negativa = bom)
+    const effectiveDifference = isCostMetric ? -difference : difference;
+
+    // Definir status baseado na diferença efetiva
+    if (effectiveDifference >= 20) {
+      return { status: 'Excelente (acima da meta)', statusColor: 'up' };
+    } else if (effectiveDifference >= 10) {
+      return { status: 'Bom (acima da meta)', statusColor: 'up' };
+    } else if (effectiveDifference >= 5) {
+      return { status: 'Levemente acima da meta', statusColor: 'up' };
+    } else if (effectiveDifference >= -5) {
+      return { status: 'Dentro da meta', statusColor: 'neutral' };
+    } else if (effectiveDifference >= -10) {
+      return { status: 'Levemente abaixo da meta', statusColor: 'down' };
+    } else if (effectiveDifference >= -20) {
+      return { status: 'Abaixo da meta', statusColor: 'down' };
+    } else {
+      return { status: 'Muito abaixo da meta', statusColor: 'down' };
+    }
+  };
 
   return (
     <div className="bg-slate-900 rounded-xl border border-slate-600 shadow-xl">

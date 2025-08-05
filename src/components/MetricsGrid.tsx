@@ -159,32 +159,75 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
     { 
       title: 'CPV', 
       value: (() => {
-        const cpvValue = realCPV !== undefined ? realCPV : (aggregated.totalSales > 0 ? aggregated.totalInvestment / aggregated.totalSales : 0);
+        // CORREÇÃO: Garantir que sempre retorne um valor válido
+        // Se temos um valor real do CPV da planilha, usar ele
+        if (realCPV !== undefined && realCPV > 0) {
+          console.log('🔍 DEBUG - MetricsGrid - Card CPV - Usando valor real:', realCPV);
+          return formatCurrency(realCPV);
+        }
+        
+        // Se não temos valor real, calcular baseado no investimento e vendas
+        let cpvValue = 0;
+        if (aggregated.totalSales > 0 && aggregated.totalInvestment > 0) {
+          cpvValue = aggregated.totalInvestment / aggregated.totalSales;
+        }
+        
         console.log('🔍 DEBUG - MetricsGrid - Card CPV - Valor calculado:', {
           realCPV,
           aggregatedTotalSales: aggregated.totalSales,
           aggregatedTotalInvestment: aggregated.totalInvestment,
-          calculatedValue: aggregated.totalSales > 0 ? aggregated.totalInvestment / aggregated.totalSales : 0,
+          calculatedValue: cpvValue,
           finalValue: cpvValue
         });
+        
         return formatCurrency(cpvValue);
       })(), 
-      trend: (realCPV !== undefined ? realCPV : aggregated.totalSales) > 0 ? 'neutral' as const : 'neutral' as const,
+      trend: 'neutral' as const, // CORREÇÃO: Sempre neutral para CPV
       tooltip: 'Custo por venda. Quanto você gasta para conseguir cada venda (valores reais da planilha de detalhes mensais)'
     },
     { 
       title: 'ROI/ROAS', 
       value: (() => {
-        const roiValue = realROI !== undefined ? realROI : `${aggregated.totalROI.toFixed(2)}%`;
+        // CORREÇÃO: Garantir que sempre retorne um valor válido
+        // Se temos um valor real do ROI da planilha, usar ele
+        if (realROI !== undefined && realROI !== 'NaN%' && realROI !== '0% (0.0x)') {
+          console.log('🔍 DEBUG - MetricsGrid - Card ROI/ROAS - Usando valor real:', realROI);
+          return realROI;
+        }
+        
+        // Se não temos valor real, calcular baseado nos dados agregados
+        const calculatedROI = aggregated.totalROI;
+        const calculatedROAS = aggregated.totalInvestment > 0 ? aggregated.totalRevenue / aggregated.totalInvestment : 0;
+        const formattedROI = `${calculatedROI.toFixed(0)}% (${calculatedROAS.toFixed(1)}x)`;
+        
         console.log('🔍 DEBUG - MetricsGrid - Card ROI/ROAS - Valor calculado:', {
           realROI,
           aggregatedTotalROI: aggregated.totalROI,
-          finalValue: roiValue
+          aggregatedTotalRevenue: aggregated.totalRevenue,
+          aggregatedTotalInvestment: aggregated.totalInvestment,
+          calculatedROI,
+          calculatedROAS,
+          finalValue: formattedROI
         });
-        return roiValue;
+        
+        return formattedROI;
       })(), 
-      trend: (realROI !== undefined ? parseFloat(realROI.replace(/[^\d.-]/g, '')) : aggregated.totalROI) > 0 ? 'up' as const : 'neutral' as const,
-      trendValue: (realROI !== undefined ? parseFloat(realROI.replace(/[^\d.-]/g, '')) : aggregated.totalROI) > 0 ? '+12.4%' : undefined,
+      trend: (() => {
+        // CORREÇÃO: Lógica simplificada para trend
+        if (realROI !== undefined && realROI !== 'NaN%' && realROI !== '0% (0.0x)') {
+          const roiNumber = parseFloat(realROI.replace(/[^\d.-]/g, ''));
+          return roiNumber > 0 ? 'up' as const : 'neutral' as const;
+        }
+        return aggregated.totalROI > 0 ? 'up' as const : 'neutral' as const;
+      })(),
+      trendValue: (() => {
+        // CORREÇÃO: Lógica simplificada para trendValue
+        if (realROI !== undefined && realROI !== 'NaN%' && realROI !== '0% (0.0x)') {
+          const roiNumber = parseFloat(realROI.replace(/[^\d.-]/g, ''));
+          return roiNumber > 0 ? '+12.4%' : undefined;
+        }
+        return aggregated.totalROI > 0 ? '+12.4%' : undefined;
+      })(),
       tooltip: 'Retorno sobre investimento. Quanto você ganha de volta para cada real investido (valores reais da planilha de detalhes mensais)'
     },
     { 
@@ -196,16 +239,40 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
     },
     { 
       title: 'Agendamentos', 
-      value: (realAgendamentos !== undefined ? realAgendamentos : aggregated.totalAppointments).toString(), 
-      trend: (realAgendamentos !== undefined ? realAgendamentos : aggregated.totalAppointments) > 0 ? 'up' as const : 'neutral' as const,
-      trendValue: (realAgendamentos !== undefined ? realAgendamentos : aggregated.totalAppointments) > 0 ? '+6.8%' : undefined,
+      value: (() => {
+        // CORREÇÃO: Garantir que sempre retorne um valor válido
+        const agendamentosValue = realAgendamentos !== undefined ? realAgendamentos : aggregated.totalAppointments;
+        return agendamentosValue.toString();
+      })(), 
+      trend: (() => {
+        // CORREÇÃO: Lógica simplificada para trend
+        const agendamentosValue = realAgendamentos !== undefined ? realAgendamentos : aggregated.totalAppointments;
+        return agendamentosValue > 0 ? 'up' as const : 'neutral' as const;
+      })(),
+      trendValue: (() => {
+        // CORREÇÃO: Lógica simplificada para trendValue
+        const agendamentosValue = realAgendamentos !== undefined ? realAgendamentos : aggregated.totalAppointments;
+        return agendamentosValue > 0 ? '+6.8%' : undefined;
+      })(),
       tooltip: 'Número de consultas ou reuniões agendadas com clientes (valores reais da planilha de detalhes mensais)'
     },
     { 
       title: 'Quantidade de Vendas', 
-      value: (realVendas !== undefined ? realVendas : aggregated.totalSales).toString(), 
-      trend: (realVendas !== undefined ? realVendas : aggregated.totalSales) > 0 ? 'up' as const : 'neutral' as const,
-      trendValue: (realVendas !== undefined ? realVendas : aggregated.totalSales) > 0 ? '+9.2%' : undefined,
+      value: (() => {
+        // CORREÇÃO: Garantir que sempre retorne um valor válido
+        const vendasValue = realVendas !== undefined ? realVendas : aggregated.totalSales;
+        return vendasValue.toString();
+      })(), 
+      trend: (() => {
+        // CORREÇÃO: Lógica simplificada para trend
+        const vendasValue = realVendas !== undefined ? realVendas : aggregated.totalSales;
+        return vendasValue > 0 ? 'up' as const : 'neutral' as const;
+      })(),
+      trendValue: (() => {
+        // CORREÇÃO: Lógica simplificada para trendValue
+        const vendasValue = realVendas !== undefined ? realVendas : aggregated.totalSales;
+        return vendasValue > 0 ? '+9.2%' : undefined;
+      })(),
       tooltip: 'Número total de vendas realizadas através dos anúncios (valores reais da planilha de detalhes mensais)'
     }
   ];
