@@ -720,10 +720,12 @@ const PublicReportView: React.FC = () => {
         }
         
         // Sempre tentar buscar detalhes mensais mais recentes salvos no Firebase
-        if (product && month) {
+        if (product && month && client) {
           try {
-            const savedDetails = await metricsService.getMonthlyDetails(month, product);
+            console.log('🔍 DEBUG - PublicReportView - Buscando detalhes mensais:', { month, product, client });
+            const savedDetails = await metricsService.getMonthlyDetails(month, product, client);
             if (savedDetails) {
+              console.log('🔍 DEBUG - PublicReportView - Detalhes encontrados:', savedDetails);
               setReportInfo(prev => ({
                 ...prev,
                 monthlyDetails: {
@@ -793,13 +795,40 @@ const PublicReportView: React.FC = () => {
     // Verificar imediatamente
     checkForUpdates();
 
-    // Verificar a cada 10 segundos (reduzido de 3 para evitar sobrecarga)
-    const interval = setInterval(checkForUpdates, 10000);
-    console.log('PublicReportView: Monitoramento de localStorage iniciado (10s)');
+    // Verificar a cada 5 segundos para atualizações mais rápidas
+    const interval = setInterval(checkForUpdates, 5000);
+    console.log('PublicReportView: Monitoramento de localStorage iniciado (5s)');
 
     return () => {
       clearInterval(interval);
       console.log('PublicReportView: Monitoramento de localStorage parado');
+    };
+  }, []);
+
+  // Adicionar listener para mudanças no localStorage em tempo real
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'metaAdsDataRefreshed' && e.newValue) {
+        try {
+          const updateData = JSON.parse(e.newValue);
+          console.log('PublicReportView: Mudança detectada no localStorage:', updateData);
+          
+          // Forçar reload imediato
+          setRefreshTrigger(prev => {
+            const newValue = prev + 1;
+            console.log('PublicReportView: RefreshTrigger atualizado (storage event):', newValue);
+            return newValue;
+          });
+        } catch (error) {
+          console.error('PublicReportView: Erro ao processar mudança no localStorage:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 

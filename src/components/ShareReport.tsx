@@ -112,11 +112,19 @@ const ShareReport: React.FC<ShareReportProps> = ({
         }
       }
       
-      // Salvar detalhes mensais atuais no Firebase (vinculado apenas ao produto)
-      if (monthlyDetailsValues && selectedProduct && selectedProduct !== 'Todos os Produtos' && (monthlyDetailsValues.agendamentos > 0 || monthlyDetailsValues.vendas > 0)) {
+      // Salvar detalhes mensais atuais no Firebase (vinculado ao cliente, produto e mês)
+      if (monthlyDetailsValues && selectedProduct && selectedProduct !== 'Todos os Produtos' && selectedClient && selectedClient !== 'Todos os Clientes') {
+        console.log('🔍 DEBUG - ShareReport - Salvando detalhes mensais:', {
+          month: selectedMonth,
+          product: selectedProduct,
+          client: selectedClient,
+          agendamentos: monthlyDetailsValues.agendamentos,
+          vendas: monthlyDetailsValues.vendas
+        });
         await metricsService.saveMonthlyDetails({
           month: selectedMonth,
           product: selectedProduct,
+          client: selectedClient,
           agendamentos: monthlyDetailsValues.agendamentos,
           vendas: monthlyDetailsValues.vendas
         });
@@ -202,11 +210,19 @@ const ShareReport: React.FC<ShareReportProps> = ({
         }
       }
     
-      // Atualizar detalhes mensais no Firebase (vinculado apenas ao produto)
-      if (monthlyDetailsValues && selectedProduct && selectedProduct !== 'Todos os Produtos' && (monthlyDetailsValues.agendamentos > 0 || monthlyDetailsValues.vendas > 0)) {
+      // Atualizar detalhes mensais no Firebase (vinculado ao cliente, produto e mês)
+      if (monthlyDetailsValues && selectedProduct && selectedProduct !== 'Todos os Produtos' && selectedClient && selectedClient !== 'Todos os Clientes') {
+        console.log('🔍 DEBUG - ShareReport - Atualizando detalhes mensais:', {
+          month: selectedMonth,
+          product: selectedProduct,
+          client: selectedClient,
+          agendamentos: monthlyDetailsValues.agendamentos,
+          vendas: monthlyDetailsValues.vendas
+        });
         await metricsService.saveMonthlyDetails({
           month: selectedMonth,
           product: selectedProduct,
+          client: selectedClient,
           agendamentos: monthlyDetailsValues.agendamentos,
           vendas: monthlyDetailsValues.vendas
         });
@@ -226,19 +242,30 @@ const ShareReport: React.FC<ShareReportProps> = ({
       if (updatedLink) {
         setGeneratedLink(updatedLink);
 
-        // Limpar cache de métricas e notificar o Dashboard para recarregar
-        metricsService.clearCache();
+        // Limpar cache específico para dados públicos
+        metricsService.clearPublicCache(selectedMonth, selectedClient, selectedProduct);
         
-        // CORREÇÃO: Não disparar eventos que causam loops infinitos
-        // O relatório já foi atualizado, não precisamos disparar eventos adicionais
-        console.log('ShareReport: Relatório atualizado com sucesso - eventos de refresh desabilitados para evitar loops');
+        // CORREÇÃO: Notificar página pública sobre atualização
+        console.log('ShareReport: Relatório atualizado com sucesso - notificando página pública');
         
-        // Apenas salvar no localStorage para a página pública (sem disparar eventos)
-        setTimeout(() => {
-          const eventDetail = { type: 'insights', timestamp: Date.now(), source: 'shareReport' };
-          localStorage.setItem('metaAdsDataRefreshed', JSON.stringify(eventDetail));
-          console.log('ShareReport: Sinal de atualização salvo no localStorage (apenas para página pública):', eventDetail);
-        }, 1000);
+        // Salvar no localStorage para a página pública
+        const eventDetail = { 
+          type: 'insights', 
+          timestamp: Date.now(), 
+          source: 'shareReport',
+          client: selectedClient,
+          product: selectedProduct,
+          month: selectedMonth
+        };
+        localStorage.setItem('metaAdsDataRefreshed', JSON.stringify(eventDetail));
+        console.log('ShareReport: Sinal de atualização salvo no localStorage:', eventDetail);
+        
+        // Disparar evento customizado para notificar outras abas
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: 'metaAdsDataRefreshed',
+          newValue: JSON.stringify(eventDetail),
+          url: window.location.href
+        }));
 
         toast.success('Relatório atualizado com sucesso!');
       } else {

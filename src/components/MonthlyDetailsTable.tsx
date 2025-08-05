@@ -493,7 +493,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
   
   // Estado para armazenar dados editáveis salvos
-  const [savedDetails, setSavedDetails] = useState({ agendamentos: 0, vendas: 0, ticketMedio: 0 });
+  const [savedDetails, setSavedDetails] = useState({ agendamentos: 0, vendas: 0, ticketMedio: 0, cpv: 0, roi: '0% (0.0x)' });
 
   // Estado para armazenar dados calculados dos públicos
   const [audienceCalculatedValues, setAudienceCalculatedValues] = useState({ agendamentos: 0, vendas: 0 });
@@ -514,7 +514,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           setSavedDetails({
             agendamentos: details.agendamentos || 0,
             vendas: details.vendas || 0,
-            ticketMedio: details.ticketMedio || 250
+            ticketMedio: details.ticketMedio || 250,
+            cpv: (details as any).cpv || 0,
+            roi: (details as any).roi || '0% (0.0x)'
           });
           console.log('Dados carregados do Firebase para produto:', selectedProduct, details);
           console.log('🔍 DEBUG - MonthlyDetailsTable - Dados salvos incluem CPV/ROI:', {
@@ -523,6 +525,33 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             cpvValue: (details as any).cpv,
             roiValue: (details as any).roi
           });
+          
+          // CORREÇÃO: Aplicar valores salvos de CPV e ROI ao tableData
+          if ((details as any).cpv !== undefined || (details as any).roi !== undefined) {
+            setTableData(prevData => {
+              const newData = prevData.map(row => {
+                const newRow = { ...row };
+                
+                // Aplicar CPV salvo se existir
+                if ((row.metric === 'CPV' || row.metric === 'CPV (Custo por Venda)') && (details as any).cpv !== undefined) {
+                  console.log(`🔍 DEBUG - MonthlyDetailsTable - Aplicando CPV salvo: ${row.realValue} → ${formatCurrency((details as any).cpv)}`);
+                  newRow.realValue = formatCurrency((details as any).cpv);
+                }
+                
+                // Aplicar ROI salvo se existir
+                if ((row.metric === 'ROI' || row.metric === 'ROI/ROAS' || row.metric === 'ROI / ROAS') && (details as any).roi !== undefined) {
+                  console.log(`🔍 DEBUG - MonthlyDetailsTable - Aplicando ROI salvo: ${row.realValue} → ${(details as any).roi}`);
+                  newRow.realValue = (details as any).roi;
+                }
+                
+                return newRow;
+              });
+              
+              // Recalcular status após aplicar valores salvos
+              const calculatedData = calculateValues(newData);
+              return calculatedData;
+            });
+          }
           
           // Log adicional para verificar todos os campos da planilha
           console.log('🔍 DEBUG - MonthlyDetailsTable - Todos os campos da planilha:', tableData.map(row => ({
@@ -541,12 +570,12 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         } catch (error) {
           console.error('Erro ao carregar detalhes salvos:', error);
           // CORREÇÃO: Garantir valores padrão em caso de erro
-          setSavedDetails({ agendamentos: 0, vendas: 0, ticketMedio: 250 });
+          setSavedDetails({ agendamentos: 0, vendas: 0, ticketMedio: 250, cpv: 0, roi: '0% (0.0x)' });
         }
       } else {
         // Limpar dados salvos se não há produto selecionado
         // CORREÇÃO: Garantir valores padrão quando não há seleção
-        setSavedDetails({ agendamentos: 0, vendas: 0, ticketMedio: 250 });
+        setSavedDetails({ agendamentos: 0, vendas: 0, ticketMedio: 250, cpv: 0, roi: '0% (0.0x)' });
       }
     };
 
@@ -728,11 +757,37 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           newRow.realValue = newValue;
         }
         
+        // CORREÇÃO: Preservar valores salvos de CPV e ROI, não recalcular
+        // Os valores de CPV e ROI devem vir dos dados salvos, não ser recalculados
+        
         return newRow;
       });
       
-      // Recalcular valores dependentes
+      // Recalcular valores dependentes, mas preservar CPV e ROI salvos
       const calculatedData = calculateValues(newData);
+      
+      // CORREÇÃO: Restaurar valores salvos de CPV e ROI após cálculo
+      const finalData = calculatedData.map(row => {
+        const newRow = { ...row };
+        
+        // Buscar valores salvos do Firebase
+        const savedCPV = (savedDetails as any).cpv;
+        const savedROI = (savedDetails as any).roi;
+        
+        // Restaurar CPV salvo se existir
+        if ((row.metric === 'CPV' || row.metric === 'CPV (Custo por Venda)') && savedCPV !== undefined) {
+          console.log(`🔍 DEBUG - MonthlyDetailsTable - Restaurando CPV salvo: ${row.realValue} → ${formatCurrency(savedCPV)}`);
+          newRow.realValue = formatCurrency(savedCPV);
+        }
+        
+        // Restaurar ROI salvo se existir
+        if ((row.metric === 'ROI' || row.metric === 'ROI/ROAS' || row.metric === 'ROI / ROAS') && savedROI !== undefined) {
+          console.log(`🔍 DEBUG - MonthlyDetailsTable - Restaurando ROI salvo: ${row.realValue} → ${savedROI}`);
+          newRow.realValue = savedROI;
+        }
+        
+        return newRow;
+      });
       
       // Notificar mudanças
       if (onValuesChange) {
@@ -744,8 +799,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         // Salvar no Firebase quando os valores dos públicos mudam
         if (selectedProduct && selectedMonth) {
           // Calcular CPV e ROI para salvar
-          const cpvRow = tableData.find(r => r.metric === 'CPV' || r.metric === 'CPV (Custo por Venda)');
-          const roiRow = tableData.find(r => r.metric === 'ROI' || r.metric === 'ROI/ROAS' || r.metric === 'ROI / ROAS');
+          const cpvRow = finalData.find(r => r.metric === 'CPV' || r.metric === 'CPV (Custo por Venda)');
+          const roiRow = finalData.find(r => r.metric === 'ROI' || r.metric === 'ROI/ROAS' || r.metric === 'ROI / ROAS');
           
           const cpv = parseNumber(cpvRow?.realValue || '0');
           const roiValue = saveROIValue(roiRow?.realValue || '0% (0.0x)');
@@ -755,7 +810,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             cpvValue: cpvRow?.realValue,
             roiRow: roiRow?.metric,
             roiValue: roiRow?.realValue,
-            allMetrics: tableData.map(r => r.metric)
+            allMetrics: finalData.map(r => r.metric)
           });
           
           // Log adicional para verificar se os valores estão sendo calculados corretamente
@@ -794,7 +849,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         onValuesChange({ agendamentos, vendas });
       }
       
-      return calculatedData;
+      return finalData;
     });
   }, [audienceCalculatedValues, onValuesChange]);
 

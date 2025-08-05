@@ -727,6 +727,22 @@ export const metricsService = {
     }
   },
 
+  // Limpar cache específico para dados públicos
+  clearPublicCache(month: string, client: string, product: string): void {
+    console.log(`Limpando cache público para: ${month} - ${client} - ${product}`);
+    
+    // Limpar cache de métricas
+    this.clearCacheByPeriod(month, client);
+    
+    // Limpar localStorage de atualizações
+    try {
+      localStorage.removeItem('metaAdsDataRefreshed');
+      console.log('Cache público limpo com sucesso');
+    } catch (error) {
+      console.error('Erro ao limpar cache público:', error);
+    }
+  },
+
   // Função para sanitizar IDs de documentos (remover caracteres especiais)
   sanitizeDocumentId(str: string): string {
     return str
@@ -941,7 +957,7 @@ export const metricsService = {
   // Buscar métricas públicas (para links compartilhados)
   async getPublicMetrics(month: string, client: string, product: string, audience: string): Promise<MetricData[]> {
     try {
-
+      console.log('🔍 DEBUG - getPublicMetrics - Buscando métricas públicas:', { month, client, product, audience });
       
       // Tentar buscar do Firebase primeiro
       try {
@@ -968,21 +984,24 @@ export const metricsService = {
           
           if (client && client !== 'Todos os Clientes') {
             filteredData = filteredData.filter(item => item.client === client);
+            console.log('🔍 DEBUG - getPublicMetrics - Após filtro por cliente:', filteredData.length, 'registros');
           }
 
           if (product && product !== '' && product !== 'Todos os Produtos') {
             filteredData = filteredData.filter(item => item.product === product);
+            console.log('🔍 DEBUG - getPublicMetrics - Após filtro por produto:', filteredData.length, 'registros');
           }
 
           if (audience && audience !== '' && audience !== 'Todos os Públicos') {
             filteredData = filteredData.filter(item => item.audience === audience);
+            console.log('🔍 DEBUG - getPublicMetrics - Após filtro por público:', filteredData.length, 'registros');
           }
           
           console.log('getPublicMetrics: Retornando dados filtrados:', filteredData.length, 'registros');
           return filteredData;
         }
       } catch (firebaseError: any) {
-
+        console.error('Erro ao buscar métricas públicas do Firebase:', firebaseError);
       }
 
       // Se não há dados no Firebase, usar dados mockados específicos
@@ -1631,13 +1650,23 @@ export const metricsService = {
       try {
         const metrics = await this.getMetrics(month, client);
         if (metrics && metrics.length > 0) {
-          investimentoTotal = metrics.reduce((sum, metric) => sum + (metric.investment || 0), 0);
-          console.log('🔍 DEBUG - getRealValuesForClient - Investimento total das métricas:', investimentoTotal);
+          // CORREÇÃO: Filtrar apenas métricas do cliente específico
+          const clientMetrics = metrics.filter(metric => metric.client === client);
+          if (clientMetrics.length > 0) {
+            investimentoTotal = clientMetrics.reduce((sum, metric) => sum + (metric.investment || 0), 0);
+            console.log('🔍 DEBUG - getRealValuesForClient - Investimento total das métricas do cliente:', investimentoTotal);
+          } else {
+            console.log('🔍 DEBUG - getRealValuesForClient - Nenhuma métrica encontrada para o cliente específico');
+            investimentoTotal = 0;
+          }
+        } else {
+          console.log('🔍 DEBUG - getRealValuesForClient - Nenhuma métrica encontrada');
+          investimentoTotal = 0;
         }
       } catch (error) {
         console.warn('🔍 DEBUG - getRealValuesForClient - Erro ao buscar métricas para investimento:', error);
-        // Usar valor padrão se não conseguir buscar
-        investimentoTotal = 225.99;
+        // CORREÇÃO: Não usar valor padrão, usar zero
+        investimentoTotal = 0;
       }
       
       // Calcular médias para CPV
@@ -1653,6 +1682,12 @@ export const metricsService = {
           totalVendas,
           finalCPV
         });
+      }
+      
+      // CORREÇÃO: Se não há dados reais da planilha, zerar CPV
+      if (totalAgendamentos === 0 && totalVendas === 0) {
+        finalCPV = 0;
+        console.log('🔍 DEBUG - getRealValuesForClient - Nenhum dado real, zerando CPV');
       }
       
       // Processar ROI - usar o primeiro valor válido ou calcular baseado nos dados
@@ -1698,6 +1733,12 @@ export const metricsService = {
           roas,
           finalROI
         });
+      }
+      
+      // CORREÇÃO: Se não há dados reais da planilha, zerar ROI
+      if (totalAgendamentos === 0 && totalVendas === 0) {
+        finalROI = '0% (0.0x)';
+        console.log('🔍 DEBUG - getRealValuesForClient - Nenhum dado real, zerando ROI');
       }
       
       console.log('🔍 DEBUG - getRealValuesForClient - Cálculo das médias:', {
