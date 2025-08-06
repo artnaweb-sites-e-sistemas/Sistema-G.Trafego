@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, User, Search, LogOut, Facebook, Database } from 'lucide-react';
+import { Settings, User, Search, LogOut, Facebook, Database, BarChart3 } from 'lucide-react';
 import MetaAdsConfig from './MetaAdsConfig';
 import ShareReport from './ShareReport';
 import MonthYearPicker from './MonthYearPicker';
@@ -37,6 +37,7 @@ interface HeaderProps {
   onDataSourceChange?: (source: 'manual' | 'facebook' | null, connected: boolean) => void;
   monthlyDetailsValues?: { agendamentos: number; vendas: number };
   metrics?: MetricData[];
+  onShowPerformanceAds?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -55,7 +56,8 @@ const Header: React.FC<HeaderProps> = ({
   isFacebookConnected,
   onDataSourceChange,
   monthlyDetailsValues = { agendamentos: 0, vendas: 0 },
-  metrics = []
+  metrics = [],
+  onShowPerformanceAds
 }) => {
   const [hasGeneratedLinks, setHasGeneratedLinks] = useState(false);
 
@@ -118,6 +120,15 @@ const Header: React.FC<HeaderProps> = ({
                 selectedProduct={selectedProduct}
                 selectedAudience={selectedAudience}
               />
+              {onShowPerformanceAds && (
+                <button 
+                  onClick={onShowPerformanceAds}
+                  className="p-3 text-slate-400 hover:text-purple-300 hover:bg-purple-500/10 rounded-xl transition-all duration-300 group shadow-sm hover:shadow-md"
+                  title="Anúncios por Performance"
+                >
+                  <BarChart3 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                </button>
+              )}
               <button className="p-3 text-slate-400 hover:text-slate-100 hover:bg-slate-700/50 rounded-xl transition-all duration-300 group shadow-sm hover:shadow-md">
                 <Settings className="w-5 h-5 group-hover:scale-110 transition-transform" />
               </button>

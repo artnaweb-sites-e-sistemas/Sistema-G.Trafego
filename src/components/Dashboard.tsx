@@ -9,6 +9,7 @@ import InsightsSection from './InsightsSection';
 import HistorySection from './HistorySection';
 import ShareReport from './ShareReport';
 import AIBenchmark from './AIBenchmark';
+import PerformanceAdsSection from './PerformanceAdsSection';
 import { User } from '../services/authService';
 import { metricsService, MetricData } from '../services/metricsService';
 import { BenchmarkResults } from '../services/aiBenchmarkService';
@@ -60,6 +61,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [realValuesForClient, setRealValuesForClient] = useState({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
   const [realValuesRefreshTrigger, setRealValuesRefreshTrigger] = useState(0);
   const [aiBenchmarkResults, setAiBenchmarkResults] = useState<BenchmarkResults | null>(null);
+  const [showPerformanceAds, setShowPerformanceAds] = useState(false);
 
   // Garantir que o mês selecionado seja sempre válido
   useEffect(() => {
@@ -604,27 +606,30 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 text-white">
-      <Header 
-        selectedMonth={selectedMonth}
-        setSelectedMonth={setSelectedMonth}
-        selectedClient={selectedClient}
-        setSelectedClient={setSelectedClient}
-        selectedProduct={selectedProduct}
-        setSelectedProduct={setSelectedProduct}
-        selectedAudience={selectedAudience}
-        setSelectedAudience={setSelectedAudience}
-        onMetaAdsSync={handleMetaAdsSync}
-        currentUser={currentUser}
-        onLogout={onLogout}
-        dataSource={dataSource}
-        isFacebookConnected={isFacebookConnected}
-        onDataSourceChange={handleDataSourceChange}
-        monthlyDetailsValues={monthlyDetailsValues}
-        metrics={metrics}
-      />
+              <Header
+          selectedMonth={selectedMonth}
+          setSelectedMonth={setSelectedMonth}
+          selectedClient={selectedClient}
+          setSelectedClient={setSelectedClient}
+          selectedProduct={selectedProduct}
+          setSelectedProduct={setSelectedProduct}
+          selectedAudience={selectedAudience}
+          setSelectedAudience={setSelectedAudience}
+          onMetaAdsSync={handleMetaAdsSync}
+          currentUser={currentUser}
+          onLogout={onLogout}
+          dataSource={dataSource}
+          isFacebookConnected={isFacebookConnected}
+          onDataSourceChange={handleDataSourceChange}
+          monthlyDetailsValues={monthlyDetailsValues}
+          metrics={metrics}
+          onShowPerformanceAds={() => setShowPerformanceAds(true)}
+        />
       
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-10">
-        {loading ? (
+        {showPerformanceAds ? (
+          <PerformanceAdsSection onBack={() => setShowPerformanceAds(false)} />
+        ) : loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="relative">
               <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-700 border-t-purple-500 shadow-lg"></div>
@@ -633,7 +638,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
           </div>
         ) : error ? (
           <div className="bg-gradient-to-r from-red-900/50 to-red-800/50 border border-red-500/30 text-red-300 px-6 py-4 rounded-xl backdrop-blur-sm shadow-lg">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center justify-center space-x-3">
               <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
                 <span className="text-xs font-bold">!</span>
               </div>
