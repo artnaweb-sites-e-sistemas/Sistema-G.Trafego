@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Users, ChevronDown, Search, Plus, Trash2, Facebook, X } from 'lucide-react';
+import { Users, ChevronDown, Search, Plus, Trash2, Facebook, X, RefreshCw } from 'lucide-react';
 import { metaAdsService } from '../services/metaAdsService';
 
 interface Audience {
@@ -73,14 +73,38 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
 
   // Carregar Ad Sets do Meta Ads
   const loadMetaAdsAdSets = async () => {
+    console.log('loadMetaAdsAdSets chamado com:', {
+      dataSource,
+      selectedProduct,
+      selectedClient,
+      selectedMonth
+    });
+    
     if (dataSource === 'facebook' && selectedProduct && selectedProduct !== 'Todos os Produtos') {
       try {
+        // Verificar se está logado no Meta Ads
+        if (!metaAdsService.isLoggedIn()) {
+          console.log('Meta Ads não está logado');
+          setAudiences([]);
+          return;
+        }
+        
+        console.log('Meta Ads está logado, verificando conta selecionada...');
+        if (!metaAdsService.hasSelectedAccount()) {
+          console.log('Nenhuma conta selecionada no Meta Ads');
+          setAudiences([]);
+          return;
+        }
+        
         setIsLoading(true);
                 
         // Obter ID da campanha do localStorage
         const campaignId = localStorage.getItem('selectedCampaignId');
+        console.log('Campaign ID do localStorage:', campaignId);
+        
         if (!campaignId) {
-                    return;
+          console.log('Nenhum campaign ID encontrado no localStorage');
+          return;
         }
         
         // Obter datas do mês selecionado
@@ -89,6 +113,15 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
             'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
             'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
           ];
+          
+          // Se não há mês selecionado, usar o mês atual
+          if (!monthString || monthString.trim() === '') {
+            const now = new Date();
+            return {
+              startDate: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0],
+              endDate: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
+            };
+          }
           
           const [monthName, yearStr] = monthString.split(' ');
           const year = parseInt(yearStr);
@@ -109,13 +142,18 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         };
 
         const { startDate, endDate } = getPeriodDates(selectedMonth || '');
+        console.log('Período calculado para Ad Sets:', { startDate, endDate });
                 
+        console.log('Chamando metaAdsService.getAdSets com:', { campaignId, startDate, endDate });
         const adSetsData = await metaAdsService.getAdSets(campaignId, startDate, endDate);
+        console.log('Ad Sets retornados da API:', adSetsData.length);
+        console.log('Primeiro Ad Set:', adSetsData[0]);
                 
         // Filtrar apenas Ad Sets ativos
         const activeAdSets = adSetsData.filter(adSet => 
           adSet.status === 'ACTIVE' || adSet.status === 'PAUSED'
         );
+        console.log('Ad Sets ativos/pausados:', activeAdSets.length);
 
         // Converter Ad Sets para formato de públicos
         const facebookAudiences: Audience[] = activeAdSets.map((adSet, index) => ({
@@ -131,18 +169,31 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
           adSet: adSet
         }));
 
-        // Se não há Ad Sets, mostrar lista vazia
-        if (facebookAudiences.length === 0) {
-          setAudiences([]);
-        } else {
-          setAudiences(facebookAudiences);
-        }
+        console.log('Públicos convertidos:', facebookAudiences.length);
+        console.log('Primeiro público:', facebookAudiences[0]);
+
+                 // Se não há Ad Sets, mostrar lista vazia
+         if (facebookAudiences.length === 0) {
+           console.log('Nenhum público encontrado, definindo lista vazia');
+           setAudiences([]);
+         } else {
+           console.log('Definindo públicos encontrados:', facebookAudiences.length);
+           setAudiences(facebookAudiences);
+         }
+         
+
         
-      } catch (error: any) {
-        setAudiences([]);
-      } finally {
-        setIsLoading(false);
-      }
+              } catch (error: any) {
+          console.error('Erro ao carregar Ad Sets:', error);
+          console.error('Detalhes do erro:', error.message);
+          
+          // Log do erro
+          console.log('Erro ao carregar Ad Sets:', error.message);
+          
+          setAudiences([]);
+        } finally {
+          setIsLoading(false);
+        }
     } else if (dataSource === 'manual') {
       // Não carregar públicos manuais - só devem vir do Meta
       setAudiences([]);
@@ -164,34 +215,42 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
 
   // Carregar públicos quando dataSource, selectedProduct, selectedClient ou selectedMonth mudar
   useEffect(() => {
+    console.log('AudiencePicker useEffect - Parâmetros:', {
+      dataSource,
+      selectedProduct,
+      selectedClient,
+      selectedMonth
+    });
                     
     // Só carregar se há produto selecionado
     if (selectedProduct && selectedProduct !== 'Todos os Produtos') {
+      console.log('Produto selecionado, carregando Ad Sets...');
             
       // Delay para garantir que o cache seja limpo
       const timer = setTimeout(() => {
-                loadMetaAdsAdSets();
+        loadMetaAdsAdSets();
       }, 300);
       
       return () => clearTimeout(timer);
     } else {
-            // Resetar públicos quando não há produto selecionado
+      console.log('Nenhum produto selecionado, resetando públicos');
+      // Resetar públicos quando não há produto selecionado
       setAudiences([{ id: '1', name: 'Todos os Públicos', productId: 'all', clientId: 'all' }]);
       setSelectedAudience('Todos os Públicos');
     }
   }, [dataSource, selectedProduct, selectedClient, selectedMonth]);
 
-  // Listener para evento de campanha selecionada
-  useEffect(() => {
-    const handleCampaignSelected = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { campaign, productName, campaignId } = customEvent.detail;
-                  
-      // Forçar recarregamento dos Ad Sets após um delay
-      setTimeout(() => {
-                loadMetaAdsAdSets();
-      }, 500);
-    };
+     // Listener para evento de campanha selecionada
+   useEffect(() => {
+     const handleCampaignSelected = (event: Event) => {
+       const customEvent = event as CustomEvent;
+       const { campaignId } = customEvent.detail;
+                   
+       // Forçar recarregamento dos Ad Sets após um delay
+       setTimeout(() => {
+                 loadMetaAdsAdSets();
+       }, 500);
+     };
 
     window.addEventListener('campaignSelected', handleCampaignSelected);
 
@@ -299,6 +358,14 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
     window.dispatchEvent(new CustomEvent('audienceCleared'));
   };
 
+  const handleRetry = () => {
+    console.log('Tentando novamente...');
+    // Limpar cache do Meta Ads
+    metaAdsService.clearCacheByType('adsets');
+    // Tentar carregar novamente
+    loadMetaAdsAdSets();
+  };
+
   const handleDeleteAudience = (audienceId: string, audienceName: string, event: React.MouseEvent) => {
     event.stopPropagation();
     
@@ -346,7 +413,16 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
   };
 
   // Verificar se o picker deve estar ativo - só ativo se Meta estiver conectado e produto/cliente selecionados
-  const isPickerActive = dataSource === 'facebook' && isFacebookConnected && selectedProduct && selectedProduct !== 'Todos os Produtos' && selectedClient && selectedClient !== 'Selecione um cliente';
+  const isPickerActive = dataSource === 'facebook' && isFacebookConnected && selectedProduct && selectedProduct !== 'Todos os Produtos' && selectedClient && selectedClient !== 'Selecione um cliente' && selectedClient !== 'Todos os Clientes';
+  
+  console.log('AudiencePicker - Condições de ativação:', {
+    dataSource,
+    isFacebookConnected,
+    selectedProduct,
+    selectedClient,
+    isPickerActive,
+    audiencesCount: audiences.length
+  });
 
   return (
     <div className="relative dropdown-container" ref={pickerRef}>
@@ -390,6 +466,28 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
               >
                 <X className="w-4 h-4 mr-1" />
                 Limpar
+              </button>
+              <button
+                onClick={() => {
+                  // Limpar cache do Meta Ads
+                  const campaignId = localStorage.getItem('selectedCampaignId');
+                  if (campaignId) {
+                    localStorage.removeItem(`adsets_campaign_${campaignId}`);
+                    localStorage.removeItem(`adsets_campaign_${campaignId}_timestamp`);
+                  }
+                  // Limpar cache geral
+                  localStorage.removeItem('metaAds_adsets');
+                  localStorage.removeItem('metaAds_adsets_timestamp');
+                  
+                  // Recarregar dados
+                  loadMetaAdsAdSets();
+                  setIsOpen(false);
+                }}
+                className="flex items-center px-3 py-1.5 text-sm font-medium text-yellow-400 hover:text-yellow-200 hover:bg-slate-800 rounded-md transition-all duration-200 ease-in-out"
+                title="Limpar cache e recarregar dados do Meta Ads"
+              >
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Recarregar
               </button>
               {/* Remover botão de adicionar público - só deve ser feito via Meta */}
               {/* <button
@@ -494,16 +592,31 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
                 </div>
               ))
             ) : (
-              <div className="p-4 text-center text-slate-400">
-                {dataSource === 'facebook' && metaAdsService.isLoggedIn()
-                  ? 'Nenhum conjunto de anúncios ativo encontrado para esta campanha'
-                  : selectedClient === 'Selecione um cliente' 
-                    ? 'Selecione um cliente para ver os públicos'
-                    : selectedProduct === 'Selecione um produto'
-                    ? 'Selecione um produto para ver os públicos'
-                    : 'Nenhum público encontrado'
-                }
-              </div>
+                             <div className="p-4 text-center text-slate-400">
+                 {dataSource === 'facebook' && metaAdsService.isLoggedIn()
+                   ? (
+                     <div>
+                       <div className="mb-3">
+                         {`Nenhum conjunto de anúncios ativo encontrado para esta campanha (${selectedProduct})`}
+                       </div>
+                       <button
+                         onClick={() => {
+                           metaAdsService.clearCacheByType('adsets');
+                           loadMetaAdsAdSets();
+                         }}
+                         className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-md transition-all duration-200 ease-in-out shadow-sm hover:shadow-md"
+                       >
+                         Tentar Novamente
+                       </button>
+                     </div>
+                   )
+                   : selectedClient === 'Selecione um cliente' 
+                     ? 'Selecione um cliente para ver os públicos'
+                     : selectedProduct === 'Selecione um produto'
+                     ? 'Selecione um produto para ver os públicos'
+                     : 'Nenhum público encontrado'
+                 }
+               </div>
             )}
           </div>
         </div>

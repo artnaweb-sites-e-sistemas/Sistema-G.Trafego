@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronDown, TrendingUp, TrendingDown, Minus, Edit3, Check, X, Info, Download } from 'lucide-react';
 import { MetricData, metricsService } from '../services/metricsService';
 
@@ -582,122 +582,28 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     loadSavedDetails();
   }, [selectedMonth, selectedProduct]);
 
-  // Listener para atualizar valores quando dados dos públicos mudarem
-  useEffect(() => {
-    const handleAudienceDetailsSaved = (event: CustomEvent) => {
-      console.log('🔍 DEBUG - MonthlyDetailsTable - Evento audienceDetailsSaved recebido:', event.detail);
-      
-      if (event.detail && event.detail.product === selectedProduct && event.detail.month === selectedMonth) {
-        console.log('🔍 DEBUG - MonthlyDetailsTable - Evento corresponde ao produto/mês atual, recarregando...');
+  // Carregar dados dos públicos para o produto selecionado
+  const loadAudienceData = useCallback(async () => {
+    if (selectedProduct && selectedProduct !== 'Todos os Produtos' && selectedMonth) {
+      try {
+        const audienceDetails = await metricsService.getAllAudienceDetailsForProduct(
+          selectedMonth,
+          selectedProduct
+        );
         
-        // Recarregar dados dos públicos quando um público for salvo
-        const loadAudienceData = async () => {
-          try {
-            console.log('🔍 DEBUG - MonthlyDetailsTable - Recarregando dados após evento...');
-            const allAudienceDetails = await metricsService.getAllAudienceDetailsForProduct(selectedMonth, selectedProduct);
-            
-            console.log('🔍 DEBUG - MonthlyDetailsTable - Dados recarregados:', allAudienceDetails);
-            
-            const totalAgendamentos = allAudienceDetails.reduce((sum, detail) => {
-              const agendamentos = detail.agendamentos || 0;
-              console.log(`🔍 DEBUG - Evento - Público ${detail.audience}: agendamentos = ${agendamentos}`);
-              return sum + agendamentos;
-            }, 0);
-            
-            const totalVendas = allAudienceDetails.reduce((sum, detail) => {
-              const vendas = detail.vendas || 0;
-              console.log(`🔍 DEBUG - Evento - Público ${detail.audience}: vendas = ${vendas}`);
-              return sum + vendas;
-            }, 0);
-            
-            setAudienceCalculatedValues({
-              agendamentos: totalAgendamentos,
-              vendas: totalVendas
-            });
-            
-            console.log('🔍 DEBUG - MonthlyDetailsTable - Dados atualizados após salvar público (FINAL):', {
-              totalAgendamentos,
-              totalVendas,
-              audienceCount: allAudienceDetails.length
-            });
-          } catch (error) {
-            console.error('Erro ao recarregar dados dos públicos:', error);
-          }
-        };
+        // Calcular totais dos públicos
+        const totalAgendamentos = audienceDetails.reduce((sum: number, detail: any) => sum + (detail.agendamentos || 0), 0);
+        const totalVendas = audienceDetails.reduce((sum: number, detail: any) => sum + (detail.vendas || 0), 0);
         
-        // Adicionar pequeno delay para garantir que o Firebase foi atualizado
-        setTimeout(loadAudienceData, 100);
-      } else {
-        console.log('🔍 DEBUG - MonthlyDetailsTable - Evento não corresponde ao produto/mês atual, ignorando');
-      }
-    };
-
-    window.addEventListener('audienceDetailsSaved', handleAudienceDetailsSaved as EventListener);
-    
-    return () => {
-      window.removeEventListener('audienceDetailsSaved', handleAudienceDetailsSaved as EventListener);
-    };
-  }, [selectedMonth, selectedProduct]);
-
-  // Carregar dados de todos os públicos para calcular agendamentos e vendas
-  useEffect(() => {
-    const loadAudienceData = async () => {
-      if (selectedProduct && selectedMonth) {
-        try {
-          console.log('🔍 DEBUG - MonthlyDetailsTable - Carregando dados dos públicos para:', {
-            selectedMonth,
-            selectedProduct
-          });
-          
-          const allAudienceDetails = await metricsService.getAllAudienceDetailsForProduct(selectedMonth, selectedProduct);
-          
-          console.log('🔍 DEBUG - MonthlyDetailsTable - Dados brutos dos públicos:', allAudienceDetails);
-          
-          // Calcular soma de agendamentos e vendas de todos os públicos (já consolidados)
-          const totalAgendamentos = allAudienceDetails.reduce((sum, detail) => {
-            const agendamentos = detail.agendamentos || 0;
-            console.log(`🔍 DEBUG - Público ${detail.audience}: agendamentos = ${agendamentos}`);
-            return sum + agendamentos;
-          }, 0);
-          
-          const totalVendas = allAudienceDetails.reduce((sum, detail) => {
-            const vendas = detail.vendas || 0;
-            console.log(`🔍 DEBUG - Público ${detail.audience}: vendas = ${vendas}`);
-            return sum + vendas;
-          }, 0);
-          
-          const newValues = {
-            agendamentos: totalAgendamentos,
-            vendas: totalVendas
-          };
-          
-          console.log('🔍 DEBUG - MonthlyDetailsTable - Definindo novos valores calculados:', newValues);
-          setAudienceCalculatedValues(newValues);
-          
-          console.log('🔍 DEBUG - MonthlyDetailsTable - Dados calculados dos públicos (FINAL):', {
-            totalAgendamentos,
-            totalVendas,
-            audienceCount: allAudienceDetails.length,
-            publicos: allAudienceDetails.map(d => ({ 
-              audience: d.audience, 
-              agendamentos: d.agendamentos, 
-              vendas: d.vendas 
-            }))
-          });
-        } catch (error) {
-          console.error('Erro ao carregar dados dos públicos:', error);
-          // CORREÇÃO: Garantir valores zerados em caso de erro
-          setAudienceCalculatedValues({ agendamentos: 0, vendas: 0 });
-        }
-      } else {
-        console.log('🔍 DEBUG - MonthlyDetailsTable - Produto ou mês não selecionado, zerando valores');
-        // CORREÇÃO: Garantir valores zerados quando não há seleção
+        setAudienceCalculatedValues({
+          agendamentos: totalAgendamentos,
+          vendas: totalVendas
+        });
+      } catch (error) {
         setAudienceCalculatedValues({ agendamentos: 0, vendas: 0 });
       }
-    };
-
-    loadAudienceData();
-  }, [selectedMonth, selectedProduct]);
+    }
+  }, [selectedProduct, selectedMonth]);
 
   // Recarregar dados quando o componente for montado ou quando houver mudança de foco
   useEffect(() => {

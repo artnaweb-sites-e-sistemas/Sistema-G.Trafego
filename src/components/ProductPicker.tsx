@@ -209,8 +209,10 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
     
     // Se for uma campanha do Facebook, salvar o ID da campanha
     if (product.source === 'facebook' && product.campaign) {
+      console.log('Salvando campaign ID:', product.campaign.id);
       localStorage.setItem('selectedCampaignId', product.campaign.id);
-      }
+      console.log('Campaign ID salvo no localStorage:', localStorage.getItem('selectedCampaignId'));
+    }
     
     // Emitir evento para notificar outros componentes
     window.dispatchEvent(new CustomEvent('productSelected', {

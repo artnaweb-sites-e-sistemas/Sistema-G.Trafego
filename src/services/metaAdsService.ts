@@ -57,6 +57,8 @@ export interface MetaAdsAd {
   id: string;
   name: string;
   status: string;
+  created_time?: string;
+  effective_object_story_id?: string; // Campo que contém o post_id real
   creative?: {
     id: string;
     name: string;
@@ -66,6 +68,19 @@ export interface MetaAdsAd {
     title?: string;
     body?: string;
     call_to_action_type?: string;
+    object_story_spec?: {
+      page_id?: string;
+      link_data?: {
+        link?: string;
+      };
+      video_data?: {
+        call_to_action?: {
+          value?: {
+            link?: string;
+          };
+        };
+      };
+    };
   };
   adset_id: string;
   campaign_id: string;
@@ -943,17 +958,36 @@ class MetaAdsService {
 
   // Buscar conjuntos de anúncios (Ad Sets) da conta selecionada
   async getAdSets(campaignId?: string, dateStart?: string, dateEnd?: string): Promise<any[]> {
-    // Se não está logado, tentar carregar dados salvos
+
+    // Se não está logado, retornar erro
     if (!this.isLoggedIn()) {
-      const savedData = this.getDataFromStorage('adsets');
-      if (savedData) {
-        return savedData;
-      }
-      throw new Error('Usuário não logado e não há dados salvos');
+      throw new Error('Usuário não logado');
     }
 
     if (!this.hasSelectedAccount()) {
       throw new Error('Conta não selecionada');
+    }
+
+    // Verificar cache específico para campanha
+    if (campaignId) {
+      const cacheKey = `adsets_campaign_${campaignId}`;
+      const cachedData = localStorage.getItem(cacheKey);
+      const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
+      
+      // Cache válido por 5 minutos para campanhas específicas
+      const cacheValid = cacheTimestamp && (Date.now() - parseInt(cacheTimestamp)) < 5 * 60 * 1000;
+      
+      if (cachedData && cacheValid) {
+        console.log(`Usando ${JSON.parse(cachedData).length} Ad Sets em cache para campanha ${campaignId}`);
+        return JSON.parse(cachedData);
+      }
+    } else {
+      // Verificar se há dados salvos no localStorage para busca geral
+      const savedData = this.getDataFromStorage('adsets');
+      if (savedData && savedData.length > 0) {
+        console.log(`Usando ${savedData.length} Ad Sets salvos do cache`);
+        return savedData;
+      }
     }
 
     try {
@@ -963,29 +997,68 @@ class MetaAdsService {
         limit: 100
       };
 
-      // Adicionar filtros de data se fornecidos
-      if (dateStart && dateEnd) {
-        params.time_range = JSON.stringify({
-          since: dateStart,
-          until: dateEnd
-        });
-      }
-
       let endpoint = `${this.baseURL}/${this.selectedAccount!.id}/adsets`;
       
       // Se uma campanha específica foi fornecida, buscar conjuntos dessa campanha
       if (campaignId) {
         endpoint = `${this.baseURL}/${campaignId}/adsets`;
+        // Para Ad Sets de uma campanha específica, não usar time_range
+        // A API do Meta Ads não aceita time_range quando buscando Ad Sets de uma campanha
+      } else {
+        // Adicionar filtros de data apenas quando não buscando por campanha específica
+        if (dateStart && dateEnd) {
+          params.time_range = JSON.stringify({
+            since: dateStart,
+            until: dateEnd
+          });
+        }
       }
+
+      console.log(`Buscando Ad Sets em: ${endpoint}`);
+      console.log(`Parâmetros:`, params);
+      console.log(`Token de acesso: ${this.user!.accessToken.substring(0, 20)}...`);
+      console.log(`Conta selecionada: ${this.selectedAccount!.id}`);
 
       const response = await axios.get(endpoint, { params });
 
       const data = response.data.data || [];
+      console.log(`Ad Sets retornados: ${data.length}`);
+      
       // Salvar dados no localStorage
-      this.saveDataAfterLoad('adsets', data);
+      if (campaignId) {
+        // Cache específico para campanha
+        const cacheKey = `adsets_campaign_${campaignId}`;
+        localStorage.setItem(cacheKey, JSON.stringify(data));
+        localStorage.setItem(`${cacheKey}_timestamp`, Date.now().toString());
+        console.log(`Ad Sets da campanha ${campaignId} salvos no cache`);
+      } else {
+        // Cache geral
+        this.saveDataAfterLoad('adsets', data);
+      }
       
       return data;
     } catch (error: any) {
+      console.error('Erro ao buscar Ad Sets:', error.response?.data || error.message);
+      
+      // Se der erro de rate limit, tentar usar cache mesmo que expirado
+      if (error.response?.data?.error?.message?.includes('User request limit reached')) {
+        if (campaignId) {
+          const cacheKey = `adsets_campaign_${campaignId}`;
+          const cachedData = localStorage.getItem(cacheKey);
+          
+          if (cachedData) {
+            console.log('Rate limit atingido, usando cache expirado para Ad Sets da campanha');
+            return JSON.parse(cachedData);
+          }
+        } else {
+          const savedData = this.getDataFromStorage('adsets');
+          if (savedData && savedData.length > 0) {
+            console.log('Rate limit atingido, usando cache expirado para Ad Sets gerais');
+            return savedData;
+          }
+        }
+      }
+      
       throw new Error(`Erro ao buscar conjuntos de anúncios: ${error.response?.data?.error?.message || error.message}`);
     }
   }
@@ -1039,8 +1112,11 @@ class MetaAdsService {
       throw new Error('Usuário não está logado. Faça login primeiro.');
     }
 
+    console.log(`Buscando insights para adSet ${adSetId} no período ${dateStart} a ${dateEnd}`);
+
     try {
-      const response = await axios.get(
+      // Primeira tentativa: período específico
+      let response = await axios.get(
         `${this.baseURL}/${adSetId}/insights`,
         {
           params: {
@@ -1055,24 +1131,134 @@ class MetaAdsService {
         }
       );
 
-      const insights = response.data.data || [];
+      let insights = response.data.data || [];
+      console.log(`Insights retornados para adSet ${adSetId} (período específico):`, insights.length);
+      
+      // Se não encontrou insights no período específico, tentar período mais amplo
+      if (insights.length === 0) {
+        console.log(`Nenhum insight encontrado no período específico, tentando período mais amplo...`);
+        
+        // Tentar últimos 30 dias
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const today = new Date();
+        
+        response = await axios.get(
+          `${this.baseURL}/${adSetId}/insights`,
+          {
+            params: {
+              access_token: this.user.accessToken,
+              fields: 'date_start,date_stop,impressions,clicks,spend,ctr,cpm,cpp,reach,frequency,actions,cost_per_action_type',
+              time_range: {
+                since: thirtyDaysAgo.toISOString().split('T')[0],
+                until: today.toISOString().split('T')[0]
+              },
+              time_increment: 1
+            }
+          }
+        );
+
+        insights = response.data.data || [];
+        console.log(`Insights retornados para adSet ${adSetId} (últimos 30 dias):`, insights.length);
+      }
+      
       // Log detalhado dos primeiros insights para debug
       if (insights.length > 0) {
+        console.log(`Primeiro insight para adSet ${adSetId}:`, insights[0]);
         // Verificar se há actions no primeiro insight
         if (insights[0].actions && insights[0].actions.length > 0) {
+          console.log(`Actions encontradas no insight:`, insights[0].actions);
           // Verificar especificamente por messaging_conversations_started
           const messagingAction = insights[0].actions.find((action: any) => 
             action.action_type === 'messaging_conversations_started' || 
             action.action_type === 'onsite_conversion.messaging_conversation_started_7d'
           );
-          } else {
-          }
-      } else {
+          console.log(`Messaging action encontrada:`, messagingAction);
+        } else {
+          console.log(`Nenhuma action encontrada no insight para adSet ${adSetId}`);
         }
+      } else {
+        console.log(`Nenhum insight encontrado para adSet ${adSetId} em nenhum período`);
+      }
 
       return insights;
     } catch (error: any) {
+      console.error(`Erro ao buscar insights para adSet ${adSetId}:`, error);
       throw new Error(`Erro ao buscar insights do conjunto de anúncios: ${error.response?.data?.error?.message || error.message}`);
+    }
+  }
+
+  // Buscar insights diretamente de um anúncio específico
+  async getAdInsights(adId: string, dateStart: string, dateEnd: string, aggregated: boolean = false): Promise<MetaAdsInsight[]> {
+    if (!this.user) {
+      throw new Error('Usuário não está logado. Faça login primeiro.');
+    }
+
+    console.log(`Buscando insights diretamente do anúncio ${adId} no período ${dateStart} a ${dateEnd} (agregado: ${aggregated})`);
+
+    try {
+      // Primeira tentativa: período específico
+      let response = await axios.get(
+        `${this.baseURL}/${adId}/insights`,
+        {
+          params: {
+            access_token: this.user.accessToken,
+            fields: 'date_start,date_stop,impressions,clicks,spend,ctr,cpm,cpp,reach,frequency,actions,cost_per_action_type',
+            time_range: {
+              since: dateStart,
+              until: dateEnd
+            },
+            ...(aggregated ? {} : { time_increment: 1 })
+          }
+        }
+      );
+
+      let insights = response.data.data || [];
+      console.log(`Insights retornados para anúncio ${adId} (período específico):`, insights.length);
+      
+      // Se não encontrou insights no período específico, tentar período mais amplo
+      if (insights.length === 0) {
+        console.log(`Nenhum insight encontrado no período específico, tentando período mais amplo...`);
+        
+        // Tentar últimos 30 dias
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const today = new Date();
+        
+        response = await axios.get(
+          `${this.baseURL}/${adId}/insights`,
+          {
+            params: {
+              access_token: this.user.accessToken,
+              fields: 'date_start,date_stop,impressions,clicks,spend,ctr,cpm,cpp,reach,frequency,actions,cost_per_action_type',
+              time_range: {
+                since: thirtyDaysAgo.toISOString().split('T')[0],
+                until: today.toISOString().split('T')[0]
+              },
+              ...(aggregated ? {} : { time_increment: 1 })
+            }
+          }
+        );
+
+        insights = response.data.data || [];
+        console.log(`Insights retornados para anúncio ${adId} (últimos 30 dias):`, insights.length);
+      }
+      
+      if (insights.length > 0) {
+        console.log(`Primeiro insight para anúncio ${adId}:`, insights[0]);
+        if (insights[0].actions && insights[0].actions.length > 0) {
+          console.log(`Actions encontradas no insight do anúncio:`, insights[0].actions);
+        } else {
+          console.log(`Nenhuma action encontrada no insight para anúncio ${adId}`);
+        }
+      } else {
+        console.log(`Nenhum insight encontrado para anúncio ${adId} em nenhum período`);
+      }
+
+      return insights;
+    } catch (error: any) {
+      console.error(`Erro ao buscar insights para anúncio ${adId}:`, error);
+      throw new Error(`Erro ao buscar insights do anúncio: ${error.response?.data?.error?.message || error.message}`);
     }
   }
 
@@ -1395,6 +1581,11 @@ class MetaAdsService {
 
   clearCacheByType(type: string): void {
     this.clearCache(type);
+    
+    // Limpar dados específicos do localStorage
+    if (type === 'adsets') {
+      localStorage.removeItem('metaAds_adsets');
+    }
   }
 
   // Método específico para limpar cache de métricas
@@ -1639,17 +1830,22 @@ class MetaAdsService {
   }
 
   async getAds(adSetId?: string, campaignId?: string): Promise<MetaAdsAd[]> {
-    if (!this.selectedAccount || !this.accessToken) {
-      throw new Error('Conta não selecionada ou token não disponível');
+    if (!this.selectedAccount) {
+      throw new Error('Conta não selecionada');
+    }
+
+    const accessToken = this.user?.accessToken || this.getAccessToken();
+    if (!accessToken) {
+      throw new Error('Token de acesso não disponível');
     }
 
     const cacheKey = this.getCacheKey('ads', { adSetId, campaignId });
     return this.makeCachedRequest('ads', async () => {
-      let fields = 'id,name,status,creative{id,name,thumbnail_url,image_url,image_hash,title,body,call_to_action_type},adset_id,campaign_id';
+      let fields = 'id,name,status,created_time,creative{id,name,thumbnail_url,image_url,image_hash,title,body,call_to_action_type,object_story_spec{page_id,link_data{link},video_data{call_to_action{value{link}}}}},adset_id,campaign_id,effective_object_story_id';
       
       let url = `${this.baseURL}/act_${this.selectedAccount!.account_id}/ads`;
       let params: any = {
-        access_token: this.accessToken,
+        access_token: accessToken,
         fields: fields,
         limit: 100
       };
@@ -1662,8 +1858,23 @@ class MetaAdsService {
       }
 
       try {
+        console.log('Buscando anúncios com campos:', fields);
         const response = await axios.get(url, { params });
-        return response.data.data || [];
+        console.log('Resposta da API de anúncios:', response.data);
+        
+        const ads = response.data.data || [];
+        console.log(`Anúncios retornados: ${ads.length}`);
+        
+        // Verificar se effective_object_story_id está presente
+        ads.forEach((ad: any, index: number) => {
+          console.log(`Anúncio ${index + 1}:`, {
+            id: ad.id,
+            name: ad.name,
+            effective_object_story_id: ad.effective_object_story_id || 'NÃO ENCONTRADO'
+          });
+        });
+        
+        return ads;
       } catch (error: any) {
         console.error('Erro ao buscar anúncios:', error.response?.data || error.message);
         throw new Error('Falha ao buscar anúncios do Meta Ads');
@@ -1671,18 +1882,149 @@ class MetaAdsService {
     }, this.CACHE_TTL.AD_SETS, { adSetId, campaignId });
   }
 
+  async getAdDetails(adId: string): Promise<any> {
+    if (!this.selectedAccount) {
+      throw new Error('Conta não selecionada');
+    }
+
+    const accessToken = this.user?.accessToken || this.getAccessToken();
+    if (!accessToken) {
+      throw new Error('Token de acesso não disponível');
+    }
+
+    return this.makeCachedRequest('adDetails', async () => {
+      const fields = 'id,name,status,created_time,creative{id,name,thumbnail_url,image_url,image_hash,title,body,call_to_action_type,object_story_spec{page_id,link_data{link},video_data{call_to_action{value{link}}}}},adset_id,campaign_id';
+      
+      const url = `${this.baseURL}/${adId}`;
+      const params = {
+        access_token: accessToken,
+        fields: fields
+      };
+
+      try {
+        console.log(`Buscando detalhes do anúncio ${adId}`);
+        const response = await axios.get(url, { params });
+        console.log(`Detalhes do anúncio ${adId} obtidos:`, response.data);
+        return response.data;
+      } catch (error: any) {
+        console.error(`Erro ao buscar detalhes do anúncio ${adId}:`, error.response?.data || error.message);
+        throw new Error(`Falha ao buscar detalhes do anúncio ${adId}`);
+      }
+    }, this.CACHE_TTL.AD_SETS, { adId });
+  }
+
+  async getCampaignDetails(campaignId: string): Promise<any> {
+    if (!this.selectedAccount) {
+      throw new Error('Conta não selecionada');
+    }
+
+    const accessToken = this.user?.accessToken || this.getAccessToken();
+    if (!accessToken) {
+      throw new Error('Token de acesso não disponível');
+    }
+
+    return this.makeCachedRequest('campaignDetails', async () => {
+      const fields = 'id,name,status,objective,created_time,updated_time';
+      
+      const url = `${this.baseURL}/${campaignId}`;
+      const params = {
+        access_token: accessToken,
+        fields: fields
+      };
+
+      try {
+        console.log(`Buscando detalhes da campanha ${campaignId}`);
+        const response = await axios.get(url, { params });
+        console.log(`Detalhes da campanha ${campaignId} obtidos:`, response.data);
+        return response.data;
+      } catch (error: any) {
+        console.error(`Erro ao buscar detalhes da campanha ${campaignId}:`, error.response?.data || error.message);
+        throw new Error(`Falha ao buscar detalhes da campanha ${campaignId}`);
+      }
+    }, this.CACHE_TTL.AD_SETS, { campaignId });
+  }
+
+  async getAdSetDetails(adSetId: string): Promise<any> {
+    if (!this.selectedAccount) {
+      throw new Error('Conta não selecionada');
+    }
+
+    const accessToken = this.user?.accessToken || this.getAccessToken();
+    if (!accessToken) {
+      throw new Error('Token de acesso não disponível');
+    }
+
+    return this.makeCachedRequest('adSetDetails', async () => {
+      const fields = 'id,name,status,created_time,updated_time';
+      
+      const url = `${this.baseURL}/${adSetId}`;
+      const params = {
+        access_token: accessToken,
+        fields: fields
+      };
+
+      try {
+        console.log(`Buscando detalhes do conjunto de anúncios ${adSetId}`);
+        const response = await axios.get(url, { params });
+        console.log(`Detalhes do conjunto ${adSetId} obtidos:`, response.data);
+        return response.data;
+      } catch (error: any) {
+        console.error(`Erro ao buscar detalhes do conjunto ${adSetId}:`, error.response?.data || error.message);
+        throw new Error(`Falha ao buscar detalhes do conjunto ${adSetId}`);
+      }
+    }, this.CACHE_TTL.AD_SETS, { adSetId });
+  }
+
+  async getPostIdsFromPage(pageId: string, pageAccessToken: string): Promise<string[]> {
+    try {
+      console.log(`Buscando post IDs da página ${pageId}`);
+      
+      const url = `${this.baseURL}/${pageId}/posts`;
+      const params = {
+        access_token: pageAccessToken,
+        fields: 'id,created_time',
+        limit: 50 // Buscar os 50 posts mais recentes
+      };
+
+      const response = await axios.get(url, { params });
+      
+      if (response.data && response.data.data) {
+        const posts = response.data.data;
+        console.log(`Encontrados ${posts.length} posts na página ${pageId}`);
+        
+        // Extrair apenas o postId (parte após o "_")
+        const postIds = posts.map((post: any) => {
+          const fullId = post.id;
+          const postId = fullId.split('_')[1]; // Pega a parte após o "_"
+          console.log(`Post ID extraído: ${fullId} -> ${postId}`);
+          return postId;
+        });
+        
+        console.log(`Post IDs extraídos:`, postIds);
+        return postIds;
+      }
+      
+      console.log(`Nenhum post encontrado para a página ${pageId}`);
+      return [];
+    } catch (error: any) {
+      console.error(`Erro ao buscar posts da página ${pageId}:`, error.response?.data || error.message);
+      throw new Error(`Falha ao buscar posts da página ${pageId}: ${error.response?.data?.error?.message || error.message}`);
+    }
+  }
+
   async getAdCreative(creativeId: string): Promise<any> {
-    if (!this.accessToken) {
+    const accessToken = this.user?.accessToken || this.getAccessToken();
+    if (!accessToken) {
       throw new Error('Token não disponível');
     }
 
     const cacheKey = this.getCacheKey('creative', { creativeId });
     return this.makeCachedRequest('creative', async () => {
-      const fields = 'id,name,thumbnail_url,image_url,image_hash,title,body,call_to_action_type,object_story_spec';
+      const fields = 'id,name,thumbnail_url,image_url,image_hash,title,body,call_to_action_type,object_story_spec,effective_object_story_id';
       
       const url = `${this.baseURL}/${creativeId}`;
       const params = {
-        access_token: this.accessToken,
+        access_token: accessToken,
         fields: fields
       };
 
@@ -1694,6 +2036,101 @@ class MetaAdsService {
         throw new Error('Falha ao buscar criativo do Meta Ads');
       }
     }, this.CACHE_TTL.AD_SETS, { creativeId });
+  }
+
+  async getAdCreativesWithEffectiveObjectStory(): Promise<any[]> {
+    if (!this.selectedAccount) {
+      throw new Error('Conta não selecionada');
+    }
+
+    const accessToken = this.user?.accessToken || this.getAccessToken();
+    if (!accessToken) {
+      throw new Error('Token de acesso não disponível');
+    }
+
+    return this.makeCachedRequest('adCreatives', async () => {
+      const fields = 'id,name,effective_object_story_id,object_story_spec';
+      
+      const url = `${this.baseURL}/act_${this.selectedAccount!.account_id}/adcreatives`;
+      const params = {
+        access_token: accessToken,
+        fields: fields,
+        limit: 100
+      };
+
+      try {
+        console.log('Buscando adcreatives com effective_object_story_id...');
+        const response = await axios.get(url, { params });
+        console.log('Adcreatives obtidos:', response.data);
+        
+        const creatives = response.data.data || [];
+        const creativesWithEffectiveStory = creatives.filter((creative: any) => creative.effective_object_story_id);
+        
+        console.log(`Creatives com effective_object_story_id: ${creativesWithEffectiveStory.length}/${creatives.length}`);
+        creativesWithEffectiveStory.forEach((creative: any) => {
+          console.log(`Creative ${creative.id}: effective_object_story_id = ${creative.effective_object_story_id}`);
+        });
+        
+        return creativesWithEffectiveStory;
+      } catch (error: any) {
+        console.error('Erro ao buscar adcreatives:', error.response?.data || error.message);
+        throw new Error('Falha ao buscar adcreatives');
+      }
+    }, this.CACHE_TTL.AD_SETS);
+  }
+
+  // Método para testar se há dados disponíveis na conta
+  async testAccountDataAvailability(): Promise<{ hasData: boolean; periods: string[] }> {
+    if (!this.selectedAccount) {
+      throw new Error('Conta não selecionada');
+    }
+
+    const accessToken = this.user?.accessToken || this.getAccessToken();
+    if (!accessToken) {
+      throw new Error('Token de acesso não disponível');
+    }
+
+    console.log('Testando disponibilidade de dados na conta...');
+
+    // Testar diferentes períodos
+    const periods = [
+      { name: 'Últimos 7 dias', since: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], until: new Date().toISOString().split('T')[0] },
+      { name: 'Últimos 30 dias', since: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], until: new Date().toISOString().split('T')[0] },
+      { name: 'Últimos 90 dias', since: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], until: new Date().toISOString().split('T')[0] }
+    ];
+
+    const results: string[] = [];
+
+    for (const period of periods) {
+      try {
+        const url = `${this.baseURL}/act_${this.selectedAccount!.account_id}/insights`;
+        const params = {
+          access_token: accessToken,
+          fields: 'date_start,date_stop,impressions,clicks,spend',
+          time_range: {
+            since: period.since,
+            until: period.until
+          },
+          time_increment: 1
+        };
+
+        const response = await axios.get(url, { params });
+        const insights = response.data.data || [];
+        console.log(`${period.name}: ${insights.length} insights encontrados`);
+        
+        if (insights.length > 0) {
+          results.push(`${period.name}: ${insights.length} insights`);
+        }
+      } catch (error: any) {
+        console.error(`Erro ao testar ${period.name}:`, error.response?.data || error.message);
+      }
+    }
+
+    const hasData = results.length > 0;
+    console.log(`Resultado do teste de disponibilidade: ${hasData ? 'Dados encontrados' : 'Nenhum dado encontrado'}`);
+    console.log('Períodos com dados:', results);
+
+    return { hasData, periods: results };
   }
 }
 

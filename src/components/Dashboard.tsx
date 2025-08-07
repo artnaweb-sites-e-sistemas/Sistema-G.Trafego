@@ -25,6 +25,47 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [dataSource, setDataSource] = useState<'manual' | 'facebook' | null>(null);
   const [isFacebookConnected, setIsFacebookConnected] = useState(false);
 
+  // Verificar status de conexão do Meta Ads ao carregar
+  useEffect(() => {
+    const checkMetaAdsConnection = async () => {
+      try {
+        // Verificar se há usuário salvo no localStorage primeiro
+        const savedUser = localStorage.getItem('facebookUser');
+        if (savedUser) {
+          const { metaAdsService } = await import('../services/metaAdsService');
+          if (metaAdsService.isLoggedIn()) {
+            setDataSource('facebook');
+            setIsFacebookConnected(true);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao verificar conexão do Meta Ads:', error);
+      }
+    };
+
+    checkMetaAdsConnection();
+
+    // Listener para quando Meta Ads for conectado
+    const handleMetaAdsConnected = () => {
+      setDataSource('facebook');
+      setIsFacebookConnected(true);
+    };
+
+    // Listener para quando Meta Ads for desconectado
+    const handleMetaAdsDisconnected = () => {
+      setDataSource(null);
+      setIsFacebookConnected(false);
+    };
+
+    window.addEventListener('metaAdsConnected', handleMetaAdsConnected);
+    window.addEventListener('metaAdsDisconnected', handleMetaAdsDisconnected);
+
+    return () => {
+      window.removeEventListener('metaAdsConnected', handleMetaAdsConnected);
+      window.removeEventListener('metaAdsDisconnected', handleMetaAdsDisconnected);
+    };
+  }, []);
+
   // Função para obter o mês atual formatado
   const getCurrentMonth = () => {
     const now = new Date();
@@ -50,6 +91,13 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       localStorage.removeItem('selectedClient');
     }
   }, [selectedClient]);
+
+  // Salvar mês selecionado no localStorage
+  useEffect(() => {
+    if (selectedMonth) {
+      localStorage.setItem('selectedMonth', selectedMonth);
+    }
+  }, [selectedMonth]);
   const [selectedProduct, setSelectedProduct] = useState('');
   const [selectedAudience, setSelectedAudience] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState('');
@@ -463,6 +511,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       localStorage.removeItem('selectedProduct');
       localStorage.removeItem('selectedAudience');
       localStorage.removeItem('selectedCampaignId');
+      localStorage.removeItem('selectedAdSetId');
       // Forçar refresh para garantir limpeza
       setRefreshTrigger(prev => prev + 1);
     };
@@ -548,6 +597,17 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
   // Função para atualizar origem dos dados
   const handleDataSourceChange = (source: 'manual' | 'facebook' | null, connected: boolean) => {
+    console.log('🔍 DEBUG - Dashboard - handleDataSourceChange chamado:', { source, connected });
+    
+    // Verificar se há usuário salvo antes de limpar dados
+    const savedUser = localStorage.getItem('facebookUser');
+    
+    // Se está tentando mudar para manual mas há usuário salvo, não permitir
+    if (source === 'manual' && savedUser) {
+      console.log('🔍 Usuário salvo encontrado, mantendo conexão Facebook');
+      return;
+    }
+    
     setDataSource(source);
     setIsFacebookConnected(connected);
     
@@ -676,6 +736,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                       selectedMonth={selectedMonth}
                       selectedAudience={selectedAudience}
                     />
+                    <PerformanceAdsSection onBack={() => setShowPerformanceAds(false)} />
                   </>
                 ) : selectedProduct && selectedProduct !== 'Todos os Produtos' ? (
                   <>

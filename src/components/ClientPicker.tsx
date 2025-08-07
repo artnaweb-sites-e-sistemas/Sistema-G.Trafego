@@ -294,6 +294,15 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
   const isPickerActive = dataSource === 'facebook' && isFacebookConnected;
   const isClientSelected = selectedClient && selectedClient !== 'Selecione um cliente' && selectedClient !== 'Todos os Clientes' && selectedClient !== '' && selectedClient !== undefined && selectedClient !== null;
 
+  // Debug: verificar status do picker
+  console.log('🔍 DEBUG - ClientPicker - Status:', {
+    dataSource,
+    isFacebookConnected,
+    isPickerActive,
+    clientsCount: clients.length,
+    isLoading
+  });
+
   return (
     <div className="relative dropdown-container" ref={pickerRef}>
       {/* Input field */}
