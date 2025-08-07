@@ -1088,17 +1088,29 @@ class MetaAdsService {
       const insights = response.data.data || [];
       // Log detalhado dos primeiros insights para debug
       if (insights.length > 0) {
+        console.log('🔍 DEBUG - getCampaignInsights - Primeiro insight:', insights[0]);
         // Verificar se há actions no primeiro insight
         if (insights[0].actions && insights[0].actions.length > 0) {
+          console.log('🔍 DEBUG - getCampaignInsights - Actions encontradas:', insights[0].actions);
           // Verificar especificamente por messaging_conversations_started
           const messagingAction = insights[0].actions.find((action: any) => 
             action.action_type === 'messaging_conversations_started' || 
             action.action_type === 'onsite_conversion.messaging_conversation_started_7d'
           );
-          } else {
-          }
-      } else {
+          console.log('🔍 DEBUG - getCampaignInsights - Messaging action encontrada:', messagingAction);
+        } else {
+          console.log('🔍 DEBUG - getCampaignInsights - Nenhuma action encontrada');
         }
+        
+        // Verificar cost_per_action_type
+        if (insights[0].cost_per_action_type && insights[0].cost_per_action_type.length > 0) {
+          console.log('🔍 DEBUG - getCampaignInsights - Cost per action type encontrado:', insights[0].cost_per_action_type);
+        } else {
+          console.log('🔍 DEBUG - getCampaignInsights - Nenhum cost_per_action_type encontrado');
+        }
+      } else {
+        console.log('🔍 DEBUG - getCampaignInsights - Nenhum insight encontrado');
+      }
 
       return insights;
     } catch (error: any) {
@@ -1164,16 +1176,24 @@ class MetaAdsService {
       
       // Log detalhado dos primeiros insights para debug
       if (insights.length > 0) {
-        console.log(`Primeiro insight para adSet ${adSetId}:`, insights[0]);
+        console.log(`🔍 DEBUG - getAdSetInsights - Primeiro insight para adSet ${adSetId}:`, insights[0]);
         // Verificar se há actions no primeiro insight
         if (insights[0].actions && insights[0].actions.length > 0) {
-          console.log(`Actions encontradas no insight:`, insights[0].actions);
-          // Verificar especificamente por messaging_conversations_started
-          const messagingAction = insights[0].actions.find((action: any) => 
-            action.action_type === 'messaging_conversations_started' || 
-            action.action_type === 'onsite_conversion.messaging_conversation_started_7d'
-          );
-          console.log(`Messaging action encontrada:`, messagingAction);
+          console.log(`🔍 DEBUG - getAdSetInsights - Actions encontradas para adSet ${adSetId}:`, insights[0].actions);
+                      console.log(`Actions encontradas no insight:`, insights[0].actions);
+            // Verificar especificamente por messaging_conversations_started
+            const messagingAction = insights[0].actions.find((action: any) => 
+              action.action_type === 'messaging_conversations_started' || 
+              action.action_type === 'onsite_conversion.messaging_conversation_started_7d'
+            );
+            console.log(`Messaging action encontrada:`, messagingAction);
+            
+            // Verificar cost_per_action_type
+            if (insights[0].cost_per_action_type && insights[0].cost_per_action_type.length > 0) {
+              console.log(`🔍 DEBUG - getAdSetInsights - Cost per action type encontrado para adSet ${adSetId}:`, insights[0].cost_per_action_type);
+            } else {
+              console.log(`🔍 DEBUG - getAdSetInsights - Nenhum cost_per_action_type encontrado para adSet ${adSetId}`);
+            }
         } else {
           console.log(`Nenhuma action encontrada no insight para adSet ${adSetId}`);
         }
@@ -1399,10 +1419,23 @@ class MetaAdsService {
       // Buscar métricas de compras (purchase) - se não houver, será 0
       const purchases = insight.actions?.find((action: any) => 
         action.action_type === 'purchase' || 
-        action.action_type === 'onsite_conversion.purchase'
+        action.action_type === 'onsite_conversion.purchase' ||
+        action.action_type === 'offsite_conversion.purchase' ||
+        action.action_type === 'offsite_conversion.fb_pixel_purchase'
       )?.value || '0';
       
       const salesCount = parseInt(purchases);
+
+      // Debug: Log de compras para verificar se estão sendo detectadas
+      if (process.env.NODE_ENV === 'development' && salesCount > 0) {
+        console.log(`🔍 DEBUG - Compras detectadas para ${insight.date_start}:`, {
+          purchases,
+          salesCount,
+          actions: insight.actions?.filter((action: any) => 
+            action.action_type.includes('purchase')
+          )
+        });
+      }
 
       // Calcular CTR baseado em cliques no link em vez do CTR geral
       const ctr = clicks > 0 && impressions > 0 ? (clicks / impressions) * 100 : 0;
@@ -1417,6 +1450,88 @@ class MetaAdsService {
       } else {
         // Calcular CPC manualmente: investimento / cliques no link
         cpl = clicks > 0 ? investment / clicks : 0;
+      }
+
+      // Calcular CPR dinamicamente baseado no objetivo da campanha
+      let cpr = 0;
+      
+      // Debug: Log dos dados disponíveis (apenas se houver problemas)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 DEBUG - convertToMetricData - Insight data:', {
+          date: insight.date_start,
+          spend: insight.spend,
+          impressions: insight.impressions,
+          actions: insight.actions?.length || 0,
+          cost_per_action_type: insight.cost_per_action_type?.length || 0,
+          salesCount,
+          leadsCount,
+          messagingConversations,
+          leads
+        });
+      }
+      
+
+
+      // Debug: Log detalhado do cost_per_action_type (apenas em desenvolvimento)
+      if (process.env.NODE_ENV === 'development' && insight.cost_per_action_type && insight.cost_per_action_type.length > 0) {
+        console.log('🔍 DEBUG - convertToMetricData - Cost per action type disponível:', insight.cost_per_action_type.map((cost: any) => ({
+          action_type: cost.action_type,
+          value: cost.value
+        })));
+      }
+
+      // Buscar CPR diretamente do Meta Ads - método mais simples e direto
+      if (insight.cost_per_action_type && insight.cost_per_action_type.length > 0) {
+        // Priorizar tipos de conversão mais relevantes (excluindo video_view e outros que não são conversões)
+        const priorityTypes = [
+          'purchase',
+          'onsite_conversion.purchase', 
+          'lead',
+          'onsite_conversion.lead',
+          'messaging_conversations_started',
+          'onsite_conversion.messaging_conversation_started_7d',
+          'complete_registration',
+          'onsite_conversion.complete_registration'
+        ];
+
+        // Tipos que NÃO devem ser considerados como CPR (não são conversões reais)
+        const excludedTypes = [
+          'video_view',
+          'post_engagement',
+          'page_engagement',
+          'link_click',
+          'onsite_conversion.link_click',
+          'impression',
+          'reach'
+        ];
+
+        // Procurar pelo primeiro tipo de conversão com valor > 0
+        for (const type of priorityTypes) {
+          const costData = insight.cost_per_action_type.find((cost: any) => 
+            cost.action_type === type && parseFloat(cost.value) > 0
+          );
+          if (costData) {
+            cpr = parseFloat(costData.value);
+            console.log(`🔍 DEBUG - CPR do Meta Ads (${type}):`, cpr);
+            break;
+          }
+        }
+
+        // Se não encontrou nenhum dos tipos prioritários, usar o primeiro com valor > 0 (excluindo tipos não conversão)
+        if (cpr === 0) {
+          const firstValidCost = insight.cost_per_action_type.find((cost: any) => 
+            parseFloat(cost.value) > 0 && !excludedTypes.includes(cost.action_type)
+          );
+          if (firstValidCost) {
+            cpr = parseFloat(firstValidCost.value);
+            console.log(`🔍 DEBUG - CPR do Meta Ads (${firstValidCost.action_type}):`, cpr);
+          }
+        }
+      }
+
+      // Se não há dados de cost_per_action_type, CPR será 0 (sem conversões)
+      if (cpr === 0) {
+        console.log('🔍 DEBUG - CPR zero (sem dados de conversão do Meta Ads)');
       }
 
       const estimatedRevenue = leadsCount * 200;
@@ -1463,11 +1578,24 @@ class MetaAdsService {
         ctr: ctr,
         cpm: cpm,
         cpl: cpl,
+        cpr: cpr, // CPR dinâmico baseado no objetivo da campanha
         roas: roas,
         roi: roi,
         appointments: leadsCount,
         sales: salesCount
       };
+
+      // Log final apenas em desenvolvimento
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 DEBUG - convertToMetricData - MetricData final:', {
+          date: correctedDate,
+          investment,
+          leads: leadsCount,
+          sales: salesCount,
+          cpr,
+          cpl
+        });
+      }
 
       return metricData;
     });

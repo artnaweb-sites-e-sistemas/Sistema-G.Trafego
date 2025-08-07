@@ -19,7 +19,8 @@ import {
   Activity,
   RefreshCw,
   AlertCircle,
-  ExternalLink
+  ExternalLink,
+  Loader2
 } from 'lucide-react';
 import { metaAdsService } from '../services/metaAdsService';
 
@@ -36,10 +37,21 @@ interface AdMetrics {
   reach?: number;
   frequency?: number;
   cpm?: number;
-  // Métricas da semana anterior para cálculo de tendência
-  cpaAnterior?: number;
-  ctrAnterior?: number;
-  conversionsAnterior?: number;
+  // Métricas dos últimos 7 dias para cálculo de tendência
+  last7DaysCpa?: number;
+  last7DaysCtr?: number;
+  last7DaysConversions?: number;
+  // Métricas dos últimos 3 dias para termômetro imediato
+  last3DaysCpa?: number;
+  last3DaysCtr?: number;
+  last3DaysConversions?: number;
+  // Métricas dos períodos anteriores para comparação
+  previous7DaysCpa?: number;
+  previous7DaysCtr?: number;
+  previous7DaysConversions?: number;
+  previous3DaysCpa?: number;
+  previous3DaysCtr?: number;
+  previous3DaysConversions?: number;
 }
 
 interface AdData {
@@ -50,7 +62,7 @@ interface AdData {
   status: 'active' | 'paused' | 'draft';
   rank: number;
   metrics: AdMetrics;
-  trend: 'up' | 'down' | 'stable';
+  trend: 'up' | 'down' | 'stable' | 'collecting';
   category: string;
   lastUpdated: string;
   adset_id?: string;
@@ -116,6 +128,8 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
       const selectedAudience = localStorage.getItem('currentSelectedAudience') || '';
       const selectedCampaignId = localStorage.getItem('selectedCampaignId') || '';
       const selectedAdSetId = localStorage.getItem('selectedAdSetId') || '';
+      
+
 
       console.log('Parâmetros de busca:', {
         selectedMonth,
@@ -152,6 +166,20 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
           };
         }
         
+        // Validar se o período não é futuro
+        const now = new Date();
+        const requestedEndDate = new Date(year, monthIndex + 1, 0);
+        
+        if (requestedEndDate > now) {
+          console.warn(`⚠️ Período solicitado (${month}) é futuro. Usando mês atual.`);
+          // Só mostrar erro se estivermos realmente buscando dados do Meta Ads
+          // (não apenas navegando na interface)
+          return {
+            startDate: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0],
+            endDate: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
+          };
+        }
+        
         const startDate = new Date(year, monthIndex, 1).toISOString().split('T')[0];
         const endDate = new Date(year, monthIndex + 1, 0).toISOString().split('T')[0];
         
@@ -162,14 +190,41 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
         // Calcular os últimos 7 dias do período selecionado
         const { startDate, endDate } = getPeriodDates(month);
         const periodEnd = new Date(endDate);
+        const now = new Date();
+        
+        // Se a data final do período é futura, ajustar para hoje
+        const actualEndDate = periodEnd > now ? now : periodEnd;
         
         // Calcular início dos últimos 7 dias
-        const last7DaysStart = new Date(periodEnd);
-        last7DaysStart.setDate(periodEnd.getDate() - 6); // 7 dias atrás (incluindo hoje)
+        const last7DaysStart = new Date(actualEndDate);
+        last7DaysStart.setDate(actualEndDate.getDate() - 6); // 7 dias atrás (incluindo hoje)
         
         return {
           startDate: last7DaysStart.toISOString().split('T')[0],
-          endDate: periodEnd.toISOString().split('T')[0]
+          endDate: actualEndDate.toISOString().split('T')[0]
+        };
+      };
+
+      const getPrevious7DaysDates = (month: string) => {
+        // Calcular os 7 dias anteriores aos últimos 7 dias (para comparação de tendência)
+        const { startDate, endDate } = getPeriodDates(month);
+        const periodEnd = new Date(endDate);
+        const now = new Date();
+        
+        // Se a data final do período é futura, ajustar para hoje
+        const actualEndDate = periodEnd > now ? now : periodEnd;
+        
+        // Calcular fim dos 7 dias anteriores (dia anterior ao início dos últimos 7 dias)
+        const previous7DaysEnd = new Date(actualEndDate);
+        previous7DaysEnd.setDate(actualEndDate.getDate() - 7);
+        
+        // Calcular início dos 7 dias anteriores 
+        const previous7DaysStart = new Date(previous7DaysEnd);
+        previous7DaysStart.setDate(previous7DaysEnd.getDate() - 6);
+        
+        return {
+          startDate: previous7DaysStart.toISOString().split('T')[0],
+          endDate: previous7DaysEnd.toISOString().split('T')[0]
         };
       };
 
@@ -177,23 +232,55 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
         // Calcular os últimos 3 dias do período selecionado
         const { startDate, endDate } = getPeriodDates(month);
         const periodEnd = new Date(endDate);
+        const now = new Date();
+        
+        // Se a data final do período é futura, ajustar para hoje
+        const actualEndDate = periodEnd > now ? now : periodEnd;
         
         // Calcular início dos últimos 3 dias
-        const last3DaysStart = new Date(periodEnd);
-        last3DaysStart.setDate(periodEnd.getDate() - 2); // 3 dias atrás (incluindo hoje)
+        const last3DaysStart = new Date(actualEndDate);
+        last3DaysStart.setDate(actualEndDate.getDate() - 2); // 3 dias atrás (incluindo hoje)
         
         return {
           startDate: last3DaysStart.toISOString().split('T')[0],
-          endDate: periodEnd.toISOString().split('T')[0]
+          endDate: actualEndDate.toISOString().split('T')[0]
+        };
+      };
+
+      const getPrevious3DaysDates = (month: string) => {
+        // Calcular os 3 dias anteriores aos últimos 3 dias (para comparação de alertas)
+        const { startDate, endDate } = getPeriodDates(month);
+        const periodEnd = new Date(endDate);
+        const now = new Date();
+        
+        // Se a data final do período é futura, ajustar para hoje
+        const actualEndDate = periodEnd > now ? now : periodEnd;
+        
+        // Calcular fim dos 3 dias anteriores (dia anterior ao início dos últimos 3 dias)
+        const previous3DaysEnd = new Date(actualEndDate);
+        previous3DaysEnd.setDate(actualEndDate.getDate() - 3);
+        
+        // Calcular início dos 3 dias anteriores 
+        const previous3DaysStart = new Date(previous3DaysEnd);
+        previous3DaysStart.setDate(previous3DaysEnd.getDate() - 2);
+        
+        return {
+          startDate: previous3DaysStart.toISOString().split('T')[0],
+          endDate: previous3DaysEnd.toISOString().split('T')[0]
         };
       };
 
       const { startDate, endDate } = getPeriodDates(selectedMonth);
       const { startDate: last7DaysStart, endDate: last7DaysEnd } = getLast7DaysDates(selectedMonth);
       const { startDate: last3DaysStart, endDate: last3DaysEnd } = getLast3DaysDates(selectedMonth);
+      const { startDate: previous7DaysStart, endDate: previous7DaysEnd } = getPrevious7DaysDates(selectedMonth);
+      const { startDate: previous3DaysStart, endDate: previous3DaysEnd } = getPrevious3DaysDates(selectedMonth);
+      
       console.log('Período atual calculado:', { startDate, endDate });
       console.log('Últimos 7 dias calculados:', { last7DaysStart, last7DaysEnd });
       console.log('Últimos 3 dias calculados:', { last3DaysStart, last3DaysEnd });
+      console.log('7 dias anteriores calculados:', { previous7DaysStart, previous7DaysEnd });
+      console.log('3 dias anteriores calculados:', { previous3DaysStart, previous3DaysEnd });
 
       // Buscar anúncios do Meta Ads
       console.log('Buscando anúncios do Meta Ads...');
@@ -222,10 +309,12 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
             console.log(`❌ effective_object_story_id não encontrado para anúncio ${ad.id}`);
           }
           
-          // Buscar insights separadamente: período selecionado, últimos 7 dias, últimos 3 dias e período total
+          // Buscar insights separadamente: período selecionado, últimos 7 dias, últimos 3 dias, períodos anteriores e período total
           let periodInsights: any[] = [];
           let last7DaysInsights: any[] = [];
           let last3DaysInsights: any[] = [];
+          let previous7DaysInsights: any[] = [];
+          let previous3DaysInsights: any[] = [];
           let allTimeInsights: any[] = [];
           
           try {
@@ -251,6 +340,14 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               // Buscar insights dos últimos 3 dias (para termômetro imediato)
               last3DaysInsights = await metaAdsService.getAdInsights(ad.id, last3DaysStart, last3DaysEnd, false);
               console.log(`Insights dos últimos 3 dias para termômetro:`, last3DaysInsights.length);
+              
+              // Buscar insights dos 7 dias anteriores (para comparação de tendência)
+              previous7DaysInsights = await metaAdsService.getAdInsights(ad.id, previous7DaysStart, previous7DaysEnd, false);
+              console.log(`Insights dos 7 dias anteriores para comparação:`, previous7DaysInsights.length);
+              
+              // Buscar insights dos 3 dias anteriores (para comparação de alertas)
+              previous3DaysInsights = await metaAdsService.getAdInsights(ad.id, previous3DaysStart, previous3DaysEnd, false);
+              console.log(`Insights dos 3 dias anteriores para comparação:`, previous3DaysInsights.length);
             } else {
               // Fallback: usar os mesmos dados do período selecionado
               console.log(`⚠️ created_time não disponível, usando período selecionado para anúncio ${ad.id}`);
@@ -527,6 +624,14 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
             let last3DaysCtr = 0;
             let last3DaysConversions = 0;
             
+            // Calcular métricas dos períodos anteriores (para comparação de tendência)
+            let previous7DaysCpa = 0;
+            let previous7DaysCtr = 0;
+            let previous7DaysConversions = 0;
+            let previous3DaysCpa = 0;
+            let previous3DaysCtr = 0;
+            let previous3DaysConversions = 0;
+            
             if (last7DaysInsights.length > 0) {
               let last7DaysTotalSpend = 0;
               let last7DaysTotalConversions = 0;
@@ -619,6 +724,102 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                 cpa: last3DaysCpa,
                 ctr: last3DaysCtr,
                 conversions: last3DaysConversions
+              });
+            }
+            
+            // Calcular métricas dos 7 dias anteriores (para comparação de tendência)
+            if (previous7DaysInsights.length > 0) {
+              let previous7DaysTotalSpend = 0;
+              let previous7DaysTotalConversions = 0;
+              let previous7DaysTotalImpressions = 0;
+              let previous7DaysTotalLinkClicks = 0;
+              
+              previous7DaysInsights.forEach((insight: any) => {
+                previous7DaysTotalSpend += parseFloat(insight.spend || '0');
+                previous7DaysTotalImpressions += parseInt(insight.impressions || '0');
+                
+                // Buscar cliques no link dos 7 dias anteriores
+                const previous7DaysLinkClicks = insight.actions?.find((action: any) => 
+                  action.action_type === 'link_click' || 
+                  action.action_type === 'onsite_conversion.link_click'
+                )?.value || '0';
+                previous7DaysTotalLinkClicks += parseInt(previous7DaysLinkClicks);
+                
+                // Somar conversões dos 7 dias anteriores
+                const previous7DaysMessagingConversations = insight.actions?.find((action: any) => 
+                  action.action_type === 'messaging_conversations_started' || 
+                  action.action_type === 'onsite_conversion.messaging_conversation_started_7d'
+                )?.value || '0';
+                
+                const previous7DaysLeads = insight.actions?.find((action: any) => 
+                  action.action_type === 'lead' || action.action_type === 'complete_registration'
+                )?.value || '0';
+                
+                const previous7DaysPurchases = insight.actions?.find((action: any) => 
+                  action.action_type === 'purchase' || 
+                  action.action_type === 'onsite_conversion.purchase'
+                )?.value || '0';
+                
+                previous7DaysTotalConversions += parseInt(previous7DaysMessagingConversations) + parseInt(previous7DaysLeads) + parseInt(previous7DaysPurchases);
+              });
+              
+              // Calcular métricas dos 7 dias anteriores
+              previous7DaysCpa = previous7DaysTotalConversions > 0 ? previous7DaysTotalSpend / previous7DaysTotalConversions : 0;
+              previous7DaysCtr = previous7DaysTotalImpressions > 0 ? (previous7DaysTotalLinkClicks / previous7DaysTotalImpressions) * 100 : 0;
+              previous7DaysConversions = previous7DaysTotalConversions;
+              
+              console.log(`Métricas dos 7 dias anteriores para anúncio ${ad.id}:`, {
+                cpa: previous7DaysCpa,
+                ctr: previous7DaysCtr,
+                conversions: previous7DaysConversions
+              });
+            }
+            
+            // Calcular métricas dos 3 dias anteriores (para comparação de alertas)
+            if (previous3DaysInsights.length > 0) {
+              let previous3DaysTotalSpend = 0;
+              let previous3DaysTotalConversions = 0;
+              let previous3DaysTotalImpressions = 0;
+              let previous3DaysTotalLinkClicks = 0;
+              
+              previous3DaysInsights.forEach((insight: any) => {
+                previous3DaysTotalSpend += parseFloat(insight.spend || '0');
+                previous3DaysTotalImpressions += parseInt(insight.impressions || '0');
+                
+                // Buscar cliques no link dos 3 dias anteriores
+                const previous3DaysLinkClicks = insight.actions?.find((action: any) => 
+                  action.action_type === 'link_click' || 
+                  action.action_type === 'onsite_conversion.link_click'
+                )?.value || '0';
+                previous3DaysTotalLinkClicks += parseInt(previous3DaysLinkClicks);
+                
+                // Somar conversões dos 3 dias anteriores
+                const previous3DaysMessagingConversations = insight.actions?.find((action: any) => 
+                  action.action_type === 'messaging_conversations_started' || 
+                  action.action_type === 'onsite_conversion.messaging_conversation_started_7d'
+                )?.value || '0';
+                
+                const previous3DaysLeads = insight.actions?.find((action: any) => 
+                  action.action_type === 'lead' || action.action_type === 'complete_registration'
+                )?.value || '0';
+                
+                const previous3DaysPurchases = insight.actions?.find((action: any) => 
+                  action.action_type === 'purchase' || 
+                  action.action_type === 'onsite_conversion.purchase'
+                )?.value || '0';
+                
+                previous3DaysTotalConversions += parseInt(previous3DaysMessagingConversations) + parseInt(previous3DaysLeads) + parseInt(previous3DaysPurchases);
+              });
+              
+              // Calcular métricas dos 3 dias anteriores
+              previous3DaysCpa = previous3DaysTotalConversions > 0 ? previous3DaysTotalSpend / previous3DaysTotalConversions : 0;
+              previous3DaysCtr = previous3DaysTotalImpressions > 0 ? (previous3DaysTotalLinkClicks / previous3DaysTotalImpressions) * 100 : 0;
+              previous3DaysConversions = previous3DaysTotalConversions;
+              
+              console.log(`Métricas dos 3 dias anteriores para anúncio ${ad.id}:`, {
+                cpa: previous3DaysCpa,
+                ctr: previous3DaysCtr,
+                conversions: previous3DaysConversions
               });
             }
             
@@ -829,7 +1030,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
           }
             
             // Determinar tendência baseada no ROAS
-            let trend: 'up' | 'down' | 'stable' = 'stable';
+            let trend: 'up' | 'down' | 'stable' | 'collecting' = 'stable';
             if (roas > 3.5) trend = 'up';
             else if (roas < 2.0) trend = 'down';
             
@@ -878,10 +1079,21 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                 reach,
                 frequency,
                 cpm,
-                // Métricas dos últimos 7 dias para cálculo de tendência
-                cpaAnterior: last7DaysCpa,
-                ctrAnterior: last7DaysCtr,
-                conversionsAnterior: last7DaysConversions
+                // Métricas dos últimos 7 dias
+                last7DaysCpa,
+                last7DaysCtr,
+                last7DaysConversions,
+                // Métricas dos últimos 3 dias para termômetro imediato
+                last3DaysCpa,
+                last3DaysCtr,
+                last3DaysConversions,
+                // Métricas dos períodos anteriores para comparação
+                previous7DaysCpa,
+                previous7DaysCtr,
+                previous7DaysConversions,
+                previous3DaysCpa,
+                previous3DaysCtr,
+                previous3DaysConversions
               },
               trend,
               category: selectedProduct || 'Meta Ads',
@@ -937,7 +1149,22 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                 cpa: 0,
                 reach: 0,
                 frequency: 0,
-                cpm: 0
+                cpm: 0,
+                // Métricas dos últimos 7 dias
+                last7DaysCpa: 0,
+                last7DaysCtr: 0,
+                last7DaysConversions: 0,
+                // Métricas dos últimos 3 dias para termômetro imediato
+                last3DaysCpa: 0,
+                last3DaysCtr: 0,
+                last3DaysConversions: 0,
+                // Métricas dos períodos anteriores para comparação
+                previous7DaysCpa: 0,
+                previous7DaysCtr: 0,
+                previous7DaysConversions: 0,
+                previous3DaysCpa: 0,
+                previous3DaysCtr: 0,
+                previous3DaysConversions: 0
     },
     trend: 'stable',
               category: selectedProduct || 'Meta Ads',
@@ -1113,6 +1340,8 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
         return <AlertCircle className="w-4 h-4 text-yellow-400" />;
       case 'stable':
         return <BarChart3 className="w-4 h-4 text-blue-400" />;
+      case 'collecting':
+        return <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />;
       default:
         return <Activity className="w-4 h-4 text-slate-400" />;
     }
@@ -1144,7 +1373,10 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
     frequenciaAtual,
     last3DaysCpa = 0,
     last3DaysCtr = 0,
-    last3DaysConversions = 0
+    last3DaysConversions = 0,
+    previous3DaysCpa = 0,
+    previous3DaysCtr = 0,
+    previous3DaysConversions = 0
   }: {
     cpaAtual: number;
     cpaAnterior: number;
@@ -1156,7 +1388,23 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
     last3DaysCpa?: number;
     last3DaysCtr?: number;
     last3DaysConversions?: number;
-  }): { trend: 'up' | 'down' | 'warning' | 'stable'; explanation: string } => {
+    previous3DaysCpa?: number;
+    previous3DaysCtr?: number;
+    previous3DaysConversions?: number;
+  }): { trend: 'up' | 'down' | 'warning' | 'stable' | 'collecting'; explanation: string } => {
+    // === DETECÇÃO DE ANÚNCIOS SEM DADOS SUFICIENTES ===
+    // Verificar se o anúncio não está em veiculação nos últimos 7 dias
+    const temDadosUltimos7Dias = conversoesAtuais > 0 || cpaAtual > 0 || ctrAtual > 0;
+    const temDadosAnteriores = conversoesAnteriores > 0 || cpaAnterior > 0 || ctrAnterior > 0;
+    
+    // Se não tem dados nos últimos 7 dias OU se não tem dados para comparação
+    if (!temDadosUltimos7Dias || !temDadosAnteriores) {
+      return {
+        trend: 'collecting',
+        explanation: 'Anúncio novo ou sem dados suficientes para análise. Aguardando coleta de dados para determinar tendência.'
+      };
+    }
+    
     // === TENDÊNCIA PRINCIPAL (Últimos 7 dias) ===
     // Condições para tendência POSITIVA (anúncio dando resultado)
     const cpaMelhorou = cpaAnterior > 0 && cpaAtual < cpaAnterior * 0.9; // Pelo menos 10% melhor
@@ -1176,11 +1424,11 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
     // Contar quantas condições negativas são verdadeiras
     const condicoesNegativas = [cpaPiorou, conversoesDiminuíram, ctrPiorou, frequenciaAlta].filter(Boolean).length;
     
-    // === TERMÔMETRO IMEDIATO (Últimos 3 dias) ===
-    // Detectar quedas bruscas ou sinais de saturação
-    const quedaBruscaCPA = last3DaysCpa > 0 && cpaAtual > last3DaysCpa * 1.3; // 30% pior nos últimos 3 dias
-    const quedaBruscaCTR = last3DaysCtr > 0 && ctrAtual < last3DaysCtr * 0.8; // 20% pior nos últimos 3 dias
-    const quedaBruscaConversions = last3DaysConversions > 0 && conversoesAtuais < last3DaysConversions * 0.7; // 30% menos nos últimos 3 dias
+    // === TERMÔMETRO IMEDIATO (Últimos 3 dias vs 3 dias anteriores) ===
+    // Detectar quedas bruscas ou sinais de saturação comparando os últimos 3 dias com os 3 dias anteriores
+    const quedaBruscaCPA = previous3DaysCpa > 0 && last3DaysCpa > previous3DaysCpa * 1.3; // CPA dos últimos 3 dias é 30% pior que os 3 dias anteriores
+    const quedaBruscaCTR = previous3DaysCtr > 0 && last3DaysCtr < previous3DaysCtr * 0.8; // CTR dos últimos 3 dias é 20% pior que os 3 dias anteriores  
+    const quedaBruscaConversions = previous3DaysConversions > 0 && last3DaysConversions < previous3DaysConversions * 0.7; // Conversões dos últimos 3 dias são 30% menores que os 3 dias anteriores
     const saturaçãoRápida = frequenciaAtual > 5.0; // Frequência muito alta
     
     const alertasImediatos = [quedaBruscaCPA, quedaBruscaCTR, quedaBruscaConversions, saturaçãoRápida].filter(Boolean).length;
@@ -1191,15 +1439,15 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
     if (alertasImediatos >= 2) {
       const reasons = [];
       if (quedaBruscaCPA) {
-        const variacao = ((cpaAtual - last3DaysCpa) / last3DaysCpa * 100);
+        const variacao = ((last3DaysCpa - previous3DaysCpa) / previous3DaysCpa * 100);
         reasons.push(`CPA piorou ${variacao.toFixed(1)}% nos últimos 3 dias`);
       }
       if (quedaBruscaCTR) {
-        const variacao = ((last3DaysCtr - ctrAtual) / last3DaysCtr * 100);
+        const variacao = ((previous3DaysCtr - last3DaysCtr) / previous3DaysCtr * 100);
         reasons.push(`CTR caiu ${variacao.toFixed(1)}% nos últimos 3 dias`);
       }
       if (quedaBruscaConversions) {
-        const variacao = ((last3DaysConversions - conversoesAtuais) / last3DaysConversions * 100);
+        const variacao = ((previous3DaysConversions - last3DaysConversions) / previous3DaysConversions * 100);
         reasons.push(`Conversões caíram ${variacao.toFixed(1)}% nos últimos 3 dias`);
       }
       if (saturaçãoRápida) {
@@ -1208,7 +1456,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
       
       return {
         trend: 'warning',
-        explanation: `⚠️ Atenção! ${reasons.join(', ')}. Considere pausar ou revisar o anúncio.`
+        explanation: `Atenção! ${reasons.join(', ')}. Considere pausar ou revisar o anúncio.`
       };
     }
     
@@ -1233,7 +1481,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
       
       return {
         trend: 'up',
-        explanation: `🔺 Anúncio dando resultado! ${reasons.join(', ')}.`
+        explanation: `Anúncio dando resultado! ${reasons.join(', ')}.`
       };
     }
     
@@ -1258,14 +1506,14 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
       
       return {
         trend: 'down',
-        explanation: `🔻 Anúncio parando de dar resultado! ${reasons.join(', ')}.`
+        explanation: `Anúncio parando de dar resultado! ${reasons.join(', ')}.`
       };
     }
     
     // 4. ESTÁVEL: Se não atende nenhuma condição
     return {
       trend: 'stable',
-      explanation: '⚡ Anúncio mantendo performance estável.'
+      explanation: 'Anúncio mantendo performance estável.'
     };
   };
 
@@ -1523,27 +1771,32 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                     </h3>
                       {(() => {
                         const trendData = calculateTrendIcon({
-                          cpaAtual: ad.metrics.cpa,
-                          cpaAnterior: ad.metrics.cpaAnterior || 0,
-                          ctrAtual: ad.metrics.ctr,
-                          ctrAnterior: ad.metrics.ctrAnterior || 0,
-                          conversoesAtuais: ad.metrics.conversions,
-                          conversoesAnteriores: ad.metrics.conversionsAnterior || 0,
+                          cpaAtual: ad.metrics.last7DaysCpa || 0,
+                          cpaAnterior: ad.metrics.previous7DaysCpa || 0,
+                          ctrAtual: ad.metrics.last7DaysCtr || 0,
+                          ctrAnterior: ad.metrics.previous7DaysCtr || 0,
+                          conversoesAtuais: ad.metrics.last7DaysConversions || 0,
+                          conversoesAnteriores: ad.metrics.previous7DaysConversions || 0,
                           frequenciaAtual: ad.metrics.frequency || 0,
-                          last3DaysCpa: last3DaysCpa || 0,
-                          last3DaysCtr: last3DaysCtr || 0,
-                          last3DaysConversions: last3DaysConversions || 0
+                          last3DaysCpa: ad.metrics.last3DaysCpa || 0,
+                          last3DaysCtr: ad.metrics.last3DaysCtr || 0,
+                          last3DaysConversions: ad.metrics.last3DaysConversions || 0,
+                          previous3DaysCpa: ad.metrics.previous3DaysCpa || 0,
+                          previous3DaysCtr: ad.metrics.previous3DaysCtr || 0,
+                          previous3DaysConversions: ad.metrics.previous3DaysConversions || 0
                         });
                         
                                                  return (
-                           <div className="relative group/trend">
-                             {getTrendIcon(trendData.trend)}
-                             {trendData.explanation && (
-                               <div className="absolute top-1/2 right-full transform -translate-y-1/2 mr-2 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg shadow-xl text-xs text-slate-300 whitespace-nowrap opacity-0 group-hover/trend:opacity-100 transition-opacity duration-200 z-50">
-                                 {trendData.explanation}
-                                 <div className="absolute top-1/2 left-full transform -translate-y-1/2 w-0 h-0 border-t-4 border-b-4 border-l-4 border-transparent border-l-slate-800"></div>
-                               </div>
-                             )}
+                           <div className="relative">
+                             <div className="group/trend-icon cursor-help">
+                               {getTrendIcon(trendData.trend)}
+                               {trendData.explanation && (
+                                 <div className="absolute top-1/2 right-full transform -translate-y-1/2 mr-2 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg shadow-xl text-xs text-slate-300 whitespace-nowrap opacity-0 group-hover/trend-icon:opacity-100 transition-opacity duration-200 z-50 pointer-events-none">
+                                   {trendData.explanation}
+                                   <div className="absolute top-1/2 left-full transform -translate-y-1/2 w-0 h-0 border-t-4 border-b-4 border-l-4 border-transparent border-l-slate-800"></div>
+                                 </div>
+                               )}
+                             </div>
                            </div>
                          );
                       })()}

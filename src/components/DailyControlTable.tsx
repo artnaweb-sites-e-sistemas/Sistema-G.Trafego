@@ -366,12 +366,11 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
     const tooltips: { [key: string]: string } = {
       'Data': 'Data do registro de controle diário',
       'Investimento': 'Valor investido em anúncios neste dia',
-      'Impressões': 'Número de vezes que o anúncio foi exibido neste dia',
-      'Cliques': 'Número de cliques recebidos neste dia',
       'CPM': 'Custo por mil impressões neste dia',
-      'CTR': 'Taxa de cliques (porcentagem de impressões que viraram cliques)',
+      'Impressões': 'Número de vezes que o anúncio foi exibido neste dia',
+      'CPR': 'Custo por resultado dinâmico: se há compras, mostra custo por compra; se há leads, mostra custo por lead; sincronizado com Meta Ads',
       'Leads': 'Número de leads gerados neste dia',
-      'CPL': 'Custo por lead gerado neste dia',
+      'Compras': 'Número de vendas/conversões realizadas neste dia',
       'Status': 'Status do anúncio: Ativo (com investimento) ou Inativo (sem investimento)'
     };
     return tooltips[column] || 'Informação sobre esta coluna';
@@ -425,12 +424,11 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
         date: `${dayStr}/${monthStr}/${yearStr}`,
         dateISO: currentDate.toISOString().split('T')[0], // Para comparação
         investment: formatCurrency(0),
-        impressions: 0,
-        clicks: 0,
         cpm: formatCurrency(0),
-        ctr: '0,00%',
+        impressions: 0,
+        cpr: formatCurrency(0),
         leads: 0,
-        cpl: formatCurrency(0),
+        compras: 0,
         status: 'Inativo',
         isPastDay,
         isToday,
@@ -445,8 +443,9 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
     interface Agg {
       investment: number;
       impressions: number;
-      clicks: number;
       leads: number;
+      compras: number;
+      cpr?: number; // Custo por resultado dinâmico
       updatedAt?: any;
       service?: string;
     }
@@ -471,12 +470,16 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
     // Agregar por dia somando serviços
     const dayAggMap = new Map<DayKey, Agg>();
     dayServiceMap.forEach((serviceMap, dateKey) => {
-      let agg: Agg = { investment: 0, impressions: 0, clicks: 0, leads: 0 };
+      let agg: Agg = { investment: 0, impressions: 0, leads: 0, compras: 0, cpr: 0 };
       serviceMap.forEach(metric => {
         agg.investment += metric.investment || 0;
         agg.impressions += metric.impressions || 0;
-        agg.clicks += metric.clicks || 0;
         agg.leads += metric.leads || 0;
+        agg.compras += metric.compras || 0;
+        // Para CPR, vamos usar a média ponderada baseada no investimento
+        if (metric.cpr && metric.investment) {
+          agg.cpr = ((agg.cpr || 0) * (agg.investment - metric.investment) + metric.cpr * metric.investment) / agg.investment;
+        }
       });
       dayAggMap.set(dateKey, agg);
     });
@@ -499,12 +502,11 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
         data[dayIndex] = {
           ...data[dayIndex],
           investment: formatCurrency(agg.investment),
-          impressions: agg.impressions,
-          clicks: agg.clicks,
           cpm: agg.impressions > 0 ? formatCurrency((agg.investment / agg.impressions) * 1000) : formatCurrency(0),
-          ctr: agg.impressions > 0 ? `${((agg.clicks / agg.impressions) * 100).toFixed(2)}%` : '0,00%',
+          impressions: agg.impressions,
+          cpr: agg.cpr && agg.cpr > 0 ? formatCurrency(agg.cpr) : formatCurrency(0),
           leads: agg.leads,
-          cpl: agg.leads > 0 ? formatCurrency(agg.investment / agg.leads) : formatCurrency(0),
+          compras: agg.compras,
           status: agg.investment > 0 ? 'Ativo' : 'Inativo'
         };
       }
@@ -518,12 +520,11 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
   const calculateTotals = () => {
     const totals = {
       investment: formatCurrency(0),
-      impressions: 0,
-      clicks: 0,
       cpm: formatCurrency(0),
-      ctr: '0,00%',
+      impressions: 0,
+      cpr: formatCurrency(0),
       leads: 0,
-      cpl: formatCurrency(0),
+      compras: 0,
       activeDays: 0
     };
 
@@ -534,30 +535,38 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
         // Extrair valores numéricos das strings formatadas
         const investmentValue = parseFloat(row.investment.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
         const impressionsValue = row.impressions || 0;
-        const clicksValue = row.clicks || 0;
         const leadsValue = row.leads || 0;
-        const cpmValue = parseFloat(row.cpm.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
-        const cplValue = parseFloat(row.cpl.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
+        const comprasValue = row.compras || 0;
+        const cprValue = parseFloat(row.cpr.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
       
         // Acumular totais
         totals.investment = formatCurrency(parseFloat(totals.investment.replace(/[^\d,.-]/g, '').replace(',', '.')) + investmentValue);
         totals.impressions += impressionsValue;
-        totals.clicks += clicksValue;
         totals.leads += leadsValue;
+        totals.compras += comprasValue;
+        
+
       
         // Calcular médias
         const totalInvestment = parseFloat(totals.investment.replace(/[^\d,.-]/g, '').replace(',', '.'));
         const totalImpressions = totals.impressions;
-        const totalClicks = totals.clicks;
         const totalLeads = totals.leads;
+        const totalCompras = totals.compras;
         
         if (totalImpressions > 0) {
           totals.cpm = formatCurrency((totalInvestment / totalImpressions) * 1000);
-          totals.ctr = `${((totalClicks / totalImpressions) * 100).toFixed(2)}%`;
         }
         
+        // Calcular CPR total baseado no investimento total e resultados totais
         if (totalLeads > 0) {
-          totals.cpl = formatCurrency(totalInvestment / totalLeads);
+          // Se há leads, calcular CPR baseado em leads
+          totals.cpr = formatCurrency(totalInvestment / totalLeads);
+        } else if (totalCompras > 0) {
+          // Se há compras, calcular CPR baseado em compras
+          totals.cpr = formatCurrency(totalInvestment / totalCompras);
+        } else {
+          // Se não há resultados, CPR é 0
+          totals.cpr = formatCurrency(0);
         }
       }
     });
@@ -586,22 +595,19 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
         {totals.investment}
       </td>
       <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
-        {totals.impressions}
-      </td>
-      <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
-        {totals.clicks}
-      </td>
-      <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
         {totals.cpm}
       </td>
       <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
-        {totals.ctr}
+        {totals.impressions}
+      </td>
+      <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
+        {totals.cpr}
       </td>
       <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
         {totals.leads}
       </td>
       <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
-        {totals.cpl}
+        {totals.compras}
       </td>
       <td className="p-4">
         <div className="flex items-center space-x-2">
@@ -1067,34 +1073,6 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                 </th>
                 <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
                   <div className="flex items-center space-x-2">
-                    <span>IMPRESSÕES</span>
-                    <Tooltip content={getColumnTooltip('Impressões')} isVisible={tooltipStates['Impressões'] || false} position="bottom">
-                      <div
-                        className="cursor-default group/tooltip"
-                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Impressões': true }))}
-                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Impressões': false }))}
-                      >
-                        <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
-                      </div>
-                    </Tooltip>
-                  </div>
-                </th>
-                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
-                  <div className="flex items-center space-x-2">
-                    <span>CLIQUES</span>
-                    <Tooltip content={getColumnTooltip('Cliques')} isVisible={tooltipStates['Cliques'] || false} position="bottom">
-                      <div
-                        className="cursor-default group/tooltip"
-                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Cliques': true }))}
-                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Cliques': false }))}
-                      >
-                        <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
-                      </div>
-                    </Tooltip>
-                  </div>
-                </th>
-                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
-                  <div className="flex items-center space-x-2">
                     <span>CPM</span>
                     <Tooltip content={getColumnTooltip('CPM')} isVisible={tooltipStates['CPM'] || false} position="bottom">
                       <div
@@ -1109,12 +1087,26 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                 </th>
                 <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
                   <div className="flex items-center space-x-2">
-                    <span>CTR (%)</span>
-                    <Tooltip content={getColumnTooltip('CTR')} isVisible={tooltipStates['CTR'] || false} position="bottom">
+                    <span>IMPRESSÕES</span>
+                    <Tooltip content={getColumnTooltip('Impressões')} isVisible={tooltipStates['Impressões'] || false} position="bottom">
                       <div
                         className="cursor-default group/tooltip"
-                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'CTR': true }))}
-                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'CTR': false }))}
+                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Impressões': true }))}
+                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Impressões': false }))}
+                      >
+                        <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                      </div>
+                    </Tooltip>
+                  </div>
+                </th>
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                  <div className="flex items-center space-x-2">
+                    <span>CPR</span>
+                    <Tooltip content={getColumnTooltip('CPR')} isVisible={tooltipStates['CPR'] || false} position="bottom">
+                      <div
+                        className="cursor-default group/tooltip"
+                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'CPR': true }))}
+                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'CPR': false }))}
                       >
                         <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
                       </div>
@@ -1137,12 +1129,12 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                 </th>
                 <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
                   <div className="flex items-center space-x-2">
-                    <span>CPL</span>
-                    <Tooltip content={getColumnTooltip('CPL')} isVisible={tooltipStates['CPL'] || false} position="bottom">
+                    <span>COMPRAS</span>
+                    <Tooltip content={getColumnTooltip('Compras')} isVisible={tooltipStates['Compras'] || false} position="bottom">
                       <div
                         className="cursor-default group/tooltip"
-                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'CPL': true }))}
-                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'CPL': false }))}
+                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'Compras': true }))}
+                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'Compras': false }))}
                       >
                         <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
                       </div>
@@ -1209,12 +1201,11 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                     </div>
                   </td>
                   <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.investment}</td>
-                  <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.impressions}</td>
-                  <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.clicks}</td>
                   <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.cpm}</td>
-                  <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.ctr}</td>
+                  <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.impressions}</td>
+                  <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.cpr}</td>
                   <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.leads}</td>
-                  <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.cpl}</td>
+                  <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.compras}</td>
                   <td className="p-4">
                     <div className="flex items-center space-x-2">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${

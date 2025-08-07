@@ -30,6 +30,7 @@ export interface MetricData {
   ctr: number;
   cpm: number;
   cpl: number;
+  cpr?: number; // Custo por resultado (dinâmico baseado no objetivo da campanha)
   roas: number;
   roi: number;
   appointments: number;
