@@ -55,7 +55,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
       setFormData(prev => ({
         ...prev,
         [parent]: {
-          ...prev[parent as keyof typeof prev],
+          ...(prev as any)[parent],
           [child]: value
         }
       }));
@@ -151,35 +151,32 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
   }
 
   return (
-    <div className="relative overflow-hidden bg-gradient-to-br from-slate-900/95 via-purple-900/40 to-indigo-900/60 backdrop-blur-sm border border-purple-400/30 rounded-2xl shadow-2xl">
-      {/* Background Effects */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-blue-500/10"></div>
-      <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-radial from-purple-400/20 via-transparent to-transparent rounded-full blur-3xl"></div>
-      <div className="absolute bottom-0 left-0 w-60 h-60 bg-gradient-radial from-blue-400/15 via-transparent to-transparent rounded-full blur-2xl"></div>
-      
-      <div className="relative p-8">
+    <div className="relative overflow-hidden bg-slate-900/80 border border-slate-700/50 rounded-2xl shadow-xl">
+      {/* Background accents sutis */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute -top-12 -right-12 w-64 h-64 rounded-full bg-gradient-to-br from-purple-500/15 to-indigo-500/15 blur-3xl" />
+        <div className="absolute -bottom-12 -left-12 w-64 h-64 rounded-full bg-gradient-to-br from-blue-500/10 to-cyan-500/10 blur-3xl" />
+      </div>
+
+      <div className="relative p-6 md:p-8">
         <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
-            <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-blue-500 rounded-2xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity duration-300"></div>
-              <div className="relative bg-gradient-to-r from-purple-600 to-blue-600 p-3 rounded-2xl shadow-lg">
-                <Brain className="h-7 w-7 text-white" />
+          <div className="flex items-center gap-4">
+            <div className="relative flex-shrink-0">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center shadow-md">
+                <Brain className="h-5 w-5 text-white" />
               </div>
+              <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-900 animate-pulse" />
             </div>
-            <div>
-              <h3 className="text-2xl font-bold bg-gradient-to-r from-purple-200 via-blue-200 to-cyan-200 bg-clip-text text-transparent">
-                Benchmark com IA
-              </h3>
-              <p className="text-slate-300 mt-1 font-medium">
-                Produto: <span className="text-purple-300 font-semibold">{selectedProduct}</span>
-              </p>
+            <div className="flex flex-col justify-center">
+              <h3 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent leading-tight">Benchmark com IA</h3>
+              <p className="text-slate-400 text-sm mt-1 leading-tight">Produto: <span className="text-slate-200 font-semibold">{selectedProduct}</span></p>
             </div>
           </div>
           
           {!showForm && (
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center gap-4">
               {lastResults && (
-                <div className="flex items-center space-x-2 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 backdrop-blur-sm border border-emerald-400/30 rounded-full px-4 py-2 shadow-lg">
+                <div className="flex items-center gap-2 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 backdrop-blur-sm border border-emerald-400/30 rounded-full px-4 py-2 shadow-lg">
                   <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
                   <span className="text-sm text-emerald-200 font-medium">
                     Benchmark ativo ({lastResults.confidence}% confiança)
@@ -188,13 +185,11 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
               )}
               <button
                 onClick={() => setShowForm(true)}
-                className="group relative overflow-hidden bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 hover:from-purple-500 hover:via-blue-500 hover:to-indigo-500 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-purple-500/30 hover:scale-105"
+                className="group relative inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] overflow-hidden"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="relative flex items-center space-x-2">
-                  <TrendingUp className="h-5 w-5" />
-                  <span>{lastResults ? 'Regenerar Benchmark' : 'Gerar Benchmark'}</span>
-                </div>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                <TrendingUp className="h-4 w-4 mr-2" />
+                <span>{lastResults ? 'Regenerar Benchmark' : 'Gerar Benchmark'}</span>
               </button>
             </div>
           )}
@@ -203,7 +198,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
         {showForm && (
           <div className="space-y-10">
             {/* Progresso do Formulário */}
-            <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/60 backdrop-blur-sm border border-slate-600/40 rounded-2xl p-6 shadow-lg">
+            <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 shadow-md">
               <div className="flex items-center justify-between mb-6">
                 <h4 className="text-lg font-semibold text-slate-200">Configuração do Benchmark</h4>
                 <div className="flex items-center space-x-2 text-sm text-slate-400">
@@ -213,9 +208,9 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
               </div>
               
               <div className="relative">
-                <div className="h-2 bg-slate-700/60 rounded-full overflow-hidden mb-6">
+                <div className="h-2 bg-slate-700/70 rounded-full overflow-hidden mb-6">
                   <div 
-                    className="h-full bg-gradient-to-r from-purple-500 via-blue-500 to-indigo-500 rounded-full transition-all duration-700 ease-out shadow-lg"
+                    className="h-full bg-gradient-to-r from-purple-500 via-indigo-500 to-blue-500 rounded-full transition-all duration-700 ease-out"
                     style={{ width: `${(currentStep / 4) * 100}%` }}
                   ></div>
                 </div>
@@ -231,11 +226,11 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                       <div className={`relative transition-all duration-500 ${
                         step <= currentStep ? 'scale-110' : 'scale-100'
                       }`}>
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-500 ${
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
                           step < currentStep 
-                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30' 
+                            ? 'bg-emerald-600 text-white shadow'
                             : step === currentStep
-                            ? `bg-gradient-to-r ${color} text-white shadow-lg shadow-current/30`
+                            ? `bg-gradient-to-r ${color} text-white shadow`
                             : 'bg-slate-700/80 text-slate-400 border border-slate-600'
                         }`}>
                           {step < currentStep ? (
@@ -260,7 +255,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
             </div>
 
             {/* Etapas do Formulário - Design Simples */}
-            <div className="bg-gradient-to-br from-slate-800/60 to-slate-700/60 backdrop-blur-sm border border-slate-600/40 rounded-2xl p-8 shadow-lg">
+            <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-8 shadow-md">
               <div className="flex items-center mb-6">
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl blur-lg opacity-30"></div>
@@ -299,7 +294,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                             onClick={() => handleInputChange('productNiche', niche === 'Outro' ? '' : niche)}
                             className={`p-3 rounded-lg text-sm font-medium transition-all duration-200 ${
                               formData.productNiche === niche || (niche === 'Outro' && !['Fitness/Saúde', 'Educação', 'Tecnologia', 'Beleza', 'Financeiro', 'Imóveis', 'Alimentação'].includes(formData.productNiche))
-                                ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg border-2 border-purple-400' 
+                                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow border border-purple-400/40' 
                                 : 'bg-slate-700/60 text-slate-300 border border-slate-600/50 hover:border-purple-400/50'
                             }`}
                           >
@@ -313,7 +308,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                           value={formData.productNiche}
                           onChange={(e) => handleInputChange('productNiche', e.target.value)}
                           placeholder="Digite seu nicho (ex: Consultoria empresarial, Coaching, etc.)"
-                          className="w-full bg-slate-700/60 border border-slate-600/50 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                         className="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
                         />
                       )}
                     </div>
@@ -332,11 +327,11 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                           <button
                             key={range.label}
                             onClick={() => handleInputChange('productValue', range.value)}
-                            className={`p-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                           className={`p-3 rounded-lg text-sm font-medium transition-all duration-200 ${
                               (range.value === 0 && formData.productValue >= 2000) || 
                               (range.value !== 0 && formData.productValue === range.value)
-                                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg' 
-                                : 'bg-slate-700/60 text-slate-300 border border-slate-600/50 hover:border-emerald-400/50'
+                                 ? 'bg-emerald-600 text-white shadow' 
+                                 : 'bg-slate-700/60 text-slate-300 border border-slate-600/50 hover:border-emerald-400/50'
                             }`}
                           >
                             {range.label}
@@ -352,7 +347,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                           placeholder="Ou digite o valor exato"
                           min="0"
                           step="0.01"
-                          className="w-full bg-slate-700/60 border border-slate-600/50 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                         className="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                         />
                       </div>
                     </div>
@@ -375,7 +370,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                             onClick={() => handleInputChange('productType', type.value)}
                             className={`p-4 rounded-lg text-left transition-all duration-200 ${
                               formData.productType === type.value
-                                ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg' 
+                                ? 'bg-blue-600 text-white shadow' 
                                 : 'bg-slate-700/60 text-slate-300 border border-slate-600/50 hover:border-blue-400/50'
                             }`}
                           >
@@ -446,11 +441,11 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                             onChange={(e) => setNewInterest(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && addInterest()}
                             placeholder="Ex: fitness, emagrecimento, musculação..."
-                            className="flex-1 bg-slate-700/60 border border-slate-600/50 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                             className="flex-1 bg-slate-800/60 border border-slate-700/50 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                           />
                           <button
                             onClick={addInterest}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors font-medium"
+                             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors font-medium"
                           >
                             Adicionar
                           </button>
@@ -479,7 +474,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                             onClick={() => handleInputChange('salesProcess.salesMethod', method.value)}
                             className={`p-4 rounded-lg text-left transition-all duration-200 ${
                               formData.salesProcess.salesMethod === method.value
-                                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg' 
+                                ? 'bg-emerald-600 text-white shadow' 
                                 : 'bg-slate-700/60 text-slate-300 border border-slate-600/50 hover:border-emerald-400/50'
                             }`}
                           >
@@ -501,7 +496,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                             onClick={() => handleInputChange('campaignObjective', objective)}
                             className={`p-3 rounded-lg text-center transition-all duration-200 ${
                               formData.campaignObjective === objective
-                                ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg' 
+                                ? 'bg-orange-600 text-white shadow' 
                                 : 'bg-slate-700/60 text-slate-300 border border-slate-600/50 hover:border-orange-400/50'
                             }`}
                           >
@@ -531,7 +526,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                             onClick={() => handleInputChange('leadQuality', quality.value)}
                             className={`w-full p-4 rounded-lg text-left transition-all duration-200 ${
                               formData.leadQuality === quality.value
-                                ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-lg' 
+                                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow' 
                                 : 'bg-slate-700/60 text-slate-300 border border-slate-600/50 hover:border-purple-400/50'
                             }`}
                           >
@@ -557,7 +552,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                             onClick={() => handleInputChange('competitionLevel', competition.value)}
                             className={`p-4 rounded-lg text-center transition-all duration-200 ${
                               formData.competitionLevel === competition.value
-                                ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg' 
+                                ? 'bg-cyan-600 text-white shadow' 
                                 : 'bg-slate-700/60 text-slate-300 border border-slate-600/50 hover:border-cyan-400/50'
                             }`}
                           >
@@ -577,7 +572,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                         onChange={(e) => handleInputChange('additionalInfo', e.target.value)}
                         placeholder="Ex: Sazonalidade específica, características únicas..."
                         rows={3}
-                        className="w-full bg-slate-700/60 border border-slate-600/50 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                         className="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
                       />
                     </div>
                   </>
@@ -611,10 +606,10 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                         (currentStep === 1 && (!formData.productNiche || !formData.productValue)) ||
                         (currentStep === 2 && formData.targetAudience.interests.length === 0)
                       }
-                      className="group relative overflow-hidden bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:from-slate-600 disabled:to-slate-600 text-white px-8 py-3 rounded-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-purple-500/25 disabled:cursor-not-allowed"
+                      className="group relative inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:from-slate-700 disabled:to-slate-700 text-white px-8 py-3 font-semibold transition-all duration-300 shadow-md hover:shadow-lg disabled:cursor-not-allowed overflow-hidden"
                     >
-                      <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 group-disabled:opacity-0 transition-opacity duration-300"></div>
-                      <div className="relative flex items-center space-x-2">
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                      <div className="relative flex items-center gap-2">
                         <span>Próximo</span>
                         <TrendingUp className="h-4 w-4" />
                       </div>
@@ -623,10 +618,10 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                     <button
                       onClick={handleGenerateBenchmark}
                       disabled={isLoading}
-                      className="group relative overflow-hidden bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:from-slate-600 disabled:to-slate-600 text-white px-8 py-3 rounded-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-emerald-500/25 disabled:cursor-not-allowed"
+                      className="group relative inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:from-slate-700 disabled:to-slate-700 text-white px-8 py-3 font-semibold transition-all duration-300 shadow-md hover:shadow-lg disabled:cursor-not-allowed overflow-hidden"
                     >
-                      <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 group-disabled:opacity-0 transition-opacity duration-300"></div>
-                      <div className="relative flex items-center space-x-2">
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                      <div className="relative flex items-center gap-2">
                         {isLoading ? (
                           <>
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -649,21 +644,17 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
 
         {/* Resultados */}
         {lastResults && !showForm && (
-          <div className="mt-8 relative overflow-hidden bg-gradient-to-br from-slate-800/60 via-emerald-900/20 to-cyan-900/30 backdrop-blur-sm border border-emerald-400/30 rounded-2xl shadow-2xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-cyan-500/10"></div>
-            <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-radial from-emerald-400/20 via-transparent to-transparent rounded-full blur-2xl"></div>
+          <div className="mt-8 relative overflow-hidden bg-slate-800/60 border border-slate-700/50 rounded-2xl shadow-md">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-cyan-500/10" />
             
             <div className="relative p-6">
               <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-3">
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-xl blur-lg opacity-30"></div>
-                    <div className="relative bg-gradient-to-r from-emerald-600 to-cyan-600 p-2 rounded-xl shadow-lg">
-                      <Lightbulb className="h-5 w-5 text-white" />
-                    </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center shadow">
+                    <Lightbulb className="h-5 w-5 text-white" />
                   </div>
                   <div>
-                    <h4 className="text-xl font-bold bg-gradient-to-r from-emerald-200 to-cyan-200 bg-clip-text text-transparent">
+                    <h4 className="text-lg md:text-xl font-bold bg-gradient-to-r from-emerald-200 to-cyan-200 bg-clip-text text-transparent">
                       Benchmark Gerado
                     </h4>
                     <p className="text-slate-300 text-sm">
@@ -689,7 +680,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                 ].map((metric, index) => (
                   <div key={index} className="group relative">
                     <div className={`absolute inset-0 bg-gradient-to-r ${metric.color} rounded-xl opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
-                    <div className="relative bg-slate-800/60 backdrop-blur-sm border border-slate-600/40 rounded-xl p-4 text-center transition-all duration-300 hover:border-slate-500/60 hover:bg-slate-700/60">
+                    <div className="relative bg-slate-900/40 border border-slate-700/50 rounded-xl p-4 text-center transition-all duration-300 hover:border-slate-600 hover:bg-slate-800/50">
                       <div className="text-xl mb-1">{metric.icon}</div>
                       <div className="text-xs text-slate-400 mb-1 font-medium">{metric.label}</div>
                       <div className={`text-lg font-bold bg-gradient-to-r ${metric.color} bg-clip-text text-transparent`}>
@@ -701,7 +692,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
               </div>
 
               {lastResults.insights.length > 0 && (
-                <div className="bg-slate-800/40 backdrop-blur-sm border border-slate-600/30 rounded-xl p-4">
+                <div className="bg-slate-900/40 border border-slate-700/50 rounded-xl p-4">
                   <h5 className="text-sm font-semibold text-emerald-200 mb-3 flex items-center">
                     <span className="w-2 h-2 bg-emerald-400 rounded-full mr-2"></span>
                     Insights da IA

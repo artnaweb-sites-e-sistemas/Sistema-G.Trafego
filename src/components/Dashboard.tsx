@@ -10,6 +10,7 @@ import HistorySection from './HistorySection';
 import ShareReport from './ShareReport';
 import AIBenchmark from './AIBenchmark';
 import PerformanceAdsSection from './PerformanceAdsSection';
+import AdStrategySection from './AdStrategySection';
 import { User } from '../services/authService';
 import { metricsService, MetricData } from '../services/metricsService';
 import { BenchmarkResults } from '../services/aiBenchmarkService';
@@ -79,6 +80,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Estados para filtros do dashboard
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
   const [selectedClient, setSelectedClient] = useState('Selecione um cliente');
+  
+  // Estados para estratégias de anúncio
+  const [adStrategies, setAdStrategies] = useState<any[]>([]);
 
   // Debug: verificar mudanças no selectedClient
   useEffect(() => {
@@ -109,7 +113,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [realValuesForClient, setRealValuesForClient] = useState({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
   const [realValuesRefreshTrigger, setRealValuesRefreshTrigger] = useState(0);
   const [aiBenchmarkResults, setAiBenchmarkResults] = useState<BenchmarkResults | null>(null);
-  const [showPerformanceAds, setShowPerformanceAds] = useState(false);
+
 
   // Garantir que o mês selecionado seja sempre válido
   useEffect(() => {
@@ -645,6 +649,13 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     toast.success('Benchmark aplicado! Os valores foram atualizados na tabela.');
   };
 
+  // Handler para quando uma estratégia é criada
+  const handleStrategyCreated = (strategy: any) => {
+    console.log('🔍 DEBUG - Dashboard - Estratégia criada:', strategy);
+    setAdStrategies(prev => [...prev, strategy]);
+    toast.success('Estratégia de anúncio criada com sucesso!');
+  };
+
   // Carregar benchmark quando produto mudar
   useEffect(() => {
     if (selectedProduct && selectedProduct !== 'Todos os Produtos') {
@@ -683,13 +694,11 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
           onDataSourceChange={handleDataSourceChange}
           monthlyDetailsValues={monthlyDetailsValues}
           metrics={metrics}
-          onShowPerformanceAds={() => setShowPerformanceAds(true)}
+
         />
       
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-10">
-        {showPerformanceAds ? (
-          <PerformanceAdsSection onBack={() => setShowPerformanceAds(false)} />
-        ) : loading ? (
+        {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="relative">
               <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-700 border-t-purple-500 shadow-lg"></div>
@@ -736,7 +745,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                       selectedMonth={selectedMonth}
                       selectedAudience={selectedAudience}
                     />
-                    <PerformanceAdsSection onBack={() => setShowPerformanceAds(false)} />
+                    <PerformanceAdsSection />
                   </>
                 ) : selectedProduct && selectedProduct !== 'Todos os Produtos' ? (
                   <>
@@ -755,20 +764,29 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                     <InsightsSection />
                   </>
                 ) : (
-                              <MetricsGrid 
-              metrics={metrics} 
-              selectedClient={selectedClient}
-              selectedMonth={selectedMonth}
-              realAgendamentos={realValuesForClient.agendamentos}
-              realVendas={realValuesForClient.vendas}
-              realCPV={realValuesForClient.cpv}
-              realROI={realValuesForClient.roi}
-            />
+                  <>
+                    <MetricsGrid 
+                      metrics={metrics} 
+                      selectedClient={selectedClient}
+                      selectedMonth={selectedMonth}
+                      realAgendamentos={realValuesForClient.agendamentos}
+                      realVendas={realValuesForClient.vendas}
+                      realCPV={realValuesForClient.cpv}
+                      realROI={realValuesForClient.roi}
+                    />
+                    
+                    {/* Seção de Estratégia de Anúncio - aparece abaixo das métricas iniciais */}
+                    <AdStrategySection 
+                      selectedClient={selectedClient}
+                      selectedMonth={selectedMonth}
+                      onStrategyCreated={handleStrategyCreated}
+                    />
+                  </>
                 )}
               </>
             )}
-            {/* Renderizar HistorySection apenas se produto OU público estiver selecionado */}
-            {((selectedProduct && selectedProduct !== 'Todos os Produtos') || (selectedAudience && selectedAudience !== 'Todos os Públicos')) && isFacebookConnected && (
+            {/* Renderizar HistorySection apenas se produto estiver selecionado E público NÃO estiver selecionado */}
+            {(selectedProduct && selectedProduct !== 'Todos os Produtos') && (!selectedAudience || selectedAudience === 'Todos os Públicos') && isFacebookConnected && (
               <HistorySection selectedProduct={selectedProduct} />
             )}
           </>

@@ -20,7 +20,8 @@ import {
   RefreshCw,
   AlertCircle,
   ExternalLink,
-  Loader2
+  Loader2,
+  Database
 } from 'lucide-react';
 import { metaAdsService } from '../services/metaAdsService';
 
@@ -33,23 +34,23 @@ interface AdMetrics {
   roas: number;
   spend: number;
   revenue: number;
-  cpa: number;
+  cpr: number;
   reach?: number;
   frequency?: number;
   cpm?: number;
   // Métricas dos últimos 7 dias para cálculo de tendência
-  last7DaysCpa?: number;
+  last7DaysCpr?: number;
   last7DaysCtr?: number;
   last7DaysConversions?: number;
   // Métricas dos últimos 3 dias para termômetro imediato
-  last3DaysCpa?: number;
+  last3DaysCpr?: number;
   last3DaysCtr?: number;
   last3DaysConversions?: number;
   // Métricas dos períodos anteriores para comparação
-  previous7DaysCpa?: number;
+  previous7DaysCpr?: number;
   previous7DaysCtr?: number;
   previous7DaysConversions?: number;
-  previous3DaysCpa?: number;
+  previous3DaysCpr?: number;
   previous3DaysCtr?: number;
   previous3DaysConversions?: number;
 }
@@ -71,10 +72,13 @@ interface AdData {
   createdTime?: string;
   performanceScore?: number;
   performanceScoreMetrics?: {
-    cpa: number;
+    cpr: number;
     cpc: number;
     conversions: number;
     frequency: number;
+    objetivo?: string;
+    tipoConversao?: string;
+    cprIdeal?: number;
   };
 }
 
@@ -615,20 +619,20 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
             const cpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
             
             // Calcular métricas dos últimos 7 dias (tendência principal)
-            let last7DaysCpa = 0;
+            let last7DaysCpr = 0;
             let last7DaysCtr = 0;
             let last7DaysConversions = 0;
             
             // Calcular métricas dos últimos 3 dias (termômetro imediato)
-            let last3DaysCpa = 0;
+            let last3DaysCpr = 0;
             let last3DaysCtr = 0;
             let last3DaysConversions = 0;
             
             // Calcular métricas dos períodos anteriores (para comparação de tendência)
-            let previous7DaysCpa = 0;
+            let previous7DaysCpr = 0;
             let previous7DaysCtr = 0;
             let previous7DaysConversions = 0;
-            let previous3DaysCpa = 0;
+            let previous3DaysCpr = 0;
             let previous3DaysCtr = 0;
             let previous3DaysConversions = 0;
             
@@ -668,12 +672,12 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               });
               
               // Calcular métricas dos últimos 7 dias
-              last7DaysCpa = last7DaysTotalConversions > 0 ? last7DaysTotalSpend / last7DaysTotalConversions : 0;
+              last7DaysCpr = last7DaysTotalConversions > 0 ? last7DaysTotalSpend / last7DaysTotalConversions : 0;
               last7DaysCtr = last7DaysTotalImpressions > 0 ? (last7DaysTotalLinkClicks / last7DaysTotalImpressions) * 100 : 0;
               last7DaysConversions = last7DaysTotalConversions;
               
               console.log(`Métricas dos últimos 7 dias para anúncio ${ad.id}:`, {
-                cpa: last7DaysCpa,
+                cpr: last7DaysCpr,
                 ctr: last7DaysCtr,
                 conversions: last7DaysConversions
               });
@@ -716,12 +720,12 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               });
               
               // Calcular métricas dos últimos 3 dias
-              last3DaysCpa = last3DaysTotalConversions > 0 ? last3DaysTotalSpend / last3DaysTotalConversions : 0;
+              last3DaysCpr = last3DaysTotalConversions > 0 ? last3DaysTotalSpend / last3DaysTotalConversions : 0;
               last3DaysCtr = last3DaysTotalImpressions > 0 ? (last3DaysTotalLinkClicks / last3DaysTotalImpressions) * 100 : 0;
               last3DaysConversions = last3DaysTotalConversions;
               
               console.log(`Métricas dos últimos 3 dias para anúncio ${ad.id}:`, {
-                cpa: last3DaysCpa,
+                cpr: last3DaysCpr,
                 ctr: last3DaysCtr,
                 conversions: last3DaysConversions
               });
@@ -764,12 +768,12 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               });
               
               // Calcular métricas dos 7 dias anteriores
-              previous7DaysCpa = previous7DaysTotalConversions > 0 ? previous7DaysTotalSpend / previous7DaysTotalConversions : 0;
+              previous7DaysCpr = previous7DaysTotalConversions > 0 ? previous7DaysTotalSpend / previous7DaysTotalConversions : 0;
               previous7DaysCtr = previous7DaysTotalImpressions > 0 ? (previous7DaysTotalLinkClicks / previous7DaysTotalImpressions) * 100 : 0;
               previous7DaysConversions = previous7DaysTotalConversions;
               
               console.log(`Métricas dos 7 dias anteriores para anúncio ${ad.id}:`, {
-                cpa: previous7DaysCpa,
+                cpr: previous7DaysCpr,
                 ctr: previous7DaysCtr,
                 conversions: previous7DaysConversions
               });
@@ -812,19 +816,19 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               });
               
               // Calcular métricas dos 3 dias anteriores
-              previous3DaysCpa = previous3DaysTotalConversions > 0 ? previous3DaysTotalSpend / previous3DaysTotalConversions : 0;
+              previous3DaysCpr = previous3DaysTotalConversions > 0 ? previous3DaysTotalSpend / previous3DaysTotalConversions : 0;
               previous3DaysCtr = previous3DaysTotalImpressions > 0 ? (previous3DaysTotalLinkClicks / previous3DaysTotalImpressions) * 100 : 0;
               previous3DaysConversions = previous3DaysTotalConversions;
               
               console.log(`Métricas dos 3 dias anteriores para anúncio ${ad.id}:`, {
-                cpa: previous3DaysCpa,
+                cpr: previous3DaysCpr,
                 ctr: previous3DaysCtr,
                 conversions: previous3DaysConversions
               });
             }
             
             // Calcular métricas para Performance Score usando dados de todos os meses ativos
-            let performanceScoreCpa = 0;
+            let performanceScoreCpr = 0;
             let performanceScoreRoas = 0;
             let performanceScoreCpc = 0;
             let performanceScoreConversions = 0;
@@ -881,14 +885,14 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                 const allTimeConversions = totalAllTimeMessagingConversations > 0 ? totalAllTimeMessagingConversations : totalAllTimeLeads;
                 const allTimeRevenue = totalAllTimePurchases * 200; // R$ 200 por compra
                 
-                performanceScoreCpa = allTimeConversions > 0 ? totalAllTimeSpend / allTimeConversions : 0;
+                performanceScoreCpr = allTimeConversions > 0 ? totalAllTimeSpend / allTimeConversions : 0;
                 performanceScoreRoas = totalAllTimeSpend > 0 ? allTimeRevenue / totalAllTimeSpend : 0;
                 performanceScoreCpc = allTimeLinkClicks > 0 ? totalAllTimeSpend / allTimeLinkClicks : 0;
                 performanceScoreConversions = allTimeConversions;
                 performanceScoreFrequency = totalAllTimeReach > 0 ? totalAllTimeImpressions / totalAllTimeReach : 0;
                 
                 console.log(`✅ Métricas para Performance Score calculadas para anúncio ${ad.id}:`, {
-                  cpa: performanceScoreCpa.toFixed(2),
+                  cpr: performanceScoreCpr.toFixed(2),
                   roas: performanceScoreRoas.toFixed(2),
                   cpc: performanceScoreCpc.toFixed(2),
                   conversions: performanceScoreConversions,
@@ -896,7 +900,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                 });
               } else {
                 // Fallback para métricas do período selecionado
-                performanceScoreCpa = 0;
+                performanceScoreCpr = 0;
                 performanceScoreRoas = 0;
                 performanceScoreCpc = 0;
                 performanceScoreConversions = 0;
@@ -906,7 +910,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
             } catch (error) {
               console.error(`❌ Erro ao calcular métricas para Performance Score:`, error);
               // Fallback para métricas zeradas
-              performanceScoreCpa = 0;
+              performanceScoreCpr = 0;
               performanceScoreRoas = 0;
               performanceScoreCpc = 0;
               performanceScoreConversions = 0;
@@ -965,12 +969,12 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
             
             // Calcular métricas derivadas do período selecionado
             const cpc = linkClicks > 0 ? spend / linkClicks : 0; // CPC baseado em cliques no link
-            const cpa = conversions > 0 ? spend / conversions : 0;
+            const cpr = conversions > 0 ? spend / conversions : 0;
             const revenue = totalPurchases * 200; // Receita baseada em compras (R$ 200 por compra)
             const roas = spend > 0 ? revenue / spend : 0;
             
             console.log(`Métricas calculadas para anúncio ${ad.id}:`, {
-              conversions, cpc, cpa, revenue, roas
+              conversions, cpc, cpr, revenue, roas
             });
             
                       // Determinar status do anúncio baseado na hierarquia: Campanha > Conjunto > Anúncio
@@ -1039,17 +1043,54 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               ? `Em veiculação por ${circulationDays} dias`
               : 'Em veiculação';
 
+            // Criar AdData temporário para determinar CPR ideal
+            const tempAdData: AdData = {
+              id: ad.id,
+              title: ad.name,
+              description: '',
+              status: 'active',
+              rank: 0,
+              metrics: {
+                impressions,
+                clicks: linkClicks,
+                ctr,
+                cpc,
+                conversions,
+                roas,
+                spend,
+                revenue,
+                cpr: performanceScoreCpr,
+                reach,
+                frequency,
+                cpm
+              },
+              trend: 'stable',
+              category: '',
+              lastUpdated: ''
+            };
+
+            // Determinar CPR ideal e objetivo baseado no tipo de conversão
+            const { cprIdeal, objetivo, tipoConversao } = determinarCprIdealEObjetivo(tempAdData);
+            
+            console.log(`🎯 CPR Ideal determinado para anúncio ${ad.id}:`, {
+              cprAtual: performanceScoreCpr,
+              cprIdeal: cprIdeal,
+              objetivo: objetivo,
+              tipoConversao: tipoConversao
+            });
+
             // Calcular Performance Score usando métricas de todos os meses ativos
             const performanceScore = calcularPerformanceScore({
-              cpaAtual: performanceScoreCpa,
+              cprAtual: performanceScoreCpr,
               cpcAtual: performanceScoreCpc,
               conversoesAtuais: performanceScoreConversions,
-              frequenciaAtual: performanceScoreFrequency
+              frequenciaAtual: performanceScoreFrequency,
+              cprIdeal: cprIdeal
             });
 
             console.log(`🎯 Performance Score calculado para anúncio ${ad.id}:`, {
               score: performanceScore,
-              cpa: performanceScoreCpa,
+              cpr: performanceScoreCpr,
               roas: performanceScoreRoas,
               cpc: performanceScoreCpc,
               conversions: performanceScoreConversions,
@@ -1075,23 +1116,23 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                 roas,
                 spend,
                 revenue,
-                cpa,
+                cpr,
                 reach,
                 frequency,
                 cpm,
                 // Métricas dos últimos 7 dias
-                last7DaysCpa,
+                last7DaysCpr,
                 last7DaysCtr,
                 last7DaysConversions,
                 // Métricas dos últimos 3 dias para termômetro imediato
-                last3DaysCpa,
+                last3DaysCpr,
                 last3DaysCtr,
                 last3DaysConversions,
                 // Métricas dos períodos anteriores para comparação
-                previous7DaysCpa,
+                previous7DaysCpr,
                 previous7DaysCtr,
                 previous7DaysConversions,
-                previous3DaysCpa,
+                previous3DaysCpr,
                 previous3DaysCtr,
                 previous3DaysConversions
               },
@@ -1104,10 +1145,13 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               createdTime: ad.created_time,
               performanceScore,
               performanceScoreMetrics: {
-                cpa: performanceScoreCpa,
+                cpr: performanceScoreCpr,
                 cpc: performanceScoreCpc,
                 conversions: performanceScoreConversions,
-                frequency: performanceScoreFrequency
+                frequency: performanceScoreFrequency,
+                objetivo: objetivo,
+                tipoConversao: tipoConversao,
+                cprIdeal: cprIdeal
               }
             };
             
@@ -1146,23 +1190,23 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                 roas: 0,
                 spend: 0,
                 revenue: 0,
-                cpa: 0,
+                cpr: 0,
                 reach: 0,
                 frequency: 0,
                 cpm: 0,
                 // Métricas dos últimos 7 dias
-                last7DaysCpa: 0,
+                last7DaysCpr: 0,
                 last7DaysCtr: 0,
                 last7DaysConversions: 0,
                 // Métricas dos últimos 3 dias para termômetro imediato
-                last3DaysCpa: 0,
+                last3DaysCpr: 0,
                 last3DaysCtr: 0,
                 last3DaysConversions: 0,
                 // Métricas dos períodos anteriores para comparação
-                previous7DaysCpa: 0,
+                previous7DaysCpr: 0,
                 previous7DaysCtr: 0,
                 previous7DaysConversions: 0,
-                previous3DaysCpa: 0,
+                previous3DaysCpr: 0,
                 previous3DaysCtr: 0,
                 previous3DaysConversions: 0
     },
@@ -1175,7 +1219,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               createdTime: ad.created_time,
               performanceScore,
               performanceScoreMetrics: {
-                cpa: 0,
+                cpr: 0,
                 cpc: 0,
                 conversions: 0,
                 frequency: 0
@@ -1216,24 +1260,24 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
         return;
       }
 
-      // Ordenar por CPA (menor primeiro) e atribuir ranks
-      // Anúncios com CPA R$ 0,00 vão para o final (não são necessariamente bons)
+      // Ordenar por CPR (menor primeiro) e atribuir ranks
+      // Anúncios com CPR R$ 0,00 vão para o final (não são necessariamente bons)
       const sortedAds = finalAds
         .sort((a, b) => {
-          // Se ambos têm CPA 0, manter ordem original
-          if (a.metrics.cpa === 0 && b.metrics.cpa === 0) {
+          // Se ambos têm CPR 0, manter ordem original
+          if (a.metrics.cpr === 0 && b.metrics.cpr === 0) {
             return 0;
           }
-          // Se apenas A tem CPA 0, B vem primeiro
-          if (a.metrics.cpa === 0) {
+          // Se apenas A tem CPR 0, B vem primeiro
+          if (a.metrics.cpr === 0) {
             return 1;
           }
-          // Se apenas B tem CPA 0, A vem primeiro
-          if (b.metrics.cpa === 0) {
+          // Se apenas B tem CPR 0, A vem primeiro
+          if (b.metrics.cpr === 0) {
             return -1;
           }
-          // Se nenhum tem CPA 0, ordenar normalmente (menor primeiro)
-          return a.metrics.cpa - b.metrics.cpa;
+          // Se nenhum tem CPR 0, ordenar normalmente (menor primeiro)
+          return a.metrics.cpr - b.metrics.cpr;
         })
         .map((ad, index) => ({
           ...ad,
@@ -1241,10 +1285,10 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
         }));
 
       console.log(`Anúncios finais ordenados: ${sortedAds.length}`);
-      console.log('Anúncios finais ordenados por CPA (CPA 0 vai para o final):', sortedAds.map(ad => ({
+      console.log('Anúncios finais ordenados por CPR (CPR 0 vai para o final):', sortedAds.map(ad => ({
         id: ad.id,
         name: ad.title,
-        cpa: ad.metrics.cpa,
+        cpr: ad.metrics.cpr,
         rank: ad.rank
       })));
 
@@ -1341,7 +1385,18 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
       case 'stable':
         return <BarChart3 className="w-4 h-4 text-blue-400" />;
       case 'collecting':
-        return <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />;
+        return (
+          <div className="relative group" title="Dados insuficientes - aguardando mais informações">
+            <div className="flex items-center space-x-1">
+              <Database className="w-4 h-4 text-slate-400" />
+              <div className="flex space-x-0.5">
+                <div className="w-1 h-1 bg-amber-400 rounded-full opacity-60"></div>
+                <div className="w-1 h-1 bg-amber-400 rounded-full opacity-80"></div>
+                <div className="w-1 h-1 bg-amber-400 rounded-full"></div>
+              </div>
+            </div>
+          </div>
+        );
       default:
         return <Activity className="w-4 h-4 text-slate-400" />;
     }
@@ -1352,8 +1407,8 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
    * 
    * @example
    * const result = calculateTrendIcon({
-   *   cpaAtual: 25,
-   *   cpaAnterior: 30,
+   *   cprAtual: 25,
+   *   cprAnterior: 30,
    *   ctrAtual: 2.1,
    *   ctrAnterior: 1.8,
    *   conversoesAtuais: 80,
@@ -1361,159 +1416,163 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
    *   frequenciaAtual: 3.8
    * });
    * console.log(result.trend); // 'up'
-   * console.log(result.explanation); // 'Tendência positiva! CPA melhorou 16.7%, CTR aumentou 16.7%, Conversões aumentaram 33.3%, Frequência está ideal (3.8).'
+   * console.log(result.explanation); // 'Tendência positiva! CPR melhorou 16.7%, CTR aumentou 16.7%, Conversões aumentaram 33.3%, Frequência está ideal (3.8).'
    */
   const calculateTrendIcon = ({
-    cpaAtual,
-    cpaAnterior,
+    cprAtual,
+    cprAnterior,
     ctrAtual,
     ctrAnterior,
     conversoesAtuais,
     conversoesAnteriores,
     frequenciaAtual,
-    last3DaysCpa = 0,
+    last3DaysCpr = 0,
     last3DaysCtr = 0,
     last3DaysConversions = 0,
-    previous3DaysCpa = 0,
+    previous3DaysCpr = 0,
     previous3DaysCtr = 0,
-    previous3DaysConversions = 0
+    previous3DaysConversions = 0,
+    objetivo = 'Indefinido',
+    tipoConversao = 'conversões'
   }: {
-    cpaAtual: number;
-    cpaAnterior: number;
+    cprAtual: number;
+    cprAnterior: number;
     ctrAtual: number;
     ctrAnterior: number;
     conversoesAtuais: number;
     conversoesAnteriores: number;
     frequenciaAtual: number;
-    last3DaysCpa?: number;
+    last3DaysCpr?: number;
     last3DaysCtr?: number;
     last3DaysConversions?: number;
-    previous3DaysCpa?: number;
+    previous3DaysCpr?: number;
     previous3DaysCtr?: number;
     previous3DaysConversions?: number;
+    objetivo?: string;
+    tipoConversao?: string;
   }): { trend: 'up' | 'down' | 'warning' | 'stable' | 'collecting'; explanation: string } => {
     // === DETECÇÃO DE ANÚNCIOS SEM DADOS SUFICIENTES ===
     // Verificar se o anúncio não está em veiculação nos últimos 7 dias
-    const temDadosUltimos7Dias = conversoesAtuais > 0 || cpaAtual > 0 || ctrAtual > 0;
-    const temDadosAnteriores = conversoesAnteriores > 0 || cpaAnterior > 0 || ctrAnterior > 0;
+    const temDadosUltimos7Dias = conversoesAtuais > 0 || cprAtual > 0 || ctrAtual > 0;
+    const temDadosAnteriores = conversoesAnteriores > 0 || cprAnterior > 0 || ctrAnterior > 0;
     
     // Se não tem dados nos últimos 7 dias OU se não tem dados para comparação
     if (!temDadosUltimos7Dias || !temDadosAnteriores) {
       return {
         trend: 'collecting',
-        explanation: 'Anúncio novo ou sem dados suficientes para análise. Aguardando coleta de dados para determinar tendência.'
+        explanation: `Anúncio ainda coletando dados para ${objetivo.toLowerCase()}. Precisa de mais tempo rodando para mostrar tendência.`
       };
     }
     
     // === TENDÊNCIA PRINCIPAL (Últimos 7 dias) ===
     // Condições para tendência POSITIVA (anúncio dando resultado)
-    const cpaMelhorou = cpaAnterior > 0 && cpaAtual < cpaAnterior * 0.9; // Pelo menos 10% melhor
+    const cprMelhorou = cprAnterior > 0 && cprAtual < cprAnterior * 0.9; // Pelo menos 10% melhor
     const conversoesAumentaram = conversoesAnteriores > 0 && conversoesAtuais > conversoesAnteriores * 1.1; // Pelo menos 10% mais
     const ctrMelhorou = ctrAnterior > 0 && ctrAtual > ctrAnterior * 1.05; // Pelo menos 5% melhor
     const frequenciaControlada = frequenciaAtual <= 3.5; // Não saturando
     
     // Condições para tendência NEGATIVA (anúncio parando de dar resultado)
-    const cpaPiorou = cpaAnterior > 0 && cpaAtual > cpaAnterior * 1.15; // Pelo menos 15% pior
+    const cprPiorou = cprAnterior > 0 && cprAtual > cprAnterior * 1.15; // Pelo menos 15% pior
     const conversoesDiminuíram = conversoesAnteriores > 0 && conversoesAtuais < conversoesAnteriores * 0.9; // Pelo menos 10% menos
     const ctrPiorou = ctrAnterior > 0 && ctrAtual < ctrAnterior * 0.95; // Pelo menos 5% pior
     const frequenciaAlta = frequenciaAtual > 4.5; // Saturando
     
     // Contar quantas condições positivas são verdadeiras
-    const condicoesPositivas = [cpaMelhorou, conversoesAumentaram, ctrMelhorou, frequenciaControlada].filter(Boolean).length;
+    const condicoesPositivas = [cprMelhorou, conversoesAumentaram, ctrMelhorou, frequenciaControlada].filter(Boolean).length;
     
     // Contar quantas condições negativas são verdadeiras
-    const condicoesNegativas = [cpaPiorou, conversoesDiminuíram, ctrPiorou, frequenciaAlta].filter(Boolean).length;
+    const condicoesNegativas = [cprPiorou, conversoesDiminuíram, ctrPiorou, frequenciaAlta].filter(Boolean).length;
     
     // === TERMÔMETRO IMEDIATO (Últimos 3 dias vs 3 dias anteriores) ===
     // Detectar quedas bruscas ou sinais de saturação comparando os últimos 3 dias com os 3 dias anteriores
-    const quedaBruscaCPA = previous3DaysCpa > 0 && last3DaysCpa > previous3DaysCpa * 1.3; // CPA dos últimos 3 dias é 30% pior que os 3 dias anteriores
+    const quedaBruscaCPR = previous3DaysCpr > 0 && last3DaysCpr > previous3DaysCpr * 1.3; // CPR dos últimos 3 dias é 30% pior que os 3 dias anteriores
     const quedaBruscaCTR = previous3DaysCtr > 0 && last3DaysCtr < previous3DaysCtr * 0.8; // CTR dos últimos 3 dias é 20% pior que os 3 dias anteriores  
     const quedaBruscaConversions = previous3DaysConversions > 0 && last3DaysConversions < previous3DaysConversions * 0.7; // Conversões dos últimos 3 dias são 30% menores que os 3 dias anteriores
     const saturaçãoRápida = frequenciaAtual > 5.0; // Frequência muito alta
     
-    const alertasImediatos = [quedaBruscaCPA, quedaBruscaCTR, quedaBruscaConversions, saturaçãoRápida].filter(Boolean).length;
+    const alertasImediatos = [quedaBruscaCPR, quedaBruscaCTR, quedaBruscaConversions, saturaçãoRápida].filter(Boolean).length;
     
     // === LÓGICA DE DECISÃO ===
     
     // 1. ALERTA IMEDIATO: Se há alertas dos últimos 3 dias
     if (alertasImediatos >= 2) {
       const reasons = [];
-      if (quedaBruscaCPA) {
-        const variacao = ((last3DaysCpa - previous3DaysCpa) / previous3DaysCpa * 100);
-        reasons.push(`CPA piorou ${variacao.toFixed(1)}% nos últimos 3 dias`);
+      if (quedaBruscaCPR) {
+        const variacao = ((last3DaysCpr - previous3DaysCpr) / previous3DaysCpr * 100);
+        reasons.push(`${tipoConversao} ficaram ${variacao.toFixed(1)}% mais caras nos últimos 3 dias`);
       }
       if (quedaBruscaCTR) {
         const variacao = ((previous3DaysCtr - last3DaysCtr) / previous3DaysCtr * 100);
-        reasons.push(`CTR caiu ${variacao.toFixed(1)}% nos últimos 3 dias`);
+        reasons.push(`menos pessoas clicaram (${variacao.toFixed(1)}% menos nos últimos 3 dias)`);
       }
       if (quedaBruscaConversions) {
         const variacao = ((previous3DaysConversions - last3DaysConversions) / previous3DaysConversions * 100);
-        reasons.push(`Conversões caíram ${variacao.toFixed(1)}% nos últimos 3 dias`);
+        reasons.push(`${tipoConversao} caíram ${variacao.toFixed(1)}% nos últimos 3 dias`);
       }
       if (saturaçãoRápida) {
-        reasons.push(`Frequência muito alta (${frequenciaAtual.toFixed(1)})`);
+        reasons.push(`público vendo o anúncio demais (${frequenciaAtual.toFixed(1)}x)`);
       }
       
       return {
         trend: 'warning',
-        explanation: `Atenção! ${reasons.join(', ')}. Considere pausar ou revisar o anúncio.`
+        explanation: `Alerta para ${objetivo.toLowerCase()}! ${reasons.join(', ')}. Ação rápida necessária para evitar desperdício.`
       };
     }
     
     // 2. TENDÊNCIA POSITIVA: pelo menos 2 condições positivas dos últimos 7 dias
     if (condicoesPositivas >= 2) {
       const reasons = [];
-      if (cpaMelhorou) {
-        const variacao = ((cpaAnterior - cpaAtual) / cpaAnterior * 100);
-        reasons.push(`CPA melhorou ${variacao.toFixed(1)}%`);
+      if (cprMelhorou) {
+        const variacao = ((cprAnterior - cprAtual) / cprAnterior * 100);
+        reasons.push(`${tipoConversao} mais baratas (${variacao.toFixed(1)}% melhor)`);
       }
       if (conversoesAumentaram) {
         const variacao = ((conversoesAtuais - conversoesAnteriores) / conversoesAnteriores * 100);
-        reasons.push(`Conversões aumentaram ${variacao.toFixed(1)}%`);
+        reasons.push(`mais ${tipoConversao} (${variacao.toFixed(1)}% a mais)`);
       }
       if (ctrMelhorou) {
         const variacao = ((ctrAtual - ctrAnterior) / ctrAnterior * 100);
-        reasons.push(`CTR melhorou ${variacao.toFixed(1)}%`);
+        reasons.push(`mais pessoas clicando (${variacao.toFixed(1)}% melhor)`);
       }
       if (frequenciaControlada) {
-        reasons.push(`Frequência controlada (${frequenciaAtual.toFixed(1)})`);
+        reasons.push(`público não saturado (${frequenciaAtual.toFixed(1)}x)`);
       }
       
       return {
         trend: 'up',
-        explanation: `Anúncio dando resultado! ${reasons.join(', ')}.`
+        explanation: `${objetivo} indo muito bem! ${reasons.join(', ')}. Continue assim!`
       };
     }
     
     // 3. TENDÊNCIA NEGATIVA: pelo menos 2 condições negativas dos últimos 7 dias
     if (condicoesNegativas >= 2) {
       const reasons = [];
-      if (cpaPiorou) {
-        const variacao = ((cpaAtual - cpaAnterior) / cpaAnterior * 100);
-        reasons.push(`CPA piorou ${variacao.toFixed(1)}%`);
+      if (cprPiorou) {
+        const variacao = ((cprAtual - cprAnterior) / cprAnterior * 100);
+        reasons.push(`${tipoConversao} mais caras (${variacao.toFixed(1)}% pior)`);
       }
       if (conversoesDiminuíram) {
         const variacao = ((conversoesAnteriores - conversoesAtuais) / conversoesAnteriores * 100);
-        reasons.push(`Conversões diminuíram ${variacao.toFixed(1)}%`);
+        reasons.push(`menos ${tipoConversao} (${variacao.toFixed(1)}% menos)`);
       }
       if (ctrPiorou) {
         const variacao = ((ctrAnterior - ctrAtual) / ctrAnterior * 100);
-        reasons.push(`CTR piorou ${variacao.toFixed(1)}%`);
+        reasons.push(`menos cliques (${variacao.toFixed(1)}% pior)`);
       }
       if (frequenciaAlta) {
-        reasons.push(`Frequência muito alta (${frequenciaAtual.toFixed(1)})`);
+        reasons.push(`público cansado do anúncio (${frequenciaAtual.toFixed(1)}x)`);
       }
       
       return {
         trend: 'down',
-        explanation: `Anúncio parando de dar resultado! ${reasons.join(', ')}.`
+        explanation: `${objetivo} piorando! ${reasons.join(', ')}. Precisa revisar a estratégia.`
       };
     }
     
     // 4. ESTÁVEL: Se não atende nenhuma condição
     return {
       trend: 'stable',
-      explanation: 'Anúncio mantendo performance estável.'
+      explanation: `${objetivo} estável. Performance sem grandes mudanças nos últimos dias.`
     };
   };
 
@@ -1544,22 +1603,67 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
     }
   };
 
+  // Função para determinar CPR ideal baseado no tipo de conversão da campanha
+  const determinarCprIdealEObjetivo = (ad: AdData): { cprIdeal: number; objetivo: string; tipoConversao: string } => {
+    const metrics = ad.metrics;
+    
+    // Se não há conversões, usar valores padrão
+    if (metrics.conversions === 0 || metrics.cpr === 0) {
+      return {
+        cprIdeal: 30,
+        objetivo: 'Indefinido',
+        tipoConversao: 'Ainda coletando dados'
+      };
+    }
+    
+    // Baseado no valor atual do CPR, inferir o tipo de conversão
+    if (metrics.cpr >= 25) {
+      // CPR alto = provavelmente compras/vendas
+      return {
+        cprIdeal: 35,
+        objetivo: 'Conversões/Compras',
+        tipoConversao: 'compras'
+      };
+    } else if (metrics.cpr >= 8) {
+      // CPR médio = provavelmente leads qualificados
+      return {
+        cprIdeal: 15,
+        objetivo: 'Geração de Leads',
+        tipoConversao: 'leads'
+      };
+    } else if (metrics.cpr >= 2) {
+      // CPR baixo = provavelmente mensagens iniciadas
+      return {
+        cprIdeal: 5,
+        objetivo: 'Mensagens/Contatos',
+        tipoConversao: 'mensagens'
+      };
+    } else {
+      // CPR muito baixo = provavelmente engajamento/visualizações
+      return {
+        cprIdeal: 2,
+        objetivo: 'Engajamento/Tráfego',
+        tipoConversao: 'interações'
+      };
+    }
+  };
+
   // Função para calcular Performance Score
   const calcularPerformanceScore = ({
-    cpaAtual,
+    cprAtual,
     cpcAtual,
     conversoesAtuais,
     frequenciaAtual,
-    cpaIdeal = 30,
+    cprIdeal = 30,
     cpcIdeal = 2,
     conversoesIdeais = 100,
     frequenciaIdeal = 3
   }: {
-    cpaAtual: number;
+    cprAtual: number;
     cpcAtual: number;
     conversoesAtuais: number;
     frequenciaAtual: number;
-    cpaIdeal?: number;
+    cprIdeal?: number;
     cpcIdeal?: number;
     conversoesIdeais?: number;
     frequenciaIdeal?: number;
@@ -1569,14 +1673,14 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
       return Math.max(0, Math.min(100, score));
     };
 
-    // 1. CPA Score (40% do peso) - Quanto menor, melhor
-    let cpaScore = 0;
-    if (cpaAtual <= cpaIdeal) {
-      cpaScore = 100; // CPA ideal ou melhor
-    } else if (cpaAtual > 0) {
-      cpaScore = limitarScore((cpaIdeal / cpaAtual) * 100);
+    // 1. CPR Score (40% do peso) - Quanto menor, melhor
+    let cprScore = 0;
+    if (cprAtual <= cprIdeal) {
+      cprScore = 100; // CPR ideal ou melhor
+    } else if (cprAtual > 0) {
+      cprScore = limitarScore((cprIdeal / cprAtual) * 100);
     }
-    const cpaPonderado = cpaScore * 0.40;
+    const cprPonderado = cprScore * 0.40;
 
     // 2. CPC Score (25% do peso) - Quanto menor, melhor
     let cpcScore = 0;
@@ -1607,12 +1711,12 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
 
     // Calcular score final
     const scoreFinal = Math.round(
-      cpaPonderado + cpcPonderado + conversoesPonderado + frequenciaPonderado
+      cprPonderado + cpcPonderado + conversoesPonderado + frequenciaPonderado
     );
 
     // Log detalhado para debug
     console.log(`📊 Performance Score para anúncio:`);
-    console.log(`   CPA: ${cpaAtual} (ideal: ${cpaIdeal}) → Score: ${cpaScore.toFixed(1)} → Ponderado: ${cpaPonderado.toFixed(1)}`);
+    console.log(`   CPR: ${cprAtual} (ideal: ${cprIdeal}) → Score: ${cprScore.toFixed(1)} → Ponderado: ${cprPonderado.toFixed(1)}`);
     console.log(`   CPC: ${cpcAtual} (ideal: ${cpcIdeal}) → Score: ${cpcScore.toFixed(1)} → Ponderado: ${cpcPonderado.toFixed(1)}`);
     console.log(`   Conversões: ${conversoesAtuais} (ideal: ${conversoesIdeais}) → Score: ${conversoesScore.toFixed(1)} → Ponderado: ${conversoesPonderado.toFixed(1)}`);
     console.log(`   Frequência: ${frequenciaAtual} (ideal: ${frequenciaIdeal}) → Score: ${frequenciaScore.toFixed(1)} → Ponderado: ${frequenciaPonderado.toFixed(1)}`);
@@ -1771,19 +1875,21 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                     </h3>
                       {(() => {
                         const trendData = calculateTrendIcon({
-                          cpaAtual: ad.metrics.last7DaysCpa || 0,
-                          cpaAnterior: ad.metrics.previous7DaysCpa || 0,
+                          cprAtual: ad.metrics.last7DaysCpr || 0,
+                          cprAnterior: ad.metrics.previous7DaysCpr || 0,
                           ctrAtual: ad.metrics.last7DaysCtr || 0,
                           ctrAnterior: ad.metrics.previous7DaysCtr || 0,
                           conversoesAtuais: ad.metrics.last7DaysConversions || 0,
                           conversoesAnteriores: ad.metrics.previous7DaysConversions || 0,
                           frequenciaAtual: ad.metrics.frequency || 0,
-                          last3DaysCpa: ad.metrics.last3DaysCpa || 0,
+                          last3DaysCpr: ad.metrics.last3DaysCpr || 0,
                           last3DaysCtr: ad.metrics.last3DaysCtr || 0,
                           last3DaysConversions: ad.metrics.last3DaysConversions || 0,
-                          previous3DaysCpa: ad.metrics.previous3DaysCpa || 0,
+                          previous3DaysCpr: ad.metrics.previous3DaysCpr || 0,
                           previous3DaysCtr: ad.metrics.previous3DaysCtr || 0,
-                          previous3DaysConversions: ad.metrics.previous3DaysConversions || 0
+                          previous3DaysConversions: ad.metrics.previous3DaysConversions || 0,
+                          objetivo: ad.performanceScoreMetrics?.objetivo || 'Indefinido',
+                          tipoConversao: ad.performanceScoreMetrics?.tipoConversao || 'conversões'
                         });
                         
                                                  return (
@@ -1791,8 +1897,10 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                              <div className="group/trend-icon cursor-help">
                                {getTrendIcon(trendData.trend)}
                                {trendData.explanation && (
-                                 <div className="absolute top-1/2 right-full transform -translate-y-1/2 mr-2 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg shadow-xl text-xs text-slate-300 whitespace-nowrap opacity-0 group-hover/trend-icon:opacity-100 transition-opacity duration-200 z-50 pointer-events-none">
-                                   {trendData.explanation}
+                                 <div className="absolute top-1/2 right-full transform -translate-y-1/2 mr-2 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg shadow-xl text-xs text-slate-300 opacity-0 group-hover/trend-icon:opacity-100 transition-opacity duration-200 z-50 pointer-events-none" style={{ width: '300px', maxWidth: '300px' }}>
+                                   <div className="break-words">
+                                     {trendData.explanation}
+                                   </div>
                                    <div className="absolute top-1/2 left-full transform -translate-y-1/2 w-0 h-0 border-t-4 border-b-4 border-l-4 border-transparent border-l-slate-800"></div>
                                  </div>
                                )}
@@ -1818,10 +1926,10 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                   <div className="space-y-1 p-3 bg-slate-700/30 rounded-lg">
                     <div className="flex items-center gap-1">
                       <DollarSign className="w-3 h-3 text-blue-400" />
-                      <span className="text-xs text-slate-400 font-medium">CPA</span>
+                      <span className="text-xs text-slate-400 font-medium">CPR</span>
                     </div>
                     <p className="text-sm font-bold text-white">
-                        {formatCurrency(ad.metrics.cpa)}
+                        {formatCurrency(ad.metrics.cpr)}
                     </p>
                   </div>
                   <div className="space-y-1 p-3 bg-slate-700/30 rounded-lg">
@@ -1993,117 +2101,127 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                 {(() => {
                   const ad = ads.find(ad => ad.id === tooltipAdId);
                   const score = ad?.performanceScore || 0;
-                  
-                  if (score >= 90) {
-                    return (
-                      <div>
-                        <p className="mb-2">🎉 <strong>Excelente performance!</strong></p>
-                        <p>Este anúncio está <strong>funcionando perfeitamente</strong>! Está gerando muitas conversões, gastando pouco dinheiro por conversão (menos de R$ 30), e as pessoas estão vendo o anúncio na frequência ideal (não muito, não pouco).</p>
-                      </div>
-                    );
-                  } else if (score >= 70) {
-                    return (
-                      <div>
-                        <p className="mb-2">👍 <strong>Boa performance!</strong></p>
-                        <p>O anúncio está <strong>funcionando bem</strong>! Está gerando conversões e gastando dinheiro de forma eficiente. Pode melhorar um pouco mais para chegar ao nível excelente, mas já está no caminho certo.</p>
-                      </div>
-                    );
-                  } else if (score >= 50) {
-                    return (
-                      <div>
-                        <p className="mb-2">⚠️ <strong>Performance regular</strong></p>
-                        <p>O anúncio está <strong>funcionando, mas pode melhorar</strong>. Pode estar gastando muito por conversão (mais de R$ 30), gerando poucas conversões, ou as pessoas estão vendo o anúncio muito frequentemente. Vale a pena revisar a estratégia.</p>
-                      </div>
-                    );
-                  } else if (score >= 30) {
-                    return (
-                      <div>
-                        <p className="mb-2">😕 <strong>Performance baixa</strong></p>
-                        <p>O anúncio <strong>não está funcionando bem</strong>. Está gastando muito dinheiro por conversão, gerando poucas conversões, ou as pessoas estão vendo o anúncio demais. Precisa de ajustes na estratégia ou no público-alvo.</p>
-                      </div>
-                    );
-                  } else {
-                    return (
-                      <div>
-                        <p className="mb-2">❌ <strong>Performance muito baixa</strong></p>
-                        <p>Este anúncio <strong>precisa de atenção imediata</strong>. Está gastando muito dinheiro sem gerar resultados, ou as pessoas estão vendo o anúncio excessivamente. Considere pausar temporariamente e revisar completamente a estratégia.</p>
-                      </div>
-                    );
-                  }
+                  const metrics = ad?.performanceScoreMetrics;
+                   const objetivo = metrics?.objetivo || 'Indefinido';
+                   const tipoConversao = metrics?.tipoConversao || 'conversões';
+                   const cprIdeal = metrics?.cprIdeal || 30;
+                   const cprAtual = metrics?.cpr || 0;
+
+                   if (score >= 90) {
+                     return (
+                       <div>
+                         <p className="mb-2">🎉 <strong>Excelente performance!</strong></p>
+                         <p>Este anúncio está <strong>funcionando perfeitamente</strong> para <strong>{objetivo}</strong>! Está gerando {tipoConversao} com custo eficiente (CPR: R$ {cprAtual.toFixed(2)} vs ideal: R$ {cprIdeal.toFixed(2)}), e as pessoas estão vendo o anúncio na frequência ideal.</p>
+                       </div>
+                     );
+                   } else if (score >= 70) {
+                     return (
+                       <div>
+                         <p className="mb-2">👍 <strong>Boa performance!</strong></p>
+                         <p>O anúncio está <strong>funcionando bem</strong> para <strong>{objetivo}</strong>! Está gerando {tipoConversao} de forma eficiente (CPR: R$ {cprAtual.toFixed(2)} vs ideal: R$ {cprIdeal.toFixed(2)}). Pode melhorar um pouco mais para chegar ao nível excelente.</p>
+                       </div>
+                     );
+                   } else if (score >= 50) {
+                     return (
+                       <div>
+                         <p className="mb-2">⚠️ <strong>Performance regular</strong></p>
+                         <p>O anúncio está <strong>funcionando, mas pode melhorar</strong> para <strong>{objetivo}</strong>. CPR atual (R$ {cprAtual.toFixed(2)}) está {cprAtual > cprIdeal ? 'acima' : 'próximo'} do ideal (R$ {cprIdeal.toFixed(2)}). Vale a pena revisar a estratégia.</p>
+                       </div>
+                     );
+                   } else if (score >= 30) {
+                     return (
+                       <div>
+                         <p className="mb-2">😕 <strong>Performance baixa</strong></p>
+                         <p>O anúncio <strong>não está funcionando bem</strong> para <strong>{objetivo}</strong>. CPR atual (R$ {cprAtual.toFixed(2)}) está muito acima do ideal (R$ {cprIdeal.toFixed(2)}). Precisa de ajustes na estratégia ou no público-alvo.</p>
+                       </div>
+                     );
+                   } else {
+                     return (
+                       <div>
+                         <p className="mb-2">❌ <strong>Performance muito baixa</strong></p>
+                         <p>Este anúncio <strong>precisa de atenção imediata</strong> para <strong>{objetivo}</strong>. CPR atual (R$ {cprAtual.toFixed(2)}) está muito alto comparado ao ideal (R$ {cprIdeal.toFixed(2)}). Considere pausar e revisar completamente a estratégia.</p>
+                       </div>
+                     );
+                   }
                 })()}
               </div>
               
               <div className="mt-3 pt-2 border-t border-slate-600">
                 <div className="text-xs text-slate-400">
-                  <p><strong>Dica:</strong> {(() => {
-                    const ad = ads.find(ad => ad.id === tooltipAdId);
-                    const score = ad?.performanceScore || 0;
-                    
-                    if (score >= 90) {
-                      return "Mantenha o excelente trabalho! Para continuar no topo:";
-                    } else if (score >= 70) {
-                      return "Para chegar ao nível excelente, foque em:";
-                    } else if (score >= 50) {
-                      return "Para melhorar significativamente, priorize:";
-                    } else if (score >= 30) {
-                      return "Para recuperar a performance, concentre-se em:";
-                    } else {
-                      return "Para reverter a situação, aja imediatamente em:";
-                    }
-                  })()}</p>
+                                     {(() => {
+                     const ad = ads.find(ad => ad.id === tooltipAdId);
+                     const metrics = ad?.performanceScoreMetrics;
+                     const objetivo = metrics?.objetivo || 'Indefinido';
+                     const score = ad?.performanceScore || 0;
+                     
+                     if (score >= 90) {
+                       return <p><strong>Dicas para {objetivo}:</strong> Mantenha o excelente trabalho! Para continuar no topo:</p>;
+                     } else if (score >= 70) {
+                       return <p><strong>Dicas para {objetivo}:</strong> Para chegar ao nível excelente, foque em:</p>;
+                     } else if (score >= 50) {
+                       return <p><strong>Dicas para {objetivo}:</strong> Para melhorar significativamente, priorize:</p>;
+                     } else if (score >= 30) {
+                       return <p><strong>Dicas para {objetivo}:</strong> Para recuperar a performance, concentre-se em:</p>;
+                     } else {
+                       return <p><strong>Dicas para {objetivo}:</strong> Para reverter a situação, aja imediatamente em:</p>;
+                     }
+                   })()}
                   <ul className="mt-1 space-y-1">
-                    {(() => {
-                      const ad = ads.find(ad => ad.id === tooltipAdId);
-                      const score = ad?.performanceScore || 0;
-                      const metrics = ad?.performanceScoreMetrics;
-                      
-                      if (score >= 90) {
-                        return (
-                          <>
-                            <li>• <strong>Monitoramento:</strong> Continue acompanhando as métricas diariamente</li>
-                            <li>• <strong>Testes:</strong> Experimente pequenos ajustes para otimizar ainda mais</li>
-                            <li>• <strong>Escala:</strong> Considere aumentar o orçamento gradualmente</li>
-                            <li>• <strong>Público:</strong> Teste públicos similares para expandir alcance</li>
-                          </>
-                        );
-                      } else if (score >= 70) {
-                        return (
-                          <>
-                            <li>• <strong>CPA:</strong> {metrics?.cpa && metrics.cpa > 30 ? "Reduza o custo por conversão testando públicos mais específicos" : "Mantenha o CPA atual e foque em conversões"}</li>
-                            <li>• <strong>Conversões:</strong> {metrics?.conversions && metrics.conversions < 50 ? "Aumente conversões melhorando landing pages" : "Otimize a qualidade das conversões"}</li>
-                            <li>• <strong>CPC:</strong> {metrics?.cpc && metrics.cpc > 2 ? "Teste criativos mais relevantes para reduzir CPC" : "Mantenha o CPC baixo e foque em volume"}</li>
-                            <li>• <strong>Frequência:</strong> {metrics?.frequency && metrics.frequency > 3 ? "Reduza frequência para evitar saturação" : "Aumente frequência para mais exposição"}</li>
-                          </>
-                        );
-                      } else if (score >= 50) {
-                        return (
-                          <>
-                            <li>• <strong>Público:</strong> Revise completamente o público-alvo - pode estar muito amplo</li>
-                            <li>• <strong>Criativos:</strong> Teste novos textos e imagens - os atuais podem estar saturados</li>
-                            <li>• <strong>Landing:</strong> Otimize landing pages para aumentar taxa de conversão</li>
-                            <li>• <strong>Orçamento:</strong> Reduza temporariamente para focar em qualidade</li>
-                          </>
-                        );
-                      } else if (score >= 30) {
-                        return (
-                          <>
-                            <li>• <strong>Pausa:</strong> Considere pausar temporariamente para reestruturar</li>
-                            <li>• <strong>Público:</strong> Defina um público mais específico e qualificado</li>
-                            <li>• <strong>Criativos:</strong> Crie novos anúncios do zero - os atuais não funcionam</li>
-                            <li>• <strong>Objetivo:</strong> Revise se o objetivo da campanha está correto</li>
-                          </>
-                        );
-                      } else {
-                        return (
-                          <>
-                            <li>• <strong>Pausa Imediata:</strong> Pare o anúncio agora para evitar perdas</li>
-                            <li>• <strong>Análise:</strong> Investigue por que o público não está respondendo</li>
-                            <li>• <strong>Reestruturação:</strong> Crie uma nova estratégia completamente diferente</li>
-                            <li>• <strong>Suporte:</strong> Considere buscar ajuda especializada</li>
-                          </>
-                        );
-                      }
-                    })()}
+                                         {(() => {
+                       const ad = ads.find(ad => ad.id === tooltipAdId);
+                       const score = ad?.performanceScore || 0;
+                       const metrics = ad?.performanceScoreMetrics;
+                       const objetivo = metrics?.objetivo || 'Indefinido';
+                       const tipoConversao = metrics?.tipoConversao || 'conversões';
+                       const cprIdeal = metrics?.cprIdeal || 30;
+                       
+                       if (score >= 90) {
+                         return (
+                           <>
+                             <li>• <strong>Monitoramento:</strong> Continue acompanhando as métricas de {tipoConversao} diariamente</li>
+                             <li>• <strong>Testes:</strong> Experimente pequenos ajustes para otimizar ainda mais {tipoConversao}</li>
+                             <li>• <strong>Escala:</strong> Considere aumentar o orçamento gradualmente para mais {tipoConversao}</li>
+                             <li>• <strong>Público:</strong> Teste públicos similares para expandir alcance de {tipoConversao}</li>
+                           </>
+                         );
+                       } else if (score >= 70) {
+                         return (
+                           <>
+                             <li>• <strong>CPR:</strong> {metrics?.cpr && metrics.cpr > cprIdeal ? `Reduza o custo de ${tipoConversao} (atual: R$ ${metrics.cpr.toFixed(2)} vs ideal: R$ ${cprIdeal.toFixed(2)})` : `Mantenha o CPR atual e foque em mais ${tipoConversao}`}</li>
+                             <li>• <strong>Conversões:</strong> {metrics?.conversions && metrics.conversions < 50 ? `Aumente ${tipoConversao} melhorando landing pages` : `Otimize a qualidade das ${tipoConversao}`}</li>
+                             <li>• <strong>CPC:</strong> {metrics?.cpc && metrics.cpc > 2 ? "Teste criativos mais relevantes para reduzir CPC" : "Mantenha o CPC baixo e foque em volume"}</li>
+                             <li>• <strong>Frequência:</strong> {metrics?.frequency && metrics.frequency > 3 ? "Reduza frequência para evitar saturação" : "Aumente frequência para mais exposição"}</li>
+                           </>
+                         );
+                       } else if (score >= 50) {
+                         return (
+                           <>
+                             <li>• <strong>Público:</strong> Revise o público-alvo para {objetivo.toLowerCase()} - pode estar muito amplo</li>
+                             <li>• <strong>Criativos:</strong> Teste novos textos focados em {tipoConversao} - os atuais podem estar saturados</li>
+                             <li>• <strong>Landing:</strong> Otimize landing pages para aumentar taxa de {tipoConversao}</li>
+                             <li>• <strong>Orçamento:</strong> Reduza temporariamente para focar na qualidade das {tipoConversao}</li>
+                           </>
+                         );
+                       } else if (score >= 30) {
+                         return (
+                           <>
+                             <li>• <strong>Pausa:</strong> Considere pausar temporariamente para reestruturar a estratégia de {tipoConversao}</li>
+                             <li>• <strong>Público:</strong> Defina um público mais específico e qualificado para {objetivo.toLowerCase()}</li>
+                             <li>• <strong>Criativos:</strong> Crie novos anúncios focados especificamente em {tipoConversao}</li>
+                             <li>• <strong>Objetivo:</strong> Revise se o objetivo atual ({objetivo}) está correto</li>
+                           </>
+                         );
+                       } else {
+                         return (
+                           <>
+                             <li>• <strong>Pausa Imediata:</strong> Pare o anúncio para evitar desperdício de orçamento em {tipoConversao} ineficazes</li>
+                             <li>• <strong>Análise:</strong> Investigue por que o público não está convertendo em {tipoConversao}</li>
+                             <li>• <strong>Reestruturação:</strong> Crie uma nova estratégia completamente diferente para {objetivo.toLowerCase()}</li>
+                             <li>• <strong>Suporte:</strong> Considere buscar ajuda especializada em campanhas de {objetivo.toLowerCase()}</li>
+                           </>
+                         );
+                       }
+                     })()}
                   </ul>
                 </div>
               </div>
