@@ -159,7 +159,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
       </div>
 
       <div className="relative p-6 md:p-8">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-8 pt-6">
           <div className="flex items-center gap-4">
             <div className="relative flex-shrink-0">
               <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center shadow-md">
@@ -167,7 +167,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
               </div>
               <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-900 animate-pulse" />
             </div>
-            <div className="flex flex-col justify-center">
+            <div className="flex flex-col justify-center h-11">
               <h3 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent leading-tight">Benchmark com IA</h3>
               <p className="text-slate-400 text-sm mt-1 leading-tight">Produto: <span className="text-slate-200 font-semibold">{selectedProduct}</span></p>
             </div>
@@ -183,14 +183,13 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                   </span>
                 </div>
               )}
-              <button
-                onClick={() => setShowForm(true)}
-                className="group relative inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] overflow-hidden"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-                <TrendingUp className="h-4 w-4 mr-2" />
-                <span>{lastResults ? 'Regenerar Benchmark' : 'Gerar Benchmark'}</span>
-              </button>
+                              <button
+                  onClick={() => setShowForm(true)}
+                  className="group relative inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] h-11"
+                >
+                  <TrendingUp className="h-4 w-4 mr-2" />
+                  <span>{lastResults ? 'Regenerar Benchmark' : 'Gerar Benchmark'}</span>
+                </button>
             </div>
           )}
         </div>
@@ -600,41 +599,39 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                 
                 <div className="flex space-x-3">
                   {currentStep < 4 ? (
-                    <button
-                      onClick={() => setCurrentStep(currentStep + 1)}
-                      disabled={
-                        (currentStep === 1 && (!formData.productNiche || !formData.productValue)) ||
-                        (currentStep === 2 && formData.targetAudience.interests.length === 0)
-                      }
-                      className="group relative inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:from-slate-700 disabled:to-slate-700 text-white px-8 py-3 font-semibold transition-all duration-300 shadow-md hover:shadow-lg disabled:cursor-not-allowed overflow-hidden"
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-                      <div className="relative flex items-center gap-2">
-                        <span>Próximo</span>
-                        <TrendingUp className="h-4 w-4" />
-                      </div>
-                    </button>
+                                          <button
+                        onClick={() => setCurrentStep(currentStep + 1)}
+                        disabled={
+                          (currentStep === 1 && (!formData.productNiche || !formData.productValue)) ||
+                          (currentStep === 2 && formData.targetAudience.interests.length === 0)
+                        }
+                        className="group relative inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:from-slate-700 disabled:to-slate-700 text-white px-8 py-3 font-semibold transition-all duration-300 shadow-md hover:shadow-lg disabled:cursor-not-allowed"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>Próximo</span>
+                          <TrendingUp className="h-4 w-4" />
+                        </div>
+                      </button>
                   ) : (
-                    <button
-                      onClick={handleGenerateBenchmark}
-                      disabled={isLoading}
-                      className="group relative inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:from-slate-700 disabled:to-slate-700 text-white px-8 py-3 font-semibold transition-all duration-300 shadow-md hover:shadow-lg disabled:cursor-not-allowed overflow-hidden"
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-                      <div className="relative flex items-center gap-2">
-                        {isLoading ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <span>Gerando...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Brain className="h-4 w-4" />
-                            <span>Gerar Benchmark</span>
-                          </>
-                        )}
-                      </div>
-                    </button>
+                                          <button
+                        onClick={handleGenerateBenchmark}
+                        disabled={isLoading}
+                        className="group relative inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:from-slate-700 disabled:to-slate-700 text-white px-8 py-3 font-semibold transition-all duration-300 shadow-md hover:shadow-lg disabled:cursor-not-allowed"
+                      >
+                        <div className="flex items-center gap-2">
+                          {isLoading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Gerando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Brain className="h-4 w-4" />
+                              <span>Gerar Benchmark</span>
+                            </>
+                          )}
+                        </div>
+                      </button>
                   )}
                 </div>
               </div>
