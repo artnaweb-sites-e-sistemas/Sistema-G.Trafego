@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Package, Target, Users, MapPin, DollarSign, Edit, Copy, RefreshCw, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Target, MapPin, DollarSign, Edit, Copy, CheckCircle, TrendingUp, GitBranch, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { adStrategyService, AdStrategy } from '../services/adStrategyService';
 import { metaAdsService } from '../services/metaAdsService';
@@ -44,6 +44,13 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
   const [locationInput, setLocationInput] = useState('');
   const [collapsedProducts, setCollapsedProducts] = useState<Set<string>>(new Set());
   const [copiedStates, setCopiedStates] = useState<Set<string>>(new Set());
+  const [plannedInput, setPlannedInput] = useState<string>('R$ 0,00');
+  const [currentInput, setCurrentInput] = useState<string>('R$ 0,00');
+  const [recommendations, setRecommendations] = useState<Record<string, { type: 'vertical' | 'horizontal' | 'wait'; tooltip: string; stats: { spend: number; ctr: number; cpl: number; cpr: number; clicks: number; impressions: number; leads: number; sales: number; objective: 'trafico' | 'mensagens' | 'compras'; adSetsCount: number; periodStart: string; periodEnd: string } }>>({});
+  
+  // Refs para controlar execução
+  const hasEvaluatedRef = useRef<Set<string>>(new Set());
+  const hasSyncedRef = useRef<Set<string>>(new Set());
 
   // Bloquear scroll quando modal estiver aberto
   useEffect(() => {
@@ -54,13 +61,54 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     }
   }, [isModalOpen]);
 
-  // Carregar estratégias existentes
+  // Carregar estratégias existentes (todas do cliente)
   useEffect(() => {
     if (selectedClient && selectedMonth) {
-      const existingStrategies = adStrategyService.getStrategiesByClientAndMonth(selectedClient, selectedMonth);
+      const existingStrategies = adStrategyService.getStrategiesByClient(selectedClient);
       setStrategies(existingStrategies);
+      // Resetar refs quando mudar cliente/mês
+      hasEvaluatedRef.current.clear();
+      hasSyncedRef.current.clear();
     }
   }, [selectedClient, selectedMonth]);
+
+  // Auto-avaliar todas as estratégias e sincronizar as que ainda não estão sincronizadas
+  useEffect(() => {
+    const run = async () => {
+      if (!strategies || strategies.length === 0) return;
+      
+      // Avaliar sequencialmente para reduzir rate limit
+      for (const s of strategies) {
+        const evaluationKey = `${s.id}-${selectedMonth}`;
+        if (!hasEvaluatedRef.current.has(evaluationKey)) {
+          try {
+            await evaluateStrategyPerformance(s);
+            hasEvaluatedRef.current.add(evaluationKey);
+            // pequena pausa para aliviar rate limit
+            await new Promise(res => setTimeout(res, 400));
+          } catch (e) {
+            // segue para próxima
+          }
+        }
+      }
+      
+      // Sincronizar orçamento apenas das não sincronizadas
+      const toSync = strategies.filter(s => !s.isSynchronized);
+      if (toSync.length > 0) {
+        for (const s of toSync) {
+          const syncKey = `${s.id}-${selectedMonth}`;
+          if (!hasSyncedRef.current.has(syncKey)) {
+            try {
+              await syncStrategyBudgetFromMeta(s);
+              hasSyncedRef.current.add(syncKey);
+              await new Promise(res => setTimeout(res, 300));
+            } catch {}
+          }
+        }
+      }
+    };
+    run();
+  }, [strategies, selectedClient, selectedMonth]);
 
   // Função para copiar texto
   const copyToClipboard = async (text: string, key: string) => {
@@ -90,6 +138,10 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     }).format(number);
   };
 
+  const formatCurrencyNumber = (num: number | undefined): string => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num || 0);
+  };
+
   // Função para extrair dígitos
   const extractDigits = (value: string): string => {
     return value.replace(/\D/g, '');
@@ -100,6 +152,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     if (strategy) {
       setCurrentStrategy(strategy);
       setEditingStrategy(strategy.id);
+      setPlannedInput(formatCurrencyNumber(strategy.budget?.planned));
+      setCurrentInput(formatCurrencyNumber(strategy.budget?.current));
     } else {
       setCurrentStrategy({
         product: {
@@ -124,6 +178,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
         isSynchronized: false
       });
       setEditingStrategy(null);
+      setPlannedInput('R$ 0,00');
+      setCurrentInput('R$ 0,00');
     }
     setIsModalOpen(true);
   };
@@ -154,6 +210,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       isSynchronized: false
     });
     setEditingStrategy(null);
+    setPlannedInput('R$ 0,00');
+    setCurrentInput('R$ 0,00');
   };
 
   // Função para salvar estratégia
@@ -168,7 +226,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       return;
     }
 
-    if (currentStrategy.budget?.planned <= 0) {
+    if (!currentStrategy.budget || (currentStrategy.budget.planned ?? 0) <= 0) {
       toast.error('Por favor, informe um valor pretendido válido');
       return;
     }
@@ -257,40 +315,205 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     generateNames();
   }, [currentStrategy.product, currentStrategy.audience]);
 
-  // Buscar valores do Meta Ads
-  const fetchMetaAdsValues = async () => {
-    if (!currentStrategy.generatedNames?.audience) return;
+  // Utilidades
+  const getMonthDateRange = (monthLabel: string): { startDate: string; endDate: string } => {
+    const months = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    const [name, yearStr] = monthLabel.split(' ');
+    const year = parseInt(yearStr, 10) || new Date().getFullYear();
+    const monthIndex = Math.max(0, months.indexOf(name));
+    const start = new Date(year, monthIndex, 1);
+    const end = new Date(year, monthIndex + 1, 0);
+    return {
+      startDate: start.toISOString().split('T')[0],
+      endDate: end.toISOString().split('T')[0]
+    };
+  };
 
+  const normalizeName = (value: string): string =>
+    (value || '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .replace(/[^a-z0-9\s]/g, '')
+      .trim();
+
+  const namesExactlyMatch = (adSetName: string, strategyAudienceName: string): boolean => {
+    return normalizeName(adSetName) === normalizeName(strategyAudienceName);
+  };
+
+  // Sincronizar orçamento de UMA estratégia pela correspondência exata do nome do Ad Set
+  const syncStrategyBudgetFromMeta = async (strategy: AdStrategy) => {
+    if (!strategy?.generatedNames?.audience) return;
     try {
-      const insights = await metaAdsService.getAdSetInsights(selectedMonth);
-      const matchingAdSets = insights.filter(insight => {
-        const normalizedInsightName = insight.adset_name.toLowerCase().replace(/[^a-z0-9\s]/g, '');
-        const normalizedGeneratedName = currentStrategy.generatedNames!.audience.toLowerCase().replace(/[^a-z0-9\s]/g, '');
-        
-        const insightWords = normalizedInsightName.split(' ');
-        const generatedWords = normalizedGeneratedName.split(' ');
-        
-        const commonWords = insightWords.filter(word => generatedWords.includes(word));
-        return commonWords.length >= 2; // Pelo menos 2 palavras em comum
-      });
+      const { startDate, endDate } = getMonthDateRange(selectedMonth);
 
-      const totalSpend = matchingAdSets.reduce((sum, insight) => sum + parseFloat(insight.spend), 0);
-      
+      // Buscar Ad Sets da conta no período
+      const adSets = await metaAdsService.getAdSets();
+
+      const wanted = strategy.generatedNames.audience;
+      const matching = (adSets || []).filter((ad: any) => namesExactlyMatch(ad.name, wanted));
+
+      let totalSpend = 0;
+      if (matching.length > 0) {
+        const allInsights = await Promise.all(
+          matching.map((ad: any) => metaAdsService.getAdSetInsights(ad.id, startDate, endDate))
+        );
+        totalSpend = allInsights.flat().reduce((sum: number, insight: any) => sum + parseFloat(insight.spend || '0'), 0);
+      }
+
+      // Atualizar apenas para o período atual, não persistir no strategy
+      const updated: AdStrategy = {
+        ...strategy,
+        budget: { ...strategy.budget, current: totalSpend },
+        isSynchronized: matching.length > 0
+      };
+
+      // Atualizar apenas na UI, não persistir
+      setStrategies(prev => prev.map(s => (s.id === strategy.id ? updated : s)));
+
+      // Se a estratégia aberta no modal for a mesma, refletir também
+      if (editingStrategy === strategy.id) {
       setCurrentStrategy(prev => ({
         ...prev,
-        budget: {
-          ...prev.budget!,
-          current: totalSpend
-        },
-        isSynchronized: matchingAdSets.length > 0
-      }));
+          budget: { ...(prev.budget as any), current: totalSpend },
+          isSynchronized: matching.length > 0
+        }));
+      }
     } catch (error) {
-      console.error('Erro ao buscar valores do Meta Ads:', error);
+      console.error('Erro ao sincronizar orçamento da estratégia:', error);
     }
   };
 
-  // Agrupar estratégias por produto
-  const strategiesByProduct = strategies.reduce((acc, strategy) => {
+  // Avaliar performance de uma estratégia e recomendar escala
+  const evaluateStrategyPerformance = async (strategy: AdStrategy) => {
+    try {
+      const { startDate, endDate } = getMonthDateRange(selectedMonth);
+      const adSets = await metaAdsService.getAdSets();
+      const wanted = strategy.generatedNames.audience;
+      const matching = (adSets || []).filter((ad: any) => namesExactlyMatch(ad.name, wanted));
+
+      // Buscar insights agregados (sem time_increment) para o período
+      let totals = { spend: 0, leads: 0, sales: 0, clicks: 0, impressions: 0, cprSamples: [] as number[], cplSamples: [] as number[] };
+      
+      if (matching.length > 0) {
+        const allInsights = await Promise.all(
+          matching.map((ad: any) => metaAdsService.getAdSetInsights(ad.id, startDate, endDate))
+        );
+        const insightsFlat = allInsights.flat().filter((i: any) => parseFloat(i.spend || '0') > 0);
+        const metricData = insightsFlat.length > 0
+          ? metaAdsService.convertToMetricData(insightsFlat, selectedMonth, selectedClient, strategy.product.name, strategy.generatedNames.audience)
+          : [];
+
+        totals = (metricData || []).reduce(
+          (acc: any, m: any) => {
+            acc.spend += m.investment || 0;
+            acc.leads += m.leads || 0;
+            acc.sales += m.sales || 0;
+            acc.clicks += m.clicks || 0;
+            acc.impressions += m.impressions || 0;
+            acc.cprSamples.push(m.cpr || 0);
+            acc.cplSamples.push(m.cpl || 0);
+            return acc;
+          },
+          { spend: 0, leads: 0, sales: 0, clicks: 0, impressions: 0, cprSamples: [] as number[], cplSamples: [] as number[] }
+        );
+      }
+
+      const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+      // Cálculos estritos por totais do período
+      const cpr = totals.sales > 0 ? totals.spend / totals.sales : 0;     // Compras
+      const cplStrict = totals.leads > 0 ? totals.spend / totals.leads : 0; // Mensagens/Leads
+      const cpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;     // Tráfego
+
+      let rec: { type: 'vertical' | 'horizontal' | 'wait'; tooltip: string } = { type: 'wait', tooltip: 'Aguardando mais dados' };
+
+      const objective = strategy.product.objective; // trafico | mensagens | compras
+      const spentEnough = totals.spend >= 50;
+
+      if (objective === 'mensagens' || objective === 'trafico') {
+        const clicksEnough = totals.clicks >= 100;
+        const perfValue = objective === 'mensagens' ? cplStrict : cpc;
+        const goodCPL = perfValue > 0 && perfValue <= (objective === 'mensagens' ? 15 : 1.2);
+        const okCPL = perfValue > 0 && perfValue <= (objective === 'mensagens' ? 25 : 2.5);
+        if (spentEnough && clicksEnough && goodCPL && ctr >= 1.5) {
+          rec = { type: 'vertical', tooltip: `Desempenho forte para ${objective === 'mensagens' ? 'Mensagens' : 'Tráfego'}: CTR ${ctr.toFixed(2)}%, ${objective === 'mensagens' ? 'CPL' : 'CPC'} ${formatCurrencyNumber(perfValue)}. Aumente orçamento gradualmente.` };
+        } else if (spentEnough && okCPL && ctr >= 1.0) {
+          rec = { type: 'horizontal', tooltip: `Bom desempenho: CTR ${ctr.toFixed(2)}%, ${objective === 'mensagens' ? 'CPL' : 'CPC'} ${formatCurrencyNumber(perfValue)}. Teste novos públicos/variações (escala horizontal).` };
+        } else {
+          rec = { type: 'wait', tooltip: `Aguardando mais dados: gasto ${formatCurrencyNumber(totals.spend)}, cliques ${totals.clicks}, CTR ${ctr.toFixed(2)}%.` };
+        }
+      } else if (objective === 'compras') {
+        const salesEnough = totals.sales >= 3;
+        if (spentEnough && salesEnough && cpr > 0 && cpr <= 30) {
+          rec = { type: 'vertical', tooltip: `Compras consistentes: CPR ${formatCurrencyNumber(cpr)} com ${totals.sales} vendas. Escale orçamento (vertical).` };
+        } else if (spentEnough && cpr > 0 && cpr <= 50) {
+          rec = { type: 'horizontal', tooltip: `Algumas compras: CPR ${formatCurrencyNumber(cpr)}. Expandir públicos/variações (horizontal).` };
+        } else {
+          rec = { type: 'wait', tooltip: `Pouca sinalização de compras ou CPR alto (${formatCurrencyNumber(cpr)}). Acompanhe antes de escalar.` };
+        }
+      }
+
+      setRecommendations(prev => ({
+        ...prev,
+        [strategy.id]: {
+          ...rec,
+          stats: {
+            spend: totals.spend,
+            ctr,
+            cpl: objective === 'mensagens' ? cplStrict : cpc,
+            cpr,
+            clicks: totals.clicks,
+            impressions: totals.impressions,
+            leads: totals.leads,
+            sales: totals.sales,
+            objective,
+            adSetsCount: matching.length,
+            periodStart: startDate,
+            periodEnd: endDate
+          }
+        }
+      }));
+
+      // Atualizar o budget.current apenas para o período atual (não persistir)
+      if (matching.length > 0) {
+        setStrategies(prev => prev.map(s => 
+          s.id === strategy.id 
+            ? { ...s, budget: { ...s.budget, current: totals.spend }, isSynchronized: true }
+            : s
+        ));
+      }
+    } catch (error) {
+      console.error('Erro ao avaliar performance da estratégia:', error);
+      // Não sobreescrever tooltip com erro; manter último sucesso ou estado "aguardando dados"
+      setRecommendations(prev => ({
+        ...prev,
+        [strategy.id]: prev[strategy.id] || {
+          type: 'wait',
+          tooltip: 'Aguardando dados do período',
+          stats: {
+            spend: 0, ctr: 0, cpl: 0, cpr: 0, clicks: 0, impressions: 0, leads: 0, sales: 0, objective: strategy.product.objective, adSetsCount: 0, periodStart: '', periodEnd: ''
+          }
+        }
+      }));
+    }
+  };
+
+  // Agrupar estratégias por produto, exibindo apenas se tiver gasto no período OU se foi criada no período selecionado
+  const strategiesByProduct = ((): Record<string, { name: string; niche: string; strategies: AdStrategy[] }> => {
+    // Filtrar por visibilidade inteligente
+    const filtered = strategies.filter((s) => {
+      const rec = recommendations[s.id];
+      const hasSpendInPeriod = rec?.stats?.spend >= 0.01;
+      const hasAdSetsInPeriod = rec?.stats?.adSetsCount > 0;
+      const createdThisMonth = s.month === selectedMonth;
+      
+      // Só aparece se: tem gasto no período E tem ad sets OU foi criada neste período
+      return (hasSpendInPeriod && hasAdSetsInPeriod) || createdThisMonth;
+    });
+    
+    return filtered.reduce((acc, strategy) => {
     const productKey = `${strategy.product.name}-${strategy.product.niche}`;
     if (!acc[productKey]) {
       acc[productKey] = {
@@ -302,6 +525,19 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     acc[productKey].strategies.push(strategy);
     return acc;
   }, {} as Record<string, { name: string; niche: string; strategies: AdStrategy[] }>);
+  })();
+
+  // Função para obter o budget atual do período específico
+  const getCurrentPeriodBudget = (strategy: AdStrategy): number => {
+    const rec = recommendations[strategy.id];
+    return rec?.stats?.spend || 0;
+  };
+
+  // Função para obter se está sincronizado no período atual
+  const getCurrentPeriodSyncStatus = (strategy: AdStrategy): boolean => {
+    const rec = recommendations[strategy.id];
+    return rec?.stats?.adSetsCount > 0 || false;
+  };
 
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-xl">
@@ -331,7 +567,9 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
 
         {/* Lista de estratégias agrupadas por produto */}
         <div className="space-y-6">
-          {Object.entries(strategiesByProduct).map(([productKey, productData]) => (
+          {Object.entries(strategiesByProduct)
+            .filter(([, productData]) => productData.strategies.length > 0)
+            .map(([productKey, productData]) => (
             <motion.div
               key={productKey}
               initial={{ opacity: 0, y: 20 }}
@@ -352,9 +590,6 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                 }}
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                    <Package className="w-4 h-4 text-white" />
-                  </div>
                   <div>
                     <h4 className="text-lg font-semibold text-slate-200">{productData.name}</h4>
                     <p className="text-sm text-slate-400">{productData.niche}</p>
@@ -384,7 +619,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                     className="border-t border-slate-700/50 overflow-hidden"
                   >
                     <div className="p-6 space-y-3">
-                      {productData.strategies.map((strategy) => (
+                      {productData.strategies
+                        .map((strategy) => (
                         <motion.div
                           key={strategy.id}
                           initial={{ opacity: 0, x: -20 }}
@@ -450,7 +686,102 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                       className="bg-gradient-to-r from-slate-700/50 to-slate-800/50 rounded-lg px-4 py-3 border border-slate-600/30 cursor-pointer hover:border-slate-500/50 hover:bg-gradient-to-r hover:from-slate-700/60 hover:to-slate-800/60 transition-all duration-200 group"
                                     >
                                       <div className="flex items-center justify-between">
-                                        <p className="text-sm text-yellow-300 font-medium leading-relaxed flex-1">{strategy.generatedNames.audience}</p>
+                                        <div className="flex items-center gap-2 flex-1 group/audience">
+                                          {/* Badge do estado de escala - tooltip somente sobre o container do público */}
+                                          {(() => {
+                                            const rec = recommendations[strategy.id];
+                                            const base = 'relative inline-flex items-center justify-center w-6 h-6 rounded-md border';
+                                            const card = (content: string, color: string) => (
+                                              <div className="tooltip-audience fixed z-[999999] hidden">
+                                                <div className={`min-w-[260px] max-w-[320px] text-xs rounded-lg shadow-xl border ${color}`}>
+                                                  <div className="p-3 bg-slate-900 rounded-lg border-slate-600/40">
+                                                    <div className="text-slate-200 font-semibold mb-1">Sugestão para este público</div>
+                                                    <div className="text-slate-300 leading-relaxed whitespace-pre-line">{content}</div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            );
+                                            const stats = rec?.stats;
+                                            const objectiveLabel = stats?.objective === 'trafico' ? 'Tráfego' : stats?.objective === 'mensagens' ? 'Mensagens' : 'Compras';
+                                            const summary = stats
+                                              ? `Gasto no período (${stats.periodStart} → ${stats.periodEnd}): ${formatCurrencyNumber(stats.spend)}\nCTR: ${stats.ctr.toFixed(2)}% • Cliques: ${stats.clicks} • Impressões: ${stats.impressions}\n${stats.objective === 'compras' ? 'CPR' : (stats.objective === 'mensagens' ? 'CPL' : 'CPC')}: ${formatCurrencyNumber(stats.cpl)}\n${stats.objective === 'compras' ? `Vendas: ${stats.sales}` : `Leads: ${stats.leads}`}\nAd Sets vinculados (match exato por nome): ${stats.adSetsCount}\nDecisão baseada no objetivo: ${objectiveLabel}.`
+                                              : 'Coletando dados deste período...';
+                                            if (rec?.type === 'vertical') {
+                                              return (
+                                                <span 
+                                                  className={`${base} bg-emerald-600/15 border-emerald-500/40`}
+                                                  onMouseEnter={(e) => {
+                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                    const tooltip = e.currentTarget.querySelector('.tooltip-audience') as HTMLElement;
+                                                    if (tooltip) {
+                                                      tooltip.style.left = `${rect.right + 10}px`;
+                                                      tooltip.style.top = `${rect.top - 30}px`;
+                                                      tooltip.style.display = 'block';
+                                                    }
+                                                  }}
+                                                  onMouseLeave={(e) => {
+                                                    const tooltip = e.currentTarget.querySelector('.tooltip-audience') as HTMLElement;
+                                                    if (tooltip) {
+                                                      tooltip.style.display = 'none';
+                                                    }
+                                                  }}
+                                                >
+                                                  <TrendingUp className="w-3.5 h-3.5 text-emerald-300" />
+                                                  {card(`Escalar orçamento (vertical).\n${rec.tooltip}\n\n${summary}`, 'border-emerald-500/40')}
+                                                </span>
+                                              );
+                                            }
+                                            if (rec?.type === 'horizontal') {
+                                              return (
+                                                <span 
+                                                  className={`${base} bg-blue-600/15 border-blue-500/40`}
+                                                  onMouseEnter={(e) => {
+                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                    const tooltip = e.currentTarget.querySelector('.tooltip-audience') as HTMLElement;
+                                                    if (tooltip) {
+                                                      tooltip.style.left = `${rect.right + 10}px`;
+                                                      tooltip.style.top = `${rect.top - 30}px`;
+                                                      tooltip.style.display = 'block';
+                                                    }
+                                                  }}
+                                                  onMouseLeave={(e) => {
+                                                    const tooltip = e.currentTarget.querySelector('.tooltip-audience') as HTMLElement;
+                                                    if (tooltip) {
+                                                      tooltip.style.display = 'none';
+                                                    }
+                                                  }}
+                                                >
+                                                  <GitBranch className="w-3.5 h-3.5 text-blue-300" />
+                                                  {card(`Expandir públicos/variações (horizontal).\n${rec.tooltip}\n\n${summary}`, 'border-blue-500/40')}
+                                                </span>
+                                              );
+                                            }
+                                            return (
+                                              <span 
+                                                className={`${base} bg-slate-600/15 border-slate-500/40`}
+                                                onMouseEnter={(e) => {
+                                                  const rect = e.currentTarget.getBoundingClientRect();
+                                                  const tooltip = e.currentTarget.querySelector('.tooltip-audience') as HTMLElement;
+                                                  if (tooltip) {
+                                                    tooltip.style.left = `${rect.right + 10}px`;
+                                                    tooltip.style.top = `${rect.top - 30}px`;
+                                                    tooltip.style.display = 'block';
+                                                  }
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                  const tooltip = e.currentTarget.querySelector('.tooltip-audience') as HTMLElement;
+                                                  if (tooltip) {
+                                                    tooltip.style.display = 'none';
+                                                  }
+                                                }}
+                                              >
+                                                <Clock className="w-3.5 h-3.5 text-slate-300" />
+                                                {card(`${rec?.tooltip || 'Aguardando otimização/mais dados.'}\n\n${summary}`, 'border-slate-500/40')}
+                                              </span>
+                                            );
+                                          })()}
+                                          <p className="text-sm text-yellow-300 font-medium leading-relaxed">{strategy.generatedNames.audience}</p>
+                                        </div>
                                         <Copy className="w-3 h-3 text-yellow-400 group-hover:text-yellow-300 transition-colors" />
                                       </div>
                                     </div>
@@ -479,23 +810,59 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                 <div className="flex items-center justify-between mb-3">
                                   <span className="text-xs text-slate-300 font-semibold uppercase tracking-wide">ORÇAMENTO</span>
                                   <div className="flex items-center gap-2">
-                                    <span className="text-xs text-slate-300 font-medium">R$ {strategy.budget.current.toFixed(2).replace('.', ',')} / R$ {strategy.budget.planned.toFixed(2).replace('.', ',')}</span>
-                                    <div className="flex items-center gap-1">
-                                      <div className={`w-2 h-2 rounded-full ${strategy.isSynchronized ? 'bg-blue-500 animate-pulse' : 'bg-red-500 animate-pulse'}`} />
-                                      <button
-                                        onClick={fetchMetaAdsValues}
-                                        className="text-slate-400 hover:text-slate-300 transition-colors p-1 rounded hover:bg-slate-600/30"
-                                        title={strategy.isSynchronized ? 'Sincronizado com Meta Ads - Valor atualizado automaticamente.' : 'Para sincronizar, é necessário que o nome do público (conjunto de anúncio) no Meta Ads, seja igual ao nome definido na estratégia criada.'}
-                                      >
-                                        <RefreshCw className="w-3 h-3" />
-                                      </button>
+                                    <span className="text-xs text-slate-300 font-medium">R$ {getCurrentPeriodBudget(strategy).toFixed(2).replace('.', ',')} / R$ {strategy.budget.planned.toFixed(2).replace('.', ',')}</span>
+                                    <div className="flex items-center gap-1 relative group/sync">
+                                      <div 
+                                        className={`w-2 h-2 rounded-full ${getCurrentPeriodSyncStatus(strategy) ? 'bg-blue-500 animate-pulse' : 'bg-red-500 animate-pulse'} cursor-help`}
+                                        onMouseEnter={(e) => {
+                                          const rect = e.currentTarget.getBoundingClientRect();
+                                          const tooltip = e.currentTarget.parentElement?.querySelector('.tooltip-sync') as HTMLElement;
+                                          if (tooltip) {
+                                            tooltip.style.left = `${rect.left - 260}px`;
+                                            tooltip.style.top = `${rect.top - 30}px`;
+                                            tooltip.style.display = 'block';
+                                          }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          const tooltip = e.currentTarget.parentElement?.querySelector('.tooltip-sync') as HTMLElement;
+                                          if (tooltip) {
+                                            tooltip.style.display = 'none';
+                                          }
+                                        }}
+                                      />
+                                      {/* Tooltip elegante */}
+                                      <div className="tooltip-sync fixed z-[999999] hidden">
+                                        <div className="min-w-[200px] max-w-[250px] text-xs rounded-lg shadow-xl border border-slate-600/40">
+                                          <div className="p-3 bg-slate-900 rounded-lg border-slate-600/40">
+                                            <div className="text-slate-200 font-semibold mb-1 flex items-center gap-2">
+                                              {getCurrentPeriodSyncStatus(strategy) ? (
+                                                <>
+                                                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                                                  <span>Sincronizado</span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                                                  <span>Não sincronizado</span>
+                                                </>
+                                              )}
+                                            </div>
+                                            <div className="text-slate-300 leading-relaxed">
+                                              {getCurrentPeriodSyncStatus(strategy) 
+                                                ? 'Orçamento atualizado automaticamente com base no gasto real do conjunto de anúncios.'
+                                                : 'Para sincronizar, é necessário que exista um conjunto de anúncios no Meta Ads com o nome exatamente igual à nomenclatura do público.'
+                                              }
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
                                 <div className="w-full bg-slate-600/50 rounded-full h-2.5 overflow-hidden">
                                   <div 
                                     className="bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500 h-2.5 rounded-full transition-all duration-500 shadow-sm"
-                                    style={{ width: `${Math.min((strategy.budget.current / strategy.budget.planned) * 100, 100)}%` }}
+                                    style={{ width: `${Math.min((getCurrentPeriodBudget(strategy) / strategy.budget.planned) * 100, 100)}%` }}
                                   />
                                 </div>
                               </div>
@@ -698,13 +1065,14 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                             <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <input
                               type="text"
-                              value={formatBRLFromDigits(currentStrategy.budget?.planned.toString() || '0')}
+                              value={plannedInput}
                               onChange={(e) => {
                                 const digits = extractDigits(e.target.value);
                                 setCurrentStrategy(prev => ({
                                   ...prev,
                                   budget: { ...prev.budget!, planned: parseInt(digits) / 100 }
                                 }));
+                                setPlannedInput(formatBRLFromDigits(digits));
                               }}
                               className="w-full bg-slate-700/60 border border-slate-600/50 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               placeholder="R$ 0,00"
@@ -717,7 +1085,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                             <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <input
                               type="text"
-                              value={formatBRLFromDigits(currentStrategy.budget?.current.toString() || '0')}
+                              value={currentInput}
                               onChange={(e) => {
                                 if (!currentStrategy.isSynchronized) {
                                   const digits = extractDigits(e.target.value);
@@ -725,20 +1093,13 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                     ...prev,
                                     budget: { ...prev.budget!, current: parseInt(digits) / 100 }
                                   }));
+                                  setCurrentInput(formatBRLFromDigits(digits));
                                 }
                               }}
                               readOnly={currentStrategy.isSynchronized}
                               className={`w-full bg-slate-700/60 border border-slate-600/50 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${currentStrategy.isSynchronized ? 'opacity-50 cursor-not-allowed' : ''}`}
                               placeholder="R$ 0,00"
                             />
-                            {!currentStrategy.isSynchronized && (
-                              <button
-                                onClick={fetchMetaAdsValues}
-                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-300 transition-colors"
-                              >
-                                <RefreshCw className="h-4 w-4" />
-                              </button>
-                            )}
                           </div>
                         </div>
                       </div>

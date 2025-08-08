@@ -38,6 +38,18 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
     additionalInfo: ''
   });
 
+  const formatBRLFromDigits = (digits: string): string => {
+    if (!digits) return 'R$ 0,00';
+    const cents = parseInt(digits, 10) || 0;
+    return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+
+  const [productValueInput, setProductValueInput] = useState<string>('R$ 0,00');
+
+  React.useEffect(() => {
+    setProductValueInput((formData.productValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
+  }, []);
+
   const [newInterest, setNewInterest] = useState('');
 
   // Sincronizar com resultados salvos
@@ -340,13 +352,16 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                       <div className="relative">
                         <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                         <input
-                          type="number"
-                          value={formData.productValue || ''}
-                          onChange={(e) => handleInputChange('productValue', parseFloat(e.target.value) || 0)}
+                          type="text"
+                          value={productValueInput}
+                          onChange={(e) => {
+                            const digits = (e.target.value || '').replace(/\D/g, '');
+                            setProductValueInput(formatBRLFromDigits(digits));
+                            const value = (parseInt(digits, 10) || 0) / 100;
+                            handleInputChange('productValue', value);
+                          }}
                           placeholder="Ou digite o valor exato"
-                          min="0"
-                          step="0.01"
-                         className="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                          className="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                         />
                       </div>
                     </div>

@@ -985,7 +985,7 @@ class MetaAdsService {
       // Verificar se há dados salvos no localStorage para busca geral
       const savedData = this.getDataFromStorage('adsets');
       if (savedData && savedData.length > 0) {
-        console.log(`Usando ${savedData.length} Ad Sets salvos do cache`);
+        // console.log(`Usando ${savedData.length} Ad Sets salvos do cache`);
         return savedData;
       }
     }
@@ -1002,24 +1002,27 @@ class MetaAdsService {
       // Se uma campanha específica foi fornecida, buscar conjuntos dessa campanha
       if (campaignId) {
         endpoint = `${this.baseURL}/${campaignId}/adsets`;
-        // Para Ad Sets de uma campanha específica, não usar time_range
-        // A API do Meta Ads não aceita time_range quando buscando Ad Sets de uma campanha
-      } else {
-        // Adicionar filtros de data apenas quando não buscando por campanha específica
-        if (dateStart && dateEnd) {
-          params.time_range = JSON.stringify({
-            since: dateStart,
-            until: dateEnd
-          });
-        }
       }
+      // Importante: a API de listagem de Ad Sets não suporta time_range em nenhuma variação.
+      // Removemos qualquer envio de time_range para evitar 400 (Bad Request).
 
       console.log(`Buscando Ad Sets em: ${endpoint}`);
       console.log(`Parâmetros:`, params);
       console.log(`Token de acesso: ${this.user!.accessToken.substring(0, 20)}...`);
       console.log(`Conta selecionada: ${this.selectedAccount!.id}`);
 
-      const response = await axios.get(endpoint, { params });
+      let response;
+      try {
+        response = await axios.get(endpoint, { params });
+      } catch (err: any) {
+        // Se der 400/429, tentar sem campos extras (reduzir payload) após um pequeno atraso
+        if (err?.response?.status === 400 || err?.response?.status === 429) {
+          await new Promise(res => setTimeout(res, 500));
+          response = await axios.get(endpoint, { params: { access_token: this.user!.accessToken, limit: 100 } });
+        } else {
+          throw err;
+        }
+      }
 
       const data = response.data.data || [];
       console.log(`Ad Sets retornados: ${data.length}`);

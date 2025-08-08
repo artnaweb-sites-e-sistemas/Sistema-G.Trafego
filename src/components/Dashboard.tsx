@@ -32,15 +32,38 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       try {
         // Verificar se há usuário salvo no localStorage primeiro
         const savedUser = localStorage.getItem('facebookUser');
+        
         if (savedUser) {
           const { metaAdsService } = await import('../services/metaAdsService');
           if (metaAdsService.isLoggedIn()) {
-            setDataSource('facebook');
-            setIsFacebookConnected(true);
+            // Verificar se há Business Manager e conta de anúncios selecionadas
+            const selectedBusinessManager = localStorage.getItem('selectedBusinessManager');
+            const selectedAdAccount = localStorage.getItem('selectedAdAccount');
+            
+            // Só considerar conectado se tiver usuário, Business Manager E conta de anúncios
+            if (selectedBusinessManager && selectedAdAccount) {
+              setDataSource('facebook');
+              setIsFacebookConnected(true);
+            } else {
+              // Se não tem Business Manager ou conta selecionada, considerar como não conectado
+              setDataSource(null);
+              setIsFacebookConnected(false);
+            }
+          } else {
+            // Se não está logado, limpar dados
+            setDataSource(null);
+            setIsFacebookConnected(false);
           }
+        } else {
+          // Se não há usuário salvo, garantir que está desconectado
+          setDataSource(null);
+          setIsFacebookConnected(false);
         }
       } catch (error) {
         console.error('Erro ao verificar conexão do Meta Ads:', error);
+        // Em caso de erro, garantir que está desconectado
+        setDataSource(null);
+        setIsFacebookConnected(false);
       }
     };
 
@@ -717,7 +740,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         ) : (
           <>
             {/* Se não está conectado ao Meta Ads, mostra mensagem de conexão */}
-            {(!isFacebookConnected && (dataSource === null || dataSource === 'manual' || dataSource === 'facebook')) ? (
+            {!isFacebookConnected ? (
               <div className="flex flex-col items-center justify-center py-24">
                 <div className="text-lg text-gray-300 mb-2 font-semibold">Conecte-se ao Meta Ads para começar.</div>
                 <div className="text-sm text-gray-400">É necessário conectar sua conta Meta Ads antes de selecionar um cliente e visualizar as informações do dashboard.</div>

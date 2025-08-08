@@ -33,11 +33,21 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
   // Carregar cliente salvo do localStorage ao inicializar
   useEffect(() => {
     const savedClient = localStorage.getItem('currentSelectedClient');
-    if (savedClient && savedClient !== 'Todos os Clientes') {
-      setSelectedClient(savedClient);
-  
+    
+    // Só carregar cliente salvo se já estiver conectado ao Meta Ads
+    // E se já tiver Business Manager e conta de anúncios selecionadas
+    // E se o cliente atual for "Selecione um cliente" (não foi selecionado ainda)
+    if (savedClient && savedClient !== 'Todos os Clientes' && isFacebookConnected) {
+      const selectedBusinessManager = localStorage.getItem('selectedBusinessManager');
+      const selectedAdAccount = localStorage.getItem('selectedAdAccount');
+      
+      // Só carregar cliente se já tiver Business Manager e conta selecionadas
+      // E se o cliente atual for "Selecione um cliente"
+      if (selectedBusinessManager && selectedAdAccount && selectedClient === 'Selecione um cliente') {
+        setSelectedClient(savedClient);
+      }
     }
-  }, [setSelectedClient]);
+  }, [setSelectedClient, isFacebookConnected, selectedClient]);
 
   // Listener para reagir quando cliente for limpo pelo Dashboard
   useEffect(() => {
