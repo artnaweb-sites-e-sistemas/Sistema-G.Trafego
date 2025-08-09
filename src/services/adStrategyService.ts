@@ -1,4 +1,7 @@
 import { metaAdsService } from './metaAdsService';
+import { db } from '../config/firebase';
+import { authService } from './authService';
+import { collection, addDoc, setDoc, doc, deleteDoc } from 'firebase/firestore';
 
 export interface AdStrategy {
   id: string;
@@ -28,10 +31,43 @@ export interface AdStrategy {
   month: string;
   createdAt: Date;
   isSynchronized: boolean;
+  firebaseId?: string; // opcional, não usado na UI
 }
 
 class AdStrategyService {
   private storageKey = 'adStrategies';
+  private hydrated = false;
+
+  private getUserCollection() {
+    const user = authService.getCurrentUser();
+    if (!user) return null;
+    return collection(db, 'users', user.uid, 'adStrategies');
+  }
+
+  private async saveRemote(strategy: AdStrategy): Promise<string | undefined> {
+    try {
+      const col = this.getUserCollection();
+      if (!col) return undefined;
+      if (strategy.firebaseId) {
+        await setDoc(doc(col, strategy.firebaseId), strategy, { merge: true });
+        return strategy.firebaseId;
+      }
+      const ref = await addDoc(col, strategy as any);
+      return ref.id;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async deleteRemote(firebaseId?: string): Promise<void> {
+    try {
+      const col = this.getUserCollection();
+      if (!col || !firebaseId) return;
+      await deleteDoc(doc(col, firebaseId));
+    } catch {
+      // ignore
+    }
+  }
 
   // Salvar estratégia no localStorage
   saveStrategy(strategy: AdStrategy): void {
@@ -39,6 +75,14 @@ class AdStrategyService {
       const existingStrategies = this.getAllStrategies();
       const updatedStrategies = [...existingStrategies, strategy];
       localStorage.setItem(this.storageKey, JSON.stringify(updatedStrategies));
+      // Salvar no Firestore em background, sem alterar a UI
+      this.saveRemote(strategy).then((fid) => {
+        if (fid) {
+          // Atualizar cópia local com firebaseId para suportar remoção/edição remota
+          const newLocal = updatedStrategies.map(s => s.id === strategy.id ? { ...s, firebaseId: fid } : s);
+          localStorage.setItem(this.storageKey, JSON.stringify(newLocal));
+        }
+      });
     } catch (error) {
       console.error('Erro ao salvar estratégia:', error);
     }
@@ -73,8 +117,11 @@ class AdStrategyService {
   removeStrategy(strategyId: string): void {
     try {
       const existingStrategies = this.getAllStrategies();
+      const target = existingStrategies.find(s => s.id === strategyId);
       const updatedStrategies = existingStrategies.filter(strategy => strategy.id !== strategyId);
       localStorage.setItem(this.storageKey, JSON.stringify(updatedStrategies));
+      // Remoção remota best-effort
+      this.deleteRemote(target?.firebaseId);
     } catch (error) {
       console.error('Erro ao remover estratégia:', error);
     }
@@ -88,6 +135,8 @@ class AdStrategyService {
         strategy.id === updatedStrategy.id ? updatedStrategy : strategy
       );
       localStorage.setItem(this.storageKey, JSON.stringify(updatedStrategies));
+      // Atualização remota best-effort
+      this.saveRemote(updatedStrategy);
     } catch (error) {
       console.error('Erro ao atualizar estratégia:', error);
     }

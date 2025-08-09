@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import PublicReportView from './components/PublicReportView';
+import AdminDataInspector from './components/AdminDataInspector';
 import { authService, User } from './services/authService';
 import { shareService } from './services/shareService';
 
@@ -89,6 +90,7 @@ function App() {
 
   // Componente para rota protegida
   const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+    const location = useLocation();
     if (isLoading) {
       return (
         <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -101,7 +103,7 @@ function App() {
     }
 
     if (!isAuthenticated) {
-      return <Navigate to="/login" replace />;
+      return <Navigate to="/login" replace state={{ from: location }} />;
     }
 
     return <>{children}</>;
@@ -154,7 +156,7 @@ function App() {
         {/* Rota de login */}
         <Route 
           path="/login" 
-          element={
+          element={(
             !isAuthenticated ? (
               <div className="min-h-screen bg-gray-900">
                 <LoginScreen 
@@ -165,9 +167,14 @@ function App() {
                 <Toaster position="top-right" />
               </div>
             ) : (
-              <Navigate to="/" replace />
+              // Após autenticar, redireciona para a rota de origem (se houver)
+              (() => {
+                const location = window.history.state && (window.history.state as any).usr ? (window.history.state as any).usr : undefined;
+                const fromPath = location?.from?.pathname || '/';
+                return <Navigate to={fromPath} replace />;
+              })()
             )
-          } 
+          )} 
         />
         
         {/* Rota principal do dashboard (protegida) */}
@@ -179,6 +186,16 @@ function App() {
                 currentUser={currentUser!}
                 onLogout={handleLogout}
               />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* Admin - Inspector (somente leitura) */}
+        <Route 
+          path="/admin/inspector" 
+          element={
+            <ProtectedRoute>
+              <AdminDataInspector />
             </ProtectedRoute>
           } 
         />
