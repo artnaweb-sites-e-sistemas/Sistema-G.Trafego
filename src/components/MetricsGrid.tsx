@@ -27,11 +27,21 @@ const Tooltip: React.FC<{ children: React.ReactNode; content: string; isVisible:
     <div className="relative inline-block">
       {children}
       {isVisible && (
-        <div className="absolute z-[9999] px-4 py-3 text-sm text-gray-100 bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl shadow-2xl border border-gray-600/50 backdrop-blur-sm whitespace-nowrap -top-3 left-1/2 transform -translate-x-1/2 -translate-y-full animate-in fade-in-0 zoom-in-95 duration-200">
-          <div className="flex items-center space-x-2">
-            <div className="w-1 h-1 bg-red-400 rounded-full animate-pulse"></div>
-            <span className="font-medium">{content}</span>
+        <div className="absolute z-[9999] px-4 py-3 text-sm text-gray-100 bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl shadow-2xl border border-gray-600/50 backdrop-blur-sm -top-3 left-1/2 transform -translate-x-1/2 -translate-y-full animate-in fade-in-0 zoom-in-95 duration-200" style={{ width: '280px', maxWidth: '280px' }}>
+          <div className="space-y-2">
+            {/* Ícone de alerta */}
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+              <span className="font-semibold text-blue-300 text-xs uppercase tracking-wide">Informação</span>
+            </div>
+            
+            {/* Conteúdo */}
+            <div className="text-sm leading-relaxed">
+              <p className="text-gray-200">{content}</p>
+            </div>
           </div>
+          
+          {/* Seta do tooltip */}
           <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
         </div>
       )}

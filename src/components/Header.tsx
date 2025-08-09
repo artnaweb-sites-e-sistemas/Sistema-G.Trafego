@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, User, Search, LogOut, Facebook, Database } from 'lucide-react';
+import { Settings, User, Search, LogOut, Facebook, Database, RefreshCw } from 'lucide-react';
 import MetaAdsConfig from './MetaAdsConfig';
 import ShareReport from './ShareReport';
 import MonthYearPicker from './MonthYearPicker';
@@ -183,7 +183,18 @@ const Header: React.FC<HeaderProps> = ({
 
             <div className="flex flex-col items-center space-y-1 w-1/4 header-filter-item">
               <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Produto</label>
-              <div className="bg-slate-800/60 rounded-lg border border-slate-600/40 p-2 shadow-sm hover:shadow-md transition-all duration-200 w-full backdrop-blur-sm dropdown-container">
+              <div className="relative bg-slate-800/60 rounded-lg border border-slate-600/40 p-2 shadow-sm hover:shadow-md transition-all duration-200 w-full backdrop-blur-sm dropdown-container">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const ev = new CustomEvent('reloadProducts');
+                    window.dispatchEvent(ev);
+                  }}
+                  className="absolute top-1 right-1 p-1 rounded-md text-slate-400 hover:text-yellow-300 hover:bg-slate-700/60 transition-colors"
+                  title="Recarregar campanhas"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
                 <ProductPicker 
                   selectedProduct={selectedProduct}
                   setSelectedProduct={setSelectedProduct}

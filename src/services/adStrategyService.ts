@@ -6,13 +6,15 @@ export interface AdStrategy {
     name: string;
     niche: string;
     type: 'online' | 'fisico';
-    objective: 'trafico' | 'mensagens' | 'compras';
+    objective: 'trafico' | 'mensagens' | 'compras' | 'captura_leads';
   };
   audience: {
     gender: 'homem' | 'mulher' | 'ambos';
     ageRange: string;
     locations: string[];
     interests: string[];
+    remarketing: string[]; // Novo campo para remarketing
+    scaleType?: 'vertical' | 'horizontal' | null;
   };
   budget: {
     planned: number;
@@ -192,7 +194,7 @@ class AdStrategyService {
       fisico: 'presencial'
     };
 
-         const productName = `[${strategy.product.name} ${typeLabels[strategy.product.type as keyof typeof typeLabels]}] [${strategy.product.niche}] [${objectiveLabels[strategy.product.objective as keyof typeof objectiveLabels]}]`;
+    const productName = `[${strategy.product.name} ${typeLabels[strategy.product.type as keyof typeof typeLabels]}] [${strategy.product.niche}] [${objectiveLabels[strategy.product.objective as keyof typeof objectiveLabels]}]`;
 
     // Gerar nome do público
     const genderLabels = {
@@ -201,7 +203,21 @@ class AdStrategyService {
       ambos: 'pessoas'
     };
 
-    const audienceName = `[${genderLabels[strategy.audience?.gender as keyof typeof genderLabels] || 'pessoas'}] [${strategy.audience?.ageRange || 'faixa etária'}] [${strategy.audience?.locations?.join(', ') || 'localização'}]`;
+    // Construir a nomenclatura do público
+    const gender = genderLabels[strategy.audience?.gender as keyof typeof genderLabels] || 'pessoas';
+    const ageRange = strategy.audience?.ageRange || 'faixa etária';
+    const locations = strategy.audience?.locations?.join(', ') || 'localização';
+    const interests = strategy.audience?.interests || [];
+
+    // Construir a nomenclatura do público com interesses
+    let audienceName = `[${gender}] [${ageRange}] [${locations}]`;
+    
+    // Adicionar interesses ou "aberto" se não há interesses
+    if (interests.length > 0) {
+      audienceName += ` [${interests.join(', ')}]`;
+    } else {
+      audienceName += ` [aberto]`;
+    }
 
     return { product: productName, audience: audienceName };
   }

@@ -701,15 +701,17 @@ export const metricsService = {
 
   // Método para limpar cache por cliente específico
   clearCacheByClient(clientName: string): void {
-    console.log(`Limpando cache de métricas para cliente: ${clientName}`);
+    console.log(`🔍 DEBUG - clearCacheByClient - Limpando TODAS as chaves de cache para troca de cliente: ${clientName}`);
     
-    // Limpar todas as chaves de cache que contêm o nome do cliente
-    for (const key of this.cache.keys()) {
-      if (key.includes(clientName)) {
-        this.cache.delete(key);
-        console.log(`Cache de métricas removido: ${key}`);
-      }
-    }
+    // CORREÇÃO: Limpar TODAS as chaves de cache quando troca de cliente
+    // Isso garante que dados do cliente anterior não sejam usados
+    const keysToDelete = Array.from(this.cache.keys());
+    keysToDelete.forEach(key => {
+      this.cache.delete(key);
+      console.log(`🔍 DEBUG - clearCacheByClient - Cache removido: ${key}`);
+    });
+    
+    console.log(`🔍 DEBUG - clearCacheByClient - Total de ${keysToDelete.length} chaves de cache removidas`);
   },
 
   // CORREÇÃO: Método para limpar cache por período específico
@@ -780,6 +782,59 @@ export const metricsService = {
         return cached;
       }
       
+      // CORREÇÃO RADICAL: Se cliente específico selecionado, verificar dados reais ANTES de buscar Meta Ads
+      if (client !== 'Todos os Clientes') {
+        console.log(`🔍 DEBUG - getMetrics - Cliente específico selecionado: ${client}, verificando dados reais primeiro`);
+        
+        try {
+          // Verificar se há dados reais no monthlyDetails para este cliente/mês
+          const detailsRef = collection(db, 'monthlyDetails');
+          const qCheck = query(
+            detailsRef,
+            where('month', '==', month),
+            where('client', '==', client)
+          );
+          const snap = await getDocs(qCheck);
+          
+          console.log(`🔍 DEBUG - getMetrics - Dados reais encontrados para ${client}/${month}: ${snap.size} documentos`);
+          
+          // Se não há dados reais E não há filtros específicos, retornar vazio SEM buscar Meta Ads
+          if (snap.size === 0 && 
+              product === 'Todos os Produtos' && 
+              audience === 'Todos os Públicos' && 
+              !campaignId && 
+              !adSetId) {
+            console.log(`🔍 DEBUG - getMetrics - Cliente ${client} não tem dados reais e sem filtros específicos. Retornando vazio SEM buscar Meta Ads.`);
+            this.setCache(cacheKey, []);
+            return [];
+          }
+          
+          // Se há dados reais mas todos são zero, também retornar vazio
+          let hasRealData = false;
+          snap.forEach(doc => {
+            const d: any = doc.data();
+            const hasValues = (d?.agendamentos || 0) > 0 || (d?.vendas || 0) > 0 || (d?.cpv || 0) > 0;
+            if (hasValues) hasRealData = true;
+          });
+          
+          if (!hasRealData && 
+              product === 'Todos os Produtos' && 
+              audience === 'Todos os Públicos' && 
+              !campaignId && 
+              !adSetId) {
+            console.log(`🔍 DEBUG - getMetrics - Cliente ${client} tem dados mas todos zerados. Retornando vazio SEM buscar Meta Ads.`);
+            this.setCache(cacheKey, []);
+            return [];
+          }
+          
+        } catch (e) {
+          console.log(`🔍 DEBUG - getMetrics - Erro ao verificar dados reais: ${e}`);
+          // Se não conseguir verificar, retornar vazio por segurança
+          this.setCache(cacheKey, []);
+          return [];
+        }
+      }
+      
       // Verificar se Meta Ads está configurado e tentar sincronizar
       if (metaAdsService.isConfigured()) {
         try {
@@ -801,9 +856,35 @@ export const metricsService = {
           
 
           
+ 
+
           // Se um cliente específico foi selecionado (Business Manager), buscar dados específicos
           let metaAdsData;
           if (client !== 'Todos os Clientes') {
+            // CORREÇÃO: Verificar se há campanhas ativas para o cliente antes de buscar dados
+            console.log(`🔍 DEBUG - getMetrics - Verificando campanhas ativas para cliente: ${client}`);
+            
+            try {
+              const campaigns = await metaAdsService.getCampaigns();
+              const activeCampaigns = campaigns?.filter((campaign: any) => 
+                campaign.status === 'ACTIVE' || campaign.status === 'PAUSED'
+              ) || [];
+              
+              console.log(`🔍 DEBUG - getMetrics - Campanhas ativas encontradas: ${activeCampaigns.length}`);
+              
+              // Se não há campanhas ativas, retornar array vazio
+              if (activeCampaigns.length === 0) {
+                console.log(`🔍 DEBUG - getMetrics - Nenhuma campanha ativa para cliente ${client}, retornando dados vazios`);
+                this.setCache(cacheKey, []);
+                return [];
+              }
+            } catch (error) {
+              console.log(`🔍 DEBUG - getMetrics - Erro ao verificar campanhas: ${error}`);
+              // Se não conseguir verificar campanhas, retornar array vazio
+              this.setCache(cacheKey, []);
+              return [];
+            }
+            
             // Se há um Ad Set específico selecionado, buscar métricas do Ad Set
             if (adSetId) {
               const adSetInsights = await metaAdsService.getAdSetInsights(adSetId, startDate, endDate);
@@ -1294,13 +1375,42 @@ export const metricsService = {
       };
     }
 
-    // Log das primeiras métricas para debug
-    if (metrics.length > 0) {
-      console.log('🟢 MetricsService: calculateAggregatedMetrics - Primeira métrica:', metrics[0]);
-      console.log(`🟢 MetricsService: calculateAggregatedMetrics - Leads na primeira métrica: ${metrics[0].leads}`);
+    // CORREÇÃO: Filtrar métricas por cliente para evitar dados incorretos
+    const currentClient = localStorage.getItem('currentSelectedClient');
+    console.log('🔍 DEBUG - calculateAggregatedMetrics - Cliente atual do localStorage:', currentClient);
+    
+    // Filtrar apenas métricas do cliente atual
+    const filteredMetrics = currentClient && currentClient !== 'Selecione um cliente' 
+      ? metrics.filter(metric => metric.client === currentClient)
+      : metrics;
+    
+    console.log(`🔍 DEBUG - calculateAggregatedMetrics - Métricas filtradas: ${filteredMetrics.length} de ${metrics.length} total`);
+    
+    if (filteredMetrics.length === 0) {
+      console.log('🟡 MetricsService: calculateAggregatedMetrics - Nenhuma métrica encontrada para o cliente atual, retornando valores padrão');
+      return {
+        totalLeads: 0,
+        totalRevenue: 0,
+        totalInvestment: 0,
+        totalImpressions: 0,
+        totalClicks: 0,
+        avgCTR: 0,
+        avgCPM: 0,
+        avgCPL: 0,
+        totalROAS: 0,
+        totalROI: 0,
+        totalAppointments: 0,
+        totalSales: 0
+      };
     }
 
-    const totals = metrics.reduce((acc, metric) => {
+    // Log das primeiras métricas para debug
+    if (filteredMetrics.length > 0) {
+      console.log('🟢 MetricsService: calculateAggregatedMetrics - Primeira métrica:', filteredMetrics[0]);
+      console.log(`🟢 MetricsService: calculateAggregatedMetrics - Leads na primeira métrica: ${filteredMetrics[0].leads}`);
+    }
+
+    const totals = filteredMetrics.reduce((acc, metric) => {
       acc.totalLeads += metric.leads;
       acc.totalRevenue += metric.revenue;
       acc.totalInvestment += metric.investment;

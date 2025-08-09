@@ -187,21 +187,13 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
           
           {!showForm && (
             <div className="flex items-center gap-4">
-              {lastResults && (
-                <div className="flex items-center gap-2 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 backdrop-blur-sm border border-emerald-400/30 rounded-full px-4 py-2 shadow-lg">
-                  <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                  <span className="text-sm text-emerald-200 font-medium">
-                    Benchmark ativo ({lastResults.confidence}% confiança)
-                  </span>
-                </div>
-              )}
-                              <button
-                  onClick={() => setShowForm(true)}
-                  className="group relative inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] h-11"
-                >
-                  <TrendingUp className="h-4 w-4 mr-2" />
-                  <span>{lastResults ? 'Regenerar Benchmark' : 'Gerar Benchmark'}</span>
-                </button>
+              <button
+                onClick={() => setShowForm(true)}
+                className="group relative inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] h-11"
+              >
+                <TrendingUp className="h-4 w-4 mr-2" />
+                <span>{lastResults ? 'Regenerar Benchmark' : 'Gerar Benchmark'}</span>
+              </button>
             </div>
           )}
         </div>
@@ -669,38 +661,18 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                     <h4 className="text-lg md:text-xl font-bold bg-gradient-to-r from-emerald-200 to-cyan-200 bg-clip-text text-transparent">
                       Benchmark Gerado
                     </h4>
-                    <p className="text-slate-300 text-sm">
-                      Confiança: {lastResults.confidence}%
-                      {lastResults.confidence < 80 && (
-                        <span className="ml-2 px-2 py-1 bg-amber-500/30 text-amber-200 text-xs rounded-full border border-amber-400/30">
-                          🤖 Simulado
-                        </span>
-                      )}
-                    </p>
                   </div>
                 </div>
-              </div>
-              
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-                {[
-                  { label: 'CPM', value: formatCurrency(lastResults.cpm), color: 'from-blue-500 to-cyan-500', icon: '💰' },
-                  { label: 'CPC', value: formatCurrency(lastResults.cpc), color: 'from-purple-500 to-pink-500', icon: '🎯' },
-                  { label: 'CTR', value: `${lastResults.ctr.toFixed(2)}%`, color: 'from-green-500 to-emerald-500', icon: '📊' },
-                  { label: 'Tx Mensagens', value: `${lastResults.txMensagens.toFixed(2)}%`, color: 'from-orange-500 to-red-500', icon: '💬' },
-                  { label: 'Tx Agendamento', value: `${lastResults.txAgendamento.toFixed(2)}%`, color: 'from-indigo-500 to-purple-500', icon: '📅' },
-                  { label: 'Tx Conversão', value: `${lastResults.txConversaoVendas.toFixed(2)}%`, color: 'from-emerald-500 to-teal-500', icon: '✅' }
-                ].map((metric, index) => (
-                  <div key={index} className="group relative">
-                    <div className={`absolute inset-0 bg-gradient-to-r ${metric.color} rounded-xl opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
-                    <div className="relative bg-slate-900/40 border border-slate-700/50 rounded-xl p-4 text-center transition-all duration-300 hover:border-slate-600 hover:bg-slate-800/50">
-                      <div className="text-xl mb-1">{metric.icon}</div>
-                      <div className="text-xs text-slate-400 mb-1 font-medium">{metric.label}</div>
-                      <div className={`text-lg font-bold bg-gradient-to-r ${metric.color} bg-clip-text text-transparent`}>
-                        {metric.value}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                <div className="flex items-center gap-2">
+                  <p className="text-slate-300 text-sm">
+                    Confiança: {lastResults.confidence}%
+                  </p>
+                  {lastResults.confidence < 80 && (
+                    <span className="px-2 py-1 bg-amber-500/30 text-amber-200 text-xs rounded-full border border-amber-400/30">
+                      🤖 Simulado
+                    </span>
+                  )}
+                </div>
               </div>
 
               {lastResults.insights.length > 0 && (

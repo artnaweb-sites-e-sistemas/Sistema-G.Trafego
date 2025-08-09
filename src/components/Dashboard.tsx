@@ -151,10 +151,29 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   useEffect(() => {
     const loadMetrics = async () => {
       
+      // CORREÇÃO: Limpeza mais agressiva do cache quando cliente muda
+      console.log('🔍 DEBUG - Dashboard - Cliente alterado, limpando cache...');
+      
+      // Limpar TODAS as chaves de cache do metricsService
+      metricsService.clearCache();
+      
+      // Limpar cache específico do cliente
+      metricsService.clearCacheByClient(selectedClient);
+      
+      // Limpar cache de métricas do Meta Ads também
+      const { metaAdsService } = await import('../services/metaAdsService');
+      metaAdsService.clearMetricsCache();
+      
+      // Limpar localStorage de métricas
+      const keysToRemove = [
+        'metaAds_metrics',
+        'metaAds_insights',
+        'metaAdsDataRefreshed'
+      ];
+      keysToRemove.forEach(key => localStorage.removeItem(key));
       
       // Não carregar métricas se não há cliente selecionado
       if (selectedClient === 'Selecione um cliente' || selectedClient === 'Todos os Clientes') {
-
         setMetrics([]);
         setLoading(false);
         return;
@@ -162,14 +181,12 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
       // Não carregar métricas se não está conectado ao Meta Ads
       if (dataSource === 'facebook' && !isFacebookConnected) {
-
         setMetrics([]);
         setLoading(false);
         return;
       }
 
       try {
-  
         setLoading(true);
 
         const data = await metricsService.getMetrics(selectedMonth, selectedClient, selectedProduct, selectedAudience, selectedCampaign);
@@ -180,7 +197,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         setError(err.message);
       } finally {
         setLoading(false);
-
       }
     };
 
@@ -215,9 +231,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       try {
         console.log('🔍 DEBUG - Dashboard - Carregando valores reais para cliente:', selectedClient);
         
-        // CORREÇÃO: Limpar cache quando período muda para evitar dados incorretos
-        console.log('🔍 DEBUG - Dashboard - Limpando cache para novo período...');
-        metricsService.clearCacheByPeriod(selectedMonth, selectedClient);
+        // CORREÇÃO: Limpar cache quando cliente muda para evitar dados incorretos
+        console.log('🔍 DEBUG - Dashboard - Limpando cache para novo cliente...');
+        metricsService.clearCacheByClient(selectedClient);
         
         // Debug: verificar dados na coleção monthlyDetails
         console.log('🔍 DEBUG - Dashboard - Verificando dados na coleção monthlyDetails...');

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Package, ChevronDown, Search, Plus, Trash2, Facebook, X } from 'lucide-react';
+import { Package, ChevronDown, Search, Trash2, X, RefreshCw } from 'lucide-react';
 import { metaAdsService } from '../services/metaAdsService';
 
 interface Product {
@@ -36,19 +36,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
-  // Função para obter o ID do cliente baseado no nome
-  const getClientIdFromName = (clientName: string): string => {
-    const clientMap: { [key: string]: string } = {
-      'João Silva': '2',
-      'Maria Santos': '3',
-      'Pedro Costa': '4',
-      'Ana Oliveira': '5',
-      'Carlos Ferreira': '6',
-      'Lucia Mendes': '7',
-      'Roberto Lima': '8'
-    };
-    return clientMap[clientName] || 'all';
-  };
+  // (removido: mapeamento legacy de cliente não utilizado)
 
   // Carregar campanhas do Meta Ads (método original que usa estado local)
   const loadMetaAdsCampaigns = async () => {
@@ -101,7 +89,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
           campaign.status === 'ACTIVE' || campaign.status === 'PAUSED'
         );
         
-        const facebookProducts: Product[] = activeCampaigns.map((campaign, index) => ({
+        const facebookProducts: Product[] = activeCampaigns.map((campaign) => ({
           id: `fb-campaign-${campaign.id}`,
           name: campaign.name,
           description: `Campanha ${campaign.status === 'ACTIVE' ? 'Ativa' : 'Pausada'} - ${getCampaignObjective(campaign.objective)}`,
@@ -120,6 +108,16 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
           }));
         } else {
           setProducts(facebookProducts);
+
+          // Sincronizar nome do produto se o ID da campanha permanecer o mesmo
+          const savedCampaignId = localStorage.getItem('selectedCampaignId');
+          if (savedCampaignId) {
+            const matched = facebookProducts.find(p => p.campaign?.id === savedCampaignId);
+            if (matched && matched.name && matched.name !== selectedProduct) {
+              setSelectedProduct(matched.name);
+              localStorage.setItem('currentSelectedProduct', matched.name);
+            }
+          }
         }
         
       } catch (error: any) {
@@ -198,6 +196,20 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Listener para recarregar produtos via botão na Header
+  useEffect(() => {
+    const handleReloadProducts = async () => {
+      try {
+        await metaAdsService.forceRefreshData('campaigns');
+      } catch (e) {
+        // noop
+      }
+      await loadMetaAdsCampaigns();
+    };
+    window.addEventListener('reloadProducts', handleReloadProducts);
+    return () => window.removeEventListener('reloadProducts', handleReloadProducts);
+  }, [selectedClient, dataSource, selectedMonth]);
 
   const handleProductSelect = (product: Product) => {
     setSelectedProduct(product.name);
@@ -283,7 +295,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
           campaign.status === 'ACTIVE' || campaign.status === 'PAUSED'
         );
         
-        const facebookProducts: Product[] = activeCampaigns.map((campaign, index) => ({
+        const facebookProducts: Product[] = activeCampaigns.map((campaign) => ({
           id: `fb-campaign-${campaign.id}`,
           name: campaign.name,
           description: `Campanha ${campaign.status === 'ACTIVE' ? 'Ativa' : 'Pausada'} - ${getCampaignObjective(campaign.objective)}`,
@@ -294,6 +306,16 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
         }));
         
         setProducts(facebookProducts);
+
+        // Sincronizar nome do produto com base no selectedCampaignId (caso renomeado no Meta)
+        const savedCampaignId = localStorage.getItem('selectedCampaignId');
+        if (savedCampaignId) {
+          const matched = facebookProducts.find(p => p.campaign?.id === savedCampaignId);
+          if (matched && matched.name && matched.name !== selectedProduct) {
+            setSelectedProduct(matched.name);
+            localStorage.setItem('currentSelectedProduct', matched.name);
+          }
+        }
         
         // Se não há produtos encontrados, disparar evento
         if (facebookProducts.length === 0) {
@@ -379,12 +401,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
     }).format(price);
   };
 
-  const getProductIcon = (product: Product) => {
-    if (product.source === 'facebook') {
-      return <Facebook className="w-4 h-4 text-blue-600" />;
-    }
-    return <Package className="w-4 h-4 text-gray-400" />;
-  };
+  // (removido: helper de ícone não utilizado)
 
   // Função para traduzir objetivos das campanhas
   const getCampaignObjective = (objective: string | undefined): string => {
@@ -462,6 +479,25 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
               >
                 <X className="w-4 h-4 mr-1" />
                 Limpar
+              </button>
+
+              <button
+                onClick={async () => {
+                  try {
+                    // Limpar cache em memória de campanhas (e ad sets relacionados)
+                    await metaAdsService.forceRefreshData('campaigns');
+                  } catch (e) {
+                    // noop
+                  }
+                  // Recarregar campanhas e fechar dropdown
+                  await loadMetaAdsCampaigns();
+                  setIsOpen(false);
+                }}
+                className="flex items-center px-3 py-1.5 text-sm font-medium text-yellow-400 hover:text-yellow-200 hover:bg-slate-800 rounded-md transition-all duration-200 ease-in-out"
+                title="Limpar cache e recarregar campanhas do Meta Ads"
+              >
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Recarregar
               </button>
 
               {/* Remover botão de adicionar produto - só deve ser feito via Meta */}

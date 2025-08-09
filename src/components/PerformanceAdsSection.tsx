@@ -1460,7 +1460,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
     if (!temDadosUltimos7Dias || !temDadosAnteriores) {
       return {
         trend: 'collecting',
-        explanation: `Anúncio ainda coletando dados para ${objetivo.toLowerCase()}. Precisa de mais tempo rodando para mostrar tendência.`
+        explanation: `Anúncio ainda coletando dados para ${objetivo.toLowerCase()}.<br>Precisa de mais tempo rodando para mostrar tendência.`
       };
     }
     
@@ -1515,7 +1515,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
       
       return {
         trend: 'warning',
-        explanation: `Alerta para ${objetivo.toLowerCase()}! ${reasons.join(', ')}. Ação rápida necessária para evitar desperdício.`
+        explanation: `Alerta para ${objetivo.toLowerCase()}!<br>${reasons.join('<br>')}.<br>Ação rápida necessária para evitar desperdício.`
       };
     }
     
@@ -1540,7 +1540,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
       
       return {
         trend: 'up',
-        explanation: `${objetivo} indo muito bem! ${reasons.join(', ')}. Continue assim!`
+        explanation: `${objetivo} indo muito bem!<br>${reasons.join('<br>')}.<br>Continue assim!`
       };
     }
     
@@ -1565,14 +1565,14 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
       
       return {
         trend: 'down',
-        explanation: `${objetivo} piorando! ${reasons.join(', ')}. Precisa revisar a estratégia.`
+        explanation: `${objetivo} piorando!<br>${reasons.join('<br>')}.<br>Precisa revisar a estratégia.`
       };
     }
     
     // 4. ESTÁVEL: Se não atende nenhuma condição
     return {
       trend: 'stable',
-      explanation: `${objetivo} estável. Performance sem grandes mudanças nos últimos dias.`
+      explanation: `${objetivo} estável.<br>Performance sem grandes mudanças nos últimos dias.`
     };
   };
 
@@ -1618,11 +1618,11 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
     
     // Baseado no valor atual do CPR, inferir o tipo de conversão
     if (metrics.cpr >= 25) {
-      // CPR alto = provavelmente compras/vendas
+      // CPR alto = provavelmente conversões/vendas
       return {
         cprIdeal: 35,
-        objetivo: 'Conversões/Compras',
-        tipoConversao: 'compras'
+        objetivo: 'Conversões',
+        tipoConversao: 'conversões'
       };
     } else if (metrics.cpr >= 8) {
       // CPR médio = provavelmente leads qualificados
@@ -1897,10 +1897,67 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                              <div className="group/trend-icon cursor-help">
                                {getTrendIcon(trendData.trend)}
                                {trendData.explanation && (
-                                 <div className="absolute top-1/2 right-full transform -translate-y-1/2 mr-2 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg shadow-xl text-xs text-slate-300 opacity-0 group-hover/trend-icon:opacity-100 transition-opacity duration-200 z-50 pointer-events-none" style={{ width: '300px', maxWidth: '300px' }}>
-                                   <div className="break-words">
-                                     {trendData.explanation}
+                                 <div className="absolute top-1/2 right-full transform -translate-y-1/2 mr-2 px-4 py-3 bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-600 rounded-xl shadow-2xl text-sm text-slate-200 opacity-0 group-hover/trend-icon:opacity-100 transition-all duration-300 z-50 pointer-events-none backdrop-blur-sm" style={{ width: '320px', maxWidth: '320px' }}>
+                                   <div className="space-y-2">
+                                     {/* Título do alerta */}
+                                     <div className="flex items-center gap-2 mb-2">
+                                       <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
+                                       <span className="font-semibold text-red-300 text-xs uppercase tracking-wide">
+                                         {trendData.trend === 'warning' ? 'Alerta para Conversões!' : 
+                                          trendData.trend === 'up' ? 'Tendência Positiva!' :
+                                          trendData.trend === 'down' ? 'Tendência Negativa!' : 'Status'}
+                                       </span>
+                                     </div>
+                                     
+                                     {/* Conteúdo principal */}
+                                     <div className="text-sm leading-relaxed space-y-1">
+                                       {trendData.explanation.split('<br>').map((sentence, index) => {
+                                         // Função para destacar partes importantes
+                                         const highlightText = (text: string) => {
+                                           let highlightedText = text;
+                                           
+                                           // Destacar porcentagens (incluindo decimais)
+                                           highlightedText = highlightedText.replace(/(\d+(?:,\d+)?(?:\.\d+)?%?)/g, '<strong class="text-yellow-300 font-semibold">$1</strong>');
+                                           
+                                           // Destacar valores monetários
+                                           highlightedText = highlightedText.replace(/(R\$ \d+(?:,\d+)?(?:\.\d+)?)/g, '<strong class="text-green-300 font-semibold">$1</strong>');
+                                           
+                                           // Destacar palavras-chave importantes (métricas)
+                                           highlightedText = highlightedText.replace(/(conversões|leads|cliques|CPR|CPC|CTR|frequência|público|impressões|alcance)/gi, '<strong class="text-blue-300 font-semibold">$1</strong>');
+                                           
+                                           // Destacar ações e status
+                                           highlightedText = highlightedText.replace(/(melhorou|aumentou|diminuiu|piorou|caíram|necessária|revisar|estável|controlada|saturada|cansado)/gi, '<strong class="text-orange-300 font-semibold">$1</strong>');
+                                           
+                                           // Destacar alertas e urgência
+                                           highlightedText = highlightedText.replace(/(alerta|urgente|crítico|atenção|imediata|rápida)/gi, '<strong class="text-red-300 font-semibold">$1</strong>');
+                                           
+                                           // Destacar períodos de tempo
+                                           highlightedText = highlightedText.replace(/(últimos \d+ dias?|últimas \d+ horas?|semana|mês)/gi, '<strong class="text-purple-300 font-semibold">$1</strong>');
+                                           
+                                           return highlightedText;
+                                         };
+
+                                         const highlightedSentence = highlightText(sentence);
+                                         
+                                         return (
+                                           <p key={index} className="text-slate-300" 
+                                              dangerouslySetInnerHTML={{ __html: highlightedSentence }}>
+                                           </p>
+                                         );
+                                       })}
+                                     </div>
+                                     
+                                     {/* Ação recomendada */}
+                                     {trendData.trend === 'warning' && (
+                                       <div className="mt-2 pt-2 border-t border-slate-600">
+                                         <p className="text-xs text-amber-300 font-medium">
+                                           ⚡ Ação rápida necessária para evitar desperdício.
+                                         </p>
+                                       </div>
+                                     )}
                                    </div>
+                                   
+                                   {/* Seta do tooltip */}
                                    <div className="absolute top-1/2 left-full transform -translate-y-1/2 w-0 h-0 border-t-4 border-b-4 border-l-4 border-transparent border-l-slate-800"></div>
                                  </div>
                                )}

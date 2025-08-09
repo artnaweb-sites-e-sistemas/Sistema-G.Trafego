@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Users, ChevronDown, Search, Plus, Trash2, Facebook, X } from 'lucide-react';
+import { Users, ChevronDown, Search, Trash2, Facebook, X } from 'lucide-react';
 import { metaAdsService, BusinessManager } from '../services/metaAdsService';
 
 interface Client {
@@ -70,7 +70,7 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
           const businessManagers = await metaAdsService.getBusinessManagers();
 
           // Converter Business Managers para formato de clientes
-          const facebookClients: Client[] = businessManagers.map((bm, index) => ({
+          const facebookClients: Client[] = businessManagers.map((bm) => ({
             id: `fb-${bm.id}`,
             name: bm.name,
             company: 'Business Manager',
@@ -121,20 +121,52 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
   }, []);
 
   const handleClientSelect = async (client: Client) => {
-
+    console.log('🔍 DEBUG - ClientPicker - Cliente selecionado:', client.name);
+    
+    // Capturar cliente anterior ANTES de trocar
+    const previousClient = localStorage.getItem('currentSelectedClient');
+    console.log('🔍 DEBUG - ClientPicker - Cliente anterior:', previousClient);
+    
+    // Limpar cache do cliente anterior especificamente
+    if (previousClient && previousClient !== client.name) {
+      console.log('🔍 DEBUG - ClientPicker - Limpando cache do cliente anterior:', previousClient);
+      
+      // Limpar TODAS as chaves de cache do metricsService
+      const { metricsService } = await import('../services/metricsService');
+      metricsService.clearCache();
+      metricsService.clearCacheByClient(previousClient);
+      
+      // Limpar cache do metaAdsService também
+      const { metaAdsService } = await import('../services/metaAdsService');
+      metaAdsService.clearMetricsCache();
+      
+      // Limpar localStorage de métricas
+      const keysToRemove = [
+        'metaAds_metrics',
+        'metaAds_insights',
+        'metaAdsDataRefreshed'
+      ];
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      
+      console.log('🔍 DEBUG - ClientPicker - Cache limpo completamente');
+    }
+    
     setSelectedClient(client.name);
     setIsOpen(false);
     setSearchTerm('');
     
-    localStorage.removeItem('selectedCampaignId');
-    localStorage.removeItem('selectedAdSetId');
-    localStorage.removeItem('selectedProduct');
-    localStorage.removeItem('selectedAudience');
+    // Somente limpar seleção se o cliente realmente mudou
+    if (!previousClient || previousClient !== client.name) {
+      localStorage.removeItem('selectedCampaignId');
+      localStorage.removeItem('selectedAdSetId');
+      localStorage.removeItem('selectedProduct');
+      localStorage.removeItem('selectedAudience');
+    }
     
     localStorage.setItem('currentSelectedClient', client.name);
 
     if (client.source === 'facebook') {
-
+      // Limpar todo o cache do Meta Ads
       metaAdsService.clearAllCache();
       
       const keysToRemove = [
@@ -147,10 +179,9 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
       ];
       keysToRemove.forEach(key => localStorage.removeItem(key));
       
-      import('../services/metricsService').then(({ metricsService }) => {
-        metricsService.clearCache();
-  
-      });
+      // Limpar cache do metricsService completamente
+      const { metricsService } = await import('../services/metricsService');
+      metricsService.clearCache();
     }
     
     if (client.source === 'facebook' && client.businessManager) {
@@ -289,9 +320,7 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
     return client ? client.name : 'Selecione um cliente';
   };
 
-  const getSelectedClientInfo = () => {
-    return clients.find(c => c.name === selectedClient);
-  };
+  // (removido: helper não utilizado)
 
   const getClientIcon = (client: Client) => {
     if (client.source === 'facebook') {
