@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Target, MapPin, DollarSign, Edit, Copy, CheckCircle, TrendingUp, GitBranch, Clock } from 'lucide-react';
+import { Plus, Target, MapPin, DollarSign, Edit, Copy, CheckCircle, TrendingUp, GitBranch, Clock, Package, Globe, MessageSquare, ShoppingCart, Users, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { adStrategyService, AdStrategy } from '../services/adStrategyService';
 import { metaAdsService } from '../services/metaAdsService';
 import { toast } from 'react-hot-toast';
+import CustomDropdown from './CustomDropdown';
 
 interface AdStrategySectionProps {
   selectedClient: string;
@@ -28,7 +29,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     audience: {
       gender: 'ambos' as const,
       ageRange: '25-45',
-      locations: []
+      locations: [],
+      interests: []
     },
     budget: {
       planned: 0,
@@ -42,6 +44,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
   });
   const [editingStrategy, setEditingStrategy] = useState<string | null>(null);
   const [locationInput, setLocationInput] = useState('');
+  const [interestInput, setInterestInput] = useState('');
   const [collapsedProducts, setCollapsedProducts] = useState<Set<string>>(new Set());
   const [copiedStates, setCopiedStates] = useState<Set<string>>(new Set());
   const [plannedInput, setPlannedInput] = useState<string>('R$ 0,00');
@@ -77,24 +80,32 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     const run = async () => {
       if (!strategies || strategies.length === 0) return;
       
+      console.log(`🔍 DEBUG - useEffect avaliação - Iniciando para ${strategies.length} estratégias no período ${selectedMonth}`);
+      
       // Avaliar sequencialmente para reduzir rate limit
       for (const s of strategies) {
         const evaluationKey = `${s.id}-${selectedMonth}`;
         if (!hasEvaluatedRef.current.has(evaluationKey)) {
           try {
+            console.log(`🔍 DEBUG - Avaliando estratégia ${s.id} (${s.generatedNames.audience}) para período ${selectedMonth}`);
             await evaluateStrategyPerformance(s);
             hasEvaluatedRef.current.add(evaluationKey);
+            console.log(`✅ DEBUG - Estratégia ${s.id} avaliada com sucesso`);
             // pequena pausa para aliviar rate limit
             await new Promise(res => setTimeout(res, 400));
           } catch (e) {
+            console.error(`❌ DEBUG - Erro ao avaliar estratégia ${s.id}:`, e);
             // segue para próxima
           }
+        } else {
+          console.log(`⏭️ DEBUG - Estratégia ${s.id} já foi avaliada para período ${selectedMonth}`);
         }
       }
       
       // Sincronizar orçamento apenas das não sincronizadas
       const toSync = strategies.filter(s => !s.isSynchronized);
       if (toSync.length > 0) {
+        console.log(`🔍 DEBUG - Sincronizando ${toSync.length} estratégias não sincronizadas`);
         for (const s of toSync) {
           const syncKey = `${s.id}-${selectedMonth}`;
           if (!hasSyncedRef.current.has(syncKey)) {
@@ -106,6 +117,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           }
         }
       }
+      
+      console.log(`🔍 DEBUG - useEffect avaliação - Concluído`);
     };
     run();
   }, [strategies, selectedClient, selectedMonth]);
@@ -165,7 +178,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
         audience: {
           gender: 'ambos' as const,
           ageRange: '25-45',
-          locations: []
+          locations: [],
+          interests: []
         },
         budget: {
           planned: 0,
@@ -180,6 +194,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       setEditingStrategy(null);
       setPlannedInput('R$ 0,00');
       setCurrentInput('R$ 0,00');
+      setLocationInput('');
+      setInterestInput('');
     }
     setIsModalOpen(true);
   };
@@ -187,31 +203,34 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
   // Função para fechar modal
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setCurrentStrategy({
-      product: {
-        name: '',
-        niche: '',
-        type: 'online' as const,
-        objective: 'trafico' as const
-      },
-      audience: {
-        gender: 'ambos' as const,
-        ageRange: '25-45',
-        locations: []
-      },
-      budget: {
-        planned: 0,
-        current: 0
-      },
-      generatedNames: {
-        product: '',
-        audience: ''
-      },
-      isSynchronized: false
-    });
+          setCurrentStrategy({
+        product: {
+          name: '',
+          niche: '',
+          type: 'online' as const,
+          objective: 'trafico' as const
+        },
+        audience: {
+          gender: 'ambos' as const,
+          ageRange: '25-45',
+          locations: [],
+          interests: []
+        },
+        budget: {
+          planned: 0,
+          current: 0
+        },
+        generatedNames: {
+          product: '',
+          audience: ''
+        },
+        isSynchronized: false
+      });
     setEditingStrategy(null);
     setPlannedInput('R$ 0,00');
     setCurrentInput('R$ 0,00');
+    setLocationInput('');
+    setInterestInput('');
   };
 
   // Função para salvar estratégia
@@ -293,13 +312,43 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     }));
   };
 
+  // Função para adicionar interesse
+  const handleAddInterest = () => {
+    if (interestInput.trim() && !currentStrategy.audience?.interests.includes(interestInput.trim())) {
+      setCurrentStrategy(prev => ({
+        ...prev,
+        audience: {
+          ...prev.audience!,
+          interests: [...(prev.audience?.interests || []), interestInput.trim()]
+        }
+      }));
+      setInterestInput('');
+    }
+  };
+
+  // Função para remover interesse
+  const handleRemoveInterest = (interest: string) => {
+    setCurrentStrategy(prev => ({
+      ...prev,
+      audience: {
+        ...prev.audience!,
+        interests: prev.audience?.interests.filter(i => i !== interest) || []
+      }
+    }));
+  };
+
   // Função para gerar nomes
   const generateNames = () => {
     if (!currentStrategy.product?.name || !currentStrategy.product?.niche || !currentStrategy.product?.objective) return;
 
     const productName = `[${currentStrategy.product.name} ${currentStrategy.product.type === 'fisico' ? 'presencial' : 'online'}] [${currentStrategy.product.niche}] [${currentStrategy.product.objective === 'trafico' ? 'tráfego' : currentStrategy.product.objective === 'mensagens' ? 'mensagens' : 'compras'}]`;
     
-    const audienceName = `[${currentStrategy.audience?.gender === 'homem' ? 'homens' : currentStrategy.audience?.gender === 'mulher' ? 'mulheres' : 'ambos'}] [${currentStrategy.audience?.ageRange}] [${currentStrategy.audience?.locations.join(', ')}]`;
+    // Lógica para interesses: se não há interesses, usar "aberto", senão usar os interesses
+    const interestsText = currentStrategy.audience?.interests && currentStrategy.audience.interests.length > 0 
+      ? currentStrategy.audience.interests.join(', ')
+      : 'aberto';
+    
+    const audienceName = `[${currentStrategy.audience?.gender === 'homem' ? 'homens' : currentStrategy.audience?.gender === 'mulher' ? 'mulheres' : 'ambos'}] [${currentStrategy.audience?.ageRange}] [${currentStrategy.audience?.locations.join(', ')}] [${interestsText}]`;
 
     setCurrentStrategy(prev => ({
       ...prev,
@@ -313,7 +362,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
   // Gerar nomes quando dados mudam
   useEffect(() => {
     generateNames();
-  }, [currentStrategy.product, currentStrategy.audience]);
+  }, [currentStrategy.product, currentStrategy.audience?.gender, currentStrategy.audience?.ageRange, currentStrategy.audience?.locations, currentStrategy.audience?.interests]);
 
   // Utilidades
   const getMonthDateRange = (monthLabel: string): { startDate: string; endDate: string } => {
@@ -390,18 +439,72 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
   const evaluateStrategyPerformance = async (strategy: AdStrategy) => {
     try {
       const { startDate, endDate } = getMonthDateRange(selectedMonth);
+      console.log(`🔍 DEBUG - evaluateStrategyPerformance - Estratégia ${strategy.id} (${strategy.generatedNames.audience}) - Período: ${startDate} a ${endDate}`);
+      
       const adSets = await metaAdsService.getAdSets();
       const wanted = strategy.generatedNames.audience;
       const matching = (adSets || []).filter((ad: any) => namesExactlyMatch(ad.name, wanted));
+      
+      console.log(`🔍 DEBUG - evaluateStrategyPerformance - AdSets encontrados:`, {
+        wanted,
+        totalAdSets: adSets?.length || 0,
+        matchingCount: matching.length,
+        matchingNames: matching.map((ad: any) => ad.name),
+        allAdSetNames: adSets?.map((ad: any) => ad.name) || [],
+        normalizedWanted: normalizeName(wanted),
+        normalizedAdSetNames: adSets?.map((ad: any) => normalizeName(ad.name)) || []
+      });
 
-      // Buscar insights agregados (sem time_increment) para o período
+      // Buscar insights APENAS para o período específico selecionado
       let totals = { spend: 0, leads: 0, sales: 0, clicks: 0, impressions: 0, cprSamples: [] as number[], cplSamples: [] as number[] };
       
       if (matching.length > 0) {
+        console.log(`🔍 DEBUG - evaluateStrategyPerformance - Buscando insights para ${matching.length} adSets`);
+        
         const allInsights = await Promise.all(
           matching.map((ad: any) => metaAdsService.getAdSetInsights(ad.id, startDate, endDate))
         );
-        const insightsFlat = allInsights.flat().filter((i: any) => parseFloat(i.spend || '0') > 0);
+        
+        console.log(`🔍 DEBUG - evaluateStrategyPerformance - Insights brutos retornados:`, {
+          totalInsights: allInsights.flat().length,
+          insightsPerAdSet: allInsights.map((insights, i) => ({
+            adSetName: matching[i].name,
+            insightsCount: insights.length
+          }))
+        });
+        
+        // Filtrar apenas insights do período específico (sem fallback para outros períodos)
+        const insightsFlat = allInsights.flat().filter((i: any) => {
+          const insightDate = new Date(i.date_start);
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          const isInPeriod = insightDate >= start && insightDate <= end;
+          const hasSpend = parseFloat(i.spend || '0') > 0;
+          
+          console.log(`🔍 DEBUG - Insight filtro:`, {
+            date: i.date_start,
+            insightDate: insightDate.toISOString(),
+            start: start.toISOString(),
+            end: end.toISOString(),
+            isInPeriod,
+            spend: i.spend,
+            hasSpend,
+            shouldInclude: isInPeriod && hasSpend
+          });
+          
+          return isInPeriod && hasSpend;
+        });
+        
+        console.log(`🔍 DEBUG - evaluateStrategyPerformance - Insights filtrados para período:`, {
+          totalFiltered: insightsFlat.length,
+          insights: insightsFlat.map((i: any) => ({
+            date: i.date_start,
+            spend: i.spend,
+            impressions: i.impressions,
+            clicks: i.clicks
+          }))
+        });
+        
         const metricData = insightsFlat.length > 0
           ? metaAdsService.convertToMetricData(insightsFlat, selectedMonth, selectedClient, strategy.product.name, strategy.generatedNames.audience)
           : [];
@@ -419,6 +522,10 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           },
           { spend: 0, leads: 0, sales: 0, clicks: 0, impressions: 0, cprSamples: [] as number[], cplSamples: [] as number[] }
         );
+        
+        console.log(`🔍 DEBUG - evaluateStrategyPerformance - Totais calculados:`, totals);
+      } else {
+        console.log(`🔍 DEBUG - evaluateStrategyPerformance - Nenhum adSet encontrado para a estratégia`);
       }
 
       const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
@@ -455,6 +562,25 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
         }
       }
 
+      console.log(`🔍 DEBUG - evaluateStrategyPerformance - Recomendação final:`, {
+        strategyId: strategy.id,
+        recommendation: rec,
+        stats: {
+          spend: totals.spend,
+          ctr,
+          cpl: objective === 'mensagens' ? cplStrict : cpc,
+          cpr,
+          clicks: totals.clicks,
+          impressions: totals.impressions,
+          leads: totals.leads,
+          sales: totals.sales,
+          objective,
+          adSetsCount: matching.length,
+          periodStart: startDate,
+          periodEnd: endDate
+        }
+      });
+
       setRecommendations(prev => ({
         ...prev,
         [strategy.id]: {
@@ -487,31 +613,48 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     } catch (error) {
       console.error('Erro ao avaliar performance da estratégia:', error);
       // Não sobreescrever tooltip com erro; manter último sucesso ou estado "aguardando dados"
-      setRecommendations(prev => ({
-        ...prev,
-        [strategy.id]: prev[strategy.id] || {
-          type: 'wait',
-          tooltip: 'Aguardando dados do período',
-          stats: {
-            spend: 0, ctr: 0, cpl: 0, cpr: 0, clicks: 0, impressions: 0, leads: 0, sales: 0, objective: strategy.product.objective, adSetsCount: 0, periodStart: '', periodEnd: ''
-          }
-        }
-      }));
     }
   };
 
-  // Agrupar estratégias por produto, exibindo apenas se tiver gasto no período OU se foi criada no período selecionado
+  // Agrupar estratégias por produto, exibindo apenas se tiver gasto no período OU se foi criada no período
   const strategiesByProduct = ((): Record<string, { name: string; niche: string; strategies: AdStrategy[] }> => {
-    // Filtrar por visibilidade inteligente
+    // Filtrar por visibilidade inteligente - só aparece se tiver gasto OU se foi criada no período
     const filtered = strategies.filter((s) => {
       const rec = recommendations[s.id];
-      const hasSpendInPeriod = rec?.stats?.spend >= 0.01;
-      const hasAdSetsInPeriod = rec?.stats?.adSetsCount > 0;
-      const createdThisMonth = s.month === selectedMonth;
       
-      // Só aparece se: tem gasto no período E tem ad sets OU foi criada neste período
-      return (hasSpendInPeriod && hasAdSetsInPeriod) || createdThisMonth;
+      console.log(`🔍 DEBUG - Filtragem estratégia ${s.id}:`, {
+        strategyName: s.generatedNames.audience,
+        hasRec: !!rec,
+        hasStats: !!rec?.stats,
+        spend: rec?.stats?.spend,
+        adSetsCount: rec?.stats?.adSetsCount,
+        hasSpendInPeriod: rec?.stats?.spend >= 0.01,
+        hasAdSetsInPeriod: rec?.stats?.adSetsCount > 0,
+        createdInPeriod: s.month === selectedMonth
+      });
+      
+      // Se não há recomendações inicializadas, não mostrar
+      if (!rec || !rec.stats) {
+        console.log(`❌ Estratégia ${s.id} filtrada: sem recomendações ou stats`);
+        return false;
+      }
+      
+      const hasSpendInPeriod = rec.stats.spend >= 0.01;
+      const hasAdSetsInPeriod = rec.stats.adSetsCount > 0;
+      const createdInPeriod = s.month === selectedMonth;
+      
+      // Só aparece se: tem gasto no período OU foi criada neste período
+      const shouldShow = hasSpendInPeriod || createdInPeriod;
+      
+      console.log(`🔍 DEBUG - Resultado filtragem ${s.id}:`, {
+        shouldShow,
+        reason: hasSpendInPeriod ? 'com gasto' : createdInPeriod ? 'criada no período' : 'sem gasto e não criada no período'
+      });
+      
+      return shouldShow;
     });
+    
+    console.log(`🔍 DEBUG - Total de estratégias após filtragem: ${filtered.length}`);
     
     return filtered.reduce((acc, strategy) => {
     const productKey = `${strategy.product.name}-${strategy.product.niche}`;
@@ -918,12 +1061,19 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                 {/* Scrollable Content */}
                 <div className="flex-1 overflow-y-auto p-6">
                   <div className="space-y-6">
-                    {/* Produto */}
-                    <div>
-                      <h3 className="text-lg font-semibold text-slate-200 mb-4">Definição do Produto</h3>
+                    {/* Container - Definição do Produto */}
+                    <div className="bg-gradient-to-br from-blue-900/20 to-blue-800/10 border border-blue-500/30 rounded-xl p-6 relative z-30">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/40 flex items-center justify-center">
+                          <svg className="w-4 h-4 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                        </div>
+                        <h3 className="text-lg font-semibold text-blue-200">Definição do Produto</h3>
+                      </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">Nome do Produto</label>
+                          <label className="block text-sm font-medium text-blue-300 mb-2">Nome do Produto</label>
                           <input
                             type="text"
                             value={currentStrategy.product?.name || ''}
@@ -931,12 +1081,12 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                               ...prev,
                               product: { ...prev.product!, name: e.target.value }
                             }))}
-                            className="w-full bg-slate-700/60 border border-slate-600/50 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                            className="w-full bg-slate-700/60 border border-blue-500/40 rounded-lg px-4 py-3 text-white placeholder-blue-400/60 focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
                             placeholder="Ex: Aulas de Pilates"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">Nicho</label>
+                          <label className="block text-sm font-medium text-blue-300 mb-2">Nicho</label>
                           <input
                             type="text"
                             value={currentStrategy.product?.niche || ''}
@@ -944,93 +1094,103 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                               ...prev,
                               product: { ...prev.product!, niche: e.target.value }
                             }))}
-                            className="w-full bg-slate-700/60 border border-slate-600/50 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                            className="w-full bg-slate-700/60 border border-blue-500/40 rounded-lg px-4 py-3 text-white placeholder-blue-400/60 focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
                             placeholder="Ex: Pilates"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">Tipo</label>
-                          <select
+                          <CustomDropdown
+                            label="Tipo"
+                            options={[
+                              { value: 'online', label: 'Produto Online', icon: <Globe className="w-4 h-4" /> },
+                              { value: 'fisico', label: 'Produto Físico', icon: <Package className="w-4 h-4" /> }
+                            ]}
                             value={currentStrategy.product?.type || 'online'}
-                            onChange={(e) => setCurrentStrategy(prev => ({
+                            onChange={(value) => setCurrentStrategy(prev => ({
                               ...prev,
-                              product: { ...prev.product!, type: e.target.value as 'online' | 'fisico' }
+                              product: { ...prev.product!, type: value as 'online' | 'fisico' }
                             }))}
-                            className="w-full bg-slate-700/60 border border-slate-600/50 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                          >
-                            <option value="online">Produto Online</option>
-                            <option value="fisico">Produto Físico</option>
-                          </select>
+                            theme="blue"
+                          />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">Objetivo</label>
-                          <select
+                          <CustomDropdown
+                            label="Objetivo"
+                            options={[
+                              { value: 'trafico', label: 'Tráfego no Site', icon: <Globe className="w-4 h-4" /> },
+                              { value: 'mensagens', label: 'Conversão em Mensagens', icon: <MessageSquare className="w-4 h-4" /> },
+                              { value: 'compras', label: 'Conversões de Compras', icon: <ShoppingCart className="w-4 h-4" /> }
+                            ]}
                             value={currentStrategy.product?.objective || 'trafico'}
-                            onChange={(e) => setCurrentStrategy(prev => ({
+                            onChange={(value) => setCurrentStrategy(prev => ({
                               ...prev,
-                              product: { ...prev.product!, objective: e.target.value as 'trafico' | 'mensagens' | 'compras' }
+                              product: { ...prev.product!, objective: value as 'trafico' | 'mensagens' | 'compras' }
                             }))}
-                            className="w-full bg-slate-700/60 border border-slate-600/50 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                          >
-                            <option value="trafico">Tráfego no Site</option>
-                            <option value="mensagens">Conversão em Mensagens</option>
-                            <option value="compras">Conversões de Compras</option>
-                          </select>
+                            theme="blue"
+                          />
                         </div>
                       </div>
                     </div>
 
-                    {/* Público */}
-                    <div>
-                      <h3 className="text-lg font-semibold text-slate-200 mb-4">Definição do Público</h3>
+                    {/* Container - Definição do Público */}
+                    <div className="bg-gradient-to-br from-yellow-900/20 to-yellow-800/10 border border-yellow-500/30 rounded-xl p-6 relative z-20">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-8 h-8 rounded-lg bg-yellow-600/20 border border-yellow-500/40 flex items-center justify-center">
+                          <Target className="w-4 h-4 text-yellow-300" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-yellow-200">Definição do Público</h3>
+                      </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">Público Alvo</label>
-                          <select
+                          <CustomDropdown
+                            label="Público Alvo"
+                            options={[
+                              { value: 'ambos', label: 'Ambos', icon: <Users className="w-4 h-4" /> },
+                              { value: 'homem', label: 'Homem', icon: <Users className="w-4 h-4" /> },
+                              { value: 'mulher', label: 'Mulher', icon: <Users className="w-4 h-4" /> }
+                            ]}
                             value={currentStrategy.audience?.gender || 'ambos'}
-                            onChange={(e) => setCurrentStrategy(prev => ({
+                            onChange={(value) => setCurrentStrategy(prev => ({
                               ...prev,
-                              audience: { ...prev.audience!, gender: e.target.value as 'homem' | 'mulher' | 'ambos' }
+                              audience: { ...prev.audience!, gender: value as 'homem' | 'mulher' | 'ambos' }
                             }))}
-                            className="w-full bg-slate-700/60 border border-slate-600/50 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                          >
-                            <option value="ambos">Ambos</option>
-                            <option value="homem">Homem</option>
-                            <option value="mulher">Mulher</option>
-                          </select>
+                            theme="yellow"
+                          />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">Faixa Etária</label>
-                          <select
+                          <CustomDropdown
+                            label="Faixa Etária"
+                            options={[
+                              { value: '18-25', label: '18-25 anos', icon: <Calendar className="w-4 h-4" /> },
+                              { value: '25-35', label: '25-35 anos', icon: <Calendar className="w-4 h-4" /> },
+                              { value: '35-45', label: '35-45 anos', icon: <Calendar className="w-4 h-4" /> },
+                              { value: '45-65', label: '45-65 anos', icon: <Calendar className="w-4 h-4" /> },
+                              { value: '65+', label: '65+ anos', icon: <Calendar className="w-4 h-4" /> }
+                            ]}
                             value={currentStrategy.audience?.ageRange || '25-45'}
-                            onChange={(e) => setCurrentStrategy(prev => ({
+                            onChange={(value) => setCurrentStrategy(prev => ({
                               ...prev,
-                              audience: { ...prev.audience!, ageRange: e.target.value }
+                              audience: { ...prev.audience!, ageRange: value }
                             }))}
-                            className="w-full bg-slate-700/60 border border-slate-600/50 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                          >
-                            <option value="18-25">18-25 anos</option>
-                            <option value="25-35">25-35 anos</option>
-                            <option value="35-45">35-45 anos</option>
-                            <option value="45-65">45-65 anos</option>
-                          </select>
+                            theme="yellow"
+                          />
                         </div>
                       </div>
                       
                       <div className="mt-4">
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Localização</label>
+                        <label className="block text-sm font-medium text-yellow-300 mb-2">Localização</label>
                         <div className="flex gap-2 mb-2">
                           <input
                             type="text"
                             value={locationInput}
                             onChange={(e) => setLocationInput(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && handleAddLocation()}
-                            className="flex-1 bg-slate-700/60 border border-slate-600/50 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                            className="flex-1 bg-slate-700/60 border border-yellow-500/40 rounded-lg px-4 py-3 text-white placeholder-yellow-400/60 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400"
                             placeholder="Digite uma localização e pressione Enter"
                           />
                           <button
                             onClick={handleAddLocation}
-                            className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                            className="px-4 py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
                           >
                             Adicionar
                           </button>
@@ -1039,13 +1199,13 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                           {currentStrategy.audience?.locations.map((location, index) => (
                             <span
                               key={index}
-                              className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-600/30 text-blue-200"
+                              className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-yellow-600/30 text-yellow-200 border border-yellow-500/40"
                             >
                               <MapPin className="w-3 h-3 mr-1" />
                               {location}
                               <button
                                 onClick={() => handleRemoveLocation(location)}
-                                className="ml-2 text-blue-300 hover:text-white transition-colors"
+                                className="ml-2 text-yellow-300 hover:text-white transition-colors"
                               >
                                 ×
                               </button>
@@ -1053,19 +1213,66 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                           ))}
                         </div>
                       </div>
+                      
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-yellow-300 mb-2">Interesses (Opcional)</label>
+                        <div className="flex gap-2 mb-2">
+                          <input
+                            type="text"
+                            value={interestInput}
+                            onChange={(e) => setInterestInput(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleAddInterest()}
+                            className="flex-1 bg-slate-700/60 border border-yellow-500/40 rounded-lg px-4 py-3 text-white placeholder-yellow-400/60 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400"
+                            placeholder="Digite um interesse e pressione Enter"
+                          />
+                          <button
+                            onClick={handleAddInterest}
+                            className="px-4 py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
+                          >
+                            Adicionar
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {currentStrategy.audience?.interests.map((interest, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-yellow-600/30 text-yellow-200 border border-yellow-500/40"
+                            >
+                              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                              </svg>
+                              {interest}
+                              <button
+                                onClick={() => handleRemoveInterest(interest)}
+                                className="ml-2 text-yellow-300 hover:text-white transition-colors"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                        <p className="text-xs text-yellow-400/70 mt-2">
+                          Se nenhum interesse for adicionado, será usado "aberto" na nomenclatura do público.
+                        </p>
+                      </div>
                     </div>
 
-                    {/* Orçamento */}
-                    <div>
-                      <h3 className="text-lg font-semibold text-slate-200 mb-4">Orçamento</h3>
+                    {/* Container - Orçamento */}
+                    <div className="bg-gradient-to-br from-emerald-900/20 to-emerald-800/10 border border-emerald-500/30 rounded-xl p-6 relative z-10">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-600/20 border border-emerald-500/40 flex items-center justify-center">
+                          <DollarSign className="w-4 h-4 text-emerald-300" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-emerald-200">Orçamento</h3>
+                      </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">Valor Pretendido</label>
+                          <label className="block text-sm font-medium text-emerald-300 mb-2">Valor Pretendido</label>
                           <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-400 font-semibold text-sm">R$</span>
                             <input
                               type="text"
-                              value={plannedInput}
+                              value={plannedInput.replace('R$ ', '').replace('R$', '')}
                               onChange={(e) => {
                                 const digits = extractDigits(e.target.value);
                                 setCurrentStrategy(prev => ({
@@ -1074,18 +1281,18 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                 }));
                                 setPlannedInput(formatBRLFromDigits(digits));
                               }}
-                              className="w-full bg-slate-700/60 border border-slate-600/50 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              placeholder="R$ 0,00"
+                              className="w-full bg-slate-700/60 border border-emerald-500/40 rounded-lg pl-8 pr-4 py-3 text-white placeholder-emerald-400/60 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              placeholder="0,00"
                             />
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">Valor Atual</label>
+                          <label className="block text-sm font-medium text-emerald-300 mb-2">Valor Atual</label>
                           <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-400 font-semibold text-sm">R$</span>
                             <input
                               type="text"
-                              value={currentInput}
+                              value={currentInput.replace('R$ ', '').replace('R$', '')}
                               onChange={(e) => {
                                 if (!currentStrategy.isSynchronized) {
                                   const digits = extractDigits(e.target.value);
@@ -1097,8 +1304,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                 }
                               }}
                               readOnly={currentStrategy.isSynchronized}
-                              className={`w-full bg-slate-700/60 border border-slate-600/50 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${currentStrategy.isSynchronized ? 'opacity-50 cursor-not-allowed' : ''}`}
-                              placeholder="R$ 0,00"
+                              className={`w-full bg-slate-700/60 border border-emerald-500/40 rounded-lg pl-8 pr-4 py-3 text-white placeholder-emerald-400/60 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${currentStrategy.isSynchronized ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              placeholder="0,00"
                             />
                           </div>
                         </div>

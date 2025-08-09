@@ -12,6 +12,7 @@ export interface AdStrategy {
     gender: 'homem' | 'mulher' | 'ambos';
     ageRange: string;
     locations: string[];
+    interests: string[];
   };
   budget: {
     planned: number;
