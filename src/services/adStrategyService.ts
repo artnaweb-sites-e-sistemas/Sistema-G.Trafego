@@ -127,13 +127,19 @@ class AdStrategyService {
   async getStrategiesByClientAndMonth(client: string, month: string): Promise<AdStrategy[]> {
     // 1) Remoto – fonte de verdade
     try {
+      console.time(`adStrategyService.getStrategiesByClientAndMonth ${client}/${month}`);
       const user = authService.getCurrentUser();
       if (!user) throw new Error('Usuário não autenticado');
+      console.log('🔍 DEBUG - adStrategyService - getStrategiesByClientAndMonth - User UID:', user.uid);
+      console.log('🔍 DEBUG - adStrategyService - getStrategiesByClientAndMonth - Filtros:', { client, month });
       const col = collection(db, 'users', user.uid, 'adStrategies');
       const q = query(col, where('client', '==', client), where('month', '==', month), orderBy('createdAt', 'desc'));
       const snap = await getDocs(q);
+      console.log('🔍 DEBUG - adStrategyService - getStrategiesByClientAndMonth - Docs encontrados:', snap.size);
+      const docIds: string[] = [];
       const remote: AdStrategy[] = snap.docs.map(d => {
         const data: any = d.data();
+        docIds.push(d.id);
         return {
           id: data.id,
           product: data.product,
@@ -147,15 +153,18 @@ class AdStrategyService {
           firebaseId: d.id
         };
       });
+      console.log('🔍 DEBUG - adStrategyService - getStrategiesByClientAndMonth - IDs:', docIds);
 
       // Atualizar cache local com o remoto (fonte de verdade)
       const existing = this.getAllStrategies();
       const byId = new Map(existing.map(s => [s.id, s]));
       for (const m of remote) byId.set(m.id, m);
       localStorage.setItem(this.storageKey, JSON.stringify(Array.from(byId.values())));
+      console.timeEnd(`adStrategyService.getStrategiesByClientAndMonth ${client}/${month}`);
       return remote;
     } catch {
       // 2) Fallback: devolver cache local se offline
+      console.warn('⚠️ DEBUG - adStrategyService - getStrategiesByClientAndMonth - Falha remota, usando cache local');
       const allStrategies = this.getAllStrategies();
       return allStrategies.filter(s => s.client === client && s.month === month);
     }

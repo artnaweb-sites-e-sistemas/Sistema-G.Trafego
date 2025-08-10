@@ -649,17 +649,23 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   // Atualização imediata ao salvar detalhes de público
   useEffect(() => {
     const onAudienceDetailsSaved = async (event: Event) => {
+      console.time('MonthlyDetailsTable.onAudienceDetailsSaved');
       const { detail } = event as CustomEvent<{ month: string; product: string }>; 
       if (!detail) return;
       // Garantir que é do mesmo mês/produto
       if (detail.month === selectedMonth && detail.product === selectedProduct) {
         try {
+          console.log('🔍 DEBUG - MonthlyDetailsTable - audienceDetailsSaved DETECTADO para mês/produto atuais', detail);
+          console.time('metricsService.getAllAudienceDetailsForProduct');
           const allAudienceDetails = await metricsService.getAllAudienceDetailsForProduct(selectedMonth, selectedProduct);
+          console.timeEnd('metricsService.getAllAudienceDetailsForProduct');
           const totalAgendamentos = allAudienceDetails.reduce((sum, d) => sum + (d.agendamentos || 0), 0);
           const totalVendas = allAudienceDetails.reduce((sum, d) => sum + (d.vendas || 0), 0);
           setAudienceCalculatedValues({ agendamentos: totalAgendamentos, vendas: totalVendas });
+          console.log('🔍 DEBUG - MonthlyDetailsTable - Valores agregados após audienceDetailsSaved:', { totalAgendamentos, totalVendas });
         } catch {}
       }
+      console.timeEnd('MonthlyDetailsTable.onAudienceDetailsSaved');
     };
     window.addEventListener('audienceDetailsSaved', onAudienceDetailsSaved);
     return () => window.removeEventListener('audienceDetailsSaved', onAudienceDetailsSaved);

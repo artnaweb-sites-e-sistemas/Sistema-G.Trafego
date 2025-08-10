@@ -209,6 +209,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Carregar valores reais de agendamentos e vendas do cliente
   useEffect(() => {
     console.log('🔍 DEBUG - Dashboard - useEffect loadRealValuesForClient INICIADO');
+    console.time('Dashboard.loadRealValuesForClient');
     console.log('🔍 DEBUG - Dashboard - Estados atuais:', { selectedClient, selectedMonth, realValuesRefreshTrigger });
     console.log('🔍 DEBUG - Dashboard - Stack trace:', new Error().stack?.split('\n').slice(1, 4).join('\n'));
     
@@ -243,7 +244,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         await metricsService.debugMonthlyDetails(selectedMonth);
         
         console.log('🔍 DEBUG - Dashboard - Chamando getRealValuesForClient...');
+        console.time('metricsService.getRealValuesForClient');
         const realValues = await metricsService.getRealValuesForClient(selectedMonth, selectedClient);
+        console.timeEnd('metricsService.getRealValuesForClient');
         console.log('🔍 DEBUG - Dashboard - Resultado da busca:', realValues);
         console.log('🔍 DEBUG - Dashboard - Tipo do resultado:', typeof realValues);
         console.log('🔍 DEBUG - Dashboard - Estrutura do resultado:', JSON.stringify(realValues, null, 2));
@@ -264,10 +267,12 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
           roi: typeof realValues.roi === 'string' ? realValues.roi : '0% (0.0x)'
         });
         console.log('🔍 DEBUG - Dashboard - Valores reais carregados:', realValues);
+        console.timeEnd('Dashboard.loadRealValuesForClient');
       } catch (error) {
         console.error('🔍 DEBUG - Dashboard - Erro ao carregar valores reais do cliente:', error);
         console.error('🔍 DEBUG - Dashboard - Stack trace do erro:', error instanceof Error ? error.stack : 'N/A');
         setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
+        console.timeEnd('Dashboard.loadRealValuesForClient');
       }
     };
 

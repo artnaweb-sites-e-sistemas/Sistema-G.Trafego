@@ -83,7 +83,10 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
 
         const { startDate, endDate } = getPeriodDates(selectedMonth || '');
         
+        console.time('ProductPicker.loadMetaAdsCampaigns');
+        console.log('🔍 DEBUG - ProductPicker - Carregando campanhas', { startDate, endDate, client: selectedClient });
         const campaignsData = await metaAdsService.getCampaigns(startDate, endDate);
+        console.log('🔍 DEBUG - ProductPicker - Campanhas retornadas:', campaignsData?.length);
         
         const activeCampaigns = campaignsData.filter(campaign => 
           campaign.status === 'ACTIVE' || campaign.status === 'PAUSED'
@@ -107,6 +110,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
             detail: { clientName: selectedClient }
           }));
         } else {
+          console.log('🔍 DEBUG - ProductPicker - Definindo produtos (campanhas ativas):', facebookProducts.length);
           setProducts(facebookProducts);
 
           // Sincronizar nome do produto se o ID da campanha permanecer o mesmo
@@ -137,8 +141,9 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
             }
           }
         }
-        
+        console.timeEnd('ProductPicker.loadMetaAdsCampaigns');
       } catch (error: any) {
+        console.error('🔴 DEBUG - ProductPicker - Erro ao carregar campanhas:', error?.message || error);
         setProducts([]);
       } finally {
         setIsLoading(false);
