@@ -1215,26 +1215,6 @@ export const metricsService = {
     roi?: string; // Changed to string to save full ROI value
   }) {
     try {
-      // Garantir client correto: se não vier no payload, tentar derivar de audienceDetails ou localStorage
-      let effectiveClient = data.client;
-      if (!effectiveClient) {
-        try {
-          const audQ = query(
-            collection(db, 'audienceDetails'),
-            where('month', '==', data.month),
-            where('product', '==', data.product)
-          );
-          const audSnap = await getDocs(audQ);
-          if (!audSnap.empty) {
-            const audData: any = audSnap.docs[0].data();
-            if (audData?.client) effectiveClient = audData.client;
-          }
-        } catch {}
-        if (!effectiveClient) {
-          try { effectiveClient = localStorage.getItem('selectedClient') || undefined as any; } catch {}
-        }
-      }
-
       const detailsRef = collection(db, 'monthlyDetails');
       
       // Buscar documento existente baseado apenas em mês e produto
@@ -1250,7 +1230,7 @@ export const metricsService = {
         // Criar novo documento
         await addDoc(detailsRef, {
           ...data,
-          client: effectiveClient || 'Cliente Padrão', // Garantir que sempre tenha um client
+          client: data.client || 'Cliente Padrão', // Garantir que sempre tenha um client
           createdAt: new Date(),
           updatedAt: new Date()
         });
@@ -1260,7 +1240,7 @@ export const metricsService = {
         const updateData: any = {
           agendamentos: data.agendamentos,
           vendas: data.vendas,
-          client: effectiveClient || 'Cliente Padrão', // Atualizar o client também
+          client: data.client || 'Cliente Padrão', // Atualizar o client também
           updatedAt: new Date()
         };
         
@@ -1283,7 +1263,7 @@ export const metricsService = {
       console.log('🔍 DEBUG - saveMonthlyDetails - Dados sendo salvos:', {
         month: data.month,
         product: data.product,
-        client: effectiveClient,
+        client: data.client,
         agendamentos: data.agendamentos,
         vendas: data.vendas,
         ticketMedio: data.ticketMedio,
@@ -1299,7 +1279,7 @@ export const metricsService = {
         detail: {
           month: data.month,
           product: data.product,
-          client: effectiveClient,
+          client: data.client,
           agendamentos: data.agendamentos,
           vendas: data.vendas,
           ticketMedio: data.ticketMedio
@@ -1311,7 +1291,7 @@ export const metricsService = {
         detail: {
           month: data.month,
           product: data.product,
-          client: effectiveClient,
+          client: data.client,
           agendamentos: data.agendamentos,
           vendas: data.vendas,
           ticketMedio: data.ticketMedio
@@ -1549,8 +1529,7 @@ export const metricsService = {
 
       // Atualizar imediatamente os valores agregados em monthlyDetails para refletir na planilha
       try {
-        const clientForAggregation = data.client || 'Cliente Padrão';
-        await this.aggregateAndSaveMonthlyFromAudiences(data.month, data.product, clientForAggregation);
+        await this.aggregateAndSaveMonthlyFromAudiences(data.month, data.product, data.client);
       } catch (aggErr) {
         console.warn('⚠️ metricsService.saveAudienceDetails - Falha ao agregar e salvar monthlyDetails:', aggErr);
       }
@@ -1583,7 +1562,7 @@ export const metricsService = {
       await this.saveMonthlyDetails({
         month,
         product,
-        client: client || 'Cliente Padrão',
+        client,
         agendamentos: sumAgendamentos,
         vendas: sumVendas
       });

@@ -137,8 +137,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [realValuesRefreshTrigger, setRealValuesRefreshTrigger] = useState(0);
   const [aiBenchmarkResults, setAiBenchmarkResults] = useState<BenchmarkResults | null>(null);
   
-  // Debounce para evitar múltiplas chamadas
+  // Debounce para evitar múltiplas chamadas e controle de execução
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const loadingRealValuesRef = useRef<boolean>(false);
 
 
   // Garantir que o mês selecionado seja sempre válido
@@ -227,6 +228,13 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     }
     
     const loadRealValuesForClient = async () => {
+      // Evitar execução simultânea
+      if (loadingRealValuesRef.current) {
+        console.log('🔍 DEBUG - Dashboard - loadRealValuesForClient já em execução, pulando...');
+        return;
+      }
+      
+      loadingRealValuesRef.current = true;
       console.log('🔍 DEBUG - Dashboard - useEffect loadRealValuesForClient executado');
       console.log('🔍 DEBUG - Dashboard - selectedClient:', selectedClient);
       console.log('🔍 DEBUG - Dashboard - selectedMonth:', selectedMonth);
@@ -273,6 +281,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         console.error('🔍 DEBUG - Dashboard - Stack trace do erro:', error instanceof Error ? error.stack : 'N/A');
         setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
         console.timeEnd('Dashboard.loadRealValuesForClient');
+      } finally {
+        loadingRealValuesRef.current = false;
       }
     };
 

@@ -126,15 +126,14 @@ class AdStrategyService {
   // Buscar estratégias por cliente e mês (Firestore-first com cache local)
   async getStrategiesByClientAndMonth(client: string, month: string): Promise<AdStrategy[]> {
     // 1) Remoto – fonte de verdade
-    console.time(`adStrategyService.getStrategiesByClientAndMonth ${client}/${month}`);
     try {
+      console.time(`adStrategyService.getStrategiesByClientAndMonth ${client}/${month}`);
       const user = authService.getCurrentUser();
       if (!user) throw new Error('Usuário não autenticado');
       console.log('🔍 DEBUG - adStrategyService - getStrategiesByClientAndMonth - User UID:', user.uid);
       console.log('🔍 DEBUG - adStrategyService - getStrategiesByClientAndMonth - Filtros:', { client, month });
       const col = collection(db, 'users', user.uid, 'adStrategies');
-      // Removido orderBy para evitar necessidade de índice composto em produção
-      const q = query(col, where('client', '==', client), where('month', '==', month));
+              const q = query(col, where('client', '==', client), where('month', '==', month));
       const snap = await getDocs(q);
       console.log('🔍 DEBUG - adStrategyService - getStrategiesByClientAndMonth - Docs encontrados:', snap.size);
       const docIds: string[] = [];
@@ -155,6 +154,7 @@ class AdStrategyService {
         };
       });
       console.log('🔍 DEBUG - adStrategyService - getStrategiesByClientAndMonth - IDs:', docIds);
+      
       // Ordenar em memória por createdAt desc
       remote.sort((a, b) => (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0));
 
@@ -163,14 +163,13 @@ class AdStrategyService {
       const byId = new Map(existing.map(s => [s.id, s]));
       for (const m of remote) byId.set(m.id, m);
       localStorage.setItem(this.storageKey, JSON.stringify(Array.from(byId.values())));
+      console.timeEnd(`adStrategyService.getStrategiesByClientAndMonth ${client}/${month}`);
       return remote;
-    } catch (err) {
+    } catch {
       // 2) Fallback: devolver cache local se offline
       console.warn('⚠️ DEBUG - adStrategyService - getStrategiesByClientAndMonth - Falha remota, usando cache local');
       const allStrategies = this.getAllStrategies();
       return allStrategies.filter(s => s.client === client && s.month === month);
-    } finally {
-      try { console.timeEnd(`adStrategyService.getStrategiesByClientAndMonth ${client}/${month}`); } catch {}
     }
   }
 

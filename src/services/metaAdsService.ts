@@ -1610,12 +1610,36 @@ class MetaAdsService {
         correctedDate = insight.date_start;
       }
 
+      // Tentar buscar nome real da campanha se product não foi fornecido
+      let finalProduct = product;
+      if (!finalProduct || finalProduct === 'Campanha Meta Ads') {
+        const campaignId = localStorage.getItem('selectedCampaignId');
+        const selectedProduct = localStorage.getItem('currentSelectedProduct');
+        if (selectedProduct && selectedProduct !== 'Campanha Meta Ads') {
+          finalProduct = selectedProduct;
+        } else if (campaignId) {
+          // Buscar nome da campanha no cache se possível
+          const cachedCampaigns = localStorage.getItem('facebook_campaigns_cache');
+          if (cachedCampaigns) {
+            try {
+              const campaigns = JSON.parse(cachedCampaigns);
+              const campaign = campaigns.find((c: any) => c.id === campaignId);
+              if (campaign?.name) {
+                finalProduct = campaign.name;
+              }
+            } catch (e) {
+              console.warn('Erro ao buscar nome da campanha no cache:', e);
+            }
+          }
+        }
+      }
+
       const metricData = {
         date: correctedDate,
         month: month,
         service: 'Meta Ads',
         client: client || 'Meta Ads',
-        product: product || 'Campanha Meta Ads',
+        product: finalProduct || 'Campanha Meta Ads',
         audience: audience || 'Público Meta Ads',
         leads: leadsCount,
         revenue: estimatedRevenue,
