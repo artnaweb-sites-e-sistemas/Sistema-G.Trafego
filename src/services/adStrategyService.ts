@@ -1,7 +1,7 @@
 import { metaAdsService } from './metaAdsService';
 import { db } from '../config/firebase';
 import { authService } from './authService';
-import { collection, addDoc, setDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, setDoc, doc, deleteDoc, getDocs, query, where, orderBy } from 'firebase/firestore';
 
 export interface AdStrategy {
   id: string;
@@ -69,19 +69,37 @@ class AdStrategyService {
     }
   }
 
-  // Salvar estratégia no localStorage
+  // Utilitário para admin/inspector: sincroniza todas estratégias locais para Firestore
+  async syncLocalStrategiesToFirestore(): Promise<{ synced: number; failed: number }> {
+    const local = this.getAllStrategies();
+    let synced = 0;
+    let failed = 0;
+    for (const s of local) {
+      try {
+        const fid = await this.saveRemote(s);
+        if (fid && s.firebaseId !== fid) {
+          s.firebaseId = fid;
+        }
+        synced++;
+      } catch {
+        failed++;
+      }
+    }
+    // Atualiza cache local com possíveis firebaseIds recebidos
+    localStorage.setItem(this.storageKey, JSON.stringify(local));
+    return { synced, failed };
+  }
+
+  // Salvar estratégia no Firestore (primário) + atualizar cache local
   saveStrategy(strategy: AdStrategy): void {
     try {
-      const existingStrategies = this.getAllStrategies();
-      const updatedStrategies = [...existingStrategies, strategy];
-      localStorage.setItem(this.storageKey, JSON.stringify(updatedStrategies));
-      // Salvar no Firestore em background, sem alterar a UI
+      // Persistência primária
       this.saveRemote(strategy).then((fid) => {
-        if (fid) {
-          // Atualizar cópia local com firebaseId para suportar remoção/edição remota
-          const newLocal = updatedStrategies.map(s => s.id === strategy.id ? { ...s, firebaseId: fid } : s);
-          localStorage.setItem(this.storageKey, JSON.stringify(newLocal));
-        }
+        const existingStrategies = this.getAllStrategies();
+        const withId = fid ? { ...strategy, firebaseId: fid } : strategy;
+        const updatedStrategies = [...existingStrategies, withId];
+        // Atualiza cache local (somente leitura futura; UI continua igual)
+        localStorage.setItem(this.storageKey, JSON.stringify(updatedStrategies));
       });
     } catch (error) {
       console.error('Erro ao salvar estratégia:', error);
@@ -99,18 +117,48 @@ class AdStrategyService {
     }
   }
 
-  // Buscar estratégias por cliente
+  // Buscar estratégias por cliente (local)
   getStrategiesByClient(client: string): AdStrategy[] {
     const allStrategies = this.getAllStrategies();
     return allStrategies.filter(strategy => strategy.client === client);
   }
 
-  // Buscar estratégias por cliente e mês
-  getStrategiesByClientAndMonth(client: string, month: string): AdStrategy[] {
-    const allStrategies = this.getAllStrategies();
-    return allStrategies.filter(strategy => 
-      strategy.client === client && strategy.month === month
-    );
+  // Buscar estratégias por cliente e mês (Firestore-first com cache local)
+  async getStrategiesByClientAndMonth(client: string, month: string): Promise<AdStrategy[]> {
+    // 1) Remoto – fonte de verdade
+    try {
+      const user = authService.getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+      const col = collection(db, 'users', user.uid, 'adStrategies');
+      const q = query(col, where('client', '==', client), where('month', '==', month), orderBy('createdAt', 'desc'));
+      const snap = await getDocs(q);
+      const remote: AdStrategy[] = snap.docs.map(d => {
+        const data: any = d.data();
+        return {
+          id: data.id,
+          product: data.product,
+          audience: data.audience,
+          budget: data.budget,
+          generatedNames: data.generatedNames,
+          client: data.client,
+          month: data.month,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
+          isSynchronized: !!data.isSynchronized,
+          firebaseId: d.id
+        };
+      });
+
+      // Atualizar cache local com o remoto (fonte de verdade)
+      const existing = this.getAllStrategies();
+      const byId = new Map(existing.map(s => [s.id, s]));
+      for (const m of remote) byId.set(m.id, m);
+      localStorage.setItem(this.storageKey, JSON.stringify(Array.from(byId.values())));
+      return remote;
+    } catch {
+      // 2) Fallback: devolver cache local se offline
+      const allStrategies = this.getAllStrategies();
+      return allStrategies.filter(s => s.client === client && s.month === month);
+    }
   }
 
   // Remover estratégia

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { db } from '../config/firebase';
 import { authService, User } from '../services/authService';
 import { collection, getDocs } from 'firebase/firestore';
+import { adStrategyService } from '../services/adStrategyService';
 
 type FirestoreDoc = { id: string; [key: string]: any };
 
@@ -11,6 +12,8 @@ const AdminDataInspector: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [strategies, setStrategies] = useState<FirestoreDoc[]>([]);
   const [monthlyBenchmarks, setMonthlyBenchmarks] = useState<FirestoreDoc[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   useEffect(() => {
     setCurrentUser(authService.getCurrentUser());
@@ -86,8 +89,27 @@ const AdminDataInspector: React.FC = () => {
         <section className="bg-slate-800/50 border border-slate-600 rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-lg font-semibold">adStrategies</h2>
-            <span className="text-slate-400 text-sm">{strategies.length} documentos</span>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={syncing}
+                className={`px-3 py-1.5 rounded ${syncing ? 'bg-slate-700 text-slate-400' : 'bg-indigo-600 hover:bg-indigo-700 text-white'} text-sm`}
+                onClick={async () => {
+                  setSyncMsg(null);
+                  setSyncing(true);
+                  try {
+                    const r = await adStrategyService.syncLocalStrategiesToFirestore();
+                    setSyncMsg(`Sincronizadas ${r.synced}, falhas ${r.failed}.`);
+                  } catch (e: any) {
+                    setSyncMsg(`Erro: ${e?.message || 'desconhecido'}`);
+                  } finally {
+                    setSyncing(false);
+                  }
+                }}
+              >{syncing ? 'Sincronizando...' : 'Sincronizar locais → Firestore'}</button>
+              <span className="text-slate-400 text-sm">{strategies.length} documentos</span>
+            </div>
           </div>
+          {syncMsg && <div className="mb-2 text-xs text-slate-300">{syncMsg}</div>}
           <pre className="text-xs whitespace-pre-wrap break-all max-h-80 overflow-auto">{JSON.stringify(strategies, null, 2)}</pre>
         </section>
 

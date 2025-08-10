@@ -53,6 +53,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
   const [plannedInput, setPlannedInput] = useState<string>('R$ 0,00');
   const [currentInput, setCurrentInput] = useState<string>('R$ 0,00');
   const [recommendations, setRecommendations] = useState<Record<string, { type: 'vertical' | 'horizontal' | 'wait'; tooltip: string; stats: { spend: number; ctr: number; cpl: number; cpr: number; clicks: number; impressions: number; leads: number; sales: number; frequency?: number; roas?: number; lpvRate?: number; objective: 'trafico' | 'mensagens' | 'compras' | 'captura_leads'; adSetsCount: number; periodStart: string; periodEnd: string } }>>({});
+  // Tick para reavaliar quando a conta de anúncios for selecionada (via evento clientChanged)
+  const [adEnvReadyTick, setAdEnvReadyTick] = useState(0);
   
   // Refs para controlar execução
   const hasEvaluatedRef = useRef<Set<string>>(new Set());
@@ -82,6 +84,11 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
   useEffect(() => {
     const run = async () => {
       if (!strategies || strategies.length === 0) return;
+      // Só avaliar quando já houver conta de anúncios selecionada
+      if (!metaAdsService.hasSelectedAccount()) {
+        console.log('🔍 DEBUG - AdStrategySection - Aguardando seleção da conta de anúncios antes de avaliar estratégias');
+        return;
+      }
       
       console.log(`🔍 DEBUG - useEffect avaliação - Iniciando para ${strategies.length} estratégias no período ${selectedMonth}`);
       
@@ -124,7 +131,19 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       console.log(`🔍 DEBUG - useEffect avaliação - Concluído`);
     };
     run();
-  }, [strategies, selectedClient, selectedMonth]);
+  }, [strategies, selectedClient, selectedMonth, adEnvReadyTick]);
+
+  // Ouvir evento de cliente alterado para saber quando a ad account foi definida e reavaliar
+  useEffect(() => {
+    const onClientChanged = (event: Event) => {
+      const { detail } = event as CustomEvent;
+      if (detail && detail.adAccount) {
+        setAdEnvReadyTick((v) => v + 1);
+      }
+    };
+    window.addEventListener('clientChanged', onClientChanged);
+    return () => window.removeEventListener('clientChanged', onClientChanged);
+  }, []);
 
   // Função para copiar texto
   const copyToClipboard = async (text: string, key: string) => {

@@ -1,6 +1,6 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, enableMultiTabIndexedDbPersistence } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 // Your web app's Firebase configuration
@@ -18,6 +18,12 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize Firebase services
 export const db = getFirestore(app);
+// Habilita persistência IndexedDB multi-aba (ignorar erro se já estiver habilitado ou não suportado)
+try {
+  enableMultiTabIndexedDbPersistence(db);
+} catch (err) {
+  // noop: em alguns ambientes (Safari/Privado) ou em HMR pode falhar – não bloqueia app
+}
 export const auth = getAuth(app);
 
 export default app;

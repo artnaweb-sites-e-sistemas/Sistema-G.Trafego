@@ -168,18 +168,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       
           // CORREÇÃO: Incluir cliente na chave para vincular ao período específico
       const selectedClient = localStorage.getItem('selectedClient') || 'Cliente Padrão';
-      const storageKey = `benchmark_${selectedClient}_${selectedProduct}_${selectedMonth}`;
-    console.log('🔍 DEBUG - MonthlyDetailsTable - Salvando benchmarks:', {
-      storageKey,
-      selectedClient,
-      selectedProduct,
-      selectedMonth,
-      dataCount: benchmarkValues.length
-    });
-    localStorage.setItem(storageKey, JSON.stringify(benchmarkValues));
-      console.log('Valores de benchmark salvos:', benchmarkValues);
-
-      // Persistir também no Firestore (best-effort) sem tocar na UI
+      // Persistir no Firestore (primário). Mantemos localStorage apenas como cache.
       try {
         const { authService } = require('../services/authService');
         const { db } = require('../config/firebase');
@@ -189,6 +178,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           const key = `${(selectedClient||'').toLowerCase().replace(/[^a-z0-9_\-]/g,'_')}|${(selectedProduct||'').toLowerCase().replace(/[^a-z0-9_\-]/g,'_')}|${(selectedMonth||'').toLowerCase().replace(/[^a-z0-9_\-]/g,'_')}`;
           const ref = doc(db, 'users', user.uid, 'monthlyBenchmarks', key);
           setDoc(ref, { benchmarks: benchmarkValues }, { merge: true });
+          // Atualiza cache local para futuras leituras offline
+          const storageKey = `benchmark_${selectedClient}_${selectedProduct}_${selectedMonth}`;
+          localStorage.setItem(storageKey, JSON.stringify(benchmarkValues));
         }
       } catch {}
     }

@@ -96,6 +96,21 @@ class MetaAdsService {
   constructor() {
     // Carregar rate limit persistente na inicialização
     this.loadPersistentRateLimit();
+    // Restaurar usuário e conta selecionada do localStorage para manter sessão após reload
+    try {
+      const savedUser = localStorage.getItem('facebookUser');
+      const savedToken = localStorage.getItem('facebookAccessToken');
+      if (savedUser && savedToken) {
+        this.user = JSON.parse(savedUser);
+        this.accessToken = savedToken;
+      }
+      const savedAdAccount = localStorage.getItem('selectedAdAccount');
+      if (savedAdAccount) {
+        this.selectedAccount = JSON.parse(savedAdAccount);
+      }
+    } catch (_) {
+      // ignore
+    }
   }
   
   // Sistema de cache para reduzir chamadas à API
@@ -111,6 +126,9 @@ class MetaAdsService {
 
   // Debounce para evitar múltiplas chamadas simultâneas
   private pendingRequests = new Map<string, Promise<any>>();
+  // Controle simples para evitar rajadas de chamadas a adsets
+  private lastAdsetsRequestAt = 0;
+  private readonly MIN_ADSETS_REQUEST_INTERVAL_MS = 800; // ~1 req/0.8s
 
   // Sistema de rate limiting para OAuth
   private oauthAttempts = 0;
@@ -968,6 +986,30 @@ class MetaAdsService {
       throw new Error('Conta não selecionada');
     }
 
+    // Respeitar rate limit global, usar cache se bloqueado
+    const canAttempt = await this.checkGlobalRateLimit();
+    if (!canAttempt) {
+      // Tentar retorno de cache (memória ou localStorage)
+      if (campaignId) {
+        const cacheKey = `adsets_campaign_${campaignId}`;
+        const cachedData = localStorage.getItem(cacheKey);
+        if (cachedData) return JSON.parse(cachedData);
+      } else {
+        const savedData = this.getDataFromStorage('adsets');
+        if (savedData) return savedData;
+      }
+      // Sem cache, retornar array vazio para não estourar o limite
+      return [];
+    }
+
+    // Debounce curto entre chamadas de adsets para reduzir estouro de limite
+    const nowTs = Date.now();
+    const elapsed = nowTs - this.lastAdsetsRequestAt;
+    if (elapsed < this.MIN_ADSETS_REQUEST_INTERVAL_MS) {
+      await new Promise(r => setTimeout(r, this.MIN_ADSETS_REQUEST_INTERVAL_MS - elapsed));
+    }
+    this.lastAdsetsRequestAt = Date.now();
+
     // Verificar cache específico para campanha
     if (campaignId) {
       const cacheKey = `adsets_campaign_${campaignId}`;
@@ -1040,11 +1082,13 @@ class MetaAdsService {
       }
       
       return data;
-    } catch (error: any) {
+      } catch (error: any) {
       console.error('Erro ao buscar Ad Sets:', error.response?.data || error.message);
       
-      // Se der erro de rate limit, tentar usar cache mesmo que expirado
+      // Se der erro de rate limit, registrar e usar cache mesmo que expirado
       if (error.response?.data?.error?.message?.includes('User request limit reached')) {
+        // Bloquear novas tentativas por 5 minutos
+        await this.recordGlobalRateLimit(5 * 60 * 1000);
         if (campaignId) {
           const cacheKey = `adsets_campaign_${campaignId}`;
           const cachedData = localStorage.getItem(cacheKey);
