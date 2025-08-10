@@ -151,6 +151,19 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     }
   }, []);
 
+  // Limpar produto selecionado quando o mês mudar (manter apenas cliente)
+  useEffect(() => {
+    console.log('🔍 DEBUG - Dashboard - Mês alterado, limpando seleção de produto');
+    setSelectedProduct('');
+    localStorage.removeItem('currentSelectedProduct');
+    localStorage.removeItem('selectedCampaignId');
+    
+    // Disparar evento para notificar outros componentes
+    window.dispatchEvent(new CustomEvent('productCleared', {
+      detail: { reason: 'monthChanged' }
+    }));
+  }, [selectedMonth]);
+
   // Carregar métricas
   useEffect(() => {
     const loadMetrics = async () => {

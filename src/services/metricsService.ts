@@ -892,7 +892,14 @@ export const metricsService = {
             } else if (campaignId) {
               // Se há uma campanha específica selecionada, buscar métricas da campanha
               const campaignInsights = await metaAdsService.getCampaignInsights(campaignId, startDate, endDate);
-              metaAdsData = metaAdsService.convertToMetricData(campaignInsights, month, client, product, audience);
+              
+              // Garantir que o nome do produto seja o nome real da campanha
+              let realProductName = product;
+              if (!realProductName || realProductName === 'Todos os Produtos' || realProductName === 'Campanha Meta Ads') {
+                realProductName = localStorage.getItem('currentSelectedProduct') || product;
+              }
+              
+              metaAdsData = metaAdsService.convertToMetricData(campaignInsights, month, client, realProductName, audience);
             } else {
               // Se apenas o cliente foi selecionado, buscar métricas de toda a conta (todas as campanhas)
               const accountInsights = await metaAdsService.getAccountInsights(startDate, endDate);

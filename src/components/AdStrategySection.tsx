@@ -3,6 +3,7 @@ import { Plus, Target, MapPin, DollarSign, Edit, Copy, CheckCircle, TrendingUp, 
 import { motion, AnimatePresence } from 'framer-motion';
 import { adStrategyService, AdStrategy } from '../services/adStrategyService';
 import { metaAdsService } from '../services/metaAdsService';
+import { metricsService } from '../services/metricsService';
 import { toast } from 'react-hot-toast';
 import CustomDropdown from './CustomDropdown';
 
@@ -11,6 +12,82 @@ interface AdStrategySectionProps {
   selectedMonth: string;
   onStrategyCreated: (strategy: AdStrategy) => void;
 }
+
+// Função para verificar se duas estratégias são similares (mesmo público-alvo)
+const areSimilarStrategies = (strategy1: AdStrategy, strategy2: AdStrategy): boolean => {
+  return (
+    strategy1.audience.gender === strategy2.audience.gender &&
+    strategy1.audience.ageRange === strategy2.audience.ageRange &&
+    JSON.stringify(strategy1.audience.locations) === JSON.stringify(strategy2.audience.locations) &&
+    JSON.stringify(strategy1.audience.interests) === JSON.stringify(strategy2.audience.interests) &&
+    JSON.stringify(strategy1.audience.remarketing) === JSON.stringify(strategy2.audience.remarketing)
+  );
+};
+
+// Função para filtrar estratégias de outros períodos baseado nas condições
+const filterStrategiesForPeriod = async (allStrategies: AdStrategy[], targetMonth: string): Promise<AdStrategy[]> => {
+  console.log(`🔍 DEBUG - filterStrategiesForPeriod - Verificando ${allStrategies.length} estratégias para o período ${targetMonth}`);
+  
+  const validStrategies: AdStrategy[] = [];
+  
+  for (const strategy of allStrategies) {
+    // Pular se for do período atual (já será incluída)
+    if (strategy.month === targetMonth) {
+      continue;
+    }
+    
+    // Condição 1: Estratégia foi criada no período atual
+    const strategyCreatedInPeriod = strategy.month === targetMonth;
+    if (strategyCreatedInPeriod) {
+      console.log(`🔍 DEBUG - filterStrategiesForPeriod - Estratégia ${strategy.id} criada no período atual`);
+      validStrategies.push(strategy);
+      continue;
+    }
+    
+    // Condição 2: Verificar se há gasto >= R$ 0,01 no período atual para público similar
+    try {
+      const hasSpendInPeriod = await checkSpendForAudience(strategy, targetMonth);
+      if (hasSpendInPeriod) {
+        console.log(`🔍 DEBUG - filterStrategiesForPeriod - Estratégia ${strategy.id} tem gasto no período atual`);
+        validStrategies.push(strategy);
+        continue;
+      }
+    } catch (error) {
+      console.warn(`Erro ao verificar gasto para estratégia ${strategy.id}:`, error);
+    }
+  }
+  
+  console.log(`🔍 DEBUG - filterStrategiesForPeriod - ${validStrategies.length} estratégias válidas encontradas`);
+  return validStrategies;
+};
+
+// Função para verificar se há gasto mínimo para o público da estratégia no período
+const checkSpendForAudience = async (strategy: AdStrategy, targetMonth: string): Promise<boolean> => {
+  try {
+    // Buscar métricas do período atual para o cliente
+    const metrics = await metricsService.getMetrics(targetMonth, strategy.client);
+    
+    if (!metrics || metrics.length === 0) {
+      return false;
+    }
+    
+    // Verificar se há alguma métrica com investimento >= R$ 0,01 para público similar
+    const relevantMetrics = metrics.filter(metric => {
+      // Verificar se a nomenclatura do público coincide com conjunto de anúncios
+      const audienceMatches = metric.audience?.toLowerCase().includes(strategy.audience.ageRange.toLowerCase()) ||
+                            strategy.audience.locations.some(loc => metric.audience?.toLowerCase().includes(loc.toLowerCase())) ||
+                            strategy.audience.interests.some(int => metric.audience?.toLowerCase().includes(int.toLowerCase()));
+      
+      return audienceMatches && metric.investment >= 0.01;
+    });
+    
+    console.log(`🔍 DEBUG - checkSpendForAudience - Estratégia ${strategy.id}: ${relevantMetrics.length} métricas com gasto relevante`);
+    return relevantMetrics.length > 0;
+  } catch (error) {
+    console.warn(`Erro ao verificar gasto para estratégia ${strategy.id}:`, error);
+    return false;
+  }
+};
 
 const AdStrategySection: React.FC<AdStrategySectionProps> = ({ 
   selectedClient, 
@@ -69,14 +146,40 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     }
   }, [isModalOpen]);
 
-  // Carregar estratégias existentes (todas do cliente) - CORRIGIDO: Usar Firestore
+  // Carregar estratégias existentes - NOVA LÓGICA: Incluir outros períodos baseado em condições
   useEffect(() => {
     const loadStrategies = async () => {
       if (selectedClient && selectedMonth) {
         try {
-          const existingStrategies = await adStrategyService.getStrategiesByClientAndMonth(selectedClient, selectedMonth);
-          console.log(`🔍 DEBUG - AdStrategySection - Estratégias carregadas do Firestore: ${existingStrategies.length}`);
-          setStrategies(existingStrategies);
+          console.log(`🔍 DEBUG - AdStrategySection - Carregando estratégias para ${selectedClient} - ${selectedMonth}`);
+          
+          // 1. Buscar estratégias do período atual
+          const currentPeriodStrategies = await adStrategyService.getStrategiesByClientAndMonth(selectedClient, selectedMonth);
+          console.log(`🔍 DEBUG - AdStrategySection - Estratégias do período atual: ${currentPeriodStrategies.length}`);
+          
+          // 2. Buscar TODAS as estratégias do cliente para verificar outros períodos
+          const allClientStrategies = await adStrategyService.getStrategiesByClient(selectedClient);
+          console.log(`🔍 DEBUG - AdStrategySection - Total de estratégias do cliente: ${allClientStrategies.length}`);
+          
+          // 3. Filtrar estratégias de outros períodos que atendem às condições
+          const otherPeriodStrategies = await filterStrategiesForPeriod(allClientStrategies, selectedMonth);
+          console.log(`🔍 DEBUG - AdStrategySection - Estratégias de outros períodos válidas: ${otherPeriodStrategies.length}`);
+          
+          // 4. Combinar estratégias (prioridade: período atual + outros válidos)
+          const combinedStrategies = [...currentPeriodStrategies];
+          
+          // Adicionar estratégias de outros períodos se não existir uma igual no período atual
+          otherPeriodStrategies.forEach(otherStrategy => {
+            const existsInCurrent = currentPeriodStrategies.some(current => 
+              areSimilarStrategies(current, otherStrategy)
+            );
+            if (!existsInCurrent) {
+              combinedStrategies.push(otherStrategy);
+            }
+          });
+          
+          console.log(`🔍 DEBUG - AdStrategySection - Total de estratégias combinadas: ${combinedStrategies.length}`);
+          setStrategies(combinedStrategies);
         } catch (error) {
           console.error('Erro ao carregar estratégias:', error);
           // Fallback para local se erro
