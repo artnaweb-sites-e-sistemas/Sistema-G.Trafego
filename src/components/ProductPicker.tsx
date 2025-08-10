@@ -113,8 +113,26 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
           const savedCampaignId = localStorage.getItem('selectedCampaignId');
           if (savedCampaignId) {
             const matched = facebookProducts.find(p => p.campaign?.id === savedCampaignId);
-            if (matched && matched.name && matched.name !== selectedProduct) {
-              setSelectedProduct(matched.name);
+            if (matched && matched.name) {
+              console.log(`🔍 DEBUG - ProductPicker - Campanha encontrada: ${matched.name} (ID: ${savedCampaignId})`);
+              console.log(`🔍 DEBUG - ProductPicker - Nome atual: ${selectedProduct}, Nome Meta: ${matched.name}`);
+              
+              // SEMPRE atualizar para o nome mais recente do Meta Ads
+              if (matched.name !== selectedProduct) {
+                console.log(`🔍 DEBUG - ProductPicker - Atualizando nome: ${selectedProduct} → ${matched.name}`);
+                setSelectedProduct(matched.name);
+                
+                // Disparar evento para notificar outros componentes sobre a mudança
+                window.dispatchEvent(new CustomEvent('productNameUpdated', {
+                  detail: { 
+                    oldName: selectedProduct,
+                    newName: matched.name,
+                    campaignId: savedCampaignId
+                  }
+                }));
+              }
+              
+              // Atualizar espelho local SEMPRE, garantindo nome mais recente
               localStorage.setItem('currentSelectedProduct', matched.name);
             }
           }

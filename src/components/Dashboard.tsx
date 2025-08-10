@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import Header from './Header';
 import MetricsGrid from './MetricsGrid';
@@ -136,6 +136,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [realValuesForClient, setRealValuesForClient] = useState({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
   const [realValuesRefreshTrigger, setRealValuesRefreshTrigger] = useState(0);
   const [aiBenchmarkResults, setAiBenchmarkResults] = useState<BenchmarkResults | null>(null);
+  
+  // Debounce para evitar múltiplas chamadas
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
 
   // Garantir que o mês selecionado seja sempre válido
@@ -268,7 +271,20 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       }
     };
 
-    loadRealValuesForClient();
+    // Debounce para evitar múltiplas chamadas
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    
+    debounceTimeoutRef.current = setTimeout(() => {
+      loadRealValuesForClient();
+    }, 300); // 300ms de debounce
+
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
   }, [selectedMonth, selectedClient, realValuesRefreshTrigger]);
 
   // Listener para atualizar valores reais quando dados dos públicos mudarem

@@ -646,6 +646,25 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     };
   }, [selectedMonth, selectedProduct]);
 
+  // Atualização imediata ao salvar detalhes de público
+  useEffect(() => {
+    const onAudienceDetailsSaved = async (event: Event) => {
+      const { detail } = event as CustomEvent<{ month: string; product: string }>; 
+      if (!detail) return;
+      // Garantir que é do mesmo mês/produto
+      if (detail.month === selectedMonth && detail.product === selectedProduct) {
+        try {
+          const allAudienceDetails = await metricsService.getAllAudienceDetailsForProduct(selectedMonth, selectedProduct);
+          const totalAgendamentos = allAudienceDetails.reduce((sum, d) => sum + (d.agendamentos || 0), 0);
+          const totalVendas = allAudienceDetails.reduce((sum, d) => sum + (d.vendas || 0), 0);
+          setAudienceCalculatedValues({ agendamentos: totalAgendamentos, vendas: totalVendas });
+        } catch {}
+      }
+    };
+    window.addEventListener('audienceDetailsSaved', onAudienceDetailsSaved);
+    return () => window.removeEventListener('audienceDetailsSaved', onAudienceDetailsSaved);
+  }, [selectedMonth, selectedProduct]);
+
 
 
   // Atualizar valores na tabela quando dados calculados dos públicos mudarem

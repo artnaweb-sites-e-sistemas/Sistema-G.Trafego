@@ -69,15 +69,27 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     }
   }, [isModalOpen]);
 
-  // Carregar estratégias existentes (todas do cliente)
+  // Carregar estratégias existentes (todas do cliente) - CORRIGIDO: Usar Firestore
   useEffect(() => {
-    if (selectedClient && selectedMonth) {
-      const existingStrategies = adStrategyService.getStrategiesByClient(selectedClient);
-      setStrategies(existingStrategies);
-      // Resetar refs quando mudar cliente/mês
-      hasEvaluatedRef.current.clear();
-      hasSyncedRef.current.clear();
-    }
+    const loadStrategies = async () => {
+      if (selectedClient && selectedMonth) {
+        try {
+          const existingStrategies = await adStrategyService.getStrategiesByClientAndMonth(selectedClient, selectedMonth);
+          console.log(`🔍 DEBUG - AdStrategySection - Estratégias carregadas do Firestore: ${existingStrategies.length}`);
+          setStrategies(existingStrategies);
+        } catch (error) {
+          console.error('Erro ao carregar estratégias:', error);
+          // Fallback para local se erro
+          const localStrategies = adStrategyService.getStrategiesByClient(selectedClient);
+          console.log(`🔍 DEBUG - AdStrategySection - Fallback para local: ${localStrategies.length}`);
+          setStrategies(localStrategies);
+        }
+        // Resetar refs quando mudar cliente/mês
+        hasEvaluatedRef.current.clear();
+        hasSyncedRef.current.clear();
+      }
+    };
+    loadStrategies();
   }, [selectedClient, selectedMonth]);
 
   // Auto-avaliar todas as estratégias e sincronizar as que ainda não estão sincronizadas
