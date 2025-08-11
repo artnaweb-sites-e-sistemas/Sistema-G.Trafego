@@ -2,12 +2,12 @@ import {
   collection, 
   doc, 
   getDocs, 
-  addDoc, 
+  getDoc,
+  setDoc,
   updateDoc, 
   deleteDoc, 
   query, 
   where, 
-  orderBy,
   Timestamp 
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -45,7 +45,7 @@ class FirestoreShareService {
     };
   }
 
-  // Salvar link no Firestore
+  // Salvar link no Firestore (usa shortCode como ID do documento para evitar índices compostos)
   async saveShareLink(shareLink: ShareLink): Promise<void> {
     const userId = this.getCurrentUserId();
     if (!userId) {
@@ -54,7 +54,7 @@ class FirestoreShareService {
 
     try {
       const linkData = this.toFirestoreFormat(shareLink);
-      await addDoc(collection(db, this.COLLECTION_NAME), linkData);
+      await setDoc(doc(db, this.COLLECTION_NAME, shareLink.shortCode), linkData);
       console.log('Link de compartilhamento salvo no Firestore:', shareLink.shortCode);
     } catch (error) {
       console.error('Erro ao salvar link no Firestore:', error);
@@ -62,26 +62,15 @@ class FirestoreShareService {
     }
   }
 
-  // Buscar link por código
+  // Buscar link por código (acesso direto pelo ID)
   async getShareLink(shortCode: string): Promise<ShareLink | null> {
     const userId = this.getCurrentUserId();
     if (!userId) return null;
 
     try {
-      const q = query(
-        collection(db, this.COLLECTION_NAME),
-        where('userId', '==', userId),
-        where('shortCode', '==', shortCode),
-        where('isActive', '==', true)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      
-      if (querySnapshot.empty) {
-        return null;
-      }
-
-      const shareLink = this.fromFirestoreFormat(querySnapshot.docs[0]);
+      const snap = await getDoc(doc(db, this.COLLECTION_NAME, shortCode));
+      if (!snap.exists()) return null;
+      const shareLink = this.fromFirestoreFormat(snap);
       
       // Verificar se o link expirou
       if (shareLink.expiresAt && new Date() > shareLink.expiresAt) {
@@ -96,7 +85,7 @@ class FirestoreShareService {
     }
   }
 
-  // Buscar todos os links ativos do usuário
+  // Buscar todos os links ativos do usuário (filtra/ordena no cliente para evitar índices compostos)
   async getAllShareLinks(): Promise<ShareLink[]> {
     const userId = this.getCurrentUserId();
     if (!userId) return [];
@@ -104,20 +93,20 @@ class FirestoreShareService {
     try {
       const q = query(
         collection(db, this.COLLECTION_NAME),
-        where('userId', '==', userId),
-        where('isActive', '==', true),
-        orderBy('createdAt', 'desc')
+        where('userId', '==', userId)
       );
-      
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => this.fromFirestoreFormat(doc));
+      return querySnapshot.docs
+        .map(doc => this.fromFirestoreFormat(doc))
+        .filter(link => link.isActive)
+        .sort((a, b) => (b.createdAt as any) - (a.createdAt as any));
     } catch (error) {
       console.error('Erro ao buscar links do Firestore:', error);
       return [];
     }
   }
 
-  // Atualizar link
+  // Atualizar link (usa shortCode como ID)
   async updateShareLink(shareLink: ShareLink): Promise<void> {
     const userId = this.getCurrentUserId();
     if (!userId) {
@@ -125,23 +114,10 @@ class FirestoreShareService {
     }
 
     try {
-      const q = query(
-        collection(db, this.COLLECTION_NAME),
-        where('userId', '==', userId),
-        where('shortCode', '==', shareLink.shortCode)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      
-      if (querySnapshot.empty) {
-        throw new Error('Link não encontrado');
-      }
-
-      const docRef = querySnapshot.docs[0].ref;
+      const docRef = doc(db, this.COLLECTION_NAME, shareLink.shortCode);
       const linkData = this.toFirestoreFormat(shareLink);
       delete linkData.userId; // Não atualizar userId
-      
-      await updateDoc(docRef, linkData);
+      await setDoc(docRef, linkData, { merge: true });
       console.log('Link atualizado no Firestore:', shareLink.shortCode);
     } catch (error) {
       console.error('Erro ao atualizar link no Firestore:', error);
@@ -155,19 +131,7 @@ class FirestoreShareService {
     if (!userId) return false;
 
     try {
-      const q = query(
-        collection(db, this.COLLECTION_NAME),
-        where('userId', '==', userId),
-        where('shortCode', '==', shortCode)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      
-      if (querySnapshot.empty) {
-        return false;
-      }
-
-      const docRef = querySnapshot.docs[0].ref;
+      const docRef = doc(db, this.COLLECTION_NAME, shortCode);
       await updateDoc(docRef, { isActive: false });
       console.log('Link desativado no Firestore:', shortCode);
       return true;
@@ -183,19 +147,7 @@ class FirestoreShareService {
     if (!userId) return false;
 
     try {
-      const q = query(
-        collection(db, this.COLLECTION_NAME),
-        where('userId', '==', userId),
-        where('shortCode', '==', shortCode)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      
-      if (querySnapshot.empty) {
-        return false;
-      }
-
-      const docRef = querySnapshot.docs[0].ref;
+      const docRef = doc(db, this.COLLECTION_NAME, shortCode);
       await deleteDoc(docRef);
       console.log('Link deletado do Firestore:', shortCode);
       return true;

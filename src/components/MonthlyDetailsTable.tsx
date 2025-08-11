@@ -66,7 +66,7 @@ const Tooltip: React.FC<{ children: React.ReactNode; content: string; isVisible:
 };
 
 const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({ 
-  metrics, 
+  metrics = [], 
   selectedProduct = '',
   selectedMonth = 'Janeiro 2025',
   onValuesChange,
