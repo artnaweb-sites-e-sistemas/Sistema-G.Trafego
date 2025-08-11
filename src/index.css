@@ -915,6 +915,15 @@ header {
   filter: none !important;
   /* Garantir que não seja afetado por backdrop-filter */
   backdrop-filter: none !important;
+  /* Harmonização visual */
+  border-radius: 0.75rem !important;
+  box-shadow: 0 24px 48px rgba(0,0,0,0.4), 0 8px 16px rgba(0,0,0,0.3) !important;
+  margin-top: 0.25rem !important; /* pequeno espaçamento do trigger */
+}
+
+/* Container do portal para permitir cliques normalmente */
+.dropdown-portal {
+  pointer-events: auto !important;
 }
 
 /* Solução específica para garantir que os dropdowns apareçam acima de tudo */

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { useDropdownPortal } from '../hooks/useDropdownPortal.tsx';
 
 interface MonthYearPickerProps {
   selectedMonth: string;
@@ -11,6 +12,8 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonthIndex, setSelectedMonthIndex] = useState(new Date().getMonth());
   const pickerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const { renderDropdown } = useDropdownPortal({ isOpen, triggerRef });
 
   const months = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -73,7 +76,9 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
   // Close picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+      const target = event.target as HTMLElement;
+      const clickedInsidePortal = target?.closest?.('.dropdown-portal');
+      if (pickerRef.current && !pickerRef.current.contains(target) && !clickedInsidePortal) {
         setIsOpen(false);
       }
     };
@@ -165,8 +170,9 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
           }
         })()}
       >
+        {/* Trigger area used for portal positioning */}
         <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-        <div className="bg-gray-700 text-white pl-10 pr-8 py-2 rounded-lg border border-gray-600/50 focus:border-purple-500/70 focus:outline-none w-full shadow-sm hover:shadow-md transition-all duration-300">
+        <div ref={triggerRef} className="bg-gray-700 text-white pl-10 pr-8 py-2 rounded-lg border border-gray-600/50 focus:border-purple-500/70 focus:outline-none w-full shadow-sm hover:shadow-md transition-all duration-300">
           <span className="truncate block font-medium">{formatDisplayMonth()}</span>
         </div>
         <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -176,8 +182,8 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
       </div>
 
       {/* Dropdown */}
-      {isOpen && (
-        <div className="dropdown-menu dropdown-spacer z-dropdown-high bg-slate-900 border border-slate-700 rounded-xl shadow-2xl" style={{ zIndex: 2147483647 }}>
+      {renderDropdown(
+          <div className="dropdown-menu dropdown-spacer z-dropdown-high bg-slate-900 border border-slate-700 rounded-xl shadow-2xl" style={{ zIndex: 2147483647 }}>
           {/* Year selector */}
           <div className="flex items-center justify-between p-3 border-b border-slate-700">
             <button
@@ -233,8 +239,8 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
               Este mês
             </button>
           </div>
-        </div>
-      )}
+          </div>
+        )}
     </div>
   );
 };

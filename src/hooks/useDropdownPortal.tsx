@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 interface UseDropdownPortalProps {
@@ -29,10 +29,23 @@ export const useDropdownPortal = ({ isOpen, triggerRef }: UseDropdownPortalProps
       if (!triggerElement) return;
 
       const rect = triggerElement.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const horizontalMargin = 8; // margem da viewport
+      const verticalOffset = 8; // espaço entre trigger e menu
+
+      // Largura alvo: pelo menos a largura do trigger, permitindo menus mais largos
+      const targetWidth = Math.max(rect.width, 360);
+
+      // Clamp para evitar overflow à direita
+      let left = rect.left;
+      if (left + targetWidth + horizontalMargin > viewportWidth) {
+        left = Math.max(horizontalMargin, viewportWidth - targetWidth - horizontalMargin);
+      }
+
       setPosition({
-        top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX,
-        width: rect.width,
+        top: rect.bottom + verticalOffset,
+        left,
+        width: targetWidth,
       });
     };
 
@@ -52,16 +65,20 @@ export const useDropdownPortal = ({ isOpen, triggerRef }: UseDropdownPortalProps
     const dropdownContent = (
       <div
         style={{
-          position: 'absolute',
+          position: 'fixed',
           top: `${position.top}px`,
           left: `${position.left}px`,
-          width: `${position.width}px`,
+          minWidth: `${position.width}px`,
+          maxWidth: 'min(560px, calc(100vw - 16px))',
           zIndex: 2147483647,
           transform: 'translate3d(0, 0, 0)',
         }}
         className="dropdown-portal"
       >
-        {children}
+        {/* Backdrop para permitir clique dentro do portal sem fechar */}
+        <div className="relative">
+          {children}
+        </div>
       </div>
     );
 
@@ -69,4 +86,6 @@ export const useDropdownPortal = ({ isOpen, triggerRef }: UseDropdownPortalProps
   };
 
   return { renderDropdown, position };
-}; 
+};
+
+

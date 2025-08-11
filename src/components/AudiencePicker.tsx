@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Users, ChevronDown, Search, Plus, Trash2, Facebook, X, RefreshCw } from 'lucide-react';
 import { metaAdsService } from '../services/metaAdsService';
+import { useDropdownPortal } from '../hooks/useDropdownPortal.tsx';
 
 interface Audience {
   id: string;
@@ -40,6 +41,8 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
   const [audiences, setAudiences] = useState<Audience[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const { renderDropdown } = useDropdownPortal({ isOpen, triggerRef });
 
   // Função para obter o ID do cliente baseado no nome
   const getClientIdFromName = (clientName: string): string => {
@@ -290,7 +293,9 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
   // Close picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+      const target = event.target as HTMLElement;
+      const clickedInsidePortal = target?.closest?.('.dropdown-portal');
+      if (pickerRef.current && !pickerRef.current.contains(target) && !clickedInsidePortal) {
         setIsOpen(false);
         setSearchTerm('');
       }
@@ -432,7 +437,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         onClick={() => isPickerActive && setIsOpen(!isOpen)}
       >
         <Users className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isPickerActive ? 'text-gray-400' : 'text-gray-600'}`} />
-        <div className={`pl-10 pr-8 py-2 rounded-lg border w-full ${
+        <div ref={triggerRef} className={`pl-10 pr-8 py-2 rounded-lg border w-full ${
           isPickerActive 
             ? 'bg-gray-700 text-white border-gray-600 focus:border-purple-500 focus:outline-none' 
             : 'bg-gray-800 text-gray-500 border-gray-700'
@@ -455,8 +460,8 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
       </div>
 
       {/* Dropdown */}
-      {isOpen && isPickerActive && (
-        <div className="dropdown-menu dropdown-menu-wide z-dropdown-high bg-slate-900 border border-slate-700 rounded-xl shadow-2xl" style={{ zIndex: 2147483647 }}>
+      {(isOpen && isPickerActive) && renderDropdown(
+          <div className="dropdown-menu dropdown-menu-wide z-dropdown-high bg-slate-900 border border-slate-700 rounded-xl shadow-2xl" style={{ zIndex: 2147483647 }}>
           {/* Action buttons - Fixed at top */}
           <div className="border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-700">
             <div className="flex items-center justify-between p-3">
@@ -619,8 +624,8 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
                </div>
             )}
           </div>
-        </div>
-      )}
+          </div>
+        )}
     </div>
   );
 };
