@@ -199,19 +199,36 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleProductSelect = (product: Product) => {
+  const handleProductSelect = async (product: Product) => {
     setSelectedProduct(product.name);
     setIsOpen(false);
     setSearchTerm('');
     
-    // Salvar no localStorage
-    localStorage.setItem('currentSelectedProduct', product.name);
-    
-    // Se for uma campanha do Facebook, salvar o ID da campanha
+    // Se for uma campanha do Facebook, salvar no Firestore
     if (product.source === 'facebook' && product.campaign) {
-      console.log('Salvando campaign ID:', product.campaign.id);
+      try {
+        const { firestoreCampaignSyncService } = await import('../services/firestoreCampaignSyncService');
+        
+        // Salvar seleção no Firestore
+        await firestoreCampaignSyncService.saveUserSelection({
+          selectedCampaignId: product.campaign.id,
+          selectedProductName: product.name,
+          selectedClient: selectedClient !== 'Selecione um cliente' ? selectedClient : undefined
+        });
+        
+        console.log('✅ Seleção salva no Firestore:', {
+          campaignId: product.campaign.id,
+          productName: product.name
+        });
+      } catch (error) {
+        console.error('Erro ao salvar seleção no Firestore:', error);
+      }
+    }
+    
+    // Manter localStorage como fallback/cache local
+    localStorage.setItem('currentSelectedProduct', product.name);
+    if (product.source === 'facebook' && product.campaign) {
       localStorage.setItem('selectedCampaignId', product.campaign.id);
-      console.log('Campaign ID salvo no localStorage:', localStorage.getItem('selectedCampaignId'));
     }
     
     // Emitir evento para notificar outros componentes
@@ -283,6 +300,25 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
           campaign.status === 'ACTIVE' || campaign.status === 'PAUSED'
         );
         
+        // Sincronizar campanhas com Firestore
+        try {
+          const { firestoreCampaignSyncService } = await import('../services/firestoreCampaignSyncService');
+          const selectedAccount = metaAdsService.getSelectedAccount();
+          
+          if (selectedAccount && activeCampaigns.length > 0) {
+            // Sincronizar campanhas no Firestore
+            await firestoreCampaignSyncService.syncCampaignsFromMetaAds(
+              activeCampaigns,
+              clientName,
+              selectedAccount.business_id || 'unknown',
+              selectedAccount.id
+            );
+            console.log('✅ Campanhas sincronizadas com Firestore');
+          }
+        } catch (error) {
+          console.error('Erro ao sincronizar campanhas com Firestore:', error);
+        }
+
         const facebookProducts: Product[] = activeCampaigns.map((campaign, index) => ({
           id: `fb-campaign-${campaign.id}`,
           name: campaign.name,

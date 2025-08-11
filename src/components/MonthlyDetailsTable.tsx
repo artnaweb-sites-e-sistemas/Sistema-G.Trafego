@@ -204,8 +204,14 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           
           setTableData(prevData => {
             const updatedData = prevData.map(row => {
-              if (benchmarkValues[row.metric]) {
-                return { ...row, benchmark: benchmarkValues[row.metric] };
+              const benchmarkValue = benchmarkValues[row.metric];
+              // Filtrar valores inválidos (NaN, 0, strings vazias)
+              if (benchmarkValue && 
+                  benchmarkValue !== '0' && 
+                  benchmarkValue !== 'R$0,00' &&
+                  !benchmarkValue.toString().includes('NaN') &&
+                  benchmarkValue.toString().trim() !== '') {
+                return { ...row, benchmark: benchmarkValue };
               }
               return row;
             });
@@ -220,9 +226,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           setTableData(getInitialTableData());
         }
       } else {
-        // CORREÇÃO: Se não há dados salvos, manter valores zerados
-        console.log('🔍 DEBUG - MonthlyDetailsTable - Nenhum benchmark salvo encontrado, mantendo valores zerados');
-        setTableData(getInitialTableData());
+        // Não resetar a planilha se não há benchmarks salvos ainda; aguardar aiBenchmarkResults
+        console.log('🔍 DEBUG - MonthlyDetailsTable - Nenhum benchmark salvo encontrado, mantendo estado atual');
       }
 
       // Carregar estados automáticos dos campos benchmark
@@ -242,6 +247,14 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       }
     }
   };
+
+  // Chamar carregamento dos benchmarks com pequeno atraso para evitar race com selectedClient no localStorage
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadBenchmarkValues();
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [selectedProduct, selectedMonth]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -498,6 +511,36 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   // Estado para armazenar dados calculados dos públicos
   const [audienceCalculatedValues, setAudienceCalculatedValues] = useState({ agendamentos: 0, vendas: 0 });
 
+  // Listener direto para mudanças nos detalhes dos públicos (comunicação mais rápida)
+  useEffect(() => {
+    const handleAudienceDetailsSaved = (event: CustomEvent) => {
+      console.log('🔍 DEBUG - MonthlyDetailsTable - Evento audienceDetailsSaved recebido:', event.detail);
+      
+      if (event.detail && 
+          event.detail.month === selectedMonth && 
+          event.detail.product === selectedProduct) {
+        console.log('🔍 DEBUG - MonthlyDetailsTable - Evento corresponde ao produto/mês atual, atualizando imediatamente...');
+        
+        // Atualizar imediatamente os valores calculados dos públicos
+        setAudienceCalculatedValues({
+          agendamentos: event.detail.details.agendamentos,
+          vendas: event.detail.details.vendas
+        });
+        
+        console.log('🔍 DEBUG - MonthlyDetailsTable - Valores dos públicos atualizados:', {
+          agendamentos: event.detail.details.agendamentos,
+          vendas: event.detail.details.vendas
+        });
+      }
+    };
+
+    window.addEventListener('audienceDetailsSaved', handleAudienceDetailsSaved as EventListener);
+    
+    return () => {
+      window.removeEventListener('audienceDetailsSaved', handleAudienceDetailsSaved as EventListener);
+    };
+  }, [selectedMonth, selectedProduct]);
+
   // Carregar dados salvos do Firebase quando produto ou mês mudar
   useEffect(() => {
     const loadSavedDetails = async () => {
@@ -605,6 +648,11 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     }
   }, [selectedProduct, selectedMonth]);
 
+  // Executar carregamento dos públicos imediatamente quando produto/mês mudarem
+  useEffect(() => {
+    loadAudienceData();
+  }, [loadAudienceData]);
+
   // Recarregar dados quando o componente for montado ou quando houver mudança de foco
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -643,9 +691,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
 
 
-  // Atualizar valores na tabela quando dados calculados dos públicos mudarem
+  // Atualizar valores na tabela quando dados calculados dos públicos mudarem (reativo)
   useEffect(() => {
-    console.log('🔍 DEBUG - MonthlyDetailsTable - Atualizando tabela com valores dos públicos:', audienceCalculatedValues);
+    console.log('🔍 DEBUG - MonthlyDetailsTable - Atualizando tabela com valores dos públicos (reativo):', audienceCalculatedValues);
     
     setTableData(prevData => {
       const newData = prevData.map(row => {

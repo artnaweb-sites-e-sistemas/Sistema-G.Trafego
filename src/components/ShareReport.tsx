@@ -3,7 +3,7 @@ import { Share2, Copy, CheckCircle, ExternalLink, Link, RefreshCw } from 'lucide
 import { toast } from 'react-hot-toast';
 import { shareService, ShareLink } from '../services/shareService';
 import { createPortal } from 'react-dom';
-import { metricsService, MetricData } from '../services/metricsService';
+import { MetricData, metricsService } from '../services/metricsService';
 
 interface ShareReportProps {
   selectedAudience: string;

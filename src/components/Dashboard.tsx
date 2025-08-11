@@ -12,7 +12,7 @@ import AIBenchmark from './AIBenchmark';
 import PerformanceAdsSection from './PerformanceAdsSection';
 import AdStrategySection from './AdStrategySection';
 import { User } from '../services/authService';
-import { metricsService, MetricData } from '../services/metricsService';
+import { metricsService, type MetricData } from '../services/metricsService';
 import { BenchmarkResults } from '../services/aiBenchmarkService';
 import { benchmarkStorage } from '../services/benchmarkStorage';
 
@@ -137,6 +137,65 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [realValuesRefreshTrigger, setRealValuesRefreshTrigger] = useState(0);
   const [aiBenchmarkResults, setAiBenchmarkResults] = useState<BenchmarkResults | null>(null);
 
+  // Carregar seleção atual do Firestore na inicialização
+  useEffect(() => {
+    const loadUserSelection = async () => {
+      try {
+        const { firestoreCampaignSyncService } = await import('../services/firestoreCampaignSyncService');
+        
+        // Carregar seleção do usuário do Firestore
+        const selection = await firestoreCampaignSyncService.getUserSelection();
+        if (selection) {
+          console.log('✅ Seleção carregada do Firestore:', selection);
+          
+          // Se há campanha selecionada, buscar o nome atual
+          if (selection.selectedCampaignId) {
+            const campaign = await firestoreCampaignSyncService.getCampaignById(selection.selectedCampaignId);
+            if (campaign) {
+              console.log('✅ Campanha encontrada no Firestore:', campaign.name);
+              setSelectedProduct(campaign.name);
+              
+              // Atualizar localStorage como cache
+              localStorage.setItem('currentSelectedProduct', campaign.name);
+              localStorage.setItem('selectedCampaignId', selection.selectedCampaignId);
+            } else if (selection.selectedProductName) {
+              // Fallback para nome salvo na seleção
+              setSelectedProduct(selection.selectedProductName);
+              localStorage.setItem('currentSelectedProduct', selection.selectedProductName);
+            }
+          }
+          
+          // Carregar cliente se disponível
+          if (selection.selectedClient) {
+            setSelectedClient(selection.selectedClient);
+            localStorage.setItem('selectedClient', selection.selectedClient);
+          }
+        } else {
+          // Fallback para localStorage se não há dados no Firestore
+          const savedProduct = localStorage.getItem('currentSelectedProduct');
+          const savedClient = localStorage.getItem('selectedClient');
+          
+          if (savedProduct) setSelectedProduct(savedProduct);
+          if (savedClient && savedClient !== 'Selecione um cliente') {
+            setSelectedClient(savedClient);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar seleção do Firestore:', error);
+        
+        // Fallback para localStorage em caso de erro
+        const savedProduct = localStorage.getItem('currentSelectedProduct');
+        const savedClient = localStorage.getItem('selectedClient');
+        
+        if (savedProduct) setSelectedProduct(savedProduct);
+        if (savedClient && savedClient !== 'Selecione um cliente') {
+          setSelectedClient(savedClient);
+        }
+      }
+    };
+
+    loadUserSelection();
+  }, []);
 
   // Garantir que o mês selecionado seja sempre válido
   useEffect(() => {
@@ -697,21 +756,41 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
   // Carregar benchmark quando produto mudar
   useEffect(() => {
-    if (selectedProduct && selectedProduct !== 'Todos os Produtos') {
-      const savedBenchmark = benchmarkStorage.loadBenchmark(
-        selectedProduct,
-        selectedClient !== 'Selecione um cliente' ? selectedClient : undefined,
-        selectedMonth
-      );
-      
-      if (savedBenchmark) {
-        setAiBenchmarkResults(savedBenchmark);
+    let isMounted = true;
+    const loadBenchmark = async () => {
+      if (selectedProduct && selectedProduct !== 'Todos os Produtos') {
+        try {
+          const savedBenchmark = await benchmarkStorage.loadBenchmark(
+            selectedProduct,
+            selectedClient !== 'Selecione um cliente' ? selectedClient : undefined,
+            selectedMonth
+          );
+          
+          if (isMounted) {
+            if (savedBenchmark) {
+              setAiBenchmarkResults(savedBenchmark);
+            } else {
+              setAiBenchmarkResults(null);
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao carregar benchmark:', error);
+          if (isMounted) {
+            setAiBenchmarkResults(null);
+          }
+        }
       } else {
-        setAiBenchmarkResults(null);
+        if (isMounted) {
+          setAiBenchmarkResults(null);
+        }
       }
-    } else {
-      setAiBenchmarkResults(null);
-    }
+    };
+
+    loadBenchmark();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [selectedProduct, selectedClient, selectedMonth]);
 
   return (

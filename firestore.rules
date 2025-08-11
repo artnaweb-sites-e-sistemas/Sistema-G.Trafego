@@ -37,6 +37,18 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
     }
     
+    // Campanhas sincronizadas - apenas para o usuário proprietário
+    match /campaigns/{campaignDocId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Seleções do usuário - apenas para o usuário proprietário
+    match /user_selections/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+    
     // Permitir acesso a outras coleções para usuários autenticados
     match /{document=**} {
       allow read, write: if request.auth != null;

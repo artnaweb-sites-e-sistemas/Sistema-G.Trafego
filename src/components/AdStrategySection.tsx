@@ -92,6 +92,16 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
   // Auto-avaliar todas as estratégias e sincronizar as que ainda não estão sincronizadas
   useEffect(() => {
     const run = async () => {
+      // Evitar chamadas ao Meta Ads quando não conectado/configurado
+      try {
+        const isConfigured = metaAdsService.isConfigured?.() ?? false;
+        const isLogged = metaAdsService.isLoggedIn?.() ?? false;
+        const hasAccount = !!metaAdsService.getSelectedAccount?.();
+        if (!isConfigured || !isLogged || !hasAccount) {
+          return;
+        }
+      } catch {}
+
       if (!strategies || strategies.length === 0) return;
       
       console.log(`🔍 DEBUG - useEffect avaliação - Iniciando para ${strategies.length} estratégias no período ${selectedMonth}`);
@@ -108,7 +118,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
             // pequena pausa para aliviar rate limit
             await new Promise(res => setTimeout(res, 400));
           } catch (e) {
-            console.error(`❌ DEBUG - Erro ao avaliar estratégia ${s.id}:`, e);
+            console.warn(`❌ DEBUG - Erro ao avaliar estratégia ${s.id}:`, e);
             // segue para próxima
           }
         } else {
@@ -504,6 +514,14 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
   const syncStrategyBudgetFromMeta = async (strategy: AdStrategy) => {
     if (!strategy?.generatedNames?.audience) return;
     try {
+      // Guardas de conexão com Meta Ads
+      const isConfigured = metaAdsService.isConfigured?.() ?? false;
+      const isLogged = metaAdsService.isLoggedIn?.() ?? false;
+      const hasAccount = !!metaAdsService.getSelectedAccount?.();
+      if (!isConfigured || !isLogged || !hasAccount) {
+        return;
+      }
+
       const { startDate, endDate } = getMonthDateRange(selectedMonth);
 
       // Buscar Ad Sets da conta no período
@@ -539,13 +557,21 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
         }));
       }
     } catch (error) {
-      console.error('Erro ao sincronizar orçamento da estratégia:', error);
+      console.warn('Erro ao sincronizar orçamento da estratégia:', error);
     }
   };
 
   // Avaliar performance de uma estratégia e recomendar escala
   const evaluateStrategyPerformance = async (strategy: AdStrategy) => {
     try {
+      // Guardas de conexão com Meta Ads
+      const isConfigured = metaAdsService.isConfigured?.() ?? false;
+      const isLogged = metaAdsService.isLoggedIn?.() ?? false;
+      const hasAccount = !!metaAdsService.getSelectedAccount?.();
+      if (!isConfigured || !isLogged || !hasAccount) {
+        return;
+      }
+
       const { startDate, endDate } = getMonthDateRange(selectedMonth);
       console.log(`🔍 DEBUG - evaluateStrategyPerformance - Estratégia ${strategy.id} (${strategy.generatedNames.audience}) - Período: ${startDate} a ${endDate}`);
       
@@ -831,7 +857,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
         ));
       }
     } catch (error) {
-      console.error('Erro ao avaliar performance da estratégia:', error);
+      console.warn('Erro ao avaliar performance da estratégia:', error);
       // Não sobreescrever tooltip com erro; manter último sucesso ou estado "aguardando dados"
     }
   };

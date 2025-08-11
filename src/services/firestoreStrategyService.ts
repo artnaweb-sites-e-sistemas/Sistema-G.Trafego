@@ -71,10 +71,20 @@ class FirestoreStrategyService {
         where('userId', '==', userId),
         orderBy('createdAt', 'desc')
       );
-      
       const querySnapshot = await getDocs(q);
       return querySnapshot.docs.map(doc => this.fromFirestoreFormat(doc));
-    } catch (error) {
+    } catch (error: any) {
+      // Fallback sem índice: buscar só por userId e ordenar no cliente
+      if (String(error?.message || '').includes('The query requires an index')) {
+        const qFallback = query(
+          collection(db, this.COLLECTION_NAME),
+          where('userId', '==', userId)
+        );
+        const snap = await getDocs(qFallback);
+        return snap.docs
+          .map(doc => this.fromFirestoreFormat(doc))
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      }
       console.error('Erro ao buscar estratégias do Firestore:', error);
       return [];
     }
@@ -92,10 +102,21 @@ class FirestoreStrategyService {
         where('client', '==', client),
         orderBy('createdAt', 'desc')
       );
-      
       const querySnapshot = await getDocs(q);
       return querySnapshot.docs.map(doc => this.fromFirestoreFormat(doc));
-    } catch (error) {
+    } catch (error: any) {
+      // Fallback sem índice: buscar por userId e filtrar em memória; ordenar no cliente
+      if (String(error?.message || '').includes('The query requires an index')) {
+        const qFallback = query(
+          collection(db, this.COLLECTION_NAME),
+          where('userId', '==', userId)
+        );
+        const snap = await getDocs(qFallback);
+        return snap.docs
+          .map(doc => this.fromFirestoreFormat(doc))
+          .filter(s => s.client === client)
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      }
       console.error('Erro ao buscar estratégias por cliente:', error);
       return [];
     }
@@ -114,10 +135,21 @@ class FirestoreStrategyService {
         where('month', '==', month),
         orderBy('createdAt', 'desc')
       );
-      
       const querySnapshot = await getDocs(q);
       return querySnapshot.docs.map(doc => this.fromFirestoreFormat(doc));
-    } catch (error) {
+    } catch (error: any) {
+      // Fallback sem índice: buscar por userId e filtrar em memória; ordenar no cliente
+      if (String(error?.message || '').includes('The query requires an index')) {
+        const qFallback = query(
+          collection(db, this.COLLECTION_NAME),
+          where('userId', '==', userId)
+        );
+        const snap = await getDocs(qFallback);
+        return snap.docs
+          .map(doc => this.fromFirestoreFormat(doc))
+          .filter(s => s.client === client && s.month === month)
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      }
       console.error('Erro ao buscar estratégias por cliente e mês:', error);
       return [];
     }

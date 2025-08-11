@@ -55,7 +55,14 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
   // Sincronizar com resultados salvos
   React.useEffect(() => {
     if (savedResults) {
-      setLastResults(savedResults);
+      // Garantir estrutura segura
+      const safeResults: BenchmarkResults = {
+        ...savedResults,
+        insights: Array.isArray((savedResults as any).insights)
+          ? (savedResults as any).insights
+          : [],
+      } as BenchmarkResults;
+      setLastResults(safeResults);
     } else {
       setLastResults(null);
     }
@@ -675,14 +682,14 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                 </div>
               </div>
 
-              {lastResults.insights.length > 0 && (
+              {(lastResults?.insights?.length ?? 0) > 0 && (
                 <div className="bg-slate-900/40 border border-slate-700/50 rounded-xl p-4">
                   <h5 className="text-sm font-semibold text-emerald-200 mb-3 flex items-center">
                     <span className="w-2 h-2 bg-emerald-400 rounded-full mr-2"></span>
                     Insights da IA
                   </h5>
                   <ul className="space-y-2">
-                    {lastResults.insights.map((insight, index) => (
+                    {(lastResults?.insights || []).map((insight, index) => (
                       <li key={index} className="text-sm text-slate-300 flex items-start">
                         <span className="text-emerald-400 mr-3 mt-0.5">•</span>
                         <span className="leading-relaxed">{insight}</span>
