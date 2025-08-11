@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Users, ChevronDown, Search, Trash2, Facebook, X } from 'lucide-react';
+import { Users, ChevronDown, Search, Plus, Trash2, Facebook, X } from 'lucide-react';
 import { metaAdsService, BusinessManager } from '../services/metaAdsService';
 
 interface Client {
@@ -70,7 +70,7 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
           const businessManagers = await metaAdsService.getBusinessManagers();
 
           // Converter Business Managers para formato de clientes
-          const facebookClients: Client[] = businessManagers.map((bm) => ({
+          const facebookClients: Client[] = businessManagers.map((bm, index) => ({
             id: `fb-${bm.id}`,
             name: bm.name,
             company: 'Business Manager',
@@ -155,13 +155,10 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
     setIsOpen(false);
     setSearchTerm('');
     
-    // Somente limpar seleção se o cliente realmente mudou
-    if (!previousClient || previousClient !== client.name) {
-      localStorage.removeItem('selectedCampaignId');
-      localStorage.removeItem('selectedAdSetId');
-      localStorage.removeItem('selectedProduct');
-      localStorage.removeItem('selectedAudience');
-    }
+    localStorage.removeItem('selectedCampaignId');
+    localStorage.removeItem('selectedAdSetId');
+    localStorage.removeItem('selectedProduct');
+    localStorage.removeItem('selectedAudience');
     
     localStorage.setItem('currentSelectedClient', client.name);
 
@@ -320,7 +317,9 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
     return client ? client.name : 'Selecione um cliente';
   };
 
-  // (removido: helper não utilizado)
+  const getSelectedClientInfo = () => {
+    return clients.find(c => c.name === selectedClient);
+  };
 
   const getClientIcon = (client: Client) => {
     if (client.source === 'facebook') {

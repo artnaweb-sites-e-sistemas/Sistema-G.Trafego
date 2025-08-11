@@ -13,6 +13,30 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
     
+    // Estratégias de anúncio - apenas para o usuário proprietário
+    match /ad_strategies/{strategyId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Links de compartilhamento - apenas para o usuário proprietário
+    match /share_links/{linkId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Benchmarks de IA - apenas para o usuário proprietário
+    match /ai_benchmarks/{benchmarkId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Detalhes mensais - apenas para o usuário proprietário
+    match /monthly_details/{detailId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+    
     // Permitir acesso a outras coleções para usuários autenticados
     match /{document=**} {
       allow read, write: if request.auth != null;

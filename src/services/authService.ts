@@ -10,6 +10,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
+import { migrationService } from './migrationService';
 
 export interface User {
   uid: string;
@@ -75,6 +76,14 @@ class AuthService {
         }
       
       localStorage.setItem('gtrafego_user', JSON.stringify(this.currentUser));
+      
+      // Executar migração automática após carregar dados do usuário
+      setTimeout(() => {
+        migrationService.autoMigrateOnLogin().catch(error => {
+          console.error('Erro na migração automática:', error);
+        });
+      }, 1000); // Aguardar 1 segundo para garantir que o usuário está completamente carregado
+      
     } catch (error) {
       // Se houver erro no Firestore, criar usuário básico
       if (firebaseUser) {

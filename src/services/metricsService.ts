@@ -892,14 +892,7 @@ export const metricsService = {
             } else if (campaignId) {
               // Se há uma campanha específica selecionada, buscar métricas da campanha
               const campaignInsights = await metaAdsService.getCampaignInsights(campaignId, startDate, endDate);
-              
-              // Garantir que o nome do produto seja o nome real da campanha
-              let realProductName = product;
-              if (!realProductName || realProductName === 'Todos os Produtos' || realProductName === 'Campanha Meta Ads') {
-                realProductName = localStorage.getItem('currentSelectedProduct') || product;
-              }
-              
-              metaAdsData = metaAdsService.convertToMetricData(campaignInsights, month, client, realProductName, audience);
+              metaAdsData = metaAdsService.convertToMetricData(campaignInsights, month, client, product, audience);
             } else {
               // Se apenas o cliente foi selecionado, buscar métricas de toda a conta (todas as campanhas)
               const accountInsights = await metaAdsService.getAccountInsights(startDate, endDate);
@@ -1485,7 +1478,6 @@ export const metricsService = {
     ticketMedio?: number;
     vendasAuto?: boolean; // New field to save the mode
     manualVendasValue?: number; // New field to save manual value
-    client?: string; // Cliente para permitir agregação por cliente
   }) {
     try {
       console.log('🔍 DEBUG - metricsService.saveAudienceDetails - Iniciando salvamento:', {
@@ -1514,7 +1506,6 @@ export const metricsService = {
           ticketMedio: data.ticketMedio || 250,
           vendasAuto: data.vendasAuto !== undefined ? data.vendasAuto : true, // Save the mode
           manualVendasValue: data.manualVendasValue !== undefined ? data.manualVendasValue : 0, // Save manual value
-          client: data.client || 'Cliente Padrão',
           updatedAt: new Date()
         });
         console.log('🔍 DEBUG - metricsService.saveAudienceDetails - Detalhes do público atualizados com sucesso:', data);
@@ -1525,7 +1516,6 @@ export const metricsService = {
           ticketMedio: data.ticketMedio || 250,
           vendasAuto: data.vendasAuto !== undefined ? data.vendasAuto : true, // Save the mode
           manualVendasValue: data.manualVendasValue !== undefined ? data.manualVendasValue : 0, // Save manual value
-          client: data.client || 'Cliente Padrão',
           createdAt: new Date(),
           updatedAt: new Date()
         });
@@ -1533,52 +1523,9 @@ export const metricsService = {
       }
       
       console.log('🔍 DEBUG - metricsService.saveAudienceDetails - Salvamento concluído com sucesso');
-
-      // Atualizar imediatamente os valores agregados em monthlyDetails para refletir na planilha
-      try {
-        await this.aggregateAndSaveMonthlyFromAudiences(data.month, data.product, data.client);
-      } catch (aggErr) {
-        console.warn('⚠️ metricsService.saveAudienceDetails - Falha ao agregar e salvar monthlyDetails:', aggErr);
-      }
     } catch (error) {
       console.error('🔍 DEBUG - metricsService.saveAudienceDetails - Erro ao salvar detalhes do público:', error);
       throw new Error('Não foi possível salvar os detalhes do público.');
-    }
-  },
-
-  // Agrega todos os audienceDetails do mês/produto (e cliente se fornecido) e salva em monthlyDetails
-  async aggregateAndSaveMonthlyFromAudiences(month: string, product: string, client?: string) {
-    try {
-      const constraints: any[] = [
-        where('month', '==', month),
-        where('product', '==', product)
-      ];
-      if (client) constraints.push(where('client', '==', client));
-
-      const q = query(collection(db, 'audienceDetails'), ...constraints);
-      const snap = await getDocs(q);
-
-      let sumAgendamentos = 0;
-      let sumVendas = 0;
-      snap.forEach(docSnap => {
-        const d: any = docSnap.data();
-        sumAgendamentos += Number(d?.agendamentos || 0);
-        sumVendas += Number(d?.vendas || 0);
-      });
-
-      await this.saveMonthlyDetails({
-        month,
-        product,
-        client,
-        agendamentos: sumAgendamentos,
-        vendas: sumVendas
-      });
-
-      // saveMonthlyDetails já dispara monthlyDetailsChanged/campaignValuesChanged
-      return { agendamentos: sumAgendamentos, vendas: sumVendas };
-    } catch (error) {
-      console.error('Erro ao agregar audienceDetails para monthlyDetails:', error);
-      throw error;
     }
   },
 
@@ -1623,6 +1570,7 @@ export const metricsService = {
       );
       
       const querySnapshot = await getDocs(q);
+      const audienceDetails: any[] = [];
       const audienceMap = new Map(); // Para consolidar duplicatas
       
       querySnapshot.forEach((doc) => {

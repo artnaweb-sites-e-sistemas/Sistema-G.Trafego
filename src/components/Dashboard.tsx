@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import Header from './Header';
 import MetricsGrid from './MetricsGrid';
@@ -136,10 +136,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [realValuesForClient, setRealValuesForClient] = useState({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
   const [realValuesRefreshTrigger, setRealValuesRefreshTrigger] = useState(0);
   const [aiBenchmarkResults, setAiBenchmarkResults] = useState<BenchmarkResults | null>(null);
-  
-  // Debounce para evitar múltiplas chamadas e controle de execução
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const loadingRealValuesRef = useRef<boolean>(false);
 
 
   // Garantir que o mês selecionado seja sempre válido
@@ -150,19 +146,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       setSelectedMonth(currentMonth);
     }
   }, []);
-
-  // Limpar produto selecionado quando o mês mudar (manter apenas cliente)
-  useEffect(() => {
-    console.log('🔍 DEBUG - Dashboard - Mês alterado, limpando seleção de produto');
-    setSelectedProduct('');
-    localStorage.removeItem('currentSelectedProduct');
-    localStorage.removeItem('selectedCampaignId');
-    
-    // Disparar evento para notificar outros componentes
-    window.dispatchEvent(new CustomEvent('productCleared', {
-      detail: { reason: 'monthChanged' }
-    }));
-  }, [selectedMonth]);
 
   // Carregar métricas
   useEffect(() => {
@@ -223,7 +206,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Carregar valores reais de agendamentos e vendas do cliente
   useEffect(() => {
     console.log('🔍 DEBUG - Dashboard - useEffect loadRealValuesForClient INICIADO');
-    console.time('Dashboard.loadRealValuesForClient');
     console.log('🔍 DEBUG - Dashboard - Estados atuais:', { selectedClient, selectedMonth, realValuesRefreshTrigger });
     console.log('🔍 DEBUG - Dashboard - Stack trace:', new Error().stack?.split('\n').slice(1, 4).join('\n'));
     
@@ -241,13 +223,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     }
     
     const loadRealValuesForClient = async () => {
-      // Evitar execução simultânea
-      if (loadingRealValuesRef.current) {
-        console.log('🔍 DEBUG - Dashboard - loadRealValuesForClient já em execução, pulando...');
-        return;
-      }
-      
-      loadingRealValuesRef.current = true;
       console.log('🔍 DEBUG - Dashboard - useEffect loadRealValuesForClient executado');
       console.log('🔍 DEBUG - Dashboard - selectedClient:', selectedClient);
       console.log('🔍 DEBUG - Dashboard - selectedMonth:', selectedMonth);
@@ -265,9 +240,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         await metricsService.debugMonthlyDetails(selectedMonth);
         
         console.log('🔍 DEBUG - Dashboard - Chamando getRealValuesForClient...');
-        console.time('metricsService.getRealValuesForClient');
         const realValues = await metricsService.getRealValuesForClient(selectedMonth, selectedClient);
-        console.timeEnd('metricsService.getRealValuesForClient');
         console.log('🔍 DEBUG - Dashboard - Resultado da busca:', realValues);
         console.log('🔍 DEBUG - Dashboard - Tipo do resultado:', typeof realValues);
         console.log('🔍 DEBUG - Dashboard - Estrutura do resultado:', JSON.stringify(realValues, null, 2));
@@ -288,31 +261,14 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
           roi: typeof realValues.roi === 'string' ? realValues.roi : '0% (0.0x)'
         });
         console.log('🔍 DEBUG - Dashboard - Valores reais carregados:', realValues);
-        console.timeEnd('Dashboard.loadRealValuesForClient');
       } catch (error) {
         console.error('🔍 DEBUG - Dashboard - Erro ao carregar valores reais do cliente:', error);
         console.error('🔍 DEBUG - Dashboard - Stack trace do erro:', error instanceof Error ? error.stack : 'N/A');
         setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
-        console.timeEnd('Dashboard.loadRealValuesForClient');
-      } finally {
-        loadingRealValuesRef.current = false;
       }
     };
 
-    // Debounce para evitar múltiplas chamadas
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-    
-    debounceTimeoutRef.current = setTimeout(() => {
-      loadRealValuesForClient();
-    }, 300); // 300ms de debounce
-
-    return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-    };
+    loadRealValuesForClient();
   }, [selectedMonth, selectedClient, realValuesRefreshTrigger]);
 
   // Listener para atualizar valores reais quando dados dos públicos mudarem

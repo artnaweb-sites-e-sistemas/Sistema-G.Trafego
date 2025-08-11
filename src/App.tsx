@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import PublicReportView from './components/PublicReportView';
-import AdminDataInspector from './components/AdminDataInspector';
+import MigrationStatus from './components/MigrationStatus';
 import { authService, User } from './services/authService';
 import { shareService } from './services/shareService';
 
@@ -90,7 +90,6 @@ function App() {
 
   // Componente para rota protegida
   const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-    const location = useLocation();
     if (isLoading) {
       return (
         <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -103,7 +102,7 @@ function App() {
     }
 
     if (!isAuthenticated) {
-      return <Navigate to="/login" replace state={{ from: location }} />;
+      return <Navigate to="/login" replace />;
     }
 
     return <>{children}</>;
@@ -140,6 +139,9 @@ function App() {
 
   return (
     <Router>
+      {/* Migration Status Banner */}
+      {isAuthenticated && <MigrationStatus />}
+      
       <Routes>
         {/* Rota pública para visualização de relatórios compartilhados */}
         <Route 
@@ -156,7 +158,7 @@ function App() {
         {/* Rota de login */}
         <Route 
           path="/login" 
-          element={(
+          element={
             !isAuthenticated ? (
               <div className="min-h-screen bg-gray-900">
                 <LoginScreen 
@@ -167,14 +169,9 @@ function App() {
                 <Toaster position="top-right" />
               </div>
             ) : (
-              // Após autenticar, redireciona para a rota de origem (se houver)
-              (() => {
-                const location = window.history.state && (window.history.state as any).usr ? (window.history.state as any).usr : undefined;
-                const fromPath = location?.from?.pathname || '/';
-                return <Navigate to={fromPath} replace />;
-              })()
+              <Navigate to="/" replace />
             )
-          )} 
+          } 
         />
         
         {/* Rota principal do dashboard (protegida) */}
@@ -189,16 +186,6 @@ function App() {
             </ProtectedRoute>
           } 
         />
-
-        {/* Admin - Inspector (somente leitura) */}
-        <Route 
-          path="/admin/inspector" 
-          element={
-            <ProtectedRoute>
-              <AdminDataInspector />
-            </ProtectedRoute>
-          } 
-        />
         
         {/* Redirecionar qualquer outra rota para o dashboard */}
         <Route 
@@ -206,6 +193,31 @@ function App() {
           element={<Navigate to="/" replace />} 
         />
       </Routes>
+      
+      {/* Toast container global */}
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#1e293b',
+            color: '#f1f5f9',
+            border: '1px solid #334155'
+          },
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#f1f5f9'
+            }
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#f1f5f9'
+            }
+          }
+        }}
+      />
     </Router>
   );
 }

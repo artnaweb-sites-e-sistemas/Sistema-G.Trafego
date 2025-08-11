@@ -1,4 +1,6 @@
 import { BenchmarkResults } from './aiBenchmarkService';
+import { firestoreBenchmarkService } from './firestoreBenchmarkService';
+import { authService } from './authService';
 
 interface StoredBenchmark {
   productName: string;
@@ -11,14 +13,21 @@ interface StoredBenchmark {
 class BenchmarkStorageService {
   private readonly STORAGE_KEY = 'ai_benchmark_results';
 
-  // Salvar benchmark para um produto específico
-  saveBenchmark(
+  // Verificar se o usuário está autenticado
+  private isUserAuthenticated(): boolean {
+    const user = authService.getCurrentUser();
+    return !!user?.uid;
+  }
+
+  // Salvar benchmark para um produto específico (localStorage + Firestore)
+  async saveBenchmark(
     productName: string, 
     results: BenchmarkResults, 
     clientName?: string, 
     month?: string
-  ): void {
+  ): Promise<void> {
     try {
+      // Salvar no localStorage
       const stored = this.getAllBenchmarks();
       const key = this.generateKey(productName, clientName, month);
       
@@ -31,16 +40,42 @@ class BenchmarkStorageService {
       };
 
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(stored));
-    } catch (error) {
+
+      // Se autenticado, salvar também no Firestore
+      if (this.isUserAuthenticated()) {
+        try {
+          await firestoreBenchmarkService.saveBenchmark(productName, results, clientName, month);
+          console.log('Benchmark salvo no localStorage e Firestore');
+        } catch (error) {
+          console.error('Erro ao salvar benchmark no Firestore (usando localStorage):', error);
+        }
       }
+    } catch (error) {
+      console.error('Erro ao salvar benchmark:', error);
+      throw error;
+    }
   }
 
-  // Carregar benchmark para um produto específico
-  loadBenchmark(
+  // Carregar benchmark para um produto específico (Firestore primeiro, localStorage como fallback)
+  async loadBenchmark(
     productName: string, 
     clientName?: string, 
     month?: string
-  ): BenchmarkResults | null {
+  ): Promise<BenchmarkResults | null> {
+    // Se autenticado, tentar buscar no Firestore primeiro
+    if (this.isUserAuthenticated()) {
+      try {
+        const firestoreResult = await firestoreBenchmarkService.loadBenchmark(productName, clientName, month);
+        if (firestoreResult) {
+          console.log('Benchmark carregado do Firestore');
+          return firestoreResult;
+        }
+      } catch (error) {
+        console.error('Erro ao carregar benchmark do Firestore, usando localStorage:', error);
+      }
+    }
+
+    // Fallback para localStorage
     try {
       const stored = this.getAllBenchmarks();
       const key = this.generateKey(productName, clientName, month);
@@ -52,17 +87,18 @@ class BenchmarkStorageService {
 
       return null;
     } catch (error) {
+      console.error('Erro ao carregar benchmark do localStorage:', error);
       return null;
     }
   }
 
   // Verificar se existe benchmark para um produto
-  hasBenchmark(
+  async hasBenchmark(
     productName: string, 
     clientName?: string, 
     month?: string
-  ): boolean {
-    const benchmark = this.loadBenchmark(productName, clientName, month);
+  ): Promise<boolean> {
+    const benchmark = await this.loadBenchmark(productName, clientName, month);
     return benchmark !== null;
   }
 

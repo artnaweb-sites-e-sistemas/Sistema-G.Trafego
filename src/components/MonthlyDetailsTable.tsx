@@ -156,7 +156,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   }, [aiBenchmarkResults, benchmarkAuto]);
 
   // Função para salvar valores de benchmark
-    const saveBenchmarkValues = (data: any[]) => {
+  const saveBenchmarkValues = (data: any[]) => {
     if (selectedProduct && selectedMonth) {
       const benchmarkValues: { [key: string]: string } = {};
       
@@ -167,22 +167,17 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       });
       
           // CORREÇÃO: Incluir cliente na chave para vincular ao período específico
-      const selectedClient = localStorage.getItem('selectedClient') || 'Cliente Padrão';
-      // Persistir no Firestore (primário). Mantemos localStorage apenas como cache.
-      try {
-        const { authService } = require('../services/authService');
-        const { db } = require('../config/firebase');
-        const { doc, setDoc } = require('firebase/firestore');
-        const user = authService.getCurrentUser?.();
-        if (user) {
-          const key = `${(selectedClient||'').toLowerCase().replace(/[^a-z0-9_\-]/g,'_')}|${(selectedProduct||'').toLowerCase().replace(/[^a-z0-9_\-]/g,'_')}|${(selectedMonth||'').toLowerCase().replace(/[^a-z0-9_\-]/g,'_')}`;
-          const ref = doc(db, 'users', user.uid, 'monthlyBenchmarks', key);
-          setDoc(ref, { benchmarks: benchmarkValues }, { merge: true });
-          // Atualiza cache local para futuras leituras offline
-          const storageKey = `benchmark_${selectedClient}_${selectedProduct}_${selectedMonth}`;
-          localStorage.setItem(storageKey, JSON.stringify(benchmarkValues));
-        }
-      } catch {}
+    const selectedClient = localStorage.getItem('selectedClient') || 'Cliente Padrão';
+    const storageKey = `benchmark_${selectedClient}_${selectedProduct}_${selectedMonth}`;
+    console.log('🔍 DEBUG - MonthlyDetailsTable - Salvando benchmarks:', {
+      storageKey,
+      selectedClient,
+      selectedProduct,
+      selectedMonth,
+      dataCount: benchmarkValues.length
+    });
+    localStorage.setItem(storageKey, JSON.stringify(benchmarkValues));
+      console.log('Valores de benchmark salvos:', benchmarkValues);
     }
   };
 
@@ -644,31 +639,6 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [selectedMonth, selectedProduct]);
-
-  // Atualização imediata ao salvar detalhes de público
-  useEffect(() => {
-    const onAudienceDetailsSaved = async (event: Event) => {
-      console.time('MonthlyDetailsTable.onAudienceDetailsSaved');
-      const { detail } = event as CustomEvent<{ month: string; product: string }>; 
-      if (!detail) return;
-      // Garantir que é do mesmo mês/produto
-      if (detail.month === selectedMonth && detail.product === selectedProduct) {
-        try {
-          console.log('🔍 DEBUG - MonthlyDetailsTable - audienceDetailsSaved DETECTADO para mês/produto atuais', detail);
-          console.time('metricsService.getAllAudienceDetailsForProduct');
-          const allAudienceDetails = await metricsService.getAllAudienceDetailsForProduct(selectedMonth, selectedProduct);
-          console.timeEnd('metricsService.getAllAudienceDetailsForProduct');
-          const totalAgendamentos = allAudienceDetails.reduce((sum, d) => sum + (d.agendamentos || 0), 0);
-          const totalVendas = allAudienceDetails.reduce((sum, d) => sum + (d.vendas || 0), 0);
-          setAudienceCalculatedValues({ agendamentos: totalAgendamentos, vendas: totalVendas });
-          console.log('🔍 DEBUG - MonthlyDetailsTable - Valores agregados após audienceDetailsSaved:', { totalAgendamentos, totalVendas });
-        } catch {}
-      }
-      console.timeEnd('MonthlyDetailsTable.onAudienceDetailsSaved');
-    };
-    window.addEventListener('audienceDetailsSaved', onAudienceDetailsSaved);
-    return () => window.removeEventListener('audienceDetailsSaved', onAudienceDetailsSaved);
   }, [selectedMonth, selectedProduct]);
 
 
@@ -1612,19 +1582,6 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     const autoStatesKey = `benchmark_auto_${clientForToggle}_${selectedProduct}_${selectedMonth}`;
       localStorage.setItem(autoStatesKey, JSON.stringify(benchmarkAuto));
       console.log('Estados automáticos de benchmark salvos:', benchmarkAuto);
-
-      // Persistir também no Firestore (best-effort) sem alterar a lógica da UI
-      try {
-        const { authService } = require('../services/authService');
-        const { db } = require('../config/firebase');
-        const { doc, setDoc } = require('firebase/firestore');
-        const user = authService.getCurrentUser?.();
-        if (user) {
-          const key = `${(clientForToggle||'').toLowerCase().replace(/[^a-z0-9_\-]/g,'_')}|${(selectedProduct||'').toLowerCase().replace(/[^a-z0-9_\-]/g,'_')}|${(selectedMonth||'').toLowerCase().replace(/[^a-z0-9_\-]/g,'_')}`;
-          const ref = doc(db, 'users', user.uid, 'monthlyBenchmarks', key);
-          setDoc(ref, { autoStates: benchmarkAuto }, { merge: true });
-        }
-      } catch {}
     }
   }, [benchmarkAuto, selectedProduct, selectedMonth]);
 
