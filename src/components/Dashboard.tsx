@@ -875,6 +875,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                     <MonthlyDetailsTable 
                       metrics={metrics} 
                       selectedProduct={selectedProduct}
+                      selectedClient={selectedClient}
                       selectedMonth={selectedMonth}
                       onValuesChange={setMonthlyDetailsValues}
                       aiBenchmarkResults={aiBenchmarkResults}

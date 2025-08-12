@@ -115,8 +115,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
             await evaluateStrategyPerformance(s);
             hasEvaluatedRef.current.add(evaluationKey);
             console.log(`✅ DEBUG - Estratégia ${s.id} avaliada com sucesso`);
-            // pequena pausa para aliviar rate limit
-            await new Promise(res => setTimeout(res, 400));
+            // Pausa maior para aliviar rate limit Meta Ads
+            await new Promise(res => setTimeout(res, 1000));
           } catch (e) {
             console.warn(`❌ DEBUG - Erro ao avaliar estratégia ${s.id}:`, e);
             // segue para próxima
@@ -867,7 +867,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     // Filtrar por visibilidade inteligente - só aparece se tiver gasto OU se foi criada no período
     const filtered = strategies.filter((s) => {
       const rec = recommendations[s.id];
-      
+      const createdInPeriod = s.month === selectedMonth;
+
       console.log(`🔍 DEBUG - Filtragem estratégia ${s.id}:`, {
         strategyName: s.generatedNames.audience,
         hasRec: !!rec,
@@ -876,27 +877,30 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
         adSetsCount: rec?.stats?.adSetsCount,
         hasSpendInPeriod: rec?.stats?.spend >= 0.01,
         hasAdSetsInPeriod: rec?.stats?.adSetsCount > 0,
-        createdInPeriod: s.month === selectedMonth
+        createdInPeriod
       });
-      
-      // Se não há recomendações inicializadas, não mostrar
+
+      // Regra 1: se foi criada no mês selecionado, mostrar mesmo sem métricas
+      if (createdInPeriod) {
+        console.log(`✅ Estratégia ${s.id} exibida: criada no período`);
+        return true;
+      }
+
+      // Regra 2: para outros meses, só mostrar se houver métricas (gasto) no período
       if (!rec || !rec.stats) {
-        console.log(`❌ Estratégia ${s.id} filtrada: sem recomendações ou stats`);
+        console.log(`❌ Estratégia ${s.id} filtrada: sem recomendações/stats para mês sem criação`);
         return false;
       }
-      
+
       const hasSpendInPeriod = rec.stats.spend >= 0.01;
-      const hasAdSetsInPeriod = rec.stats.adSetsCount > 0;
-      const createdInPeriod = s.month === selectedMonth;
-      
-      // Só aparece se: tem gasto no período OU foi criada neste período
-      const shouldShow = hasSpendInPeriod || createdInPeriod;
-      
+
+      const shouldShow = hasSpendInPeriod;
+
       console.log(`🔍 DEBUG - Resultado filtragem ${s.id}:`, {
         shouldShow,
-        reason: hasSpendInPeriod ? 'com gasto' : createdInPeriod ? 'criada no período' : 'sem gasto e não criada no período'
+        reason: hasSpendInPeriod ? 'com gasto' : 'sem gasto'
       });
-      
+
       return shouldShow;
     });
     

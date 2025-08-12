@@ -368,7 +368,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       'Investimento': 'Valor investido em anúncios neste dia',
       'CPM': 'Custo por mil impressões neste dia',
       'Impressões': 'Número de vezes que o anúncio foi exibido neste dia',
-      'CPR': 'Custo por resultado dinâmico: se há compras, mostra custo por compra; se há leads, mostra custo por lead; sincronizado com Meta Ads',
+      'CPR': 'Custo por resultado dinâmico: prioriza custo por compra; se não houver, custo por lead; caso contrário, custo por clique (tráfego). Mostra “-” quando não houver resultado no dia.',
       'Leads': 'Número de leads gerados neste dia',
       'Compras': 'Número de vendas/conversões realizadas neste dia',
       'Status': 'Status do anúncio: Ativo (com investimento) ou Inativo (sem investimento)'
@@ -426,7 +426,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
         investment: formatCurrency(0),
         cpm: formatCurrency(0),
         impressions: 0,
-        cpr: formatCurrency(0),
+        cpr: '-',
         leads: 0,
         compras: 0,
         status: 'Inativo',
@@ -443,6 +443,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
     interface Agg {
       investment: number;
       impressions: number;
+      clicks?: number;
       leads: number;
       compras: number;
       cpr?: number; // Custo por resultado dinâmico
@@ -470,16 +471,14 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
     // Agregar por dia somando serviços
     const dayAggMap = new Map<DayKey, Agg>();
     dayServiceMap.forEach((serviceMap, dateKey) => {
-      let agg: Agg = { investment: 0, impressions: 0, leads: 0, compras: 0, cpr: 0 };
+      let agg: Agg = { investment: 0, impressions: 0, clicks: 0, leads: 0, compras: 0, cpr: 0 };
       serviceMap.forEach(metric => {
         agg.investment += metric.investment || 0;
         agg.impressions += metric.impressions || 0;
+        agg.clicks = (agg.clicks || 0) + (metric.clicks || 0);
         agg.leads += metric.leads || 0;
         agg.compras += metric.compras || 0;
-        // Para CPR, vamos usar a média ponderada baseada no investimento
-        if (metric.cpr && metric.investment) {
-          agg.cpr = ((agg.cpr || 0) * (agg.investment - metric.investment) + metric.cpr * metric.investment) / agg.investment;
-        }
+        // CPR será calculado ao aplicar por dia com base em investimento/resultado do próprio dia
       });
       dayAggMap.set(dateKey, agg);
     });
@@ -499,12 +498,19 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       }
       const dayIndex = metricDate.getDate() - 1;
       if (dayIndex >= 0 && dayIndex < data.length) {
+        // CPR diário: considerar apenas compras > leads; sem resultado, mostrar '-'
+        const resultsCount = (agg.compras && agg.compras > 0)
+          ? agg.compras
+          : (agg.leads && agg.leads > 0)
+            ? agg.leads
+            : 0;
+
         data[dayIndex] = {
           ...data[dayIndex],
           investment: formatCurrency(agg.investment),
           cpm: agg.impressions > 0 ? formatCurrency((agg.investment / agg.impressions) * 1000) : formatCurrency(0),
           impressions: agg.impressions,
-          cpr: agg.cpr && agg.cpr > 0 ? formatCurrency(agg.cpr) : formatCurrency(0),
+          cpr: resultsCount > 0 ? formatCurrency(agg.investment / resultsCount) : '-',
           leads: agg.leads,
           compras: agg.compras,
           status: agg.investment > 0 ? 'Ativo' : 'Inativo'

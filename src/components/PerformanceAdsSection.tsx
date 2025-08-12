@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -99,6 +100,36 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [tooltipAdId, setTooltipAdId] = useState<string | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
+  const [metricTooltip, setMetricTooltip] = useState<{ adId: string; metric: 'cpr' | 'cpc' | 'ctr' | 'freq'; position: { x: number; y: number } } | null>(null);
+  const portalRef = useRef<HTMLElement | null>(null);
+  const metricTooltipWrapperRef = useRef<HTMLDivElement | null>(null);
+  const handleCardMouseLeave = (adId: string, e: React.MouseEvent) => {
+    // Se o mouse está indo para dentro do tooltip portal, não feche
+    if (metricTooltipWrapperRef.current) {
+      const next = e.relatedTarget as Node | null;
+      if (next && metricTooltipWrapperRef.current.contains(next)) {
+        return;
+      }
+    }
+    setHoveredAd(null);
+    setMetricTooltip(null);
+  };
+
+  useEffect(() => {
+    let el = document.getElementById('tooltip-portal-root') as HTMLElement | null;
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'tooltip-portal-root';
+      el.style.position = 'fixed';
+      el.style.left = '0';
+      el.style.top = '0';
+      el.style.width = '0';
+      el.style.height = '0';
+      el.style.zIndex = '2147483647';
+      document.body.appendChild(el);
+    }
+    portalRef.current = el;
+  }, []);
   const buttonRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
   const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -622,6 +653,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
             let last7DaysCpr = 0;
             let last7DaysCtr = 0;
             let last7DaysConversions = 0;
+            let last7DaysDetails: Array<{ date: string; cpr: number; cpc: number; ctr: number; frequency: number }> = [];
             
             // Calcular métricas dos últimos 3 dias (termômetro imediato)
             let last3DaysCpr = 0;
@@ -643,32 +675,46 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               let last7DaysTotalLinkClicks = 0;
               
               last7DaysInsights.forEach((insight: any) => {
-                last7DaysTotalSpend += parseFloat(insight.spend || '0');
-                last7DaysTotalImpressions += parseInt(insight.impressions || '0');
-                
-                // Buscar cliques no link dos últimos 7 dias
-                const last7DaysLinkClicks = insight.actions?.find((action: any) => 
-                  action.action_type === 'link_click' || 
+                const dayImpressions = parseInt(insight.impressions || '0');
+                const daySpend = parseFloat(insight.spend || '0');
+                const dayReach = parseInt(insight.reach || '0');
+
+                const linkClicksStr = insight.actions?.find((action: any) => 
+                  action.action_type === 'link_click' ||
                   action.action_type === 'onsite_conversion.link_click'
                 )?.value || '0';
-                last7DaysTotalLinkClicks += parseInt(last7DaysLinkClicks);
-                
-                // Somar conversões dos últimos 7 dias
-                const last7DaysMessagingConversations = insight.actions?.find((action: any) => 
-                  action.action_type === 'messaging_conversations_started' || 
-                  action.action_type === 'onsite_conversion.messaging_conversation_started_7d'
-                )?.value || '0';
-                
-                const last7DaysLeads = insight.actions?.find((action: any) => 
-                  action.action_type === 'lead' || action.action_type === 'complete_registration'
-                )?.value || '0';
-                
-                const last7DaysPurchases = insight.actions?.find((action: any) => 
-                  action.action_type === 'purchase' || 
-                  action.action_type === 'onsite_conversion.purchase'
-                )?.value || '0';
-                
-                last7DaysTotalConversions += parseInt(last7DaysMessagingConversations) + parseInt(last7DaysLeads) + parseInt(last7DaysPurchases);
+                const dayLinkClicks = parseInt(linkClicksStr);
+
+                const dayMessaging = parseInt(
+                  (insight.actions?.find((action: any) => 
+                    action.action_type === 'messaging_conversations_started' || 
+                    action.action_type === 'onsite_conversion.messaging_conversation_started_7d')?.value) || '0'
+                );
+                const dayLeads = parseInt(
+                  (insight.actions?.find((action: any) => action.action_type === 'lead' || action.action_type === 'complete_registration')?.value) || '0'
+                );
+                const dayPurchases = parseInt(
+                  (insight.actions?.find((action: any) => action.action_type === 'purchase' || action.action_type === 'onsite_conversion.purchase')?.value) || '0'
+                );
+                const dayConversions = dayMessaging + dayLeads + dayPurchases;
+
+                const dayCpc = dayLinkClicks > 0 ? daySpend / dayLinkClicks : 0;
+                const dayCtr = dayImpressions > 0 ? (dayLinkClicks / dayImpressions) * 100 : 0;
+                const dayFrequency = dayReach > 0 ? dayImpressions / dayReach : 0;
+                const dayCpr = dayConversions > 0 ? daySpend / dayConversions : 0;
+
+                last7DaysDetails.push({
+                  date: insight.date_start,
+                  cpr: dayCpr,
+                  cpc: dayCpc,
+                  ctr: dayCtr,
+                  frequency: dayFrequency
+                });
+
+                last7DaysTotalSpend += daySpend;
+                last7DaysTotalImpressions += dayImpressions;
+                last7DaysTotalLinkClicks += dayLinkClicks;
+                last7DaysTotalConversions += dayConversions;
               });
               
               // Calcular métricas dos últimos 7 dias
@@ -1124,6 +1170,8 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                 last7DaysCpr,
                 last7DaysCtr,
                 last7DaysConversions,
+                // Detalhes por dia (para tooltips)
+                last7DaysDetails,
                 // Métricas dos últimos 3 dias para termômetro imediato
                 last3DaysCpr,
                 last3DaysCtr,
@@ -1361,6 +1409,33 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
     setTooltipPosition(null);
   };
 
+  // Tooltips globais para métricas (CPR/CPC/CTR/Frequência)
+  const handleMetricTooltipEnter = (
+    adId: string,
+    metric: 'cpr' | 'cpc' | 'ctr' | 'freq',
+    event: React.MouseEvent
+  ) => {
+    const el = event.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    const tooltipWidth = 288; // w-72
+    const margin = 6;
+    const x = Math.max(margin, Math.min(rect.left, window.innerWidth - margin - tooltipWidth));
+    const y = rect.bottom + margin;
+    setMetricTooltip({ adId, metric, position: { x, y } });
+  };
+
+  const handleMetricTooltipLeave = (e?: React.MouseEvent) => {
+    // Se o mouse está indo para dentro do tooltip portal, não feche
+    if (e && metricTooltipWrapperRef.current) {
+      const next = e.relatedTarget as Node | null;
+      if (next && metricTooltipWrapperRef.current.contains(next)) {
+        return;
+      }
+    }
+    if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
+    tooltipTimeoutRef.current = setTimeout(() => setMetricTooltip(null), 120);
+  };
+
   const getRankIcon = (rank: number) => {
     switch (rank) {
       case 1:
@@ -1453,7 +1528,8 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
   }): { trend: 'up' | 'down' | 'warning' | 'stable' | 'collecting'; explanation: string } => {
     // === DETECÇÃO DE ANÚNCIOS SEM DADOS SUFICIENTES ===
     // Verificar se o anúncio não está em veiculação nos últimos 7 dias
-    const temDadosUltimos7Dias = conversoesAtuais > 0 || cprAtual > 0 || ctrAtual > 0;
+    // CPR=0 não deve contar como dado suficiente (pode ser ausência de conversão)
+    const temDadosUltimos7Dias = conversoesAtuais > 0 || ctrAtual > 0 || (cprAtual > 0);
     const temDadosAnteriores = conversoesAnteriores > 0 || cprAnterior > 0 || ctrAnterior > 0;
     
     // Se não tem dados nos últimos 7 dias OU se não tem dados para comparação
@@ -1466,7 +1542,8 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
     
     // === TENDÊNCIA PRINCIPAL (Últimos 7 dias) ===
     // Condições para tendência POSITIVA (anúncio dando resultado)
-    const cprMelhorou = cprAnterior > 0 && cprAtual < cprAnterior * 0.9; // Pelo menos 10% melhor
+    // Ignorar cprAtual=0 para não apontar melhoria artificial
+    const cprMelhorou = cprAnterior > 0 && cprAtual > 0 && cprAtual < cprAnterior * 0.9; // Pelo menos 10% melhor
     const conversoesAumentaram = conversoesAnteriores > 0 && conversoesAtuais > conversoesAnteriores * 1.1; // Pelo menos 10% mais
     const ctrMelhorou = ctrAnterior > 0 && ctrAtual > ctrAnterior * 1.05; // Pelo menos 5% melhor
     const frequenciaControlada = frequenciaAtual <= 3.5; // Não saturando
@@ -1520,7 +1597,8 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
     }
     
     // 2. TENDÊNCIA POSITIVA: pelo menos 2 condições positivas dos últimos 7 dias
-    if (condicoesPositivas >= 2) {
+    // Requisito extra: pelo menos 1 conversão nos últimos 7 dias para marcar positiva
+    if (condicoesPositivas >= 2 && conversoesAtuais > 0) {
       const reasons = [];
       if (cprMelhorou) {
         const variacao = ((cprAnterior - cprAtual) / cprAnterior * 100);
@@ -1601,6 +1679,50 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
       default:
         return 'bg-slate-500/20 text-slate-300 border-slate-500/30';
     }
+  };
+
+  // Formata a data ISO (YYYY-MM-DD) para "DD/MM (DiaSemana)"
+  const formatTooltipDate = (isoDate: string): string => {
+    if (!isoDate || typeof isoDate !== 'string') return '';
+    const parts = isoDate.split('-').map(Number);
+    if (parts.length < 3 || parts.some(isNaN)) return isoDate;
+    const [year, month, day] = parts;
+    const dateObj = new Date(year, month - 1, day);
+    const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+    const weekDay = dayNames[dateObj.getDay()] || '';
+    const dd = String(day).padStart(2, '0');
+    const mm = String(month).padStart(2, '0');
+    return `${dd}/${mm} (${weekDay})`;
+  };
+
+  // Retorna partes formatadas e classe de cor para hoje/ontem/anteontem
+  const getTooltipDateParts = (isoDate: string): { dateStr: string; tagText: string; tagClass: string } => {
+    if (!isoDate) return { dateStr: '', tagText: '', tagClass: '' };
+    const [yearStr, monthStr, dayStr] = isoDate.split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    const day = Number(dayStr);
+    const dateObj = new Date(year, month - 1, day);
+
+    const dd = String(day).padStart(2, '0');
+    const mm = String(month).padStart(2, '0');
+    const dateStr = `${dd}/${mm}`;
+
+    // Normalizar para meia-noite local
+    const normalize = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const today = normalize(new Date());
+    const target = normalize(dateObj);
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const diff = Math.round((today.getTime() - target.getTime()) / msPerDay);
+
+    const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+    const weekDay = dayNames[dateObj.getDay()] || '';
+
+    if (diff === 0) return { dateStr, tagText: 'Hoje', tagClass: 'text-blue-300' };
+    if (diff === 1) return { dateStr, tagText: weekDay, tagClass: 'text-amber-300' };
+    if (diff === 2) return { dateStr, tagText: weekDay, tagClass: 'text-red-300' };
+
+    return { dateStr, tagText: weekDay, tagClass: 'text-slate-400' };
   };
 
   // Função para determinar CPR ideal baseado no tipo de conversão da campanha
@@ -1840,7 +1962,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                 hoveredAd === ad.id ? 'ring-2 ring-purple-500/50' : ''
               }`}
               onMouseEnter={() => setHoveredAd(ad.id)}
-              onMouseLeave={() => setHoveredAd(null)}
+              onMouseLeave={(e) => handleCardMouseLeave(ad.id, e)}
             >
               {/* Header with Rank and Status */}
               <div className="p-6 pb-4">
@@ -1980,7 +2102,8 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               {/* Key Metrics Grid */}
               <div className="px-6 pb-4">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1 p-3 bg-slate-700/30 rounded-lg">
+                  <div className="space-y-1 p-3 bg-slate-700/30 rounded-lg group/metric-cpr relative z-10"
+                       onMouseEnter={(e) => handleMetricTooltipEnter(ad.id, 'cpr', e)}>
                     <div className="flex items-center gap-1">
                       <DollarSign className="w-3 h-3 text-blue-400" />
                       <span className="text-xs text-slate-400 font-medium">CPR</span>
@@ -1988,8 +2111,10 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                     <p className="text-sm font-bold text-white">
                         {formatCurrency(ad.metrics.cpr)}
                     </p>
+                    {/* Tooltip local removido, usamos portal global */}
                   </div>
-                  <div className="space-y-1 p-3 bg-slate-700/30 rounded-lg">
+                  <div className="space-y-1 p-3 bg-slate-700/30 rounded-lg group/metric-cpc relative z-10"
+                       onMouseEnter={(e) => handleMetricTooltipEnter(ad.id, 'cpc', e)}>
                     <div className="flex items-center gap-1">
                       <MousePointer className="w-3 h-3 text-green-400" />
                       <span className="text-xs text-slate-400 font-medium">CPC</span>
@@ -1997,8 +2122,10 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                     <p className="text-sm font-bold text-white">
                       {formatCurrency(ad.metrics.cpc)}
                     </p>
+                    {/* Tooltip local removido, usamos portal global */}
                   </div>
-                  <div className="space-y-1 p-3 bg-slate-700/30 rounded-lg">
+                  <div className="space-y-1 p-3 bg-slate-700/30 rounded-lg group/metric-ctr relative z-10"
+                       onMouseEnter={(e) => handleMetricTooltipEnter(ad.id, 'ctr', e)}>
                     <div className="flex items-center gap-1">
                       <Target className="w-3 h-3 text-yellow-400" />
                         <span className="text-xs text-slate-400 font-medium">CTR</span>
@@ -2006,8 +2133,10 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                     <p className="text-sm font-bold text-white">
                         {ad.metrics.ctr.toFixed(2)}%
                     </p>
+                    {/* Tooltip local removido, usamos portal global */}
                   </div>
-                  <div className="space-y-1 p-3 bg-slate-700/30 rounded-lg">
+                  <div className="space-y-1 p-3 bg-slate-700/30 rounded-lg group/metric-freq relative z-10"
+                       onMouseEnter={(e) => handleMetricTooltipEnter(ad.id, 'freq', e)}>
                     <div className="flex items-center gap-1">
                       <Eye className="w-3 h-3 text-purple-400" />
                         <span className="text-xs text-slate-400 font-medium">Frequência Total</span>
@@ -2015,6 +2144,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                     <p className="text-sm font-bold text-white">
                         {ad.metrics.frequency ? ad.metrics.frequency.toFixed(1) : (ad.metrics.impressions / ad.metrics.clicks).toFixed(1)}
                     </p>
+                    {/* Tooltip local removido, usamos portal global */}
                   </div>
                 </div>
               </div>
@@ -2287,6 +2417,58 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
             {/* Seta do tooltip */}
             <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-800"></div>
           </div>
+        )}
+
+        {/* Tooltip Global para métricas (CPR/CPC/CTR/Freq) - fora do fluxo para evitar stacking context */}
+        {metricTooltip && portalRef.current && createPortal(
+          <div
+            ref={metricTooltipWrapperRef}
+            className="pointer-events-auto"
+            style={{ position: 'fixed', left: metricTooltip.position.x, top: metricTooltip.position.y }}
+            onMouseEnter={() => {
+              if (tooltipTimeoutRef.current) {
+                clearTimeout(tooltipTimeoutRef.current);
+                tooltipTimeoutRef.current = null;
+              }
+            }}
+            onMouseLeave={() => handleMetricTooltipLeave()}
+          >
+            <div className="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-72 text-slate-200">
+              <p className="text-xs text-slate-300 font-semibold mb-2">
+                {metricTooltip.metric === 'cpr' && 'Últimos 7 dias (CPR/dia)'}
+                {metricTooltip.metric === 'cpc' && 'Últimos 7 dias (CPC/dia)'}
+                {metricTooltip.metric === 'ctr' && 'Últimos 7 dias (CTR/dia)'}
+                {metricTooltip.metric === 'freq' && 'Últimos 7 dias (Frequência/dia)'}
+              </p>
+              <ul className="text-xs text-slate-400 space-y-1">
+                {(() => {
+                  const ad = ads.find(a => a.id === metricTooltip.adId);
+                  const details = ad?.metrics?.last7DaysDetails || [];
+                  if (!details.length) {
+                    return <li className="text-slate-500">Sem dados nos últimos 7 dias</li>;
+                  }
+                  return details.map((d: any, idx: number) => {
+                    const parts = getTooltipDateParts(d.date);
+                    return (
+                    <li key={idx} className="flex justify-between py-1 border-b border-slate-700/60 last:border-0">
+                      <span>
+                        {parts.dateStr}
+                        {' '}
+                        <span className={`font-medium ${parts.tagClass}`}>({parts.tagText})</span>
+                      </span>
+                      <span>
+                        {metricTooltip.metric === 'cpr' && `${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(d.cpr || 0)}`}
+                        {metricTooltip.metric === 'cpc' && `${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(d.cpc || 0)}`}
+                        {metricTooltip.metric === 'ctr' && `${Number(d.ctr || 0).toFixed(2)}%`}
+                        {metricTooltip.metric === 'freq' && `${Number(d.frequency || 0).toFixed(1)}x`}
+                      </span>
+                    </li>
+                  );});
+                })()}
+              </ul>
+            </div>
+          </div>,
+          portalRef.current
         )}
       </div>
     </div>

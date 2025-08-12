@@ -1405,6 +1405,7 @@ class MetaAdsService {
 
       const investment = parseFloat(insight.spend || '0');
       const impressions = parseInt(insight.impressions || '0');
+      const reach = parseInt(insight.reach || '0');
       
       // Buscar especificamente cliques no link (link_click) em vez de todos os cliques
       const linkClicks = insight.actions?.find((action: any) => 
@@ -1505,7 +1506,9 @@ class MetaAdsService {
           'link_click',
           'onsite_conversion.link_click',
           'impression',
-          'reach'
+          'reach',
+          // NÃO considerar custo por interação genérica pós-engajamento como CPR válido
+          'post_interaction_gross'
         ];
 
         // Procurar pelo primeiro tipo de conversão com valor > 0
@@ -1566,7 +1569,7 @@ class MetaAdsService {
         correctedDate = insight.date_start;
       }
 
-      const metricData = {
+        const metricData = {
         date: correctedDate,
         month: month,
         service: 'Meta Ads',
@@ -1577,6 +1580,7 @@ class MetaAdsService {
         revenue: estimatedRevenue,
         investment: investment,
         impressions: impressions,
+          reach: reach,
         clicks: clicks,
         ctr: ctr,
         cpm: cpm,

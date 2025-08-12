@@ -26,6 +26,7 @@ export interface MetricData {
   revenue: number;
   investment: number;
   impressions: number;
+  reach?: number;
   clicks: number;
   ctr: number;
   cpm: number;
@@ -1333,7 +1334,7 @@ export const metricsService = {
         console.log('🔍 DEBUG - getMonthlyDetails - Dados encontrados:', {
           month,
           product,
-          client,
+          client: client || 'undefined',
           agendamentos: data.agendamentos,
           vendas: data.vendas,
           ticketMedio: data.ticketMedio

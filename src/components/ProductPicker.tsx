@@ -462,6 +462,20 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
     (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  // Ordenar produtos: Ativos primeiro, depois Pausados, depois outros; desempate por nome
+  const getCampaignStatusRank = (product: Product): number => {
+    const status = product.campaign?.status;
+    if (status === 'ACTIVE') return 0;
+    if (status === 'PAUSED') return 1;
+    return 2;
+  };
+
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    const rankDiff = getCampaignStatusRank(a) - getCampaignStatusRank(b);
+    if (rankDiff !== 0) return rankDiff;
+    return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
+  });
+
   return (
     <div className="relative dropdown-container" ref={pickerRef}>
       {/* Input field */}
@@ -537,8 +551,8 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500 mx-auto mb-2"></div>
                 Carregando campanhas...
               </div>
-            ) : filteredProducts.length > 0 ? (
-              filteredProducts.map((product) => (
+            ) : sortedProducts.length > 0 ? (
+              sortedProducts.map((product) => (
                 <div
                   key={product.id}
                   onClick={() => handleProductSelect(product)}

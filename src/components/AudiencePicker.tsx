@@ -290,6 +290,20 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
     return matchesSearch && matchesClient && matchesProduct;
   });
 
+  // Ordenar públicos: Ativos primeiro, depois Pausados, depois outros; desempate por nome
+  const getAdSetStatusRank = (audience: Audience): number => {
+    const status = audience.adSet?.status;
+    if (status === 'ACTIVE') return 0;
+    if (status === 'PAUSED') return 1;
+    return 2;
+  };
+
+  const sortedAudiences = [...filteredAudiences].sort((a, b) => {
+    const rankDiff = getAdSetStatusRank(a) - getAdSetStatusRank(b);
+    if (rankDiff !== 0) return rankDiff;
+    return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
+  });
+
   // Close picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -526,8 +540,8 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500 mx-auto mb-2"></div>
                 Carregando conjuntos de anúncios...
               </div>
-            ) : filteredAudiences.length > 0 ? (
-              filteredAudiences.map((audience) => (
+            ) : sortedAudiences.length > 0 ? (
+              sortedAudiences.map((audience) => (
                 <div
                   key={audience.id}
                   onClick={() => handleAudienceSelect(audience)}

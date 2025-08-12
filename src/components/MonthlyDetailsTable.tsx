@@ -7,6 +7,7 @@ import { BenchmarkResults } from '../services/aiBenchmarkService';
 interface MonthlyDetailsTableProps {
   metrics: MetricData[];
   selectedProduct?: string;
+  selectedClient?: string;
   selectedMonth?: string;
   onValuesChange?: (values: { agendamentos: number; vendas: number }) => void;
   aiBenchmarkResults?: BenchmarkResults | null;
@@ -68,6 +69,7 @@ const Tooltip: React.FC<{ children: React.ReactNode; content: string; isVisible:
 const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({ 
   metrics = [], 
   selectedProduct = '',
+  selectedClient = '',
   selectedMonth = 'Janeiro 2025',
   onValuesChange,
   aiBenchmarkResults
@@ -783,13 +785,12 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             ticketMedio
           });
           
-          // CORREÇÃO: Incluir o cliente selecionado ao salvar
-          const selectedClient = localStorage.getItem('selectedClient') || 'Cliente Padrão';
+          // CORREÇÃO: Usar o cliente passado via props
           
           metricsService.saveMonthlyDetails({
             month: selectedMonth,
             product: selectedProduct,
-            client: selectedClient, // Adicionar cliente
+            client: selectedClient, // Cliente via props
             agendamentos: agendamentos,
             vendas: vendas,
             ticketMedio: ticketMedio,
@@ -1271,7 +1272,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         metricsService.saveMonthlyDetails({
           month: selectedMonth,
           product: selectedProduct,
-          client: selectedClient, // Adicionar cliente
+          client: selectedClient,
           agendamentos: savedDetails.agendamentos,
           vendas: savedDetails.vendas,
           ticketMedio: ticketMedio,

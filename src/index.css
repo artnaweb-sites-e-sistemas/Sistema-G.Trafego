@@ -3,6 +3,16 @@
 @tailwind utilities;
 
 /* Estilos específicos para o modal do Meta Ads */
+/* Utilitários globais para tooltips e overlays de métricas */
+.tooltip-portal,
+.force-topmost {
+  position: relative;
+  z-index: 2147483647; /* topo de tudo */
+}
+
+.allow-overflow-visible {
+  overflow: visible !important;
+}
 .meta-ads-modal {
   display: flex;
   align-items: center;
