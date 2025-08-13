@@ -888,7 +888,8 @@ export const metricsService = {
             
             // Se há um Ad Set específico selecionado, buscar métricas do Ad Set
             if (adSetId) {
-              const adSetInsights = await metaAdsService.getAdSetInsights(adSetId, startDate, endDate);
+              // Evitar fallback para últimos 30 dias quando não há dados no período selecionado
+              const adSetInsights = await metaAdsService.getAdSetInsights(adSetId, startDate, endDate, { fallbackToLast30Days: false });
               metaAdsData = metaAdsService.convertToMetricData(adSetInsights, month, client, product, audience);
             } else if (campaignId) {
               // Se há uma campanha específica selecionada, buscar métricas da campanha
@@ -909,7 +910,7 @@ export const metricsService = {
           } else {
             // Se há um Ad Set específico selecionado, buscar métricas do Ad Set
             if (adSetId) {
-              const adSetInsights = await metaAdsService.getAdSetInsights(adSetId, startDate, endDate);
+              const adSetInsights = await metaAdsService.getAdSetInsights(adSetId, startDate, endDate, { fallbackToLast30Days: false });
               metaAdsData = metaAdsService.convertToMetricData(adSetInsights, month, client, product, audience);
             } else if (campaignId) {
               // Se há uma campanha específica selecionada, buscar métricas da campanha
@@ -1308,6 +1309,7 @@ export const metricsService = {
   // Buscar detalhes mensais editáveis - vinculado apenas ao produto
   async getMonthlyDetails(month: string, product: string, client?: string) {
     try {
+      console.log('🔍 DEBUG - metricsService.getMonthlyDetails - params:', { month, product, client });
       const detailsRef = collection(db, 'monthlyDetails');
       let q;
       
@@ -1328,6 +1330,7 @@ export const metricsService = {
       }
       
       const snapshot = await getDocs(q);
+      console.log('🔍 DEBUG - metricsService.getMonthlyDetails - snapshot size:', snapshot.size);
       
       if (!snapshot.empty) {
         const data = snapshot.docs[0].data();
@@ -1939,6 +1942,90 @@ export const metricsService = {
       return monthsWithData;
     } catch (error) {
       console.error('Erro ao verificar dados do cliente em outros meses:', error);
+      return [];
+    }
+  },
+
+  // Retorna meses com gasto na coleção de métricas para o cliente (BM) selecionado
+  async getClientMonthsWithSpend(
+    client: string,
+    referenceMonth?: string,
+    minInvestment: number = 1,
+    direction: 'past' | 'future' | 'both' = 'past'
+  ): Promise<string[]> {
+    try {
+      
+      const metricsRef = collection(db, 'metrics');
+      const selectedAdAccountRaw = localStorage.getItem('selectedAdAccount');
+      let adAccountId: string | null = null;
+      try {
+        if (selectedAdAccountRaw) {
+          const parsed = JSON.parse(selectedAdAccountRaw);
+          adAccountId = parsed?.id || parsed?.account_id || null;
+        }
+      } catch {}
+
+      let q = query(metricsRef, where('client', '==', client));
+      const snapshot = await getDocs(q);
+      
+
+      // Helpers de datas (mês pt-BR)
+      const monthsPt = [
+        'Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
+      ];
+      const toMonthDate = (m: string): Date | null => {
+        const parts = m.split(' ');
+        if (parts.length < 2) return null;
+        const name = parts[0];
+        const year = parseInt(parts[1]);
+        const idx = monthsPt.findIndex(x => x.toLowerCase() === name.toLowerCase());
+        if (idx < 0 || !year) return null;
+        return new Date(year, idx, 1);
+      };
+      const refDate = referenceMonth ? toMonthDate(referenceMonth) : null;
+
+      // Acumular investimento por mês
+      const monthToInvestmentSum = new Map<string, number>();
+      snapshot.forEach((docSnap) => {
+        const data: any = docSnap.data();
+        const monthStr = typeof data?.month === 'string' ? data.month.trim() : '';
+        const inv = typeof data?.investment === 'number' ? data.investment : 0;
+        const service = data?.service;
+        const docAdAccId = data?.adAccountId;
+        
+        // Exigir serviço Meta Ads (evitar dados manuais)
+        if (service && service !== 'Meta Ads') return;
+        // Se temos adAccountId selecionado, exigir match estrito (ignorar docs sem o campo ou divergentes)
+        if (adAccountId && docAdAccId !== adAccountId) return;
+        // Considerar posição relativa ao mês de referência
+        if (refDate) {
+          const d = toMonthDate(monthStr);
+          if (!d) return;
+          if (direction === 'past' && !(d < refDate)) return;
+          if (direction === 'future' && !(d > refDate)) return;
+          if (direction === 'both' && d.getTime() === refDate.getTime()) return;
+        }
+        if (!monthStr) return;
+        monthToInvestmentSum.set(monthStr, (monthToInvestmentSum.get(monthStr) || 0) + inv);
+      });
+
+      
+
+      // Filtrar meses com soma de investimento >= minInvestment, ordenar desc e limitar
+      const monthsWithSpend = Array.from(monthToInvestmentSum.entries())
+        .filter(([, sum]) => (sum || 0) >= minInvestment)
+        .map(([m]) => m)
+        .sort((a, b) => {
+          const da = toMonthDate(a)?.getTime() || 0;
+          const db = toMonthDate(b)?.getTime() || 0;
+          return db - da;
+        })
+        .slice(0, 12);
+
+      
+      return monthsWithSpend;
+    } catch (error) {
+      console.error('Erro ao listar meses com gasto para cliente:', error);
       return [];
     }
   },

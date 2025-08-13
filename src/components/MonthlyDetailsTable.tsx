@@ -551,10 +551,13 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       
       if (selectedProduct && selectedMonth) {
         try {
+          console.log('🔍 DEBUG - MonthlyDetailsTable - getMonthlyDetails(params):', { month: selectedMonth, product: selectedProduct, client: selectedClient });
           const details = await metricsService.getMonthlyDetails(
             selectedMonth,
-            selectedProduct
+            selectedProduct,
+            selectedClient
           );
+          console.log('🔍 DEBUG - MonthlyDetailsTable - getMonthlyDetails(result):', details);
           // CORREÇÃO: Garantir que sempre tenham valores válidos
           setSavedDetails({
             agendamentos: details.agendamentos || 0,
@@ -777,23 +780,22 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             roiParsed: parseROI(roiRow?.realValue || '0')
           });
           
-          console.log('🔍 DEBUG - MonthlyDetailsTable - Salvando dados dos públicos com CPV/ROI:', {
+          console.log('🔍 DEBUG - MonthlyDetailsTable - Salvando dados dos públicos com CPV/ROI (sem tocar no ticketMedio):', {
             agendamentos,
             vendas,
             cpv,
-            roi: roiValue,
-            ticketMedio
+            roi: roiValue
           });
           
           // CORREÇÃO: Usar o cliente passado via props
           
+          // Importante: não enviar ticketMedio aqui para não sobrescrever o valor configurado no Bench
           metricsService.saveMonthlyDetails({
             month: selectedMonth,
             product: selectedProduct,
             client: selectedClient, // Cliente via props
             agendamentos: agendamentos,
             vendas: vendas,
-            ticketMedio: ticketMedio,
             cpv: cpv,
             roi: roiValue
           }).catch(error => {
@@ -1247,8 +1249,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
   // Salvar ticketMedio automaticamente quando alterado
   useEffect(() => {
-    // Só salvar se não for o valor padrão inicial e se há produto/mês selecionado
-    if (ticketMedio !== 250 && selectedProduct && selectedMonth) {
+    // Só salvar se não for o valor padrão inicial e se há produto/mês/cliente selecionado
+    if (ticketMedio !== 250 && selectedProduct && selectedMonth && selectedClient) {
       const timeoutId = setTimeout(() => {
         // Calcular CPV e ROI para salvar
         const cpvRow = tableData.find(r => r.metric === 'CPV' || r.metric === 'CPV (Custo por Venda)');
@@ -1256,9 +1258,6 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         
         const cpv = parseNumber(cpvRow?.realValue || '0');
         const roiValue = saveROIValue(roiRow?.realValue || '0% (0.0x)');
-        
-        // CORREÇÃO: Incluir o cliente selecionado ao salvar
-        const selectedClient = localStorage.getItem('selectedClient') || 'Cliente Padrão';
         
         console.log('🔍 DEBUG - MonthlyDetailsTable - Salvando ticket médio com CPV/ROI:', {
           agendamentos: savedDetails.agendamentos,
@@ -1285,7 +1284,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
       return () => clearTimeout(timeoutId);
     }
-  }, [ticketMedio, selectedProduct, selectedMonth, savedDetails.agendamentos, savedDetails.vendas]);
+  }, [ticketMedio, selectedProduct, selectedMonth, selectedClient, savedDetails.agendamentos, savedDetails.vendas]);
 
   // Funções para editar o Ticket Médio
   const handleTicketClick = () => {
@@ -1657,6 +1656,23 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     return tooltips[metric] || 'Informação sobre esta métrica';
   };
 
+  // Utilitário local: obter início/fim do mês a partir do label (ex.: "Agosto 2025")
+  const getMonthDateRange = (monthLabel: string): { startDate: string; endDate: string } => {
+    const months = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    const [name, yearStr] = (monthLabel || '').split(' ');
+    const year = parseInt(yearStr || '', 10) || new Date().getFullYear();
+    const monthIndex = Math.max(0, months.indexOf(name));
+    const start = new Date(year, monthIndex, 1);
+    const end = new Date(year, monthIndex + 1, 0);
+    return {
+      startDate: start.toISOString().split('T')[0],
+      endDate: end.toISOString().split('T')[0]
+    };
+  };
+
   // Agrupar dados por categoria
   const groupedData = tableData.reduce((acc, item) => {
     if (!acc[item.category]) {
@@ -1758,7 +1774,21 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               <div className="flex items-center mt-1 space-x-2">
                 <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
                 <p className="text-sm text-blue-400 font-medium">
-                  ✓ {metrics.length} registros sincronizados do Meta Ads
+                  {(() => {
+                    // Contar quantos ad sets tiveram gasto > 0 no período selecionado
+                    const { startDate, endDate } = getMonthDateRange(selectedMonth);
+                    const periodSpendByAd: Record<string, number> = {};
+                    (metrics || []).forEach((m: any) => {
+                      const d = new Date(m.date);
+                      const inPeriod = d >= new Date(startDate) && d <= new Date(endDate);
+                      if (!inPeriod) return;
+                      const key = m.adSetId || m.adset_id || m.adSet || m.audience || 'unknown';
+                      const spend = Number(m.investment || m.spend || 0) || 0;
+                      periodSpendByAd[key] = (periodSpendByAd[key] || 0) + spend;
+                    });
+                    const activeCount = Object.values(periodSpendByAd).filter(v => (v || 0) > 0).length;
+                    return `✓ ${activeCount} conjunto${activeCount !== 1 ? 's' : ''} de anúncio sincronizado${activeCount !== 1 ? 's' : ''}`;
+                  })()}
                 </p>
               </div>
             )}

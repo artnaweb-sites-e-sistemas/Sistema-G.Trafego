@@ -143,7 +143,7 @@ export const metricsServiceSimple = {
         let insights = [];
         if (audience !== 'Todos os Públicos' && adSetId) {
           // Buscar métricas do ad set
-          insights = await metaAdsService.getAdSetInsights(adSetId, startDate, endDate);
+          insights = await metaAdsService.getAdSetInsights(adSetId, startDate, endDate, { fallbackToLast30Days: false });
         } else if (product !== 'Todos os Produtos' && campaignId) {
           // Buscar métricas da campanha
           insights = await metaAdsService.getCampaignInsights(campaignId, startDate, endDate);

@@ -138,6 +138,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [realValuesForClient, setRealValuesForClient] = useState({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
   const [realValuesRefreshTrigger, setRealValuesRefreshTrigger] = useState(0);
   const [aiBenchmarkResults, setAiBenchmarkResults] = useState<BenchmarkResults | null>(null);
+  // Estado para controlar ausência de dados e sugerir outros períodos com gasto
+  const [noDataForSelection, setNoDataForSelection] = useState(false);
+  const [monthsWithData, setMonthsWithData] = useState<string[]>([]);
 
   // Carregar seleção atual do Firestore na inicialização
   useEffect(() => {
@@ -263,6 +266,64 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
     loadMetrics();
   }, [selectedMonth, selectedClient, selectedProduct, selectedAudience, selectedCampaign, refreshTrigger, dataSource, isFacebookConnected]);
+
+  // Verificar quando não há dados para o cliente/período selecionado e sugerir outros meses com gasto
+  useEffect(() => {
+    const checkNoDataAndSuggestMonths = async () => {
+      const hasValidClient = selectedClient && selectedClient !== 'Selecione um cliente' && selectedClient !== 'Todos os Clientes';
+      if (!hasValidClient || loading || !!error) {
+        setNoDataForSelection(false);
+        setMonthsWithData([]);
+        return;
+      }
+
+      // Definir util para mês atual
+      const now = new Date();
+      const months = [
+        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+      ];
+      const [selMonthName, selYearStr] = selectedMonth.split(' ');
+      const selMonthIndex = months.findIndex(m => m.toLowerCase() === selMonthName.toLowerCase());
+      const selYear = parseInt(selYearStr);
+      const isPastMonth = selYear < now.getFullYear() || (selYear === now.getFullYear() && selMonthIndex < now.getMonth());
+      const isCurrentMonth = selYear === now.getFullYear() && selMonthIndex === now.getMonth();
+      const isFutureMonth = selYear > now.getFullYear() || (selYear === now.getFullYear() && selMonthIndex > now.getMonth());
+
+      // Para o mês atual: nunca exibir a mensagem (mantém UI)
+      if (isCurrentMonth) {
+        setNoDataForSelection(false);
+        setMonthsWithData([]);
+        return;
+      }
+
+      if (metrics.length === 0) {
+        setNoDataForSelection(true);
+        try {
+          // Buscar meses com gasto em ambos os sentidos (anteriores e posteriores) ao período selecionado
+          const otherMonths = await metricsService.getClientMonthsWithSpend(selectedClient, selectedMonth, 1, 'both');
+          // Remover o mês atual da lista sugerida e ordenar crescente
+          const filtered = (otherMonths || []).filter(m => m !== selectedMonth);
+          const toMonthDate = (m: string): number => {
+            const [name, yearStr] = m.split(' ');
+            const idx = months.findIndex(mm => mm.toLowerCase() === name.toLowerCase());
+            const year = parseInt(yearStr);
+            const d = idx >= 0 && !isNaN(year) ? new Date(year, idx, 1) : new Date(0);
+            return d.getTime();
+          };
+          const sortedAsc = [...filtered].sort((a, b) => toMonthDate(a) - toMonthDate(b));
+          setMonthsWithData(sortedAsc);
+        } catch {
+          setMonthsWithData([]);
+        }
+      } else {
+        setNoDataForSelection(false);
+        setMonthsWithData([]);
+      }
+    };
+
+    checkNoDataAndSuggestMonths();
+  }, [metrics, selectedClient, selectedMonth, loading, error]);
 
   // Carregar valores reais de agendamentos e vendas do cliente
   useEffect(() => {
@@ -859,6 +920,31 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                 <div className="text-lg text-gray-300 mb-2 font-semibold">Selecione um cliente para visualizar as informações do dashboard.</div>
                 <div className="text-sm text-gray-400">Nenhum dado será exibido até que um cliente seja selecionado no topo da página.</div>
               </div>
+            ) : noDataForSelection ? (
+              <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/50 border border-slate-600/30 text-slate-200 px-6 py-6 rounded-xl backdrop-blur-sm shadow-lg">
+                <div className="flex flex-col items-center text-center space-y-2">
+                  <div className="text-lg font-semibold">Nenhum registro para {selectedClient} em {selectedMonth}.</div>
+                  {monthsWithData.length > 0 ? (
+                    <div className="text-sm text-gray-400">
+                      Foram encontrados gastos em outros períodos.
+                      <div className="flex flex-wrap gap-2 mt-2 justify-center">
+                        {monthsWithData.map((m) => (
+                          <button
+                            key={m}
+                            onClick={() => setSelectedMonth(m)}
+                            className="px-3 py-1 rounded-full border border-slate-600/50 hover:border-purple-500 hover:text-purple-300 transition"
+                            title={`Ir para ${m}`}
+                          >
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-400">Não identificamos registros deste cliente neste período.</div>
+                  )}
+                </div>
+              </div>
             ) : (
               <>
                 {/* Lógica condicional para renderização das seções */}
@@ -936,7 +1022,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
               </>
             )}
             {/* Renderizar HistorySection apenas se produto estiver selecionado E público NÃO estiver selecionado */}
-            {(selectedProduct && selectedProduct !== 'Todos os Produtos') && (!selectedAudience || selectedAudience === 'Todos os Públicos') && isFacebookConnected && (
+            {(selectedProduct && selectedProduct !== 'Todos os Produtos') && (!selectedAudience || selectedAudience === 'Todos os Públicos') && isFacebookConnected && !noDataForSelection && (
               <HistorySection selectedProduct={selectedProduct} />
             )}
           </>

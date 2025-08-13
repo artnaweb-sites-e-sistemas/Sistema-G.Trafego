@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Users, AlertTriangle, CheckCircle2, Loader2, CalendarDays, Pencil, TrendingUp, GitBranch, Clock } from 'lucide-react';
+import { Users, AlertTriangle, CheckCircle2, Loader2, CalendarDays, Pencil, TrendingUp, GitBranch, Clock, PauseCircle } from 'lucide-react';
 import { analysisPlannerService } from '../services/analysisPlannerService';
 import { metricsService } from '../services/metricsService';
 import { metaAdsService } from '../services/metaAdsService';
@@ -20,8 +20,13 @@ type AudienceStatus = {
   nextAnalysisDate?: string; // ISO
   spend?: number;
   plannedBudget?: number;
-  suggestionType?: 'vertical' | 'horizontal' | 'wait';
+  suggestionType?: 'vertical' | 'horizontal' | 'alert' | 'wait';
   suggestionTooltip?: string;
+  activeDaysTotal?: number;
+  activeDaysMonth?: number;
+  activeDaysPrevMonth?: number;
+  adSetStatus?: string; // ACTIVE | PAUSED | etc
+  campaignStatus?: string; // ACTIVE | PAUSED | etc
 };
 
 // util não usado após migração para dayjs (mantido aqui apenas como referência)
@@ -113,15 +118,57 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
 
         // 5) Buscar gasto atual por público, priorizando adSetId salvo no planner
         const { since, until } = getMonthDateRange(selectedMonth);
+        // Buscar status da campanha selecionada uma única vez
+        let campaignStatus: string | undefined = undefined;
+        try {
+          const selectedCampaignId = localStorage.getItem('selectedCampaignId') || '';
+          if (selectedCampaignId && metaAdsService.isLoggedIn() && metaAdsService.getSelectedAccount()) {
+            const camp = await metaAdsService.getCampaignDetails(selectedCampaignId);
+            campaignStatus = (camp?.status as string) || undefined;
+          }
+        } catch {}
+
         const withSpend = await Promise.all(statusList.map(async (s) => {
           try {
             const rec = planners.find(p => (p.audience || '') === s.name);
             const adSetId = rec?.adSetId;
             if (adSetId && metaAdsService.isLoggedIn() && metaAdsService.getSelectedAccount()) {
-              const insights = await metaAdsService.getAdSetInsights(adSetId, since, until);
+              // Este mês (mês selecionado)
+              // Não usar fallback de 30 dias aqui para evitar métricas irreais quando não houver dados no período
+              const insights = await metaAdsService.getAdSetInsights(adSetId, since, until, { fallbackToLast30Days: false });
               const spend = (insights || []).reduce((sum: number, i: any) => sum + (parseFloat(i?.spend || '0') || 0), 0);
+
+              // Buscar status do ad set (ACTIVE/PAUSED)
+              let adSetStatus: string | undefined;
+              try {
+                const det = await metaAdsService.getAdSetDetails(adSetId);
+                adSetStatus = (det?.status as string) || undefined;
+              } catch {}
+              const activeDaysMonth = (insights || []).reduce((acc: number, i: any) => acc + ((parseFloat(i?.spend || '0') || 0) > 0 ? 1 : 0), 0);
+
+              // Mês anterior
+              let activeDaysPrevMonth = 0;
+              try {
+                const monthsMap: Record<string, number> = { 'janeiro':0,'fevereiro':1,'março':2,'marco':2,'abril':3,'maio':4,'junho':5,'julho':6,'agosto':7,'setembro':8,'outubro':9,'novembro':10,'dezembro':11 };
+                const parts = (selectedMonth || '').toLowerCase().split(/\s+/);
+                const curIdx = monthsMap[parts[0]] ?? dayjs().month();
+                const curYear = parseInt(parts[1],10) || dayjs().year();
+                const prev = dayjs(new Date(curYear, curIdx, 1)).subtract(1,'month');
+                const prevSince = prev.startOf('month').format('YYYY-MM-DD');
+                const prevUntil = prev.endOf('month').format('YYYY-MM-DD');
+                // Também sem fallback para mês anterior
+                const insightsPrev = await metaAdsService.getAdSetInsights(adSetId, prevSince, prevUntil, { fallbackToLast30Days: false });
+                activeDaysPrevMonth = (insightsPrev || []).reduce((acc: number, i: any) => acc + ((parseFloat(i?.spend || '0') || 0) > 0 ? 1 : 0), 0);
+              } catch {}
+              // Regra: se o mês selecionado é o mês atual, somar mês anterior; 
+              // se o mês selecionado é passado, considerar apenas o próprio mês (ignorar anteriores e posteriores)
+              const partsSel = (selectedMonth || '').toLowerCase().split(/\s+/);
+              const selIdx = ({'janeiro':0,'fevereiro':1,'março':2,'marco':2,'abril':3,'maio':4,'junho':5,'julho':6,'agosto':7,'setembro':8,'outubro':9,'novembro':10,'dezembro':11}[partsSel[0]] ?? dayjs().month());
+              const selYear = parseInt(partsSel[1],10) || dayjs().year();
+              const isCurrentMonth = dayjs().isSame(dayjs(new Date(selYear, selIdx, 1)), 'month');
+              const activeDaysTotal = isCurrentMonth ? (activeDaysMonth + activeDaysPrevMonth) : activeDaysMonth;
               // Converter para nosso formato e calcular métricas simples
-              let suggestionType: 'vertical' | 'horizontal' | 'wait' = 'wait';
+              let suggestionType: 'vertical' | 'horizontal' | 'alert' | 'wait' = 'wait';
               let suggestionTooltip = 'Aguardando otimização/mais dados.';
               try {
                 const metricData = metaAdsService.convertToMetricData(insights || [], selectedMonth, selectedClient, selectedProduct, s.name) || [];
@@ -139,20 +186,37 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
                 const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
                 const freq = totals.frequencySamples.length ? totals.frequencySamples.reduce((a: number, b: number)=>a+b,0)/totals.frequencySamples.length : 0;
                 const cpl = totals.leads > 0 ? totals.investment / totals.leads : (totals.cplSamples.find((v: number)=>v>0) || 0);
-                // Heurística simples (mensagens/leads):
+
+                // Heurísticas de alerta (baixo desempenho)
+                const spendPositive = totals.investment > 100;
+                const alertLowCTRHighFreq = ctr < 0.8 && freq >= 2.5;
+                const alertHighCPLFewLeads = cpl > 35 && totals.leads < 5;
+                const alertSpendNoResults = spendPositive && totals.leads === 0 && totals.sales === 0;
+                if (alertSpendNoResults) {
+                  suggestionType = 'alert';
+                  suggestionTooltip = `Atenção: gasto sem resultados. Revise objetivo da campanha, eventos de conversão e tracking.`;
+                } else if (alertLowCTRHighFreq) {
+                  suggestionType = 'alert';
+                  suggestionTooltip = `Atenção: CTR ${ctr.toFixed(2)}% e frequência ${freq.toFixed(1)} — indício de fadiga. Renove criativos e ajuste público.`;
+                } else if (alertHighCPLFewLeads) {
+                  suggestionType = 'alert';
+                  suggestionTooltip = `Atenção: CPL ${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cpl)} com ${totals.leads} leads — teste novos ângulos/segmentações.`;
+                }
+
+                // Heurística de bom desempenho (mensagens/leads)
                 const hasEnoughLeads = totals.leads >= 10;
-                if (hasEnoughLeads && cpl > 0 && cpl <= 15 && ctr >= 1.5 && freq <= 3.0) {
+                if (suggestionType !== 'alert' && hasEnoughLeads && cpl > 0 && cpl <= 15 && ctr >= 1.5 && freq <= 3.0) {
                   suggestionType = 'vertical';
                   suggestionTooltip = `Desempenho forte: CTR ${ctr.toFixed(2)}%, CPL ${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cpl)}, leads ${totals.leads}, freq ${freq.toFixed(1)}.`;
-                } else if (cpl > 0 && cpl <= 25 && ctr >= 1.0 && freq <= 3.0) {
+                } else if (suggestionType !== 'alert' && cpl > 0 && cpl <= 25 && ctr >= 1.0 && freq <= 3.0) {
                   suggestionType = 'horizontal';
                   suggestionTooltip = `Bom desempenho: CTR ${ctr.toFixed(2)}%, CPL ${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cpl)}, freq ${freq.toFixed(1)}. Teste variações/públicos.`;
-                } else {
+                } else if (suggestionType !== 'alert') {
                   suggestionType = 'wait';
                   suggestionTooltip = `Aguardando otimização: CTR ${ctr.toFixed(2)}%, CPL ${cpl ? new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cpl) : '—'}, leads ${totals.leads}, freq ${freq.toFixed(1)}.`;
                 }
               } catch {}
-              return { ...s, spend, suggestionType, suggestionTooltip } as AudienceStatus;
+              return { ...s, spend, suggestionType, suggestionTooltip, activeDaysTotal, activeDaysMonth, activeDaysPrevMonth, adSetStatus, campaignStatus } as AudienceStatus;
             }
           } catch {}
           return s;
@@ -188,6 +252,44 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
           </div>
         </div>
 
+        {/* Barra de progresso agregada (todos os públicos) */}
+        {audiences.length > 0 && (
+          <div className="mb-4">
+            {(() => {
+              const totalSpend = audiences.reduce((sum, a) => sum + ((a.spend || 0) as number), 0);
+              const totalPlanned = audiences.reduce((sum, a) => sum + ((a.plannedBudget || 0) as number), 0);
+              const isCampaignPaused = audiences.some(a => a.campaignStatus === 'PAUSED');
+              const allAdSetsPaused = audiences.length > 0 && audiences.every(a => a.adSetStatus === 'PAUSED');
+              const { since, until } = getMonthDateRange(selectedMonth);
+              const start = new Date(since).getTime();
+              const end = new Date(until).getTime();
+              const days = Math.max(1, Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1);
+              const perDay = totalPlanned / days;
+              const fmt = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+              const pausedGlobal = isCampaignPaused || allAdSetsPaused;
+              const pct = pausedGlobal ? 100 : (totalPlanned > 0 ? Math.min(100, Math.round((totalSpend / totalPlanned) * 100)) : (totalSpend > 0 ? 100 : 0));
+              return (
+                <>
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                    <span className="flex items-center gap-2">
+                      Gastos neste mês
+                      <span className="progress-animated-text font-medium">{fmt(totalSpend)}</span>
+                    </span>
+                    {!pausedGlobal && (
+                      <span className="text-slate-500 inline-flex items-center gap-1">
+                        Pretendido {fmt(totalPlanned)} <span className="text-slate-400">({fmt(perDay)} / dia)</span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="h-2 w-full bg-slate-700/50 rounded-full overflow-hidden">
+                    <div className="h-2 rounded-full progress-animated" style={{ width: `${pct}%` }} />
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center gap-2 text-slate-300">
             <Loader2 className="w-4 h-4 animate-spin" /> Carregando públicos…
@@ -210,7 +312,7 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
                     <div className="flex items-center gap-2">
                       {/* Badge de sugestão dinâmica (com tooltip acima de tudo) */}
                       <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md border relative
-                        ${a.suggestionType==='vertical' ? 'bg-emerald-600/15 border-emerald-500/40' : a.suggestionType==='horizontal' ? 'bg-blue-600/15 border-blue-500/40' : 'bg-slate-600/15 border-slate-500/40'}`}
+                        ${a.suggestionType==='vertical' ? 'bg-emerald-600/15 border-emerald-500/40' : a.suggestionType==='horizontal' ? 'bg-blue-600/15 border-blue-500/40' : a.suggestionType==='alert' ? 'bg-amber-600/15 border-amber-500/40' : 'bg-slate-600/15 border-slate-500/40'}`}
                         onMouseEnter={(e)=>{
                           const rect = e.currentTarget.getBoundingClientRect();
                           const tooltipWidth = 300; // largura aproximada
@@ -231,30 +333,41 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
                           <TrendingUp className="w-3.5 h-3.5 text-emerald-300" />
                         ) : a.suggestionType==='horizontal' ? (
                           <GitBranch className="w-3.5 h-3.5 text-blue-300" />
+                        ) : a.suggestionType==='alert' ? (
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
                         ) : (
                           <Clock className="w-3.5 h-3.5 text-slate-300" />
                         )}
                       </span>
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] tracking-wide border ${
-                      a.status === 'ok'
-                        ? 'bg-emerald-500/15 text-emerald-200 border-emerald-400/30'
-                        : 'bg-rose-500/15 text-rose-200 border-rose-400/30'
+                      {typeof a.activeDaysTotal === 'number' && (
+                        <span className="text-[11px] text-slate-400">Ativo há <b className="text-slate-200">{a.activeDaysTotal} dias</b></span>
+                      )}
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] text-slate-300 bg-slate-700/30 border border-slate-600/40">
+                      <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="text-slate-400">Próxima análise em</span>
+                      {diff !== null && (
+                        diff >= 0
+                          ? <span className="text-slate-300"> <b className="text-slate-200 font-semibold">{diff}</b> dias</span>
+                          : <span className="text-slate-300"> há <b className="text-slate-200 font-semibold">{Math.abs(diff)}</b> dias</span>
+                      )}
+                      <span className="text-slate-400"> - </span>
+                      {nextStr}
+                    </span>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] tracking-wide border ${
+                      (a.adSetStatus === 'PAUSED' || a.campaignStatus === 'PAUSED')
+                        ? 'bg-amber-500/15 text-amber-200 border-amber-400/30'
+                        : a.status === 'ok'
+                          ? 'bg-emerald-500/15 text-emerald-200 border-emerald-400/30'
+                          : 'bg-rose-500/15 text-rose-200 border-rose-400/30'
                     }`}>
-                      {a.status === 'ok' ? (
+                      {(a.adSetStatus === 'PAUSED' || a.campaignStatus === 'PAUSED') ? (
+                        <PauseCircle className="w-3.5 h-3.5" />
+                      ) : a.status === 'ok' ? (
                         <CheckCircle2 className="w-3.5 h-3.5" />
                       ) : (
                         <AlertTriangle className="w-3.5 h-3.5" />
                       )}
-                      {a.status === 'ok' ? 'Analisado' : 'Pendente'}
-                    </span>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] text-slate-300 bg-slate-700/30 border border-slate-600/40">
-                      <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
-                      {nextStr}
-                      {diff !== null && (
-                        diff >= 0
-                          ? <span className="text-slate-400">- em <b className="text-slate-200 font-semibold">{diff}</b> dias</span>
-                          : <span className="text-slate-400">- há <b className="text-slate-200 font-semibold">{Math.abs(diff)}</b> dias</span>
-                      )}
+                      {(a.adSetStatus === 'PAUSED' || a.campaignStatus === 'PAUSED') ? 'Pausado' : (a.status === 'ok' ? 'Analisado' : 'Pendente')}
                     </span>
                     </div>
                   </div>
@@ -262,10 +375,10 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
                   <div className="w-full">
                     <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
                       <span className="flex items-center gap-2">
-                        Gasto no período
+                        Gastos neste mês
                         <span className="progress-animated-text font-medium">{new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(a.spend || 0)}</span>
                       </span>
-                      {typeof a.plannedBudget === 'number' && (
+                      {(a.adSetStatus !== 'PAUSED' && a.campaignStatus !== 'PAUSED') && typeof a.plannedBudget === 'number' && (
                         <span className="text-slate-500 inline-flex items-center gap-1">
                           {(() => {
                             const { since, until } = getMonthDateRange(selectedMonth);
@@ -295,10 +408,14 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
                       )}
                     </div>
                     <div className="h-2 w-full bg-slate-700/50 rounded-full overflow-hidden">
-                      {typeof a.plannedBudget === 'number' && a.plannedBudget > 0 ? (
-                        <div className="h-2 rounded-full progress-animated" style={{ width: `${Math.min(100, Math.round(((a.spend || 0) / a.plannedBudget) * 100))}%` }} />
+                      {(a.adSetStatus === 'PAUSED' || a.campaignStatus === 'PAUSED') ? (
+                        <div className="h-2 rounded-full progress-animated" style={{ width: `100%` }} />
                       ) : (
-                        <div className="h-2 rounded-full progress-animated" style={{ width: `${(a.spend || 0) > 0 ? 100 : 0}%` }} />
+                        typeof a.plannedBudget === 'number' && a.plannedBudget > 0 ? (
+                          <div className="h-2 rounded-full progress-animated" style={{ width: `${Math.min(100, Math.round(((a.spend || 0) / a.plannedBudget) * 100))}%` }} />
+                        ) : (
+                          <div className="h-2 rounded-full progress-animated" style={{ width: `${(a.spend || 0) > 0 ? 100 : 0}%` }} />
+                        )
                       )}
                     </div>
 

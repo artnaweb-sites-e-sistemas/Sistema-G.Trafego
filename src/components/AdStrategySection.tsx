@@ -535,7 +535,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       let totalSpend = 0;
       if (matching.length > 0) {
         const allInsights = await Promise.all(
-          matching.map((ad: any) => metaAdsService.getAdSetInsights(ad.id, startDate, endDate))
+          matching.map((ad: any) => metaAdsService.getAdSetInsights(ad.id, startDate, endDate, { fallbackToLast30Days: false }))
         );
         totalSpend = allInsights.flat().reduce((sum: number, insight: any) => sum + parseFloat(insight.spend || '0'), 0);
       }
@@ -612,7 +612,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
         console.log(`🔍 DEBUG - evaluateStrategyPerformance - Buscando insights para ${matching.length} adSets`);
         
         const allInsights = await Promise.all(
-          matching.map((ad: any) => metaAdsService.getAdSetInsights(ad.id, startDate, endDate))
+          matching.map((ad: any) => metaAdsService.getAdSetInsights(ad.id, startDate, endDate, { fallbackToLast30Days: false }))
         );
         
         console.log(`🔍 DEBUG - evaluateStrategyPerformance - Insights brutos retornados:`, {

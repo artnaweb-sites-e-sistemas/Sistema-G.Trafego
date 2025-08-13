@@ -392,7 +392,8 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
             console.error(`Erro ao buscar insights para anúncio ${ad.id}:`, error);
             // Fallback: tentar do Ad Set
             try {
-              periodInsights = await metaAdsService.getAdSetInsights(ad.adset_id, startDate, endDate);
+              // Evitar fallback para 30 dias para manter veracidade por período
+              periodInsights = await metaAdsService.getAdSetInsights(ad.adset_id, startDate, endDate, { fallbackToLast30Days: false });
               allTimeInsights = periodInsights;
               console.log(`Insights encontrados via Ad Set (fallback) para anúncio ${ad.id}:`, periodInsights.length);
             } catch (adSetError) {
@@ -2446,7 +2447,9 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                   if (!details.length) {
                     return <li className="text-slate-500">Sem dados nos últimos 7 dias</li>;
                   }
-                  return details.map((d: any, idx: number) => {
+                  // Ordenar com o dia atual no topo e demais em ordem decrescente (sequenciais)
+                  const ordered = [...details].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                  return ordered.map((d: any, idx: number) => {
                     const parts = getTooltipDateParts(d.date);
                     return (
                     <li key={idx} className="flex justify-between py-1 border-b border-slate-700/60 last:border-0">

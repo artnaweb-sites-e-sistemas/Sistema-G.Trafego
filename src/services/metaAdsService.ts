@@ -1133,7 +1133,7 @@ class MetaAdsService {
   }
 
   // Buscar insights de conjunto de anúncios específico
-  async getAdSetInsights(adSetId: string, dateStart: string, dateEnd: string): Promise<MetaAdsInsight[]> {
+  async getAdSetInsights(adSetId: string, dateStart: string, dateEnd: string, options?: { fallbackToLast30Days?: boolean }): Promise<MetaAdsInsight[]> {
     if (!this.user) {
       throw new Error('Usuário não está logado. Faça login primeiro.');
     }
@@ -1160,15 +1160,12 @@ class MetaAdsService {
       let insights = response.data.data || [];
       console.log(`Insights retornados para adSet ${adSetId} (período específico):`, insights.length);
       
-      // Se não encontrou insights no período específico, tentar período mais amplo
-      if (insights.length === 0) {
-        console.log(`Nenhum insight encontrado no período específico, tentando período mais amplo...`);
-        
-        // Tentar últimos 30 dias
+      // Se não encontrou insights no período específico, só tentar período mais amplo se explicitamente habilitado
+      if (insights.length === 0 && options?.fallbackToLast30Days) {
+        console.log(`Nenhum insight encontrado no período específico. Fallback para últimos 30 dias habilitado, tentando período mais amplo...`);
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const today = new Date();
-        
         response = await axios.get(
           `${this.baseURL}/${adSetId}/insights`,
           {
@@ -1183,7 +1180,6 @@ class MetaAdsService {
             }
           }
         );
-
         insights = response.data.data || [];
         console.log(`Insights retornados para adSet ${adSetId} (últimos 30 dias):`, insights.length);
       }
@@ -1223,7 +1219,7 @@ class MetaAdsService {
   }
 
   // Buscar insights diretamente de um anúncio específico
-  async getAdInsights(adId: string, dateStart: string, dateEnd: string, aggregated: boolean = false): Promise<MetaAdsInsight[]> {
+  async getAdInsights(adId: string, dateStart: string, dateEnd: string, aggregated: boolean = false, options?: { fallbackToLast30Days?: boolean }): Promise<MetaAdsInsight[]> {
     if (!this.user) {
       throw new Error('Usuário não está logado. Faça login primeiro.');
     }
@@ -1250,15 +1246,12 @@ class MetaAdsService {
       let insights = response.data.data || [];
       console.log(`Insights retornados para anúncio ${adId} (período específico):`, insights.length);
       
-      // Se não encontrou insights no período específico, tentar período mais amplo
-      if (insights.length === 0) {
-        console.log(`Nenhum insight encontrado no período específico, tentando período mais amplo...`);
-        
-        // Tentar últimos 30 dias
+      // Se não encontrou insights no período específico, só tentar período mais amplo se explicitamente habilitado
+      if (insights.length === 0 && options?.fallbackToLast30Days) {
+        console.log(`Nenhum insight encontrado no período específico. Fallback para últimos 30 dias habilitado, tentando período mais amplo...`);
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const today = new Date();
-        
         response = await axios.get(
           `${this.baseURL}/${adId}/insights`,
           {
@@ -1273,7 +1266,6 @@ class MetaAdsService {
             }
           }
         );
-
         insights = response.data.data || [];
         console.log(`Insights retornados para anúncio ${adId} (últimos 30 dias):`, insights.length);
       }
@@ -1442,15 +1434,7 @@ class MetaAdsService {
       const salesCount = parseInt(purchases);
 
       // Debug: Log de compras para verificar se estão sendo detectadas
-      if (process.env.NODE_ENV === 'development' && salesCount > 0) {
-        console.log(`🔍 DEBUG - Compras detectadas para ${insight.date_start}:`, {
-          purchases,
-          salesCount,
-          actions: insight.actions?.filter((action: any) => 
-            action.action_type.includes('purchase')
-          )
-        });
-      }
+      
 
       // Calcular CTR baseado em cliques no link em vez do CTR geral
       const ctr = clicks > 0 && impressions > 0 ? (clicks / impressions) * 100 : 0;
@@ -1471,29 +1455,12 @@ class MetaAdsService {
       let cpr = 0;
       
       // Debug: Log dos dados disponíveis (apenas se houver problemas)
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔍 DEBUG - convertToMetricData - Insight data:', {
-          date: insight.date_start,
-          spend: insight.spend,
-          impressions: insight.impressions,
-          actions: insight.actions?.length || 0,
-          cost_per_action_type: insight.cost_per_action_type?.length || 0,
-          salesCount,
-          leadsCount,
-          messagingConversations,
-          leads
-        });
-      }
+      
       
 
 
       // Debug: Log detalhado do cost_per_action_type (apenas em desenvolvimento)
-      if (process.env.NODE_ENV === 'development' && insight.cost_per_action_type && insight.cost_per_action_type.length > 0) {
-        console.log('🔍 DEBUG - convertToMetricData - Cost per action type disponível:', insight.cost_per_action_type.map((cost: any) => ({
-          action_type: cost.action_type,
-          value: cost.value
-        })));
-      }
+      
 
       // Buscar CPR diretamente do Meta Ads - método mais simples e direto
       if (insight.cost_per_action_type && insight.cost_per_action_type.length > 0) {
@@ -1529,7 +1496,7 @@ class MetaAdsService {
           );
           if (costData) {
             cpr = parseFloat(costData.value);
-            console.log(`🔍 DEBUG - CPR do Meta Ads (${type}):`, cpr);
+            
             break;
           }
         }
@@ -1541,15 +1508,12 @@ class MetaAdsService {
           );
           if (firstValidCost) {
             cpr = parseFloat(firstValidCost.value);
-            console.log(`🔍 DEBUG - CPR do Meta Ads (${firstValidCost.action_type}):`, cpr);
           }
         }
       }
 
       // Se não há dados de cost_per_action_type, CPR será 0 (sem conversões)
-      if (cpr === 0) {
-        console.log('🔍 DEBUG - CPR zero (sem dados de conversão do Meta Ads)');
-      }
+      
 
       const estimatedRevenue = leadsCount * 200;
       const roas = investment > 0 ? estimatedRevenue / investment : 0;
@@ -1580,13 +1544,16 @@ class MetaAdsService {
         correctedDate = insight.date_start;
       }
 
-        const metricData = {
+      const metricData = {
         date: correctedDate,
         month: month,
         service: 'Meta Ads',
         client: client || 'Meta Ads',
         product: product || 'Campanha Meta Ads',
         audience: audience || 'Público Meta Ads',
+        // Identificação da conta para permitir filtros precisos por BM/ad account
+        adAccountId: this.selectedAccount ? this.selectedAccount.id : undefined,
+        adAccountName: this.selectedAccount ? this.selectedAccount.name : undefined,
         leads: leadsCount,
         revenue: estimatedRevenue,
         investment: investment,
@@ -1604,16 +1571,7 @@ class MetaAdsService {
       };
 
       // Log final apenas em desenvolvimento
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔍 DEBUG - convertToMetricData - MetricData final:', {
-          date: correctedDate,
-          investment,
-          leads: leadsCount,
-          sales: salesCount,
-          cpr,
-          cpl
-        });
-      }
+      
 
       return metricData;
     });
