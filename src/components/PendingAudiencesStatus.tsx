@@ -1,0 +1,377 @@
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Users, AlertTriangle, CheckCircle2, Loader2, CalendarDays, Pencil, TrendingUp, GitBranch, Clock } from 'lucide-react';
+import { analysisPlannerService } from '../services/analysisPlannerService';
+import { metricsService } from '../services/metricsService';
+import { metaAdsService } from '../services/metaAdsService';
+import dayjs from 'dayjs';
+import { adStrategyService } from '../services/adStrategyService';
+
+interface PendingAudiencesStatusProps {
+  selectedClient: string;
+  selectedProduct: string;
+  selectedMonth: string;
+}
+
+type AudienceStatus = {
+  name: string;
+  status: 'pending' | 'ok';
+  lastAnalysisDate?: string; // ISO
+  nextAnalysisDate?: string; // ISO
+  spend?: number;
+  plannedBudget?: number;
+  suggestionType?: 'vertical' | 'horizontal' | 'wait';
+  suggestionTooltip?: string;
+};
+
+// util não usado após migração para dayjs (mantido aqui apenas como referência)
+
+function getMonthDateRange(monthLabel: string): { since: string; until: string } {
+  // monthLabel no formato "Agosto 2025"
+  const months: Record<string, number> = {
+    'janeiro': 0, 'fevereiro': 1, 'março': 2, 'marco': 2, 'abril': 3, 'maio': 4, 'junho': 5,
+    'julho': 6, 'agosto': 7, 'setembro': 8, 'outubro': 9, 'novembro': 10, 'dezembro': 11
+  };
+  const parts = (monthLabel || '').toLowerCase().split(/\s+/);
+  const monthIdx = months[parts[0]] ?? new Date().getMonth();
+  const year = parseInt(parts[1]) || new Date().getFullYear();
+  const start = new Date(year, monthIdx, 1);
+  const end = new Date(year, monthIdx + 1, 0);
+  const since = start.toISOString().slice(0, 10);
+  const until = end.toISOString().slice(0, 10);
+  return { since, until };
+}
+
+const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selectedClient, selectedProduct, selectedMonth }) => {
+  const [loading, setLoading] = useState(true);
+  const [audiences, setAudiences] = useState<AudienceStatus[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [editingBudget, setEditingBudget] = useState<string | null>(null);
+  const [tempBudget, setTempBudget] = useState<string>('');
+  const formatBRLFromDigits = (digits: string): string => {
+    if (!digits) return '0,00';
+    const num = parseInt(digits, 10);
+    const value = isNaN(num) ? 0 : num / 100;
+    return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+  const [tooltip, setTooltip] = useState<{ visible: boolean; x: number; y: number; content: string; color: 'emerald' | 'blue' | 'slate' }>({ visible: false, x: 0, y: 0, content: '', color: 'slate' });
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // 1) Tentar listar públicos via Meta Ads a partir da campanha selecionada
+        let audienceNames: string[] = [];
+        const campaignId = localStorage.getItem('selectedCampaignId') || '';
+        if (metaAdsService.isLoggedIn() && metaAdsService.getSelectedAccount() && campaignId) {
+          try {
+            const adsets = await metaAdsService.getAdSets(campaignId);
+            audienceNames = (adsets || []).map((a: any) => a?.name).filter(Boolean);
+          } catch (e) {
+            // Falhou buscar adsets (400/429/rate limit). Segue com fallback; não quebra.
+          }
+        }
+
+        // 2) Fallback: usar audienceDetails salvos no Firestore
+        if (!audienceNames.length) {
+          const details = await metricsService.getAllAudienceDetailsForProduct(selectedMonth, selectedProduct);
+          audienceNames = details.map((d: any) => d.audience).filter(Boolean);
+        }
+
+        // Garantir únicos
+        audienceNames = Array.from(new Set(audienceNames));
+
+        // 3) Trazer planners salvos e determinar status
+        const planners = await analysisPlannerService.listPlannersForProduct(selectedClient, selectedProduct);
+        const today = dayjs().startOf('day');
+
+        // 4) Orçamento pretendido: usar planner quando houver; fallback em estratégias
+        let plannedByName: Record<string, number> = {};
+        try {
+          const strategies = await adStrategyService.getStrategiesByClientAndMonth(selectedClient, selectedMonth);
+          plannedByName = strategies.reduce((acc, s) => {
+            const audience = s.generatedNames?.audience || '';
+            acc[audience] = s.budget?.planned || 0;
+            return acc;
+          }, {} as Record<string, number>);
+        } catch {}
+
+        const statusList: AudienceStatus[] = audienceNames.map(name => {
+          const rec = planners.find(p => (p.audience || '') === name);
+          if (!rec || !rec.lastAnalysisDate || !rec.intervalDays) {
+            return { name, status: 'pending', lastAnalysisDate: undefined, nextAnalysisDate: undefined, plannedBudget: plannedByName[name] };
+          }
+          // Calcular datas de forma local (sem fuso) e SEM contar o dia atual (começa amanhã)
+          const last = dayjs(rec.lastAnalysisDate, 'YYYY-MM-DD').startOf('day');
+          const next = last.add(Math.max(1, rec.intervalDays), 'day');
+          const pending = today.isAfter(next);
+          const planned = typeof rec.plannedBudget === 'number' ? rec.plannedBudget : plannedByName[name];
+          return { name, status: pending ? 'pending' : 'ok', lastAnalysisDate: rec.lastAnalysisDate, nextAnalysisDate: next.format('YYYY-MM-DD'), plannedBudget: planned };
+        });
+
+        // 5) Buscar gasto atual por público, priorizando adSetId salvo no planner
+        const { since, until } = getMonthDateRange(selectedMonth);
+        const withSpend = await Promise.all(statusList.map(async (s) => {
+          try {
+            const rec = planners.find(p => (p.audience || '') === s.name);
+            const adSetId = rec?.adSetId;
+            if (adSetId && metaAdsService.isLoggedIn() && metaAdsService.getSelectedAccount()) {
+              const insights = await metaAdsService.getAdSetInsights(adSetId, since, until);
+              const spend = (insights || []).reduce((sum: number, i: any) => sum + (parseFloat(i?.spend || '0') || 0), 0);
+              // Converter para nosso formato e calcular métricas simples
+              let suggestionType: 'vertical' | 'horizontal' | 'wait' = 'wait';
+              let suggestionTooltip = 'Aguardando otimização/mais dados.';
+              try {
+                const metricData = metaAdsService.convertToMetricData(insights || [], selectedMonth, selectedClient, selectedProduct, s.name) || [];
+                const totals = (metricData as any[]).reduce((acc: { investment: number; impressions: number; clicks: number; leads: number; sales: number; frequencySamples: number[]; cplSamples: number[]; cprSamples: number[] }, m: any) => {
+                  acc.investment += (m?.investment as number) || 0;
+                  acc.impressions += (m?.impressions as number) || 0;
+                  acc.clicks += (m?.clicks as number) || 0;
+                  acc.leads += (m?.leads as number) || 0;
+                  acc.sales += (m?.sales as number) || 0;
+                  acc.frequencySamples.push(((m as any)?.frequency as number) || 0);
+                  acc.cplSamples.push((m?.cpl as number) || 0);
+                  acc.cprSamples.push((m?.cpr as number) || 0);
+                  return acc;
+                }, { investment: 0, impressions: 0, clicks: 0, leads: 0, sales: 0, frequencySamples: [] as number[], cplSamples: [] as number[], cprSamples: [] as number[] });
+                const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+                const freq = totals.frequencySamples.length ? totals.frequencySamples.reduce((a: number, b: number)=>a+b,0)/totals.frequencySamples.length : 0;
+                const cpl = totals.leads > 0 ? totals.investment / totals.leads : (totals.cplSamples.find((v: number)=>v>0) || 0);
+                // Heurística simples (mensagens/leads):
+                const hasEnoughLeads = totals.leads >= 10;
+                if (hasEnoughLeads && cpl > 0 && cpl <= 15 && ctr >= 1.5 && freq <= 3.0) {
+                  suggestionType = 'vertical';
+                  suggestionTooltip = `Desempenho forte: CTR ${ctr.toFixed(2)}%, CPL ${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cpl)}, leads ${totals.leads}, freq ${freq.toFixed(1)}.`;
+                } else if (cpl > 0 && cpl <= 25 && ctr >= 1.0 && freq <= 3.0) {
+                  suggestionType = 'horizontal';
+                  suggestionTooltip = `Bom desempenho: CTR ${ctr.toFixed(2)}%, CPL ${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cpl)}, freq ${freq.toFixed(1)}. Teste variações/públicos.`;
+                } else {
+                  suggestionType = 'wait';
+                  suggestionTooltip = `Aguardando otimização: CTR ${ctr.toFixed(2)}%, CPL ${cpl ? new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cpl) : '—'}, leads ${totals.leads}, freq ${freq.toFixed(1)}.`;
+                }
+              } catch {}
+              return { ...s, spend, suggestionType, suggestionTooltip } as AudienceStatus;
+            }
+          } catch {}
+          return s;
+        }));
+
+        if (!cancelled) setAudiences(withSpend);
+      } catch (e: any) {
+        if (!cancelled) setError('Não foi possível carregar os públicos deste produto.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    if (selectedProduct && selectedProduct !== 'Todos os Produtos') {
+      load();
+    }
+    return () => { cancelled = true; };
+  }, [selectedClient, selectedProduct, selectedMonth]);
+
+  return (
+    <div className="relative overflow-visible bg-slate-900/80 border border-slate-700/50 rounded-2xl shadow-xl">
+      <div className="relative p-6 md:p-8">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shadow-md">
+              <Users className="h-5 w-5 text-slate-900" />
+            </div>
+            <div>
+              <h3 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent leading-tight">
+                Públicos deste produto
+              </h3>
+              <p className="text-slate-400 text-sm mt-1 leading-tight">Status de análise por conjunto de anúncios</p>
+            </div>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center gap-2 text-slate-300">
+            <Loader2 className="w-4 h-4 animate-spin" /> Carregando públicos…
+          </div>
+        ) : error ? (
+          <div className="text-sm text-red-300">{error}</div>
+        ) : audiences.length === 0 ? (
+          <div className="text-sm text-slate-400">Nenhum público encontrado para este produto.</div>
+        ) : (
+          <ul className="space-y-2">
+            {audiences.map((a, idx) => {
+              const nextDate = a.nextAnalysisDate ? dayjs(a.nextAnalysisDate) : null;
+              const nextStr = nextDate ? nextDate.format('DD/MM') : '—';
+              // Diferença baseada em início do dia para evitar off-by-one (contagem inclusiva)
+              const diff = nextDate ? nextDate.startOf('day').diff(dayjs().startOf('day'), 'day') : null; // >=0: em N dias; <0: há N dias
+              return (
+                <li key={idx} className="flex flex-col gap-2 p-3 bg-slate-800/40 border border-slate-700/40 rounded-lg hover:border-slate-600/50 transition">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-200 text-sm font-medium truncate pr-3">{a.name}</span>
+                    <div className="flex items-center gap-2">
+                      {/* Badge de sugestão dinâmica (com tooltip acima de tudo) */}
+                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md border relative
+                        ${a.suggestionType==='vertical' ? 'bg-emerald-600/15 border-emerald-500/40' : a.suggestionType==='horizontal' ? 'bg-blue-600/15 border-blue-500/40' : 'bg-slate-600/15 border-slate-500/40'}`}
+                        onMouseEnter={(e)=>{
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const tooltipWidth = 300; // largura aproximada
+                          const offset = 24; // empurrar mais para a esquerda
+                          const x = Math.max(10, rect.left - (tooltipWidth + offset));
+                          const y = Math.max(10, rect.top - 30);
+                          setTooltip({
+                            visible: true,
+                            x,
+                            y,
+                            content: a.suggestionTooltip || 'Aguardando otimização/mais dados.',
+                            color: a.suggestionType==='vertical' ? 'emerald' : a.suggestionType==='horizontal' ? 'blue' : 'slate'
+                          });
+                        }}
+                        onMouseLeave={()=> setTooltip(prev => ({ ...prev, visible: false }))}
+                      >
+                        {a.suggestionType==='vertical' ? (
+                          <TrendingUp className="w-3.5 h-3.5 text-emerald-300" />
+                        ) : a.suggestionType==='horizontal' ? (
+                          <GitBranch className="w-3.5 h-3.5 text-blue-300" />
+                        ) : (
+                          <Clock className="w-3.5 h-3.5 text-slate-300" />
+                        )}
+                      </span>
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] tracking-wide border ${
+                      a.status === 'ok'
+                        ? 'bg-emerald-500/15 text-emerald-200 border-emerald-400/30'
+                        : 'bg-rose-500/15 text-rose-200 border-rose-400/30'
+                    }`}>
+                      {a.status === 'ok' ? (
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      ) : (
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                      )}
+                      {a.status === 'ok' ? 'Analisado' : 'Pendente'}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] text-slate-300 bg-slate-700/30 border border-slate-600/40">
+                      <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
+                      {nextStr}
+                      {diff !== null && (
+                        diff >= 0
+                          ? <span className="text-slate-400">- em <b className="text-slate-200 font-semibold">{diff}</b> dias</span>
+                          : <span className="text-slate-400">- há <b className="text-slate-200 font-semibold">{Math.abs(diff)}</b> dias</span>
+                      )}
+                    </span>
+                    </div>
+                  </div>
+                  {/* Barra de progresso de orçamento (gasto vs pretendido) */}
+                  <div className="w-full">
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                      <span className="flex items-center gap-2">
+                        Gasto no período
+                        <span className="progress-animated-text font-medium">{new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(a.spend || 0)}</span>
+                      </span>
+                      {typeof a.plannedBudget === 'number' && (
+                        <span className="text-slate-500 inline-flex items-center gap-1">
+                          {(() => {
+                            const { since, until } = getMonthDateRange(selectedMonth);
+                            const start = new Date(since).getTime();
+                            const end = new Date(until).getTime();
+                            const days = Math.max(1, Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1);
+                            const perDay = (a.plannedBudget || 0) / days;
+                            const fmt = (val: number) => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(val || 0);
+                            return (
+                              <>
+                                Pretendido {fmt(a.plannedBudget || 0)} <span className="text-slate-400">({fmt(perDay)} / dia)</span>
+                              </>
+                            );
+                          })()}
+                          <button
+                            className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded hover:bg-slate-700/60"
+                            onClick={() => {
+                              setEditingBudget(a.name);
+                              const cents = Math.round(((a.plannedBudget || 0) as number) * 100);
+                              setTempBudget(String(cents));
+                            }}
+                            title="Editar orçamento pretendido"
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-slate-300" />
+                          </button>
+                        </span>
+                      )}
+                    </div>
+                    <div className="h-2 w-full bg-slate-700/50 rounded-full overflow-hidden">
+                      {typeof a.plannedBudget === 'number' && a.plannedBudget > 0 ? (
+                        <div className="h-2 rounded-full progress-animated" style={{ width: `${Math.min(100, Math.round(((a.spend || 0) / a.plannedBudget) * 100))}%` }} />
+                      ) : (
+                        <div className="h-2 rounded-full progress-animated" style={{ width: `${(a.spend || 0) > 0 ? 100 : 0}%` }} />
+                      )}
+                    </div>
+
+                    {/* Editor inline de orçamento pretendido */}
+                    {editingBudget === a.name && (
+                      <div className="mt-2 flex items-center justify-end gap-2 text-[12px]">
+                        <div className="flex items-center gap-2">
+                          <div className="relative">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300">R$</span>
+                            <input
+                              type="text"
+                              value={(() => {
+                                const digits = String(tempBudget).replace(/\D/g, '');
+                                return formatBRLFromDigits(digits);
+                              })()}
+                              onChange={(e) => {
+                                const digits = e.target.value.replace(/\D/g, '');
+                                setTempBudget(digits);
+                              }}
+                              onKeyDown={async (e) => {
+                                if (e.key === 'Enter') {
+                                  const value = Number(String(tempBudget).replace(/\D/g,'') || '0') / 100;
+                                  await analysisPlannerService.savePlanner(selectedClient, selectedProduct, a.name, { plannedBudget: value });
+                                  setAudiences(prev => prev.map(x => x.name === a.name ? { ...x, plannedBudget: value } : x));
+                                  setEditingBudget(null);
+                                } else if (e.key === 'Escape') {
+                                  setEditingBudget(null);
+                                }
+                              }}
+                              className="pl-7 pr-2 py-1 rounded bg-slate-800/70 border border-slate-600/50 text-slate-200 w-40 text-right"
+                              placeholder="0,00"
+                            />
+                          </div>
+                          <button
+                            className="px-2 py-1 rounded bg-emerald-600/80 hover:bg-emerald-600 text-white"
+                            onClick={async () => {
+                              const value = Number(String(tempBudget).replace(/\D/g,'') || '0') / 100;
+                              await analysisPlannerService.savePlanner(selectedClient, selectedProduct, a.name, { plannedBudget: value });
+                              setAudiences(prev => prev.map(x => x.name === a.name ? { ...x, plannedBudget: value } : x));
+                              setEditingBudget(null);
+                            }}
+                          >Salvar</button>
+                          <button className="px-2 py-1 rounded bg-slate-700/60 hover:bg-slate-700 text-slate-100" onClick={() => setEditingBudget(null)}>Cancelar</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+      {/* Tooltip Portal global para ficar acima de tudo */}
+      {tooltip.visible && createPortal(
+        <div
+          style={{ position: 'fixed', left: tooltip.x, top: tooltip.y, zIndex: 2147483647 }}
+        >
+          <div className={`min-w-[240px] max-w-[320px] text-xs rounded-lg shadow-xl border ${
+            tooltip.color==='emerald' ? 'border-emerald-500/40' : tooltip.color==='blue' ? 'border-blue-500/40' : 'border-slate-600/40'
+          }`}>
+            <div className="p-3 bg-slate-900 rounded-lg border-slate-600/40">
+              <div className="text-slate-200 font-semibold mb-1">Sugestão para este público</div>
+              <div className="text-slate-300 leading-relaxed whitespace-pre-line">{tooltip.content}</div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+};
+
+export default PendingAudiencesStatus;
+
+

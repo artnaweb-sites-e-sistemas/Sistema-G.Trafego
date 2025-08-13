@@ -635,7 +635,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
 
   return (
     <>
-      <div className="bg-slate-900 rounded-xl border border-slate-700 shadow-xl">
+      <div className="bg-slate-900 rounded-xl border border-slate-700 shadow-xl overflow-hidden">
         <div className="p-6 border-b border-slate-700 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900">
           <div className="flex items-center justify-between">
             <div>
@@ -666,7 +666,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
         </div>
         
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-750">
                 <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">

@@ -2,6 +2,7 @@ import {
   collection, 
   doc, 
   getDocs, 
+  getDoc,
   addDoc, 
   updateDoc, 
   deleteDoc, 
@@ -188,7 +189,7 @@ class FirestoreStrategyService {
     }
   }
 
-  // Remover estratégia
+  // Remover estratégia (robusto para diferentes formatos antigos)
   async removeStrategy(strategyId: string): Promise<void> {
     const userId = this.getCurrentUserId();
     if (!userId) {
@@ -196,23 +197,35 @@ class FirestoreStrategyService {
     }
 
     try {
+      // 1) Buscar por campo 'id' (formato atual)
       const q = query(
         collection(db, this.COLLECTION_NAME),
         where('userId', '==', userId),
         where('id', '==', strategyId)
       );
-      
+
       const querySnapshot = await getDocs(q);
-      
-      if (querySnapshot.empty) {
-        throw new Error('Estratégia não encontrada');
+      if (!querySnapshot.empty) {
+        const docRefFromField = querySnapshot.docs[0].ref;
+        await deleteDoc(docRefFromField);
+        console.log('Estratégia removida do Firestore (via campo id):', strategyId);
+        return;
       }
 
-      const docRef = querySnapshot.docs[0].ref;
-      await deleteDoc(docRef);
-      console.log('Estratégia removida do Firestore:', strategyId);
+      // 2) Fallback: tentar usar strategyId como ID do documento (formato antigo)
+      const directRef = doc(db, this.COLLECTION_NAME, strategyId);
+      const directSnap = await getDoc(directRef);
+      if (directSnap.exists()) {
+        await deleteDoc(directRef);
+        console.log('Estratégia removida do Firestore (via docId):', strategyId);
+        return;
+      }
+
+      // 3) Não encontrada — não lançar erro para não travar UX
+      console.warn('Estratégia não encontrada para remoção no Firestore:', strategyId);
     } catch (error) {
       console.error('Erro ao remover estratégia do Firestore:', error);
+      // Propagar apenas erros de permissão; ignorar not found
       throw error;
     }
   }

@@ -733,6 +733,109 @@ header {
   overflow: visible !important;
 }
 
+/* ===== Tooltip de ação aplicada (botões) ===== */
+.applied-tooltip {
+  position: absolute;
+  top: -44px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #e2e8f0; /* slate-200 */
+  background: rgba(30, 41, 59, 0.95); /* slate-800 */
+  border: 1px solid rgba(71, 85, 105, 0.6); /* slate-600 */
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform-origin: bottom center;
+  animation: appliedTooltipFade 800ms ease forwards;
+}
+
+.applied-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px 6px 0 6px;
+  border-style: solid;
+  border-color: rgba(71, 85, 105, 0.6) transparent transparent transparent;
+}
+
+/* ===== Animações de gradiente azul (gasto atual e barra) ===== */
+@keyframes blueGradientFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animated-blue-gradient {
+  background: linear-gradient(90deg, rgba(56,189,248,0.35), rgba(59,130,246,0.55), rgba(56,189,248,0.35));
+  background-size: 200% 200%;
+  animation: blueGradientFlow 3s ease infinite;
+}
+
+.animated-blue-text {
+  /* Tom unificado: cyan-400 (#38bdf8) → blue-500 (#3b82f6) → cyan-400 */
+  background: linear-gradient(90deg, #38bdf8, #3b82f6, #38bdf8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  background-size: 200% 200%;
+  animation: blueGradientFlow 3.2s ease infinite;
+}
+
+/* Barra de progresso com animação mais rica (tons de azul correndo) */
+.progress-animated {
+  position: relative;
+  /* Mesmo tom do texto: cyan-400 → blue-500 → cyan-400 */
+  background-image: linear-gradient(90deg, #38bdf8 0%, #3b82f6 50%, #38bdf8 100%);
+  background-size: 200% 100%;
+  animation: gradientMove 2.6s linear infinite;
+  box-shadow: 0 0 10px rgba(59,130,246,0.35), inset 0 0 8px rgba(56,189,248,0.25);
+}
+
+.progress-animated::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.18) 20%, rgba(255,255,255,0.06) 38%, transparent 60%);
+  background-size: 200% 100%;
+  animation: shine 3.2s linear infinite;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+@keyframes gradientMove {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 200% 0%; }
+}
+
+@keyframes shine {
+  0% { background-position: -50% 0%; opacity: 0.85; }
+  50% { opacity: 1; }
+  100% { background-position: 150% 0%; opacity: 0.85; }
+}
+
+/* Texto com a mesma animação/tons da barra */
+.progress-animated-text {
+  background-image: linear-gradient(90deg, #38bdf8 0%, #3b82f6 50%, #38bdf8 100%);
+  background-size: 200% 100%;
+  animation: gradientMove 2.6s linear infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes appliedTooltipFade {
+  0% { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.98); }
+  20% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  80% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-6px) scale(0.98); }
+}
+
 /* Garantir que o tema dark seja aplicado nos dropdowns */
 .dropdown-menu.bg-slate-900,
 .dropdown-menu-large.bg-slate-900,

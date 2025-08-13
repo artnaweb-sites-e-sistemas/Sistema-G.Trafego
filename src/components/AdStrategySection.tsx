@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Target, MapPin, DollarSign, Edit, Copy, CheckCircle, TrendingUp, GitBranch, Clock, Package, Globe, MessageSquare, ShoppingCart, Users, Calendar } from 'lucide-react';
+import { Plus, Target, MapPin, DollarSign, Edit, Copy, CheckCircle, Package, Globe, MessageSquare, ShoppingCart, Users, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { adStrategyService, AdStrategy } from '../services/adStrategyService';
 import { metaAdsService } from '../services/metaAdsService';
@@ -309,6 +309,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       toast.error('Erro ao salvar estratégia');
     }
   };
+
+  // removido duplicado (mantemos a versão abaixo)
 
   // Função para deletar estratégia
   const handleDeleteStrategy = async (strategyId: string) => {
@@ -939,7 +941,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
 
   // Função para validar tamanho mínimo da amostra
   const hasMinimumSampleSize = (totals: any, objective: string): boolean => {
-    const { impressions, clicks, spend, leads, sales } = totals;
+    const { impressions, clicks, spend } = totals;
     
     // Critério base: Impressões ≥ 3.000 e cliques ≥ 100
     const baseCriteria = impressions >= 3000 && clicks >= 100;
@@ -1163,97 +1165,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                       className="bg-gradient-to-r from-slate-700/50 to-slate-800/50 rounded-lg px-4 py-3 border border-slate-600/30 cursor-pointer hover:border-slate-500/50 hover:bg-gradient-to-r hover:from-slate-700/60 hover:to-slate-800/60 transition-all duration-200 group"
                                     >
                                       <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 flex-1 group/audience">
-                                          {/* Badge do estado de escala - tooltip somente sobre o container do público */}
-                                          {(() => {
-                                            const rec = recommendations[strategy.id];
-                                            const base = 'relative inline-flex items-center justify-center w-6 h-6 rounded-md border';
-                                            const card = (content: string, color: string) => (
-                                              <div className="tooltip-audience fixed z-[999999] hidden">
-                                                <div className={`min-w-[260px] max-w-[320px] text-xs rounded-lg shadow-xl border ${color}`}>
-                                                  <div className="p-3 bg-slate-900 rounded-lg border-slate-600/40">
-                                                    <div className="text-slate-200 font-semibold mb-1">Sugestão para este público</div>
-                                                    <div className="text-slate-300 leading-relaxed whitespace-pre-line">{content}</div>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            );
-                                            const stats = rec?.stats;
-                                            const objectiveLabel = stats?.objective === 'trafico' ? 'Tráfego' : stats?.objective === 'mensagens' ? 'Mensagens' : stats?.objective === 'captura_leads' ? 'Captura de Leads' : 'Compras';
-                                            if (rec?.type === 'vertical') {
-                                              return (
-                                                <span 
-                                                  className={`${base} bg-emerald-600/15 border-emerald-500/40`}
-                                                  onMouseEnter={(e) => {
-                                                    const rect = e.currentTarget.getBoundingClientRect();
-                                                    const tooltip = e.currentTarget.querySelector('.tooltip-audience') as HTMLElement;
-                                                    if (tooltip) {
-                                                      tooltip.style.left = `${rect.right + 10}px`;
-                                                      tooltip.style.top = `${rect.top - 30}px`;
-                                                      tooltip.style.display = 'block';
-                                                    }
-                                                  }}
-                                                  onMouseLeave={(e) => {
-                                                    const tooltip = e.currentTarget.querySelector('.tooltip-audience') as HTMLElement;
-                                                    if (tooltip) {
-                                                      tooltip.style.display = 'none';
-                                                    }
-                                                  }}
-                                                >
-                                                  <TrendingUp className="w-3.5 h-3.5 text-emerald-300" />
-                                                  {card(`Escalar orçamento (vertical).\n${rec.tooltip}`, 'border-emerald-500/40')}
-                                                </span>
-                                              );
-                                            }
-                                            if (rec?.type === 'horizontal') {
-                                              return (
-                                                <span 
-                                                  className={`${base} bg-blue-600/15 border-blue-500/40`}
-                                                  onMouseEnter={(e) => {
-                                                    const rect = e.currentTarget.getBoundingClientRect();
-                                                    const tooltip = e.currentTarget.querySelector('.tooltip-audience') as HTMLElement;
-                                                    if (tooltip) {
-                                                      tooltip.style.left = `${rect.right + 10}px`;
-                                                      tooltip.style.top = `${rect.top - 30}px`;
-                                                      tooltip.style.display = 'block';
-                                                    }
-                                                  }}
-                                                  onMouseLeave={(e) => {
-                                                    const tooltip = e.currentTarget.querySelector('.tooltip-audience') as HTMLElement;
-                                                    if (tooltip) {
-                                                      tooltip.style.display = 'none';
-                                                    }
-                                                  }}
-                                                >
-                                                  <GitBranch className="w-3.5 h-3.5 text-blue-300" />
-                                                  {card(`Expandir públicos/variações (horizontal).\n${rec.tooltip}`, 'border-blue-500/40')}
-                                                </span>
-                                              );
-                                            }
-                                            return (
-                                              <span 
-                                                className={`${base} bg-slate-600/15 border-slate-500/40`}
-                                                onMouseEnter={(e) => {
-                                                  const rect = e.currentTarget.getBoundingClientRect();
-                                                  const tooltip = e.currentTarget.querySelector('.tooltip-audience') as HTMLElement;
-                                                  if (tooltip) {
-                                                    tooltip.style.left = `${rect.right + 10}px`;
-                                                    tooltip.style.top = `${rect.top - 30}px`;
-                                                    tooltip.style.display = 'block';
-                                                  }
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                  const tooltip = e.currentTarget.querySelector('.tooltip-audience') as HTMLElement;
-                                                  if (tooltip) {
-                                                    tooltip.style.display = 'none';
-                                                  }
-                                                }}
-                                              >
-                                                <Clock className="w-3.5 h-3.5 text-slate-300" />
-                                                {card(`${rec?.tooltip || 'Aguardando otimização/mais dados.'}`, 'border-slate-500/40')}
-                                              </span>
-                                            );
-                                          })()}
+                                        <div className="flex items-center gap-2 flex-1">
                                           <p className="text-sm text-yellow-300 font-medium leading-relaxed">{strategy.generatedNames.audience}</p>
                                         </div>
                                         <Copy className="w-3 h-3 text-yellow-400 group-hover:text-yellow-300 transition-colors" />
@@ -1652,7 +1564,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                               name="scaleType"
                               value=""
                               checked={!currentStrategy.audience?.scaleType}
-                              onChange={(e) => setCurrentStrategy(prev => ({
+                              onChange={() => setCurrentStrategy(prev => ({
                                 ...prev,
                                 audience: { ...prev.audience!, scaleType: null }
                               }))}

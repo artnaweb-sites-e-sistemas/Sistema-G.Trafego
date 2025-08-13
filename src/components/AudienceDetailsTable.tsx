@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import InsightsSection from './InsightsSection';
 import { Calendar, Save, AlertTriangle, Edit3 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { metricsService } from '../services/metricsService';
@@ -426,6 +427,17 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
 
   return (
     <div className="bg-slate-900 rounded-xl border border-slate-600 shadow-xl">
+      {/* Insights & Sugestões focados no Público (Ad Set) */}
+      {selectedAudience && selectedAudience !== 'Todos os Públicos' && (
+        <div className="p-6 border-b border-slate-700">
+          <InsightsSection
+            selectedProduct={selectedProduct}
+            selectedClient={selectedClient}
+            selectedMonth={selectedMonth}
+            selectedAudience={selectedAudience}
+          />
+        </div>
+      )}
       {/* Header */}
       <div className="p-6 border-b border-slate-700 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900">
         <div className="flex items-center justify-between">

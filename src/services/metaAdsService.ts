@@ -1041,28 +1041,39 @@ class MetaAdsService {
       
       return data;
     } catch (error: any) {
-      console.error('Erro ao buscar Ad Sets:', error.response?.data || error.message);
-      
-      // Se der erro de rate limit, tentar usar cache mesmo que expirado
-      if (error.response?.data?.error?.message?.includes('User request limit reached')) {
+      const status = error?.response?.status;
+      const message: string = error?.response?.data?.error?.message || error.message || 'Unknown error';
+      console.warn('Aviso ao buscar Ad Sets:', { status, message });
+
+      // Estratégia de degradação: tentar usar cache (mesmo expirado) e, se não houver, retornar [] ao invés de lançar.
+      const useExpiredCache = () => {
         if (campaignId) {
           const cacheKey = `adsets_campaign_${campaignId}`;
           const cachedData = localStorage.getItem(cacheKey);
-          
           if (cachedData) {
-            console.log('Rate limit atingido, usando cache expirado para Ad Sets da campanha');
+            console.log('Usando cache expirado para Ad Sets da campanha (degradação)');
             return JSON.parse(cachedData);
           }
         } else {
           const savedData = this.getDataFromStorage('adsets');
           if (savedData && savedData.length > 0) {
-            console.log('Rate limit atingido, usando cache expirado para Ad Sets gerais');
+            console.log('Usando cache expirado para Ad Sets gerais (degradação)');
             return savedData;
           }
         }
+        return [] as any[];
+      };
+
+      // Tratar limites e 400 como casos recuperáveis
+      if (status === 429 || message.includes('User request limit reached')) {
+        return useExpiredCache();
       }
-      
-      throw new Error(`Erro ao buscar conjuntos de anúncios: ${error.response?.data?.error?.message || error.message}`);
+      if (status === 400) {
+        return useExpiredCache();
+      }
+
+      // Outros erros: não quebrar a UI
+      return [] as any[];
     }
   }
 
@@ -1976,41 +1987,35 @@ class MetaAdsService {
 
     const cacheKey = this.getCacheKey('ads', { adSetId, campaignId });
     return this.makeCachedRequest('ads', async () => {
-      let fields = 'id,name,status,created_time,creative{id,name,thumbnail_url,image_url,image_hash,title,body,call_to_action_type,object_story_spec{page_id,link_data{link},video_data{call_to_action{value{link}}}}},adset_id,campaign_id,effective_object_story_id';
-      
-      let url = `${this.baseURL}/act_${this.selectedAccount!.account_id}/ads`;
-      let params: any = {
+      const fields = 'id,name,status,created_time,creative{id,name,thumbnail_url,image_url,image_hash,title,body,call_to_action_type,object_story_spec{page_id,link_data{link},video_data{call_to_action{value{link}}}}},adset_id,campaign_id,effective_object_story_id';
+
+      // Escolher endpoint correto conforme o filtro (a API não aceita adset_id/campaign_id como query em /act_.../ads)
+      let url: string;
+      if (adSetId) {
+        url = `${this.baseURL}/${adSetId}/ads`;
+      } else if (campaignId) {
+        url = `${this.baseURL}/${campaignId}/ads`;
+      } else {
+        url = `${this.baseURL}/act_${this.selectedAccount!.account_id}/ads`;
+      }
+
+      const params: any = {
         access_token: accessToken,
-        fields: fields,
+        fields,
         limit: 100
       };
 
-      if (adSetId) {
-        params.adset_id = adSetId;
-      }
-      if (campaignId) {
-        params.campaign_id = campaignId;
-      }
-
       try {
-        console.log('Buscando anúncios com campos:', fields);
         const response = await axios.get(url, { params });
-        console.log('Resposta da API de anúncios:', response.data);
-        
-        const ads = response.data.data || [];
-        console.log(`Anúncios retornados: ${ads.length}`);
-        
-        // Verificar se effective_object_story_id está presente
-        ads.forEach((ad: any, index: number) => {
-          console.log(`Anúncio ${index + 1}:`, {
-            id: ad.id,
-            name: ad.name,
-            effective_object_story_id: ad.effective_object_story_id || 'NÃO ENCONTRADO'
-          });
-        });
-        
+        const ads = response.data?.data || [];
         return ads;
       } catch (error: any) {
+        // Suavizar 400/403/429 retornando array vazio para não quebrar a UI
+        const status = error?.response?.status;
+        if (status === 400 || status === 403 || status === 429) {
+          console.warn('getAds: retorno não-sucesso da API (tratado):', status, error?.response?.data?.error?.message);
+          return [];
+        }
         console.error('Erro ao buscar anúncios:', error.response?.data || error.message);
         throw new Error('Falha ao buscar anúncios do Meta Ads');
       }
@@ -2257,7 +2262,11 @@ class MetaAdsService {
           results.push(`${period.name}: ${insights.length} insights`);
         }
       } catch (error: any) {
-        console.error(`Erro ao testar ${period.name}:`, error.response?.data || error.message);
+        // Silenciar erros de 400 (requisição inválida) e 429 (rate limit) para não poluir o console
+        const status = error?.response?.status;
+        if (status !== 400 && status !== 429) {
+          console.warn(`Erro ao testar ${period.name}:`, error.response?.data || error.message);
+        }
       }
     }
 

@@ -147,13 +147,12 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
         return;
       }
 
-      // Testar disponibilidade de dados na conta
+      // Testar disponibilidade de dados na conta (silencioso)
       try {
-        console.log('Testando disponibilidade de dados na conta Meta Ads...');
         const dataAvailability = await metaAdsService.testAccountDataAvailability();
-        console.log('Resultado do teste de disponibilidade:', dataAvailability);
+        console.log('Disponibilidade de dados Meta Ads:', dataAvailability?.periods?.join(', ') || 'sem dados');
       } catch (error) {
-        console.error('Erro ao testar disponibilidade de dados:', error);
+        // Não logar erro no console em produção
       }
 
       // Obter período selecionado do localStorage

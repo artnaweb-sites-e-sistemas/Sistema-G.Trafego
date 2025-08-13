@@ -10,6 +10,8 @@ import HistorySection from './HistorySection';
 import ShareReport from './ShareReport';
 import AIBenchmark from './AIBenchmark';
 import PerformanceAdsSection from './PerformanceAdsSection';
+import PendingAudiencesStatus from './PendingAudiencesStatus';
+import { analysisPlannerService } from '../services/analysisPlannerService';
 import AdStrategySection from './AdStrategySection';
 import { User } from '../services/authService';
 import { metricsService, type MetricData } from '../services/metricsService';
@@ -482,6 +484,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       
       // Atualizar produto selecionado
       setSelectedProduct(productName);
+      // Ao trocar de campanha/produto, voltar para visão de produto (sem público)
+      setSelectedAudience('Todos os Públicos');
+      try { localStorage.removeItem('selectedAdSetId'); } catch {}
       
       // Armazenar o ID da campanha para usar nas métricas
       if (campaignId) {
@@ -516,6 +521,12 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       // Armazenar o ID do Ad Set para usar nas métricas
       if (adSetId) {
         localStorage.setItem('selectedAdSetId', adSetId);
+        try {
+          // Persistir o vínculo do público com o adSetId no planner para consumo de gastos
+          if (selectedClient && selectedProduct) {
+            analysisPlannerService.savePlanner(selectedClient, selectedProduct, audienceName, { adSetId }).catch(() => {});
+          }
+        } catch {}
       }
       
       try {
@@ -793,6 +804,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     };
   }, [selectedProduct, selectedClient, selectedMonth]);
 
+  // Flag de recurso para exibir/ocultar a seção de Benchmark com IA
+  const SHOW_AI_BENCHMARK = false;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 text-white">
               <Header
@@ -867,11 +881,29 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                   </>
                 ) : selectedProduct && selectedProduct !== 'Todos os Produtos' ? (
                   <>
-                    <AIBenchmark 
-                      selectedProduct={selectedProduct}
-                      onBenchmarkGenerated={handleBenchmarkGenerated}
-                      savedResults={aiBenchmarkResults}
-                    />
+                    {SHOW_AI_BENCHMARK && (
+                      <AIBenchmark 
+                        selectedProduct={selectedProduct}
+                        onBenchmarkGenerated={handleBenchmarkGenerated}
+                        savedResults={aiBenchmarkResults}
+                      />
+                    )}
+                    {/* Quando apenas produto estiver selecionado, mostrar status dos públicos (sem planner/sugestões) */}
+                    {(!selectedAudience || selectedAudience === 'Todos os Públicos') ? (
+                      <PendingAudiencesStatus
+                        selectedClient={selectedClient}
+                        selectedProduct={selectedProduct}
+                        selectedMonth={selectedMonth}
+                      />
+                    ) : (
+                      <InsightsSection 
+                        selectedProduct={selectedProduct} 
+                        results={aiBenchmarkResults}
+                        selectedClient={selectedClient}
+                        selectedMonth={selectedMonth}
+                        selectedAudience={selectedAudience}
+                      />
+                    )}
                     <MonthlyDetailsTable 
                       metrics={metrics} 
                       selectedProduct={selectedProduct}
@@ -880,7 +912,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                       onValuesChange={setMonthlyDetailsValues}
                       aiBenchmarkResults={aiBenchmarkResults}
                     />
-                    <InsightsSection />
                   </>
                 ) : (
                   <>
