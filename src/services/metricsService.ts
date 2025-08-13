@@ -783,12 +783,10 @@ export const metricsService = {
         return cached;
       }
       
-      // CORREÇÃO RADICAL: Se cliente específico selecionado, verificar dados reais ANTES de buscar Meta Ads
+      // Se cliente específico selecionado, podemos verificar monthlyDetails apenas para logging, mas não bloquear busca no Meta Ads
       if (client !== 'Todos os Clientes') {
-        console.log(`🔍 DEBUG - getMetrics - Cliente específico selecionado: ${client}, verificando dados reais primeiro`);
-        
+        console.log(`🔍 DEBUG - getMetrics - Cliente específico selecionado: ${client}, verificando monthlyDetails apenas para diagnóstico`);
         try {
-          // Verificar se há dados reais no monthlyDetails para este cliente/mês
           const detailsRef = collection(db, 'monthlyDetails');
           const qCheck = query(
             detailsRef,
@@ -796,43 +794,9 @@ export const metricsService = {
             where('client', '==', client)
           );
           const snap = await getDocs(qCheck);
-          
-          console.log(`🔍 DEBUG - getMetrics - Dados reais encontrados para ${client}/${month}: ${snap.size} documentos`);
-          
-          // Se não há dados reais E não há filtros específicos, retornar vazio SEM buscar Meta Ads
-          if (snap.size === 0 && 
-              product === 'Todos os Produtos' && 
-              audience === 'Todos os Públicos' && 
-              !campaignId && 
-              !adSetId) {
-            console.log(`🔍 DEBUG - getMetrics - Cliente ${client} não tem dados reais e sem filtros específicos. Retornando vazio SEM buscar Meta Ads.`);
-            this.setCache(cacheKey, []);
-            return [];
-          }
-          
-          // Se há dados reais mas todos são zero, também retornar vazio
-          let hasRealData = false;
-          snap.forEach(doc => {
-            const d: any = doc.data();
-            const hasValues = (d?.agendamentos || 0) > 0 || (d?.vendas || 0) > 0 || (d?.cpv || 0) > 0;
-            if (hasValues) hasRealData = true;
-          });
-          
-          if (!hasRealData && 
-              product === 'Todos os Produtos' && 
-              audience === 'Todos os Públicos' && 
-              !campaignId && 
-              !adSetId) {
-            console.log(`🔍 DEBUG - getMetrics - Cliente ${client} tem dados mas todos zerados. Retornando vazio SEM buscar Meta Ads.`);
-            this.setCache(cacheKey, []);
-            return [];
-          }
-          
+          console.log(`🔍 DEBUG - getMetrics - monthlyDetails: ${snap.size} docs para ${client}/${month}`);
         } catch (e) {
-          console.log(`🔍 DEBUG - getMetrics - Erro ao verificar dados reais: ${e}`);
-          // Se não conseguir verificar, retornar vazio por segurança
-          this.setCache(cacheKey, []);
-          return [];
+          console.log(`🔍 DEBUG - getMetrics - Falha ao verificar monthlyDetails: ${e}`);
         }
       }
       

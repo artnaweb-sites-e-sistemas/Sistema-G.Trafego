@@ -33,24 +33,10 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
   const triggerRef = useRef<HTMLDivElement>(null);
   const { renderDropdown } = useDropdownPortal({ isOpen, triggerRef });
   
-  // Carregar cliente salvo do localStorage ao inicializar
+  // Desabilitar restauração automática de cliente salvo ao iniciar (exigência: iniciar sem cliente selecionado)
   useEffect(() => {
-    const savedClient = localStorage.getItem('currentSelectedClient');
-    
-    // Só carregar cliente salvo se já estiver conectado ao Meta Ads
-    // E se já tiver Business Manager e conta de anúncios selecionadas
-    // E se o cliente atual for "Selecione um cliente" (não foi selecionado ainda)
-    if (savedClient && savedClient !== 'Todos os Clientes' && isFacebookConnected) {
-      const selectedBusinessManager = localStorage.getItem('selectedBusinessManager');
-      const selectedAdAccount = localStorage.getItem('selectedAdAccount');
-      
-      // Só carregar cliente se já tiver Business Manager e conta selecionadas
-      // E se o cliente atual for "Selecione um cliente"
-      if (selectedBusinessManager && selectedAdAccount && selectedClient === 'Selecione um cliente') {
-        setSelectedClient(savedClient);
-      }
-    }
-  }, [setSelectedClient, isFacebookConnected, selectedClient]);
+    // Intencionalmente vazio para não auto-selecionar
+  }, []);
 
   // Listener para reagir quando cliente for limpo pelo Dashboard
   useEffect(() => {

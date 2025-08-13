@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import InsightsSection from './InsightsSection';
-import { Calendar, Save, AlertTriangle, Edit3 } from 'lucide-react';
+import { Edit3 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { metricsService } from '../services/metricsService';
+import SectionHeader from './ui/SectionHeader';
+import Chip from './ui/Chip';
 
 interface AudienceDetailsTableProps {
   selectedAudience: string;
@@ -32,7 +34,7 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [editingField, setEditingField] = useState<'agendamentos' | 'vendas' | null>(null);
   const [editValue, setEditValue] = useState('');
-  const [editRawValue, setEditRawValue] = useState('');
+  // Mantido anteriormente para máscara em valores monetários; removido por não uso atual
   const [vendasAuto, setVendasAuto] = useState(true);
   const [manualVendasValue, setManualVendasValue] = useState(0); // Novo estado para preservar valor manual
   const inputRef = useRef<HTMLInputElement>(null);
@@ -211,11 +213,9 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
     if (field === 'vendas') {
       // Para vendas, usar número simples (quantidade de vendas)
       setEditValue(details.vendas.toString());
-      setEditRawValue('');
     } else {
       // Para agendamentos, usar número simples
       setEditValue(details[field].toString());
-      setEditRawValue('');
     }
     
     setTimeout(() => {
@@ -240,7 +240,6 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
     } else if (e.key === 'Escape') {
       setEditingField(null);
       setEditValue('');
-      setEditRawValue('');
     }
   };
 
@@ -297,7 +296,6 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
       setDetails(updatedDetails);
       setEditingField(null);
       setEditValue('');
-      setEditRawValue('');
       toast.success('Valor atualizado com sucesso!');
       
       // Disparar evento para notificar outros componentes
@@ -426,10 +424,10 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
   }
 
   return (
-    <div className="bg-slate-900 rounded-xl border border-slate-600 shadow-xl">
+    <div className="bg-slate-900 rounded-2xl border border-slate-700/50 shadow-xl overflow-hidden">
       {/* Insights & Sugestões focados no Público (Ad Set) */}
       {selectedAudience && selectedAudience !== 'Todos os Públicos' && (
-        <div className="p-6 border-b border-slate-700">
+        <div className="p-6 border-b border-slate-700/60">
           <InsightsSection
             selectedProduct={selectedProduct}
             selectedClient={selectedClient}
@@ -439,20 +437,14 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
         </div>
       )}
       {/* Header */}
-      <div className="p-6 border-b border-slate-700 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-100 mb-1">Detalhes do Público</h2>
-            <p className="text-slate-400 text-sm">{selectedMonth}</p>
+      <div className="p-6 border-b border-slate-700/60 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900">
+        <SectionHeader title="Detalhes do Público" subtitle={selectedMonth} />
+        {isSaving && (
+          <div className="mt-2 inline-flex items-center space-x-2 text-blue-300 bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-500/30">
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-400 border-t-transparent"></div>
+            <span className="text-sm font-medium">Salvando...</span>
           </div>
-          
-          {isSaving && (
-            <div className="flex items-center space-x-2 text-blue-400 bg-blue-900/20 px-4 py-2 rounded-lg border border-blue-500/30">
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-400 border-t-transparent"></div>
-              <span className="text-sm font-medium">Salvando...</span>
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Conteúdo */}
@@ -489,9 +481,7 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
                 <div className="text-2xl font-bold text-slate-100">
                   {details.agendamentos.toLocaleString('pt-BR')}
                 </div>
-                <div className="flex items-center space-x-1">
-                  <span className="text-xs text-emerald-400 font-medium">Edição Manual</span>
-                </div>
+                <Chip color="emerald" size="xs">Edição Manual</Chip>
               </div>
             )}
           </div>
@@ -546,14 +536,9 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
                   {details.vendas.toLocaleString('pt-BR')}
                 </div>
                 {vendasAuto ? (
-                  <div className="flex items-center space-x-1">
-                    <span className="text-xs text-blue-400 font-medium">Sincronizando</span>
-                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                  </div>
+                  <Chip color="blue" size="xs">Sincronizando</Chip>
                 ) : (
-                  <div className="flex items-center space-x-1">
-                    <span className="text-xs text-emerald-400 font-medium">Edição Manual</span>
-                  </div>
+                  <Chip color="emerald" size="xs">Edição Manual</Chip>
                 )}
               </div>
             )}

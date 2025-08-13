@@ -177,7 +177,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
 
   // Carregar produtos quando componente montar ou quando cliente/dataSource mudar
   useEffect(() => {
-    if (selectedClient && selectedClient !== 'Todos os Clientes') {
+    if (selectedClient && selectedClient !== 'Todos os Clientes' && selectedClient !== 'Selecione um cliente') {
       loadMetaAdsCampaigns();
     } else {
       // Se não há cliente selecionado, zerar produtos e disparar evento

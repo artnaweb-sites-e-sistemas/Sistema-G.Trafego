@@ -46,26 +46,44 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
             if (selectedBusinessManager && selectedAdAccount) {
               setDataSource('facebook');
               setIsFacebookConnected(true);
+              // Garantir estado inicial sem cliente/produto selecionados
+              setSelectedClient('Selecione um cliente');
+              setSelectedProduct('');
+              try {
+                localStorage.removeItem('currentSelectedClient');
+                localStorage.removeItem('selectedClient');
+                localStorage.removeItem('currentSelectedProduct');
+                localStorage.removeItem('selectedCampaignId');
+                localStorage.removeItem('selectedAudience');
+              } catch {}
             } else {
               // Se não tem Business Manager ou conta selecionada, considerar como não conectado
               setDataSource(null);
               setIsFacebookConnected(false);
+              setSelectedClient('Selecione um cliente');
+              setSelectedProduct('');
             }
           } else {
             // Se não está logado, limpar dados
             setDataSource(null);
             setIsFacebookConnected(false);
+            setSelectedClient('Selecione um cliente');
+            setSelectedProduct('');
           }
         } else {
           // Se não há usuário salvo, garantir que está desconectado
           setDataSource(null);
           setIsFacebookConnected(false);
+          setSelectedClient('Selecione um cliente');
+          setSelectedProduct('');
         }
       } catch (error) {
         console.error('Erro ao verificar conexão do Meta Ads:', error);
         // Em caso de erro, garantir que está desconectado
         setDataSource(null);
         setIsFacebookConnected(false);
+        setSelectedClient('Selecione um cliente');
+        setSelectedProduct('');
       }
     };
 
@@ -116,8 +134,11 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     // Salvar cliente selecionado no localStorage para uso em outros componentes
     if (selectedClient && selectedClient !== 'Selecione um cliente') {
       localStorage.setItem('selectedClient', selectedClient);
+      // Manter compatibilidade com serviços que leem currentSelectedClient
+      try { localStorage.setItem('currentSelectedClient', selectedClient); } catch {}
     } else {
       localStorage.removeItem('selectedClient');
+      try { localStorage.removeItem('currentSelectedClient'); } catch {}
     }
   }, [selectedClient]);
 
@@ -142,63 +163,35 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [noDataForSelection, setNoDataForSelection] = useState(false);
   const [monthsWithData, setMonthsWithData] = useState<string[]>([]);
 
-  // Carregar seleção atual do Firestore na inicialização
+  // Carregar seleção atual do Firestore na inicialização (desabilitado para evitar auto-seleção após login)
   useEffect(() => {
+    const RESTORE_SELECTION_ON_LOAD = false;
     const loadUserSelection = async () => {
       try {
         const { firestoreCampaignSyncService } = await import('../services/firestoreCampaignSyncService');
-        
-        // Carregar seleção do usuário do Firestore
         const selection = await firestoreCampaignSyncService.getUserSelection();
-        if (selection) {
-          console.log('✅ Seleção carregada do Firestore:', selection);
-          
-          // Se há campanha selecionada, buscar o nome atual
+        if (selection && RESTORE_SELECTION_ON_LOAD) {
+          console.log('✅ Seleção carregada do Firestore (restauração habilitada):', selection);
           if (selection.selectedCampaignId) {
             const campaign = await firestoreCampaignSyncService.getCampaignById(selection.selectedCampaignId);
             if (campaign) {
-              console.log('✅ Campanha encontrada no Firestore:', campaign.name);
               setSelectedProduct(campaign.name);
-              
-              // Atualizar localStorage como cache
               localStorage.setItem('currentSelectedProduct', campaign.name);
               localStorage.setItem('selectedCampaignId', selection.selectedCampaignId);
             } else if (selection.selectedProductName) {
-              // Fallback para nome salvo na seleção
               setSelectedProduct(selection.selectedProductName);
               localStorage.setItem('currentSelectedProduct', selection.selectedProductName);
             }
           }
-          
-          // Carregar cliente se disponível
           if (selection.selectedClient) {
             setSelectedClient(selection.selectedClient);
             localStorage.setItem('selectedClient', selection.selectedClient);
           }
-        } else {
-          // Fallback para localStorage se não há dados no Firestore
-          const savedProduct = localStorage.getItem('currentSelectedProduct');
-          const savedClient = localStorage.getItem('selectedClient');
-          
-          if (savedProduct) setSelectedProduct(savedProduct);
-          if (savedClient && savedClient !== 'Selecione um cliente') {
-            setSelectedClient(savedClient);
-          }
         }
       } catch (error) {
         console.error('Erro ao carregar seleção do Firestore:', error);
-        
-        // Fallback para localStorage em caso de erro
-        const savedProduct = localStorage.getItem('currentSelectedProduct');
-        const savedClient = localStorage.getItem('selectedClient');
-        
-        if (savedProduct) setSelectedProduct(savedProduct);
-        if (savedClient && savedClient !== 'Selecione um cliente') {
-          setSelectedClient(savedClient);
-        }
       }
     };
-
     loadUserSelection();
   }, []);
 

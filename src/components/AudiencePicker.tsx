@@ -158,18 +158,52 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         );
         console.log('Ad Sets ativos/pausados:', activeAdSets.length);
 
-        // Converter Ad Sets para formato de públicos
-        const facebookAudiences: Audience[] = activeAdSets.map((adSet, index) => ({
-          id: `fb-adset-${adSet.id}`,
-          name: adSet.name,
-          description: `Conjunto de anúncios ${adSet.status === 'ACTIVE' ? 'Ativo' : 'Pausado'}`,
-          ageRange: '18-65',
-          location: 'Brasil',
-          size: 10000, // Tamanho estimado do público
-          productId: selectedProduct,
-          clientId: selectedClient,
-          source: 'facebook' as const,
-          adSet: adSet
+        // Converter Ad Sets para formato de públicos, buscando targeting atualizado por adset quando possível
+        const facebookAudiences: Audience[] = await Promise.all(activeAdSets.map(async (adSet) => {
+          // Buscar detalhes do ad set (inclui targeting atualizado)
+          let targeting: any = adSet?.targeting || {};
+          try {
+            const det = await metaAdsService.getAdSetDetails(adSet.id);
+            console.log('DEBUG AudiencePicker - detalhes do adset', adSet.id, det);
+            if (det?.targeting) targeting = det.targeting;
+            console.log('DEBUG AudiencePicker - targeting resolvido', adSet.id, targeting);
+          } catch (e) {
+            console.warn('DEBUG AudiencePicker - falha ao buscar detalhes do adset', adSet.id, e);
+          }
+
+          // Idade: priorizar targeting.age_range [min,max]; fallback para age_min/age_max
+          const arrRange = Array.isArray(targeting?.age_range) && targeting.age_range.length === 2
+            ? { min: Number(targeting.age_range[0]), max: Number(targeting.age_range[1]) }
+            : null;
+          const ageMin = (arrRange?.min ?? (typeof targeting?.age_min === 'number' ? targeting.age_min : undefined));
+          const ageMax = (arrRange?.max ?? (typeof targeting?.age_max === 'number' ? targeting.age_max : undefined));
+          const ageRange = (typeof ageMin === 'number' || typeof ageMax === 'number')
+            ? `${ageMin ?? 18}-${ageMax ?? 65}`
+            : undefined;
+
+          // Localização básica
+          let location: string | undefined = undefined;
+          const geo = targeting?.geo_locations || {};
+          const countries: string[] = Array.isArray(geo.countries) ? geo.countries : [];
+          if (countries.length === 1) {
+            location = countries[0] === 'BR' ? 'Brasil' : countries[0];
+          } else if (countries.length > 1) {
+            location = 'Múltiplos países';
+          } else if (geo.location_types && geo.location_types.length > 0) {
+            location = 'Localização personalizada';
+          }
+
+          return {
+            id: `fb-adset-${adSet.id}`,
+            name: adSet.name,
+            description: `Conjunto de anúncios ${adSet.status === 'ACTIVE' ? 'Ativo' : 'Pausado'}`,
+            ageRange,
+            location,
+            productId: selectedProduct,
+            clientId: selectedClient,
+            source: 'facebook' as const,
+            adSet: adSet
+          } as Audience;
         }));
 
         console.log('Públicos convertidos:', facebookAudiences.length);

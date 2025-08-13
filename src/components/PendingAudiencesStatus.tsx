@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Users, AlertTriangle, CheckCircle2, Loader2, CalendarDays, Pencil, TrendingUp, GitBranch, Clock, PauseCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2, CalendarDays, Pencil, TrendingUp, GitBranch, Clock, PauseCircle } from 'lucide-react';
 import { analysisPlannerService } from '../services/analysisPlannerService';
 import { metricsService } from '../services/metricsService';
 import { metaAdsService } from '../services/metaAdsService';
 import dayjs from 'dayjs';
 import { adStrategyService } from '../services/adStrategyService';
+import Chip from './ui/Chip';
+import ProgressBar from './ui/ProgressBar';
+import SectionHeader from './ui/SectionHeader';
 
 interface PendingAudiencesStatusProps {
   selectedClient: string;
@@ -238,23 +241,11 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
   return (
     <div className="relative overflow-visible bg-slate-900/80 border border-slate-700/50 rounded-2xl shadow-xl">
       <div className="relative p-6 md:p-8">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shadow-md">
-              <Users className="h-5 w-5 text-slate-900" />
-            </div>
-            <div>
-              <h3 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent leading-tight">
-                Públicos deste produto
-              </h3>
-              <p className="text-slate-400 text-sm mt-1 leading-tight">Status de análise por conjunto de anúncios</p>
-            </div>
-          </div>
-        </div>
+        <SectionHeader title="Públicos deste produto" subtitle="Status de análise por conjunto de anúncios" />
 
         {/* Barra de progresso agregada (todos os públicos) */}
         {audiences.length > 0 && (
-          <div className="mb-4">
+          <div className="mb-6">
             {(() => {
               const totalSpend = audiences.reduce((sum, a) => sum + ((a.spend || 0) as number), 0);
               const totalPlanned = audiences.reduce((sum, a) => sum + ((a.plannedBudget || 0) as number), 0);
@@ -270,20 +261,19 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
               const pct = pausedGlobal ? 100 : (totalPlanned > 0 ? Math.min(100, Math.round((totalSpend / totalPlanned) * 100)) : (totalSpend > 0 ? 100 : 0));
               return (
                 <>
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                  <div className="flex items-center justify-between text-xs text-slate-300 mb-2">
                     <span className="flex items-center gap-2">
                       Gastos neste mês
-                      <span className="progress-animated-text font-medium">{fmt(totalSpend)}</span>
+                      <span className="animated-blue-text font-semibold">{fmt(totalSpend)}</span>
                     </span>
                     {!pausedGlobal && (
-                      <span className="text-slate-500 inline-flex items-center gap-1">
+                      <span className="text-slate-400 inline-flex items-center gap-1">
                         Pretendido {fmt(totalPlanned)} <span className="text-slate-400">({fmt(perDay)} / dia)</span>
                       </span>
                     )}
                   </div>
-                  <div className="h-2 w-full bg-slate-700/50 rounded-full overflow-hidden">
-                    <div className="h-2 rounded-full progress-animated" style={{ width: `${pct}%` }} />
-                  </div>
+                  {/* Destaque forte: barra principal animada com altura customizada 0.55rem */}
+                  <ProgressBar value={pct} variant="animated" heightRem={0.55} />
                 </>
               );
             })()}
@@ -299,26 +289,25 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
         ) : audiences.length === 0 ? (
           <div className="text-sm text-slate-400">Nenhum público encontrado para este produto.</div>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {audiences.map((a, idx) => {
               const nextDate = a.nextAnalysisDate ? dayjs(a.nextAnalysisDate) : null;
               const nextStr = nextDate ? nextDate.format('DD/MM') : '—';
               // Diferença baseada em início do dia para evitar off-by-one (contagem inclusiva)
               const diff = nextDate ? nextDate.startOf('day').diff(dayjs().startOf('day'), 'day') : null; // >=0: em N dias; <0: há N dias
               return (
-                <li key={idx} className="flex flex-col gap-2 p-3 bg-slate-800/40 border border-slate-700/40 rounded-lg hover:border-slate-600/50 transition">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-200 text-sm font-medium truncate pr-3">{a.name}</span>
-                    <div className="flex items-center gap-2">
-                      {/* Badge de sugestão dinâmica (com tooltip acima de tudo) */}
-                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md border relative
+                <li key={idx} className="flex flex-col gap-3 p-4 bg-slate-800/40 border border-slate-700/40 rounded-xl hover:border-slate-600/50 transition">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {/* Badge de sugestão dinâmica à esquerda do nome (tooltip abre à direita) */}
+                      <span className={`shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-md border relative
                         ${a.suggestionType==='vertical' ? 'bg-emerald-600/15 border-emerald-500/40' : a.suggestionType==='horizontal' ? 'bg-blue-600/15 border-blue-500/40' : a.suggestionType==='alert' ? 'bg-amber-600/15 border-amber-500/40' : 'bg-slate-600/15 border-slate-500/40'}`}
                         onMouseEnter={(e)=>{
                           const rect = e.currentTarget.getBoundingClientRect();
                           const tooltipWidth = 300; // largura aproximada
-                          const offset = 24; // empurrar mais para a esquerda
-                          const x = Math.max(10, rect.left - (tooltipWidth + offset));
-                          const y = Math.max(10, rect.top - 30);
+                          const offset = 12; // abrir para a direita
+                          const x = Math.min(window.innerWidth - tooltipWidth - 10, rect.right + offset);
+                          const y = Math.max(10, rect.top - 8);
                           setTooltip({
                             visible: true,
                             x,
@@ -330,30 +319,29 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
                         onMouseLeave={()=> setTooltip(prev => ({ ...prev, visible: false }))}
                       >
                         {a.suggestionType==='vertical' ? (
-                          <TrendingUp className="w-3.5 h-3.5 text-emerald-300" />
+                          <TrendingUp className="w-4 h-4 text-emerald-300" />
                         ) : a.suggestionType==='horizontal' ? (
-                          <GitBranch className="w-3.5 h-3.5 text-blue-300" />
+                          <GitBranch className="w-4 h-4 text-blue-300" />
                         ) : a.suggestionType==='alert' ? (
-                          <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
+                          <AlertTriangle className="w-4 h-4 text-amber-300" />
                         ) : (
-                          <Clock className="w-3.5 h-3.5 text-slate-300" />
+                          <Clock className="w-4 h-4 text-slate-300" />
                         )}
                       </span>
+                      <span className="text-slate-200 text-sm font-medium truncate">{a.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
                       {typeof a.activeDaysTotal === 'number' && (
-                        <span className="text-[11px] text-slate-400">Ativo há <b className="text-slate-200">{a.activeDaysTotal} dias</b></span>
+                        <Chip size="xs" color="slate" icon={<Clock className="w-4 h-4 text-slate-400" />}> <span className="text-slate-400">Ativo há</span> <b className="text-slate-200">{a.activeDaysTotal} dias</b> </Chip>
                       )}
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] text-slate-300 bg-slate-700/30 border border-slate-600/40">
-                      <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="text-slate-400">Próxima análise em</span>
-                      {diff !== null && (
-                        diff >= 0
-                          ? <span className="text-slate-300"> <b className="text-slate-200 font-semibold">{diff}</b> dias</span>
-                          : <span className="text-slate-300"> há <b className="text-slate-200 font-semibold">{Math.abs(diff)}</b> dias</span>
-                      )}
+                    <Chip size="xs" color="slate" icon={<CalendarDays className="w-4 h-4 text-slate-400" />}> <span className="text-slate-400">Próxima análise em</span>
+                      {diff !== null && (diff >= 0
+                        ? <span className="text-slate-300"> <b className="text-slate-200 font-semibold">{diff}</b> dias</span>
+                        : <span className="text-slate-300"> há <b className="text-slate-200 font-semibold">{Math.abs(diff)}</b> dias</span>)}
                       <span className="text-slate-400"> - </span>
                       {nextStr}
-                    </span>
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] tracking-wide border ${
+                    </Chip>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs tracking-wide border ${
                       (a.adSetStatus === 'PAUSED' || a.campaignStatus === 'PAUSED')
                         ? 'bg-amber-500/15 text-amber-200 border-amber-400/30'
                         : a.status === 'ok'
@@ -361,11 +349,11 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
                           : 'bg-rose-500/15 text-rose-200 border-rose-400/30'
                     }`}>
                       {(a.adSetStatus === 'PAUSED' || a.campaignStatus === 'PAUSED') ? (
-                        <PauseCircle className="w-3.5 h-3.5" />
+                        <PauseCircle className="w-4 h-4" />
                       ) : a.status === 'ok' ? (
-                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <CheckCircle2 className="w-4 h-4" />
                       ) : (
-                        <AlertTriangle className="w-3.5 h-3.5" />
+                        <AlertTriangle className="w-4 h-4" />
                       )}
                       {(a.adSetStatus === 'PAUSED' || a.campaignStatus === 'PAUSED') ? 'Pausado' : (a.status === 'ok' ? 'Analisado' : 'Pendente')}
                     </span>
@@ -373,7 +361,7 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
                   </div>
                   {/* Barra de progresso de orçamento (gasto vs pretendido) */}
                   <div className="w-full">
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                    <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
                       <span className="flex items-center gap-2">
                         Gastos neste mês
                         <span className="progress-animated-text font-medium">{new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(a.spend || 0)}</span>
@@ -394,7 +382,7 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
                             );
                           })()}
                           <button
-                            className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded hover:bg-slate-700/60"
+                            className="ml-1 inline-flex items-center justify-center w-6 h-6 rounded hover:bg-slate-700/60"
                             onClick={() => {
                               setEditingBudget(a.name);
                               const cents = Math.round(((a.plannedBudget || 0) as number) * 100);
@@ -402,22 +390,21 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
                             }}
                             title="Editar orçamento pretendido"
                           >
-                            <Pencil className="w-3.5 h-3.5 text-slate-300" />
+                            <Pencil className="w-4 h-4 text-slate-300" />
                           </button>
                         </span>
                       )}
                     </div>
-                    <div className="h-2 w-full bg-slate-700/50 rounded-full overflow-hidden">
-                      {(a.adSetStatus === 'PAUSED' || a.campaignStatus === 'PAUSED') ? (
-                        <div className="h-2 rounded-full progress-animated" style={{ width: `100%` }} />
-                      ) : (
-                        typeof a.plannedBudget === 'number' && a.plannedBudget > 0 ? (
-                          <div className="h-2 rounded-full progress-animated" style={{ width: `${Math.min(100, Math.round(((a.spend || 0) / a.plannedBudget) * 100))}%` }} />
-                        ) : (
-                          <div className="h-2 rounded-full progress-animated" style={{ width: `${(a.spend || 0) > 0 ? 100 : 0}%` }} />
-                        )
-                      )}
-                    </div>
+                    {(() => {
+                      const pct = (a.adSetStatus === 'PAUSED' || a.campaignStatus === 'PAUSED')
+                        ? 100
+                        : (typeof a.plannedBudget === 'number' && a.plannedBudget > 0)
+                          ? Math.min(100, Math.round(((a.spend || 0) / (a.plannedBudget || 1)) * 100))
+                          : ((a.spend || 0) > 0 ? 100 : 0);
+                      return (
+                        <ProgressBar value={pct} variant="muted" size="sm" />
+                      );
+                    })()}
 
                     {/* Editor inline de orçamento pretendido */}
                     {editingBudget === a.name && (

@@ -2053,7 +2053,8 @@ class MetaAdsService {
     }
 
     return this.makeCachedRequest('adSetDetails', async () => {
-      const fields = 'id,name,status,created_time,updated_time';
+      // Incluir targeting para obter age_min/age_max e geo_locations
+      const fields = 'id,name,status,created_time,updated_time,targeting';
       
       const url = `${this.baseURL}/${adSetId}`;
       const params = {
