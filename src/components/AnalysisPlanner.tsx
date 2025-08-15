@@ -10,6 +10,8 @@ interface AnalysisPlannerProps {
   selectedMonth?: string;
   selectedProduct: string;
   selectedAudience?: string;
+  isFacebookConnected?: boolean;
+  metaAdsUserId?: string;
 }
 
 type PlannerStorage = {
@@ -101,7 +103,7 @@ function recommendIntervalFromMetrics(metrics: MetricData[]): { days: number; re
   return { days: 7, reason: 'Métricas estáveis. Revisão semanal é suficiente.' };
 }
 
-const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', selectedMonth = '', selectedProduct, selectedAudience = '' }) => {
+const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', selectedMonth = '', selectedProduct, selectedAudience = '', isFacebookConnected = false, metaAdsUserId = '' }) => {
   const [lastAnalysisDate, setLastAnalysisDate] = useState<string>('');
   const [intervalDays, setIntervalDays] = useState<number>(DEFAULT_INTERVAL);
   const [loadingSuggestion, setLoadingSuggestion] = useState<boolean>(false);
@@ -141,10 +143,10 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
           console.log('🔄 Carregando dados do planejador...', { selectedClient, selectedProduct, selectedAudience });
           
           // 1ª tentativa: registro específico do público
-          let record = await analysisPlannerService.getPlanner(selectedClient, selectedProduct, selectedAudience);
+          let record = await analysisPlannerService.getPlanner(selectedClient, selectedProduct, selectedAudience, metaAdsUserId);
           // Fallback 1: nível do produto
           if (!record && selectedAudience) {
-            record = await analysisPlannerService.getPlanner(selectedClient, selectedProduct, undefined);
+            record = await analysisPlannerService.getPlanner(selectedClient, selectedProduct, undefined, metaAdsUserId);
           }
           // Fallback 2: procurar por adSetId atual entre todos os planners do produto
           if (!record) {
@@ -306,7 +308,8 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
         selectedClient,
         selectedProduct,
         selectedAudience,
-        { lastAnalysisDate: todayIso, intervalDays: newIntervalDays, adSetId }
+        { lastAnalysisDate: todayIso, intervalDays: newIntervalDays, adSetId },
+        metaAdsUserId
       );
       
       console.log('✅ Dados salvos com sucesso:', payload);

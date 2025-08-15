@@ -560,7 +560,19 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
       {/* Tooltip Portal global para ficar acima de tudo */}
       {tooltip.visible && createPortal(
         <div
-          style={{ position: 'fixed', left: tooltip.x, top: tooltip.y, zIndex: 2147483647 }}
+          className="dropdown-menu"
+          style={{ 
+            position: 'fixed', 
+            left: tooltip.x, 
+            top: tooltip.y, 
+            zIndex: 2147483647,
+            transform: 'translate3d(0, 0, 0)',
+            isolation: 'isolate',
+            contain: 'layout',
+            backfaceVisibility: 'hidden',
+            perspective: '1000px',
+            willChange: 'transform'
+          }}
         >
           <div className={`min-w-[240px] max-w-[320px] text-xs rounded-lg shadow-xl border ${
             tooltip.color==='emerald' ? 'border-emerald-500/40' : tooltip.color==='blue' ? 'border-blue-500/40' : 'border-slate-600/40'

@@ -30,9 +30,16 @@ try {
       // Se for o projeto antigo, deletar a instância
       if (existingProjectId === 'dashboard---g-trafego') {
         console.log('🗑️ Firebase: Deletando instância do projeto ANTIGO...');
-        const { deleteApp } = await import("firebase/app");
-        await deleteApp(existingApp);
-        console.log('✅ Firebase: Instância antiga deletada');
+        try {
+          const { deleteApp } = require("firebase/app");
+          deleteApp(existingApp).then(() => {
+            console.log('✅ Firebase: Instância antiga deletada');
+          }).catch((error: any) => {
+            console.warn('⚠️ Firebase: Erro ao deletar instância antiga:', error);
+          });
+        } catch (importError) {
+          console.warn('⚠️ Firebase: Não foi possível importar deleteApp:', importError);
+        }
       } else if (existingProjectId === firebaseConfig.projectId) {
         console.log('✅ Firebase: Instância com projeto correto encontrada');
         app = existingApp;

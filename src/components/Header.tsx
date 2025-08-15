@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, User, Search, LogOut, Facebook, Database, RefreshCw } from 'lucide-react';
+import { User, LogOut, Facebook, Database, RefreshCw, CheckSquare } from 'lucide-react';
 import MetaAdsConfig from './MetaAdsConfig';
 import ShareReport from './ShareReport';
 import MonthYearPicker from './MonthYearPicker';
 import ClientPicker from './ClientPicker';
 import ProductPicker from './ProductPicker';
 import AudiencePicker from './AudiencePicker';
+import TaskManager from './TaskManager';
 import { shareService } from '../services/shareService';
 import { MetricData } from '../services/metricsService';
 
@@ -60,6 +61,32 @@ const Header: React.FC<HeaderProps> = ({
 
 }) => {
   const [hasGeneratedLinks, setHasGeneratedLinks] = useState(false);
+  const [isTaskManagerOpen, setIsTaskManagerOpen] = useState(false);
+
+  // Debug: monitorar mudanças no estado do modal
+  useEffect(() => {
+    console.log('🔍 TaskManager Modal State:', isTaskManagerOpen);
+  }, [isTaskManagerOpen]);
+
+  // Função para obter o ID do usuário do Meta Ads
+  const getMetaAdsUserId = (): string => {
+    try {
+      const savedUser = localStorage.getItem('facebookUser');
+      const selectedAdAccount = localStorage.getItem('selectedAdAccount');
+      
+      if (savedUser && selectedAdAccount) {
+        const user = JSON.parse(savedUser);
+        const adAccount = JSON.parse(selectedAdAccount);
+        // Usar combinação do ID do usuário Facebook + ID da conta de anúncios
+        return `${user.id}_${adAccount.id}`;
+      }
+      
+      return currentUser?.uid || '';
+    } catch (error) {
+      console.error('Erro ao obter ID do usuário Meta Ads:', error);
+      return currentUser?.uid || '';
+    }
+  };
 
   // Verificar se há links gerados ao carregar o componente
   useEffect(() => {
@@ -90,6 +117,24 @@ const Header: React.FC<HeaderProps> = ({
     };
   }, []);
 
+  // Monitorar mudanças na conexão do Meta Ads
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'facebookUser' || e.key === 'selectedAdAccount') {
+        // Fechar modal de tarefas se estiver aberto quando houver mudança de conta
+        if (isTaskManagerOpen) {
+          setIsTaskManagerOpen(false);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [isTaskManagerOpen]);
+
   return (
     <header className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700/50 shadow-xl">
       <div className="max-w-7xl mx-auto px-8 py-6">
@@ -112,18 +157,33 @@ const Header: React.FC<HeaderProps> = ({
           {/* User Section */}
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <button className="p-3 text-slate-400 hover:text-slate-100 hover:bg-slate-700/50 rounded-xl transition-all duration-300 group shadow-sm hover:shadow-md">
-                <Search className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              <button 
+                onClick={() => {
+                  console.log('🔍 CLICK - Botão de tarefas clicado!', { isFacebookConnected, isTaskManagerOpen });
+                  if (isFacebookConnected) {
+                    setIsTaskManagerOpen(true);
+                  }
+                }}
+                className={`p-3 rounded-xl transition-all duration-300 group shadow-sm hover:shadow-md ${
+                  isFacebookConnected 
+                    ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/50 cursor-pointer' 
+                    : 'text-slate-600 cursor-not-allowed opacity-50'
+                }`}
+                title={isFacebookConnected ? "Tarefas" : "Conecte-se ao Meta Ads para usar tarefas"}
+                disabled={!isFacebookConnected}
+              >
+                <CheckSquare className={`w-5 h-5 transition-transform ${
+                  isFacebookConnected ? 'group-hover:scale-110' : ''
+                }`} />
               </button>
               <NotificationButton 
                 selectedClient={selectedClient}
                 selectedProduct={selectedProduct}
                 selectedAudience={selectedAudience}
+                selectedMonth={selectedMonth}
+                isFacebookConnected={isFacebookConnected}
+                metaAdsUserId={getMetaAdsUserId()}
               />
-
-              <button className="p-3 text-slate-400 hover:text-slate-100 hover:bg-slate-700/50 rounded-xl transition-all duration-300 group shadow-sm hover:shadow-md">
-                <Settings className="w-5 h-5 group-hover:scale-110 transition-transform" />
-              </button>
             </div>
 
             <div className="h-8 w-px bg-gradient-to-b from-slate-600 to-transparent"></div>
@@ -254,6 +314,16 @@ const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Task Manager Modal */}
+      {isFacebookConnected && (
+        <TaskManager
+          isOpen={isTaskManagerOpen}
+          onClose={() => setIsTaskManagerOpen(false)}
+          userId={getMetaAdsUserId()}
+          onMetaAdsDisconnect={() => setIsTaskManagerOpen(false)}
+        />
+      )}
     </header>
   );
 };

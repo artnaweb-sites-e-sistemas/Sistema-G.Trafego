@@ -27,11 +27,15 @@ function buildDocId(userId: string, client: string, product: string, audience?: 
 }
 
 export const analysisPlannerService = {
-  async getPlanner(client: string, product: string, audience?: string): Promise<AnalysisPlannerRecord | null> {
+  async getPlanner(client: string, product: string, audience?: string, metaAdsUserId?: string): Promise<AnalysisPlannerRecord | null> {
     try {
       const user = authService.getCurrentUser();
       if (!user?.uid) return null;
-      const id = buildDocId(user.uid, client, product, audience);
+      
+      // Usar metaAdsUserId se fornecido, caso contrário usar o ID do usuário Firebase
+      const userId = metaAdsUserId || user.uid;
+      
+      const id = buildDocId(userId, client, product, audience);
       
       const ref = doc(db, 'analysisPlanner', id);
       const snap = await getDoc(ref);
@@ -40,7 +44,7 @@ export const analysisPlannerService = {
       }
       const data = snap.data();
       return {
-        userId: user.uid,
+        userId,
         client,
         product,
         audience,
@@ -56,13 +60,17 @@ export const analysisPlannerService = {
     }
   },
 
-  async savePlanner(client: string, product: string, audience: string | undefined, payload: { lastAnalysisDate?: string; intervalDays?: number; plannedBudget?: number; adSetId?: string }): Promise<void> {
+  async savePlanner(client: string, product: string, audience: string | undefined, payload: { lastAnalysisDate?: string; intervalDays?: number; plannedBudget?: number; adSetId?: string }, metaAdsUserId?: string): Promise<void> {
     const user = authService.getCurrentUser();
     if (!user?.uid) return; // sem user logado, não persiste no Firestore
-    const id = buildDocId(user.uid, client, product, audience);
+    
+    // Usar metaAdsUserId se fornecido, caso contrário usar o ID do usuário Firebase
+    const userId = metaAdsUserId || user.uid;
+    
+    const id = buildDocId(userId, client, product, audience);
     const ref = doc(db, 'analysisPlanner', id);
     const data: any = {
-      userId: user.uid,
+      userId,
       client,
       product,
       audience: audience || null,
@@ -126,6 +134,40 @@ export const analysisPlannerService = {
         console.error('Erro ao listar planners (fallback):', e);
         return [];
       }
+    }
+  },
+
+  async listAllPlanners(metaAdsUserId?: string): Promise<AnalysisPlannerRecord[]> {
+    const user = authService.getCurrentUser();
+    if (!user?.uid) return [];
+    
+    // Usar metaAdsUserId se fornecido, caso contrário usar o ID do usuário Firebase
+    const userId = metaAdsUserId || user.uid;
+    
+    try {
+      const q = query(
+        collection(db, 'analysisPlanner'),
+        where('userId', '==', userId)
+      );
+      const snap = await getDocs(q);
+      const results = snap.docs.map(d => {
+        const data: any = d.data();
+        return {
+          userId: data.userId,
+          client: data.client,
+          product: data.product,
+          audience: data.audience || undefined,
+          lastAnalysisDate: data.lastAnalysisDate || undefined,
+          intervalDays: typeof data.intervalDays === 'number' ? data.intervalDays : undefined,
+          plannedBudget: typeof data.plannedBudget === 'number' ? data.plannedBudget : undefined,
+          adSetId: typeof data.adSetId === 'string' ? data.adSetId : undefined,
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date()
+        } as AnalysisPlannerRecord;
+      });
+      return results;
+    } catch (err: any) {
+      console.error('Erro ao listar todos os planners:', err);
+      return [];
     }
   }
 };

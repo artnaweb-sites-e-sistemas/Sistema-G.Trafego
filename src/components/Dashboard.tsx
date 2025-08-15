@@ -29,6 +29,26 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [dataSource, setDataSource] = useState<'manual' | 'facebook' | null>(null);
   const [isFacebookConnected, setIsFacebookConnected] = useState(false);
 
+  // Função para obter o ID do usuário do Meta Ads
+  const getMetaAdsUserId = (): string => {
+    try {
+      const savedUser = localStorage.getItem('facebookUser');
+      const selectedAdAccount = localStorage.getItem('selectedAdAccount');
+      
+      if (savedUser && selectedAdAccount) {
+        const user = JSON.parse(savedUser);
+        const adAccount = JSON.parse(selectedAdAccount);
+        // Usar combinação do ID do usuário Facebook + ID da conta de anúncios
+        return `${user.id}_${adAccount.id}`;
+      }
+      
+      return currentUser?.uid || '';
+    } catch (error) {
+      console.error('Erro ao obter ID do usuário Meta Ads:', error);
+      return currentUser?.uid || '';
+    }
+  };
+
   // Verificar status de conexão do Meta Ads ao carregar
   useEffect(() => {
     const checkMetaAdsConnection = async () => {
@@ -1121,6 +1141,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                         selectedClient={selectedClient}
                         selectedMonth={selectedMonth}
                         selectedAudience={selectedAudience}
+                        isFacebookConnected={isFacebookConnected}
+                        metaAdsUserId={getMetaAdsUserId()}
                       />
                     )}
                     <MonthlyDetailsTable 

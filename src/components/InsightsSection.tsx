@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Lightbulb } from 'lucide-react';
 import { type BenchmarkResults } from '../services/aiBenchmarkService';
 import AnalysisPlanner from './AnalysisPlanner';
@@ -10,10 +10,11 @@ interface InsightsSectionProps {
   selectedClient?: string;
   selectedMonth?: string;
   selectedAudience?: string;
+  isFacebookConnected?: boolean;
+  metaAdsUserId?: string;
 }
 
-const InsightsSection: React.FC<InsightsSectionProps> = ({ selectedProduct, results, selectedClient = '', selectedMonth = '', selectedAudience = '' }) => {
-  const insights = results?.insights ?? [];
+const InsightsSection: React.FC<InsightsSectionProps> = ({ selectedProduct, results, selectedClient = '', selectedMonth = '', selectedAudience = '', isFacebookConnected = false, metaAdsUserId = '' }) => {
 
   const [autoSuggestions, setAutoSuggestions] = useState<string[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState<boolean>(false);
@@ -50,7 +51,7 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({ selectedProduct, resu
   }, [selectedClient, selectedProduct, selectedAudience, selectedMonth]);
 
   return (
-    <div className="relative overflow-hidden bg-slate-900/80 border border-slate-700/50 rounded-2xl shadow-xl">
+    <div data-section="insights" className="relative overflow-hidden bg-slate-900/80 border border-slate-700/50 rounded-2xl shadow-xl">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute -top-12 -right-12 w-64 h-64 rounded-full bg-gradient-to-br from-amber-500/10 to-orange-500/10 blur-3xl" />
         <div className="absolute -bottom-12 -left-12 w-64 h-64 rounded-full bg-gradient-to-br from-yellow-500/10 to-emerald-500/10 blur-3xl" />
@@ -89,6 +90,8 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({ selectedProduct, resu
             selectedMonth={selectedMonth}
             selectedProduct={selectedProduct}
             selectedAudience={selectedAudience}
+            isFacebookConnected={isFacebookConnected}
+            metaAdsUserId={metaAdsUserId}
           />
         )}
 
