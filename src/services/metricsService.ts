@@ -687,12 +687,21 @@ export const metricsService = {
   },
 
   setCache(key: string, data: MetricData[]): void {
+    console.log('🧹 CACHE DEBUG - setCache - Salvando no cache:', {
+      key,
+      dataCount: data.length,
+      firstMetric: data[0] ? {
+        month: data[0].month,
+        client: data[0].client,
+        date: data[0].date
+      } : null
+    });
+    
     this.cache.set(key, {
       data,
       timestamp: Date.now(),
       ttl: this.CACHE_TTL
     });
-
   },
 
   // Cache auxiliar para histórico por produto (todas os períodos)
@@ -702,14 +711,51 @@ export const metricsService = {
 
   // Método para limpar cache de métricas
   clearCache(): void {
+    const cacheSize = this.cache.size;
     this.cache.clear();
-
+    console.log(`🧹 CACHE DEBUG - clearCache - Cache limpo (${cacheSize} itens removidos)`);
   },
 
   // Método para forçar refresh dos dados
   forceRefresh(): void {
     this.cache.clear();
     console.log('Cache limpo - forçando refresh dos dados');
+  },
+
+  // NOVA FUNÇÃO: Limpeza completa de cache E localStorage
+  clearAllCacheAndStorage(): void {
+    console.log('🧹 CACHE DEBUG - clearAllCacheAndStorage - LIMPEZA COMPLETA INICIADA');
+    
+    // Limpar cache em memória
+    const cacheSize = this.cache.size;
+    this.cache.clear();
+    console.log(`🧹 CACHE DEBUG - Cache em memória limpo (${cacheSize} itens)`);
+    
+    // Limpar localStorage relacionado a métricas
+    const keysToRemove = [
+      'metaAdsDataRefreshed',
+      'selectedAdSetId', 
+      'selectedCampaignId',
+      'audiencePickerState',
+      'productPickerState',
+      'currentSelectedClient',
+      'currentSelectedMonth'
+    ];
+    
+    let removedCount = 0;
+    keysToRemove.forEach(key => {
+      try {
+        if (localStorage.getItem(key) !== null) {
+          localStorage.removeItem(key);
+          removedCount++;
+          console.log(`🧹 CACHE DEBUG - localStorage removido: ${key}`);
+        }
+      } catch (e) {
+        console.log(`🧹 CACHE DEBUG - Erro ao remover ${key}:`, e);
+      }
+    });
+    
+    console.log(`🧹 CACHE DEBUG - clearAllCacheAndStorage - CONCLUÍDA (${removedCount} localStorage itens removidos)`);
   },
 
   // Método para limpar cache por cliente específico
@@ -790,10 +836,22 @@ export const metricsService = {
     try {
       // Verificar cache primeiro
       const cacheKey = this.getCacheKey(month, client, product, audience);
+      console.log('🧹 CACHE DEBUG - getMetrics - Verificando cache com chave:', cacheKey);
       const cached = this.getFromCache(cacheKey);
       if (cached) {
+        console.log('🧹 CACHE DEBUG - getMetrics - DADOS RETORNADOS DO CACHE:', {
+          cacheKey,
+          dataCount: cached.length,
+          firstMetric: cached[0] ? {
+            month: cached[0].month,
+            client: cached[0].client,
+            date: cached[0].date
+          } : null
+        });
         return cached;
       }
+      
+      console.log('🧹 CACHE DEBUG - getMetrics - Cache MISS - buscando dados frescos');
       
       // Se cliente específico selecionado, podemos verificar monthlyDetails apenas para logging, mas não bloquear busca no Meta Ads
       if (client !== 'Todos os Clientes') {
@@ -2133,12 +2191,22 @@ export const metricsService = {
 
     // CORREÇÃO: Filtrar métricas por cliente para evitar dados incorretos
     const currentClient = localStorage.getItem('currentSelectedClient');
+    const currentMonth = localStorage.getItem('currentSelectedMonth');
     console.log('🔍 DEBUG - calculateAggregatedMetrics - Cliente atual do localStorage:', currentClient);
+    console.log('🔍 DEBUG - calculateAggregatedMetrics - Mês atual do localStorage:', currentMonth);
     
-    // Filtrar apenas métricas do cliente atual
-    const filteredMetrics = currentClient && currentClient !== 'Selecione um cliente' 
-      ? metrics.filter(metric => metric.client === currentClient)
-      : metrics;
+    // Filtrar apenas métricas do cliente E mês atuais
+    let filteredMetrics = metrics;
+    
+    if (currentClient && currentClient !== 'Selecione um cliente') {
+      filteredMetrics = filteredMetrics.filter(metric => metric.client === currentClient);
+      console.log('🔍 DEBUG - calculateAggregatedMetrics - Filtradas por cliente:', filteredMetrics.length);
+    }
+    
+    if (currentMonth && currentMonth !== 'Selecione um mês') {
+      filteredMetrics = filteredMetrics.filter(metric => metric.month === currentMonth);
+      console.log('🔍 DEBUG - calculateAggregatedMetrics - Filtradas por mês:', filteredMetrics.length);
+    }
     
     console.log(`🔍 DEBUG - calculateAggregatedMetrics - Métricas filtradas: ${filteredMetrics.length} de ${metrics.length} total`);
     

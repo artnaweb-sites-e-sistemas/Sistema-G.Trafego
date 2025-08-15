@@ -877,33 +877,28 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
         hasStats: !!rec?.stats,
         spend: rec?.stats?.spend,
         adSetsCount: rec?.stats?.adSetsCount,
-        hasSpendInPeriod: rec?.stats?.spend >= 0.01,
-        hasAdSetsInPeriod: rec?.stats?.adSetsCount > 0,
-        createdInPeriod
+        createdInPeriod,
+        strategyMonth: s.month,
+        currentMonth: selectedMonth
       });
 
-      // Regra 1: se foi criada no mês selecionado, mostrar mesmo sem métricas
+      // NOVA LÓGICA SIMPLIFICADA:
+      // 1. Se foi criada no período atual, sempre mostrar
       if (createdInPeriod) {
-        console.log(`✅ Estratégia ${s.id} exibida: criada no período`);
+        console.log(`✅ Estratégia ${s.id} exibida: criada no período atual`);
         return true;
       }
 
-      // Regra 2: para outros meses, só mostrar se houver métricas (gasto) no período
-      if (!rec || !rec.stats) {
-        console.log(`❌ Estratégia ${s.id} filtrada: sem recomendações/stats para mês sem criação`);
-        return false;
+      // 2. Se é uma estratégia salva/existente, sempre mostrar 
+      // (estratégias salvas devem aparecer para permitir análise histórica)
+      if (s.id && s.generatedNames?.audience) {
+        console.log(`✅ Estratégia ${s.id} exibida: estratégia salva existente`);
+        return true;
       }
 
-      const hasSpendInPeriod = rec.stats.spend >= 0.01;
-
-      const shouldShow = hasSpendInPeriod;
-
-      console.log(`🔍 DEBUG - Resultado filtragem ${s.id}:`, {
-        shouldShow,
-        reason: hasSpendInPeriod ? 'com gasto' : 'sem gasto'
-      });
-
-      return shouldShow;
+      // 3. Fallback: ocultar apenas se não for uma estratégia válida
+      console.log(`❌ Estratégia ${s.id} filtrada: não é uma estratégia válida`);
+      return false;
     });
     
     console.log(`🔍 DEBUG - Total de estratégias após filtragem: ${filtered.length}`);

@@ -343,18 +343,23 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   useEffect(() => {
     console.log('🔍 DEBUG - Dashboard - useEffect loadRealValuesForClient INICIADO');
     console.log('🔍 DEBUG - Dashboard - Estados atuais:', { selectedClient, selectedMonth, realValuesRefreshTrigger });
-    console.log('🔍 DEBUG - Dashboard - Stack trace:', new Error().stack?.split('\n').slice(1, 4).join('\n'));
     console.log('🎯 CARD DEBUG - Dashboard - Trigger para atualização dos cards ativado:', { realValuesRefreshTrigger });
     
     // Evitar execução desnecessária se não há cliente selecionado
     if (!selectedClient || selectedClient === 'Selecione um cliente' || selectedClient === 'Todos os Clientes') {
-      console.log('🔍 DEBUG - Dashboard - Cliente não selecionado, pulando carregamento');
+      console.log('🔍 DEBUG - Dashboard - Cliente não selecionado, definindo valores zerados');
       setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
       return;
     }
     
+    // CORREÇÃO: Verificar se já temos dados válidos para evitar carregamentos desnecessários
+    if (realValuesForClient.agendamentos > 0 || realValuesForClient.vendas > 0) {
+      console.log('🎯 CARD DEBUG - Dashboard - Valores já carregados, pulando nova busca:', realValuesForClient);
+      return;
+    }
+    
     // Evitar loop infinito - limitar o número de chamadas consecutivas
-    if (realValuesRefreshTrigger > 300) {
+    if (realValuesRefreshTrigger > 50) {
       console.log('🔍 DEBUG - Dashboard - Muitas chamadas consecutivas detectadas, pausando...');
       return;
     }
@@ -369,7 +374,11 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       try {
         console.log('🔍 DEBUG - Dashboard - Carregando valores reais para cliente:', selectedClient);
         
-        // CORREÇÃO: Limpar cache quando cliente muda para evitar dados incorretos
+        // CORREÇÃO: Limpar cache completamente para evitar dados incorretos de contextos anteriores
+        console.log('🧹 CACHE DEBUG - Dashboard - FORCE CLEAR - Limpando TODO o cache antes de carregar valores...');
+        metricsService.clearCache();
+        
+        // CORREÇÃO: Também limpar cache específico do cliente
         console.log('🔍 DEBUG - Dashboard - Limpando cache para novo cliente...');
         metricsService.clearCacheByClient(selectedClient);
         
@@ -445,6 +454,29 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
     loadRealValuesForClient();
   }, [selectedMonth, selectedClient, realValuesRefreshTrigger]);
+
+  // CORREÇÃO: Reset completo de cache e valores quando cliente ou mês mudam
+  useEffect(() => {
+    console.log('🔍 DEBUG - Dashboard - Reset valores por mudança cliente/mês');
+    
+    // CORREÇÃO: Limpar TODO o cache E localStorage quando cliente ou mês mudam
+    console.log('🧹 CACHE DEBUG - Dashboard - Limpando COMPLETAMENTE todo o cache E localStorage por mudança de contexto');
+    metricsService.clearAllCacheAndStorage();
+    
+    // CORREÇÃO: Salvar cliente e mês atuais no localStorage para filtros
+    if (selectedClient && selectedClient !== 'Selecione um cliente') {
+      localStorage.setItem('currentSelectedClient', selectedClient);
+      console.log('🔍 DEBUG - Dashboard - Cliente salvo no localStorage:', selectedClient);
+    }
+    
+    if (selectedMonth && selectedMonth !== 'Selecione um mês') {
+      localStorage.setItem('currentSelectedMonth', selectedMonth);
+      console.log('🔍 DEBUG - Dashboard - Mês salvo no localStorage:', selectedMonth);
+    }
+    
+    setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
+    setRealValuesRefreshTrigger(prev => prev + 1);
+  }, [selectedClient, selectedMonth]);
 
   // Listener para atualizar valores reais quando dados dos públicos mudarem
   useEffect(() => {
@@ -911,10 +943,51 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         }
       };
 
+      // 🧹 NOVA FUNÇÃO DEBUG: Limpeza de emergência do cache
+      (window as any).clearAllCache = () => {
+        console.log('🧹 EMERGÊNCIA - Limpando TODO o cache e localStorage...');
+        metricsService.clearAllCacheAndStorage();
+        
+        // Forçar reload da página para garantir estado limpo
+        if (confirm('Cache limpo! Recarregar a página para garantir estado limpo?')) {
+          window.location.reload();
+        }
+      };
+
+      // 🎯 NOVA FUNÇÃO DEBUG: Verificar estratégias carregadas
+      (window as any).debugStrategies = async (client?: string) => {
+        const targetClient = client || selectedClient;
+        console.log(`🎯 DEBUG - Verificando estratégias para cliente: ${targetClient}`);
+        
+        try {
+          const { firestoreStrategyService } = await import('../services/firestoreStrategyService');
+          const strategies = await firestoreStrategyService.getStrategiesByClient(targetClient);
+          
+          console.log(`🎯 DEBUG - Estratégias encontradas no Firestore: ${strategies.length}`);
+          strategies.forEach((strategy, index) => {
+            console.log(`🎯 DEBUG - Estratégia ${index + 1}:`, {
+              id: strategy.id,
+              name: strategy.generatedNames?.audience || 'Nome não gerado',
+              product: strategy.product?.name || 'Produto sem nome',
+              month: strategy.month,
+              client: strategy.client,
+              synchronized: strategy.isSynchronized
+            });
+          });
+          
+          return strategies;
+        } catch (error) {
+          console.error('❌ Erro ao buscar estratégias:', error);
+          return [];
+        }
+      };
+
       console.log('🔧 DEBUG - Funções de debug adicionadas ao window:');
       console.log('  - debugAudienceValues("Janeiro 2025", "Nome do Produto") - Ver dados no Firebase');
       console.log('  - resetProductData("Janeiro 2025", "Nome do Produto") - Limpar TODOS os dados e recomeçar');
       console.log('  - deleteOldAudience() - Deletar o público antigo "[Anúncio Jurídico] UTI Negada"');
+      console.log('  - clearAllCache() - 🧹 EMERGÊNCIA: Limpar TODO o cache e localStorage');
+      console.log('  - debugStrategies("Cliente Nome") - 🎯 VERIFICAR: Estratégias carregadas do Firestore');
     }
   }, [selectedMonth, selectedProduct]);
 
