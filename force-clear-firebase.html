@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧹 Limpeza Completa Firebase</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        .action-section {
+            background: #2d2d2d;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #ff6b6b;
+        }
+        .success {
+            color: #51cf66;
+            font-weight: bold;
+        }
+        .error {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+        .warning {
+            color: #ffd43b;
+            font-weight: bold;
+        }
+        button {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #fa5252;
+        }
+        button.safe {
+            background: #51cf66;
+        }
+        button.safe:hover {
+            background: #40c057;
+        }
+        pre {
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            border: 1px solid #444;
+        }
+        .emergency {
+            background: #2d1b1b;
+            border-left-color: #ff4757;
+            border: 2px solid #ff4757;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚨 LIMPEZA DE EMERGÊNCIA - FIREBASE</h1>
+    
+    <div class="action-section emergency">
+        <h2>⚠️ SITUAÇÃO CRÍTICA</h2>
+        <p>O Firebase ainda está conectando ao projeto antigo (<code>dashboard---g-trafego</code>) mesmo após atualização.</p>
+        <p><strong>Esta página vai forçar a limpeza completa e conectar ao novo projeto.</strong></p>
+    </div>
+
+    <div class="action-section">
+        <h2>🧹 Limpeza Completa</h2>
+        <button onclick="clearEverything()">LIMPAR TUDO E REINICIAR</button>
+        <div id="clear-status"></div>
+    </div>
+
+    <div class="action-section">
+        <h2>🔧 Verificar Projeto Atual</h2>
+        <button class="safe" onclick="checkFirebaseProject()">Verificar Projeto Firebase</button>
+        <div id="project-status"></div>
+    </div>
+
+    <div class="action-section">
+        <h2>📊 Logs</h2>
+        <pre id="logs"></pre>
+        <button class="safe" onclick="clearLogs()">Limpar Logs</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp, getApps, getApp, deleteApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Nova configuração correta
+        const firebaseConfig = {
+            apiKey: "AIzaSyAvf81ALIWW7HP7cwze9VP_YUfv3BWU7rU",
+            authDomain: "dashboard-gtrafego.firebaseapp.com",
+            projectId: "dashboard-gtrafego",
+            storageBucket: "dashboard-gtrafego.firebasestorage.app",
+            messagingSenderId: "585100264503",
+            appId: "1:585100264503:web:b9baaadf113cb1f2e02bb2"
+        };
+
+        function addLog(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            logsDiv.textContent += logEntry;
+            console.log(message);
+        }
+
+        window.clearEverything = async function() {
+            const statusDiv = document.getElementById('clear-status');
+            statusDiv.innerHTML = '<span class="warning">🧹 Limpando tudo...</span>';
+            
+            try {
+                addLog('🚨 INICIANDO LIMPEZA DE EMERGÊNCIA');
+                
+                // 1. Deletar todas as instâncias do Firebase
+                addLog('🔥 Deletando instâncias existentes do Firebase...');
+                const apps = getApps();
+                for (const app of apps) {
+                    addLog(`Deletando app: ${app.name} (projeto: ${app.options.projectId})`);
+                    await deleteApp(app);
+                }
+                
+                // 2. Limpar TODOS os dados do browser
+                addLog('📦 Limpando localStorage...');
+                localStorage.clear();
+                
+                addLog('📦 Limpando sessionStorage...');
+                sessionStorage.clear();
+                
+                addLog('🍪 Limpando cookies...');
+                document.cookie.split(";").forEach((c) => {
+                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+                });
+                
+                // 3. Limpar IndexedDB (onde Firebase pode armazenar cache)
+                addLog('🗄️ Limpando IndexedDB...');
+                if ('indexedDB' in window) {
+                    const databases = await indexedDB.databases();
+                    for (const db of databases) {
+                        if (db.name && db.name.includes('firebase')) {
+                            addLog(`Deletando database: ${db.name}`);
+                            indexedDB.deleteDatabase(db.name);
+                        }
+                    }
+                }
+                
+                // 4. Limpar Service Workers
+                if ('serviceWorker' in navigator) {
+                    addLog('⚙️ Limpando Service Workers...');
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (const registration of registrations) {
+                        await registration.unregister();
+                    }
+                }
+                
+                // 5. Limpar Cache API
+                if ('caches' in window) {
+                    addLog('💾 Limpando Cache API...');
+                    const cacheNames = await caches.keys();
+                    for (const cacheName of cacheNames) {
+                        await caches.delete(cacheName);
+                    }
+                }
+                
+                addLog('✅ LIMPEZA COMPLETA FINALIZADA');
+                statusDiv.innerHTML = '<span class="success">✅ Tudo limpo! Recarregando página...</span>';
+                
+                // Aguardar um pouco e recarregar
+                setTimeout(() => {
+                    window.location.reload(true);
+                }, 3000);
+                
+            } catch (error) {
+                addLog(`❌ Erro durante limpeza: ${error.message}`, 'error');
+                statusDiv.innerHTML = `<span class="error">❌ Erro: ${error.message}</span>`;
+            }
+        };
+
+        window.checkFirebaseProject = async function() {
+            const statusDiv = document.getElementById('project-status');
+            
+            try {
+                addLog('🔍 Verificando projeto Firebase atual...');
+                
+                // Limpar instâncias existentes primeiro
+                const existingApps = getApps();
+                for (const app of existingApps) {
+                    addLog(`Removendo app existente: ${app.options.projectId}`);
+                    await deleteApp(app);
+                }
+                
+                // Criar nova instância com configuração correta
+                addLog('🔥 Criando nova instância Firebase...');
+                const app = initializeApp(firebaseConfig);
+                const db = getFirestore(app);
+                
+                const projectId = app.options.projectId;
+                addLog(`✅ Firebase conectado ao projeto: ${projectId}`);
+                
+                if (projectId === 'dashboard-gtrafego') {
+                    statusDiv.innerHTML = '<span class="success">✅ Conectado ao projeto CORRETO: dashboard-gtrafego</span>';
+                } else {
+                    statusDiv.innerHTML = `<span class="error">❌ Conectado ao projeto ERRADO: ${projectId}</span>`;
+                }
+                
+            } catch (error) {
+                addLog(`❌ Erro ao verificar projeto: ${error.message}`, 'error');
+                statusDiv.innerHTML = `<span class="error">❌ Erro: ${error.message}</span>`;
+            }
+        };
+
+        window.clearLogs = function() {
+            document.getElementById('logs').textContent = '';
+        };
+
+        // Log inicial
+        addLog('🚨 Página de limpeza de emergência carregada');
+        addLog('⚠️ Use "LIMPAR TUDO E REINICIAR" para resolver o problema');
+    </script>
+</body>
+</html>

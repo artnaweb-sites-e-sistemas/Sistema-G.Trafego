@@ -103,6 +103,16 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, subtitle, trend, 
 };
 
 const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, selectedMonth, realAgendamentos, realVendas, realCPV, realROI }) => {
+  console.log('🎯 CARD DEBUG - MetricsGrid - Props recebidas:', {
+    selectedClient,
+    selectedMonth,
+    realAgendamentos,
+    realVendas,
+    realCPV,
+    realROI,
+    metricsLength: metrics?.length || 0
+  });
+  
   // CORREÇÃO: Garantir que aggregated seja calculado corretamente mesmo sem métricas
   const aggregated = metricsService.calculateAggregatedMetrics(metrics || []);
   
@@ -148,12 +158,15 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
     { 
       title: 'CPV', 
       value: (() => {
+        console.log('🎯 CARD DEBUG - MetricsGrid - CPV Card:', { realCPV, realCPVType: typeof realCPV });
         // CORREÇÃO: Se temos um valor real do CPV da planilha, usar ele
         if (realCPV !== undefined && realCPV > 0) {
+          console.log('🎯 CARD DEBUG - MetricsGrid - CPV usando valor real:', formatCurrency(realCPV));
           return formatCurrency(realCPV);
         }
         
         // CORREÇÃO: Se não temos valor real, retornar valor zerado
+        console.log('🎯 CARD DEBUG - MetricsGrid - CPV usando valor zerado');
         return formatCurrency(0);
       })(), 
       trend: 'neutral' as const, // CORREÇÃO: Sempre neutral para CPV
@@ -162,12 +175,15 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
     { 
       title: 'ROI/ROAS', 
       value: (() => {
+        console.log('🎯 CARD DEBUG - MetricsGrid - ROI/ROAS Card:', { realROI, realROIType: typeof realROI });
         // CORREÇÃO: Se temos um valor real do ROI da planilha, usar ele
         if (realROI !== undefined && realROI !== 'NaN%' && realROI !== '0% (0.0x)') {
+          console.log('🎯 CARD DEBUG - MetricsGrid - ROI/ROAS usando valor real:', realROI);
           return realROI;
         }
         
         // CORREÇÃO: Se não temos valor real, retornar valor zerado
+        console.log('🎯 CARD DEBUG - MetricsGrid - ROI/ROAS usando valor zerado');
         return '0% (0.0x)';
       })(), 
       trend: (() => {
@@ -198,12 +214,15 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
     { 
       title: 'Agendamentos', 
       value: (() => {
+        console.log('🎯 CARD DEBUG - MetricsGrid - Agendamentos Card:', { realAgendamentos, realAgendamentosType: typeof realAgendamentos });
         // CORREÇÃO: Se temos um valor real da planilha, usar ele
         if (realAgendamentos !== undefined && realAgendamentos > 0) {
+          console.log('🎯 CARD DEBUG - MetricsGrid - Agendamentos usando valor real:', realAgendamentos.toString());
           return realAgendamentos.toString();
         }
         
         // CORREÇÃO: Se não temos valor real, retornar zero
+        console.log('🎯 CARD DEBUG - MetricsGrid - Agendamentos usando valor zerado');
         return '0';
       })(), 
       trend: (() => {
@@ -225,12 +244,15 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
     { 
       title: 'Quantidade de Vendas', 
       value: (() => {
+        console.log('🎯 CARD DEBUG - MetricsGrid - Vendas Card:', { realVendas, realVendasType: typeof realVendas });
         // CORREÇÃO: Se temos um valor real da planilha, usar ele
         if (realVendas !== undefined && realVendas > 0) {
+          console.log('🎯 CARD DEBUG - MetricsGrid - Vendas usando valor real:', realVendas.toString());
           return realVendas.toString();
         }
         
         // CORREÇÃO: Se não temos valor real, retornar zero
+        console.log('🎯 CARD DEBUG - MetricsGrid - Vendas usando valor zerado');
         return '0';
       })(), 
       trend: (() => {

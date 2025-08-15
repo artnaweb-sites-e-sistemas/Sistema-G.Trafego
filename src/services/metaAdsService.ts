@@ -96,6 +96,13 @@ class MetaAdsService {
   constructor() {
     // Carregar rate limit persistente na inicialização
     this.loadPersistentRateLimit();
+    
+    console.log('🔄 DEBUG - MetaAdsService constructor - Rate limit carregado:', {
+      oauthAttempts: this.oauthAttempts,
+      lastOAuthAttempt: this.lastOAuthAttempt,
+      facebookRateLimitActive: this.facebookRateLimitActive,
+      facebookRateLimitUntil: this.facebookRateLimitUntil
+    });
   }
   
   // Sistema de cache para reduzir chamadas à API
@@ -131,15 +138,29 @@ class MetaAdsService {
   private loadPersistentRateLimit(): void {
     try {
       const stored = localStorage.getItem(this.RATE_LIMIT_STORAGE_KEY);
+      console.log('🔄 DEBUG - loadPersistentRateLimit - Dados no localStorage:', stored);
+      
       if (stored) {
         const data = JSON.parse(stored);
+        console.log('🔄 DEBUG - loadPersistentRateLimit - Dados parseados:', data);
+        
         this.oauthAttempts = data.oauthAttempts || 0;
         this.lastOAuthAttempt = data.lastOAuthAttempt || 0;
         this.facebookRateLimitActive = data.facebookRateLimitActive || false;
         this.facebookRateLimitUntil = data.facebookRateLimitUntil || 0;
+        
+        console.log('🔄 DEBUG - loadPersistentRateLimit - Rate limit carregado:', {
+          oauthAttempts: this.oauthAttempts,
+          lastOAuthAttempt: this.lastOAuthAttempt,
+          facebookRateLimitActive: this.facebookRateLimitActive,
+          facebookRateLimitUntil: this.facebookRateLimitUntil
+        });
+      } else {
+        console.log('🔄 DEBUG - loadPersistentRateLimit - Nenhum dado persistente encontrado');
       }
     } catch (error) {
-      }
+      console.error('🔄 DEBUG - loadPersistentRateLimit - Erro ao carregar:', error);
+    }
   }
 
   // Método para salvar rate limit persistente
@@ -152,9 +173,13 @@ class MetaAdsService {
         facebookRateLimitUntil: this.facebookRateLimitUntil,
         timestamp: Date.now()
       };
+      
+      console.log('🔄 DEBUG - savePersistentRateLimit - Salvando dados:', data);
       localStorage.setItem(this.RATE_LIMIT_STORAGE_KEY, JSON.stringify(data));
+      console.log('🔄 DEBUG - savePersistentRateLimit - Dados salvos com sucesso');
     } catch (error) {
-      }
+      console.error('🔄 DEBUG - savePersistentRateLimit - Erro ao salvar:', error);
+    }
   }
 
   // Método para verificar rate limit global (por IP/usuário)
@@ -607,11 +632,82 @@ class MetaAdsService {
 
   // Resetar rate limit do OAuth
   resetOAuthRateLimit(): void {
+    console.log('🔄 DEBUG - resetOAuthRateLimit - Resetando contador de rate limit');
+    
+    // Resetar variáveis em memória
     this.oauthAttempts = 0;
     this.lastOAuthAttempt = 0;
     this.facebookRateLimitActive = false;
     this.facebookRateLimitUntil = 0;
+    
+    // 🎯 CORREÇÃO: Limpar persistência no localStorage
+    try {
+      localStorage.removeItem(this.RATE_LIMIT_STORAGE_KEY);
+      localStorage.removeItem(this.GLOBAL_RATE_LIMIT_KEY);
+      console.log('🔄 DEBUG - resetOAuthRateLimit - localStorage limpo com sucesso');
+    } catch (error) {
+      console.error('🔄 DEBUG - resetOAuthRateLimit - Erro ao limpar localStorage:', error);
     }
+    
+    // 🎯 CORREÇÃO: Salvar estado resetado no localStorage
+    this.savePersistentRateLimit();
+    
+    console.log('🔄 DEBUG - resetOAuthRateLimit - Reset concluído:', {
+      oauthAttempts: this.oauthAttempts,
+      lastOAuthAttempt: this.lastOAuthAttempt,
+      facebookRateLimitActive: this.facebookRateLimitActive,
+      facebookRateLimitUntil: this.facebookRateLimitUntil
+    });
+  }
+
+  // 🎯 NOVA FUNÇÃO: Resetar rate limit da API do Meta Ads
+  resetApiRateLimit(): void {
+    console.log('🔄 DEBUG - resetApiRateLimit - Resetando rate limit da API do Meta Ads');
+    
+    try {
+      // Limpar rate limit global para todos os usuários
+      const userIdentifier = this.getUserIdentifier();
+      const globalKey = `${this.GLOBAL_RATE_LIMIT_KEY}_${userIdentifier}`;
+      localStorage.removeItem(globalKey);
+      
+      // Resetar rate limit do Facebook também
+      this.facebookRateLimitActive = false;
+      this.facebookRateLimitUntil = 0;
+      
+      // Salvar estado resetado
+      this.savePersistentRateLimit();
+      
+      console.log('🔄 DEBUG - resetApiRateLimit - API rate limit resetado com sucesso');
+      console.log('🔄 DEBUG - resetApiRateLimit - globalKey removido:', globalKey);
+      
+    } catch (error) {
+      console.error('🔄 DEBUG - resetApiRateLimit - Erro ao resetar rate limit da API:', error);
+    }
+  }
+
+  // 🎯 NOVA FUNÇÃO: Verificar status do rate limit da API
+  async getApiRateLimitStatus(): Promise<{
+    isActive: boolean;
+    remainingTime?: number;
+    canMakeRequest: boolean;
+  }> {
+    try {
+      const globalRateLimit = await this.checkGlobalRateLimit();
+      const now = Date.now();
+      
+      return {
+        isActive: globalRateLimit || (this.facebookRateLimitActive && now < this.facebookRateLimitUntil),
+        remainingTime: this.facebookRateLimitActive ? Math.max(0, this.facebookRateLimitUntil - now) : 0,
+        canMakeRequest: !globalRateLimit && !(this.facebookRateLimitActive && now < this.facebookRateLimitUntil)
+      };
+    } catch (error) {
+      console.error('Erro ao verificar status do rate limit da API:', error);
+      return {
+        isActive: false,
+        canMakeRequest: true
+      };
+    }
+  }
 
   // Obter status do rate limit do OAuth
   async getOAuthRateLimitStatus(): Promise<{ 
@@ -826,15 +922,41 @@ class MetaAdsService {
             adAccounts = response.data.data || [];
           }
       
-          return adAccounts.map((account: any) => ({
+          const normalized = adAccounts.map((account: any) => ({
             ...account,
             business_id: businessId
           }));
+          // Salvar no cache local para fallback futuro
+          try {
+            const existing = (this.getDataFromStorage('ad_accounts_by_business') as any[] | null) || [];
+            // Mesclar mantendo distintas por id
+            const mergedMap = new Map<string, any>();
+            for (const acc of [...existing, ...normalized]) {
+              const key = acc.id || acc.account_id;
+              if (key) mergedMap.set(key, acc);
+            }
+            const merged = Array.from(mergedMap.values());
+            this.saveDataAfterLoad('ad_accounts_by_business', merged);
+          } catch {}
+          return normalized;
         } catch (error: any) {
+          // Fallback: tentar dados em cache local para não quebrar o fluxo da UI
+          try {
+            const cached = this.getDataFromStorage('ad_accounts_by_business') as any[] | null;
+            if (cached && Array.isArray(cached)) {
+              const cachedForBm = cached
+                .filter((acc: any) => acc?.business_id === businessId || acc?.businessId === businessId)
+                .map((acc: any) => ({ ...acc, business_id: businessId }));
+              if (cachedForBm.length > 0) {
+                console.warn('metaAdsService.getAdAccountsByBusiness: usando fallback de cache para BM', businessId);
+                return cachedForBm as AdAccount[];
+              }
+            }
+          } catch {}
+
           if (error.response?.data?.error?.code === 100) {
             throw new Error('Permissão negada. É necessário solicitar permissão ads_read no App Review.');
           }
-          
           throw new Error(`Erro ao buscar contas de anúncios: ${error.response?.data?.error?.message || error.message}`);
         }
       },
@@ -968,6 +1090,13 @@ class MetaAdsService {
       throw new Error('Conta não selecionada');
     }
 
+    // Coalescer chamadas simultâneas (evita duplicidade no StrictMode)
+    const pendingKey = `getAdSets_${campaignId || (this.selectedAccount ? this.selectedAccount.id : 'none')}`;
+    const existing = this.pendingRequests.get(pendingKey);
+    if (existing) {
+      try { return await existing; } catch { /* deixa seguir para fallback abaixo */ }
+    }
+
     // Verificar cache específico para campanha
     if (campaignId) {
       const cacheKey = `adsets_campaign_${campaignId}`;
@@ -980,6 +1109,8 @@ class MetaAdsService {
       if (cachedData && cacheValid) {
         console.log(`Usando ${JSON.parse(cachedData).length} Ad Sets em cache para campanha ${campaignId}`);
         return JSON.parse(cachedData);
+      } else if (cachedData) {
+        console.log(`Cache expirado encontrado para campanha ${campaignId} com ${JSON.parse(cachedData).length} Ad Sets, mas continuando com API...`);
       }
     } else {
       // Verificar se há dados salvos no localStorage para busca geral
@@ -990,7 +1121,25 @@ class MetaAdsService {
       }
     }
 
-    try {
+    // Se há rate limit global ativo, retornar cache expirado imediatamente
+    const canCall = await this.checkGlobalRateLimit();
+    if (!canCall) {
+      const useExpiredFromLimit = () => {
+        if (campaignId) {
+          const cacheKey = `adsets_campaign_${campaignId}`;
+          const cachedData = localStorage.getItem(cacheKey);
+          if (cachedData) return JSON.parse(cachedData);
+        } else {
+          const savedData = this.getDataFromStorage('adsets');
+          if (savedData && savedData.length > 0) return savedData;
+        }
+        return [] as any[];
+      };
+      return useExpiredFromLimit();
+    }
+
+    const execPromise = (async () => {
+      try {
       const params: any = {
         access_token: this.user!.accessToken,
         fields: 'id,name,status,created_time,updated_time,start_time,stop_time,targeting',
@@ -1014,11 +1163,17 @@ class MetaAdsService {
       let response;
       try {
         response = await axios.get(endpoint, { params });
+        console.log(`Resposta da API - status: ${response.status}`);
+        console.log(`Resposta da API - data:`, response.data);
       } catch (err: any) {
+        console.log(`Erro na primeira tentativa - status: ${err?.response?.status}, message: ${err?.response?.data?.error?.message || err.message}`);
         // Se der 400/429, tentar sem campos extras (reduzir payload) após um pequeno atraso
         if (err?.response?.status === 400 || err?.response?.status === 429) {
+          console.log('Tentando novamente com parâmetros reduzidos...');
           await new Promise(res => setTimeout(res, 500));
           response = await axios.get(endpoint, { params: { access_token: this.user!.accessToken, limit: 100 } });
+          console.log(`Resposta da API (segunda tentativa) - status: ${response.status}`);
+          console.log(`Resposta da API (segunda tentativa) - data:`, response.data);
         } else {
           throw err;
         }
@@ -1026,6 +1181,10 @@ class MetaAdsService {
 
       const data = response.data.data || [];
       console.log(`Ad Sets retornados: ${data.length}`);
+      if (data.length > 0) {
+        console.log(`Primeiro Ad Set:`, data[0]);
+        console.log(`Status dos Ad Sets:`, data.map((ad: any) => ({ id: ad.id, name: ad.name, status: ad.status })));
+      }
       
       // Salvar dados no localStorage
       if (campaignId) {
@@ -1040,7 +1199,7 @@ class MetaAdsService {
       }
       
       return data;
-    } catch (error: any) {
+      } catch (error: any) {
       const status = error?.response?.status;
       const message: string = error?.response?.data?.error?.message || error.message || 'Unknown error';
       console.warn('Aviso ao buscar Ad Sets:', { status, message });
@@ -1066,15 +1225,27 @@ class MetaAdsService {
 
       // Tratar limites e 400 como casos recuperáveis
       if (status === 429 || message.includes('User request limit reached')) {
+        // Registrar rate limit global por 3 minutos
+        try { await this.recordGlobalRateLimit(3 * 60 * 1000); } catch {}
         return useExpiredCache();
       }
       if (status === 400) {
+        if (message.includes('User request limit reached')) {
+          try { await this.recordGlobalRateLimit(3 * 60 * 1000); } catch {}
+        }
         return useExpiredCache();
       }
 
       // Outros erros: não quebrar a UI
       return [] as any[];
-    }
+      } finally {
+        // limpar pending
+        this.pendingRequests.delete(pendingKey);
+      }
+    })();
+
+    this.pendingRequests.set(pendingKey, execPromise);
+    return await execPromise;
   }
 
   // Buscar insights de campanha específica
@@ -1411,14 +1582,14 @@ class MetaAdsService {
       const reach = parseInt(insight.reach || '0');
       
       // Buscar especificamente cliques no link (link_click) em vez de todos os cliques
-      const linkClicks = insight.actions?.find((action: any) => 
+      // Usar cliques no link (quando houver). Caso NÃO haja link_click, usar clicks gerais
+      const linkClicksRaw = insight.actions?.find((action: any) => 
         action.action_type === 'link_click' || 
         action.action_type === 'onsite_conversion.link_click'
       )?.value || '0';
-      
-      // Usar cliques no link para cálculos de CPC e CTR
-      const clicks = parseInt(linkClicks);
-      const totalClicks = parseInt(insight.clicks || '0'); // Todos os cliques para referência
+      const totalClicksRaw = insight.clicks || '0';
+      const hasLinkClicks = parseInt(linkClicksRaw) > 0;
+      const clicks = hasLinkClicks ? parseInt(linkClicksRaw) : parseInt(totalClicksRaw);
       
       // Priorizar messaging_conversations_started, mas usar fallback se não disponível
       const leadsCount = parseInt(messagingConversations) > 0 ? parseInt(messagingConversations) : parseInt(leads);
@@ -1554,6 +1725,12 @@ class MetaAdsService {
         // Identificação da conta para permitir filtros precisos por BM/ad account
         adAccountId: this.selectedAccount ? this.selectedAccount.id : undefined,
         adAccountName: this.selectedAccount ? this.selectedAccount.name : undefined,
+        campaignId: (insight as any)?.campaign_id,
+        // ID do conjunto de anúncios quando disponível (via insights de ad set)
+        adSetId: (insight as any)?.adset_id,
+        // Resultado primário para CPR
+        resultCount: leadsCount > 0 ? leadsCount : salesCount,
+        resultType: leadsCount > 0 ? 'messages' : (salesCount > 0 ? 'sales' : undefined),
         leads: leadsCount,
         revenue: estimatedRevenue,
         investment: investment,

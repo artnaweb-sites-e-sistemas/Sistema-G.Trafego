@@ -50,20 +50,16 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
         setSelectedMonthIndex(monthIndex);
         setSelectedYear(year);
       } else {
-        // Fallback to current date
+        // Fallback to current date - only set state, don't update selectedMonth to avoid loop
         setSelectedMonthIndex(currentMonth);
         setSelectedYear(currentYear);
-        // Atualizar o selectedMonth para o mês atual se não conseguir fazer parse
-        setSelectedMonth(getCurrentMonthString());
       }
     } else {
-      // Fallback to current date
+      // Fallback to current date - only set state, don't update selectedMonth to avoid loop
       setSelectedMonthIndex(currentMonth);
       setSelectedYear(currentYear);
-      // Atualizar o selectedMonth para o mês atual se não conseguir fazer parse
-      setSelectedMonth(getCurrentMonthString());
     }
-  }, [selectedMonth, months]);
+  }, [months]); // 🎯 CORREÇÃO: Removed selectedMonth from dependencies to prevent infinite loop
 
   // Inicializar com mês atual se selectedMonth estiver vazio ou inválido
   useEffect(() => {

@@ -563,13 +563,11 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
           totals.cpm = formatCurrency((totalInvestment / totalImpressions) * 1000);
         }
         
-        // Calcular CPR total baseado no investimento total e resultados totais
-        if (totalLeads > 0) {
-          // Se há leads, calcular CPR baseado em leads
-          totals.cpr = formatCurrency(totalInvestment / totalLeads);
-        } else if (totalCompras > 0) {
-          // Se há compras, calcular CPR baseado em compras
+        // Calcular CPR total alinhado ao histórico: prioriza COMPRAS > LEADS
+        if (totalCompras > 0) {
           totals.cpr = formatCurrency(totalInvestment / totalCompras);
+        } else if (totalLeads > 0) {
+          totals.cpr = formatCurrency(totalInvestment / totalLeads);
         } else {
           // Se não há resultados, CPR é 0
           totals.cpr = formatCurrency(0);

@@ -6,7 +6,8 @@ import DailyControlTable from './DailyControlTable';
 import MonthlyDetailsTable from './MonthlyDetailsTable';
 import AudienceDetailsTable from './AudienceDetailsTable';
 import InsightsSection from './InsightsSection';
-import HistorySection from './HistorySection';
+// import HistorySection from './HistorySection'; // Removido conforme solicitação
+import AudienceHistorySection from './AudienceHistorySection';
 import ShareReport from './ShareReport';
 import AIBenchmark from './AIBenchmark';
 import PerformanceAdsSection from './PerformanceAdsSection';
@@ -323,6 +324,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     console.log('🔍 DEBUG - Dashboard - useEffect loadRealValuesForClient INICIADO');
     console.log('🔍 DEBUG - Dashboard - Estados atuais:', { selectedClient, selectedMonth, realValuesRefreshTrigger });
     console.log('🔍 DEBUG - Dashboard - Stack trace:', new Error().stack?.split('\n').slice(1, 4).join('\n'));
+    console.log('🎯 CARD DEBUG - Dashboard - Trigger para atualização dos cards ativado:', { realValuesRefreshTrigger });
     
     // Evitar execução desnecessária se não há cliente selecionado
     if (!selectedClient || selectedClient === 'Selecione um cliente' || selectedClient === 'Todos os Clientes') {
@@ -342,6 +344,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       console.log('🔍 DEBUG - Dashboard - selectedClient:', selectedClient);
       console.log('🔍 DEBUG - Dashboard - selectedMonth:', selectedMonth);
       console.log('🔍 DEBUG - Dashboard - realValuesRefreshTrigger:', realValuesRefreshTrigger);
+      console.log('🎯 CARD DEBUG - Dashboard - Iniciando carregamento dos valores reais dos cards...');
       
       try {
         console.log('🔍 DEBUG - Dashboard - Carregando valores reais para cliente:', selectedClient);
@@ -354,6 +357,32 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         console.log('🔍 DEBUG - Dashboard - Verificando dados na coleção monthlyDetails...');
         await metricsService.debugMonthlyDetails(selectedMonth);
         
+        // 🎯 CARD DEBUG: Verificar dados específicos para este cliente
+        console.log('🎯 CARD DEBUG - Dashboard - Verificando dados específicos para o cliente:', selectedClient);
+        try {
+          const { db } = await import('../config/firebase');
+          const { collection, query, where, getDocs } = await import('firebase/firestore');
+          
+          // Verificar se há dados na coleção monthlyDetails para este cliente
+          const testQuery = query(
+            collection(db, 'monthlyDetails'),
+            where('month', '==', selectedMonth),
+            where('client', '==', selectedClient)
+          );
+          
+          const testSnapshot = await getDocs(testQuery);
+          console.log('🎯 CARD DEBUG - Dashboard - Documentos encontrados para este cliente:', testSnapshot.size);
+          
+          testSnapshot.forEach((doc) => {
+            console.log('🎯 CARD DEBUG - Dashboard - Documento encontrado:', {
+              id: doc.id,
+              data: doc.data()
+            });
+          });
+        } catch (debugError) {
+          console.error('🎯 CARD DEBUG - Dashboard - Erro ao verificar dados:', debugError);
+        }
+        
         console.log('🔍 DEBUG - Dashboard - Chamando getRealValuesForClient...');
         const realValues = await metricsService.getRealValuesForClient(selectedMonth, selectedClient);
         console.log('🔍 DEBUG - Dashboard - Resultado da busca:', realValues);
@@ -365,17 +394,28 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
           cpvType: typeof realValues.cpv,
           roiType: typeof realValues.roi
         });
+        console.log('🎯 CARD DEBUG - Dashboard - Valores recebidos para os cards:', {
+          agendamentos: realValues.agendamentos,
+          vendas: realValues.vendas,
+          cpv: realValues.cpv,
+          roi: realValues.roi
+        });
         
         // CORREÇÃO: Se não há dados para o mês atual, retornar valores zerados
         // Não buscar dados de outros meses nem criar dados de teste automaticamente
         console.log('🔍 DEBUG - Dashboard - Definindo valores reais:', realValues);
-        setRealValuesForClient({
+        
+        const finalValues = {
           agendamentos: realValues.agendamentos || 0,
           vendas: realValues.vendas || 0,
           cpv: realValues.cpv || 0,
           roi: typeof realValues.roi === 'string' ? realValues.roi : '0% (0.0x)'
-        });
+        };
+        
+        console.log('🎯 CARD DEBUG - Dashboard - Valores finais que serão definidos nos cards:', finalValues);
+        setRealValuesForClient(finalValues);
         console.log('🔍 DEBUG - Dashboard - Valores reais carregados:', realValues);
+        console.log('🎯 CARD DEBUG - Dashboard - setRealValuesForClient executado com sucesso!');
       } catch (error) {
         console.error('🔍 DEBUG - Dashboard - Erro ao carregar valores reais do cliente:', error);
         console.error('🔍 DEBUG - Dashboard - Stack trace do erro:', error instanceof Error ? error.stack : 'N/A');
@@ -717,7 +757,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       const customEvent = event as CustomEvent;
       const { clientName, source, businessManager, adAccount } = customEvent.detail;
 
-      
+      console.log('🎯 CARD DEBUG - Dashboard - handleClientChanged CHAMADO:', { clientName, source });
       
       // Atualizar o cliente selecionado
       setSelectedClient(clientName);
@@ -729,25 +769,33 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         setIsFacebookConnected(true);
   
         
-        try {
+                try {
           const { metricsService } = await import('../services/metricsService');
           metricsService.clearCache();
-  
+
           
           // Forçar carregamento imediato das métricas para o cliente selecionado
     
           setRefreshTrigger(prev => prev + 1);
+          
+          // 🎯 CORREÇÃO: Forçar atualização dos cards de valores reais imediatamente
+          console.log('🎯 CORREÇÃO - Dashboard - Forçando atualização dos cards após mudança de cliente Facebook');
+          setRealValuesRefreshTrigger(prev => prev + 1);
         } catch (error) {
           console.warn('🔴 Dashboard: Erro ao limpar cache:', error);
         }
-      } else if (source === 'manual') {
+            } else if (source === 'manual') {
         setDataSource('manual');
         setIsFacebookConnected(false);
-  
+
         
         // Para clientes manuais, também forçar refresh
         setRefreshTrigger(prev => prev + 1);
-  
+        
+        // 🎯 CORREÇÃO: Forçar atualização dos cards de valores reais imediatamente
+        console.log('🎯 CORREÇÃO - Dashboard - Forçando atualização dos cards após mudança de cliente manual');
+        setRealValuesRefreshTrigger(prev => prev + 1);
+
       }
     };
 
@@ -757,6 +805,98 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       window.removeEventListener('clientChanged', handleClientChanged);
     };
   }, []);
+
+  // 🎯 DEBUG: Adicionar função global para debug de dados de públicos
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).debugAudienceValues = async (month?: string, product?: string) => {
+        try {
+          const { metricsService } = await import('../services/metricsService');
+          const currentMonth = month || selectedMonth;
+          const currentProduct = product || selectedProduct;
+          
+          console.log('🔍 DEBUG - Iniciando debug dos valores de público:', { currentMonth, currentProduct });
+          
+          if (!currentMonth || !currentProduct || currentProduct === 'Todos os Produtos') {
+            console.log('❌ DEBUG - Parâmetros insuficientes. Use: debugAudienceValues("mês", "produto")');
+            return { error: 'Parâmetros insuficientes' };
+          }
+          
+          const result = await metricsService.debugAudienceData(currentMonth, currentProduct);
+          console.log('🔍 DEBUG - Resultado completo:', result);
+          
+          return result;
+        } catch (error) {
+          console.error('🔍 DEBUG - Erro no debug:', error);
+          return { error };
+        }
+      };
+
+      // 🧹 FUNÇÃO DE RESET COMPLETO
+      (window as any).resetProductData = async (month?: string, product?: string) => {
+        try {
+          const { metricsService } = await import('../services/metricsService');
+          const currentMonth = month || selectedMonth;
+          const currentProduct = product || selectedProduct;
+          
+          console.log('🧹 DEBUG - Iniciando reset completo dos dados:', { currentMonth, currentProduct });
+          
+          if (!currentMonth || !currentProduct || currentProduct === 'Todos os Produtos') {
+            console.log('❌ DEBUG - Parâmetros insuficientes. Use: resetProductData("mês", "produto")');
+            return { error: 'Parâmetros insuficientes' };
+          }
+          
+          const result = await metricsService.resetProductData(currentMonth, currentProduct);
+          console.log('🧹 DEBUG - Reset concluído:', result);
+          
+          // Forçar recarregamento da página para garantir estado limpo
+          if (result.success) {
+            console.log('🔄 DEBUG - Recarregando página para estado limpo...');
+            setTimeout(() => {
+              window.location.reload();
+            }, 2000);
+          }
+          
+          return result;
+        } catch (error) {
+          console.error('🧹 DEBUG - Erro no reset:', error);
+          return { error };
+        }
+      };
+      
+      // Função específica para deletar o público antigo renomeado
+      (window as any).deleteOldAudience = async () => {
+        if (!selectedMonth || !selectedProduct || !selectedClient) {
+          console.log('❌ Selecione um cliente, mês e produto primeiro');
+          return;
+        }
+
+        try {
+          console.log('🗑️ Resetando dados do produto para limpar duplicação...');
+          
+          // Usar a função resetProductData que já funciona
+          const { metricsService } = await import('../services/metricsService');
+          const result = await metricsService.resetProductData(selectedMonth, selectedProduct);
+          
+          if (result.success) {
+            console.log('✅ Dados limpos com sucesso! A página será recarregada...');
+            setTimeout(() => {
+              window.location.reload();
+            }, 1000);
+          } else {
+            console.log('❌ Erro ao limpar dados:', result.error);
+          }
+        } catch (error) {
+          console.error('❌ Erro ao deletar público antigo:', error);
+        }
+      };
+
+      console.log('🔧 DEBUG - Funções de debug adicionadas ao window:');
+      console.log('  - debugAudienceValues("Janeiro 2025", "Nome do Produto") - Ver dados no Firebase');
+      console.log('  - resetProductData("Janeiro 2025", "Nome do Produto") - Limpar TODOS os dados e recomeçar');
+      console.log('  - deleteOldAudience() - Deletar o público antigo "[Anúncio Jurídico] UTI Negada"');
+    }
+  }, [selectedMonth, selectedProduct]);
 
   const handleMetaAdsSync = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -1014,9 +1154,12 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                 )}
               </>
             )}
-            {/* Renderizar HistorySection apenas se produto estiver selecionado E público NÃO estiver selecionado */}
+            {/* Renderizar apenas Histórico de Público (HistorySection removido) */}
             {(selectedProduct && selectedProduct !== 'Todos os Produtos') && (!selectedAudience || selectedAudience === 'Todos os Públicos') && isFacebookConnected && !noDataForSelection && (
-              <HistorySection selectedProduct={selectedProduct} />
+              <AudienceHistorySection 
+                selectedClient={selectedClient}
+                selectedProduct={selectedProduct}
+              />
             )}
           </>
         )}

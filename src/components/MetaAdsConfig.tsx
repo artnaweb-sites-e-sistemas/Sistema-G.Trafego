@@ -401,8 +401,23 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
                           Voce atingiu o limite local de tentativas. Tente novamente em {Math.ceil((rateLimitStatus.nextAttemptDelay || 0) / 60000)} minutos.
                         </p>
                         <button
-                          onClick={() => metaAdsService.resetOAuthRateLimit()}
-                          className="text-yellow-400 hover:text-yellow-300 text-sm underline"
+                          onClick={async () => {
+                            console.log('🔄 MetaAdsConfig - Botão resetar contador clicado');
+                            try {
+                              metaAdsService.resetOAuthRateLimit();
+                              
+                              // 🎯 CORREÇÃO: Recarregar status após reset
+                              setTimeout(async () => {
+                                const newStatus = await metaAdsService.getOAuthRateLimitStatus();
+                                setRateLimitStatus(newStatus);
+                                console.log('🔄 MetaAdsConfig - Status recarregado após reset:', newStatus);
+                              }, 100);
+                              
+                            } catch (error) {
+                              console.error('🔄 MetaAdsConfig - Erro ao resetar contador:', error);
+                            }
+                          }}
+                          className="text-yellow-400 hover:text-yellow-300 text-sm underline hover:bg-yellow-400/10 px-2 py-1 rounded transition-all duration-200"
                         >
                           Resetar contador (apenas se necessario)
                         </button>

@@ -112,7 +112,8 @@ const ShareReport: React.FC<ShareReportProps> = ({
           product: selectedProduct,
           client: selectedClient,
           agendamentos: monthlyDetailsValues.agendamentos,
-          vendas: monthlyDetailsValues.vendas
+          vendas: monthlyDetailsValues.vendas,
+          investment: monthlyDetailsValues.investment || 0 // Adicionar investimento se disponível
         });
       }
       

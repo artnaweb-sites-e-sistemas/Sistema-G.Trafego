@@ -249,6 +249,17 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
     let newValue: number;
     let newManualVendasValue = manualVendasValue;
     
+    console.log('🔵 DEBUG - AudienceDetailsTable - INÍCIO DO SALVAMENTO:', {
+      editingField,
+      editValue,
+      selectedAudience,
+      selectedProduct,
+      selectedMonth,
+      currentDetails: details,
+      vendasAuto,
+      manualVendasValue
+    });
+    
     if (editingField === 'vendas') {
       // Para vendas, usar número simples (quantidade de vendas)
       newValue = parseInt(editValue) || 0;
@@ -270,7 +281,7 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
         [editingField]: newValue
       };
 
-      console.log('🔍 DEBUG - AudienceDetailsTable - Salvando dados:', {
+      console.log('🔵 DEBUG - AudienceDetailsTable - DADOS PARA SALVAR:', {
         month: selectedMonth,
         product: selectedProduct,
         audience: selectedAudience,
@@ -279,7 +290,9 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
         vendasAuto: vendasAuto,
         manualVendasValue: newManualVendasValue,
         editingField,
-        isManualMode: !vendasAuto
+        newValue,
+        isManualMode: !vendasAuto,
+        updatedDetails
       });
 
       await metricsService.saveAudienceDetails({
@@ -299,11 +312,15 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
       toast.success('Valor atualizado com sucesso!');
       
       // Disparar evento para notificar outros componentes
-      console.log('🔍 DEBUG - AudienceDetailsTable - Disparando evento audienceDetailsSaved:', {
-        month: selectedMonth,
-        product: selectedProduct,
-        audience: selectedAudience,
-        details: updatedDetails
+      console.log('🔵 DEBUG - AudienceDetailsTable - SALVAMENTO CONCLUÍDO E DISPARANDO EVENTO:', {
+        savedData: updatedDetails,
+        eventDetails: {
+          month: selectedMonth,
+          product: selectedProduct,
+          audience: selectedAudience,
+          client: selectedClient,
+          details: updatedDetails
+        }
       });
       
       window.dispatchEvent(new CustomEvent('audienceDetailsSaved', {
@@ -315,6 +332,8 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
           details: updatedDetails
         }
       }));
+      
+      console.log('🔵 DEBUG - AudienceDetailsTable - EVENTO DISPARADO: audienceDetailsSaved');
     } catch (error) {
       console.error('Erro ao salvar detalhes do público:', error);
       toast.error('Erro ao salvar valor');

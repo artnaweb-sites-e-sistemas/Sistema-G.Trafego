@@ -20,6 +20,7 @@ interface ReportData {
   shareLink: ShareLink;
 }
 
+// [DEPRECATED] Este componente foi desativado e não deve mais ser usado.
 const HistorySection: React.FC<HistorySectionProps> = ({ selectedProduct }) => {
   const [reports, setReports] = useState<ReportData[]>([]);
   const [filteredReports, setFilteredReports] = useState<ReportData[]>([]);

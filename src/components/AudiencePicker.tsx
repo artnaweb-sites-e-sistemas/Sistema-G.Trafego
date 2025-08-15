@@ -76,12 +76,36 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
 
   // Carregar Ad Sets do Meta Ads
   const loadMetaAdsAdSets = async () => {
-    console.log('loadMetaAdsAdSets chamado com:', {
+    console.log('🔍 AudiencePicker - loadMetaAdsAdSets chamado com:', {
       dataSource,
       selectedProduct,
       selectedClient,
-      selectedMonth
+      selectedMonth,
+      isFacebookConnected
     });
+    
+    // Verificar todas as condições necessárias
+    if (dataSource !== 'facebook') {
+      console.log('❌ AudiencePicker - DataSource não é facebook:', dataSource);
+      return;
+    }
+    
+    if (!selectedProduct || selectedProduct === 'Todos os Produtos' || selectedProduct === '') {
+      console.log('❌ AudiencePicker - Produto não selecionado ou inválido:', selectedProduct);
+      return;
+    }
+    
+    if (!selectedClient || selectedClient === 'Selecione um cliente' || selectedClient === 'Todos os Clientes') {
+      console.log('❌ AudiencePicker - Cliente não selecionado ou inválido:', selectedClient);
+      return;
+    }
+    
+    if (!isFacebookConnected) {
+      console.log('❌ AudiencePicker - Meta Ads não conectado');
+      return;
+    }
+    
+    console.log('✅ AudiencePicker - Todas as condições atendidas, iniciando carregamento...');
     
     if (dataSource === 'facebook' && selectedProduct && selectedProduct !== 'Todos os Produtos') {
       try {
@@ -101,14 +125,35 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         
         setIsLoading(true);
                 
-        // Obter ID da campanha do localStorage
-        const campaignId = localStorage.getItem('selectedCampaignId');
-        console.log('Campaign ID do localStorage:', campaignId);
+        // 🎯 CORREÇÃO: Obter ID da campanha com múltiplas tentativas
+        let campaignId = localStorage.getItem('selectedCampaignId');
+        console.log('🔍 DEBUG - AudiencePicker - Campaign ID do localStorage (primeira tentativa):', campaignId);
+        
+        // Se não encontrou, aguardar um pouco e tentar novamente
+        if (!campaignId) {
+          console.log('⏳ DEBUG - AudiencePicker - Campaign ID não encontrado, aguardando e tentando novamente...');
+          
+          // Aguardar um pouco para o localStorage ser atualizado
+          await new Promise(resolve => setTimeout(resolve, 500));
+          campaignId = localStorage.getItem('selectedCampaignId');
+          console.log('🔍 DEBUG - AudiencePicker - Campaign ID do localStorage (segunda tentativa):', campaignId);
+        }
         
         if (!campaignId) {
-          console.log('Nenhum campaign ID encontrado no localStorage');
-          return;
+          console.log('❌ DEBUG - AudiencePicker - Nenhum campaign ID encontrado após múltiplas tentativas');
+          
+          // 🎯 MELHORIA: Tentar obter campaign ID do produto selecionado no localStorage
+          const currentSelectedProduct = localStorage.getItem('currentSelectedProduct');
+          if (currentSelectedProduct) {
+            console.log('🔍 DEBUG - AudiencePicker - Tentando buscar campaign ID alternativo do produto:', currentSelectedProduct);
+            // Se há produto selecionado, continuar sem falhar (será um fallback)
+          } else {
+            setAudiences([]);
+            return;
+          }
         }
+        
+        console.log('✅ DEBUG - AudiencePicker - Campaign ID encontrado:', campaignId);
         
         // Obter datas do mês selecionado
         const getPeriodDates = (monthString: string) => {
@@ -224,6 +269,28 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
           console.error('Erro ao carregar Ad Sets:', error);
           console.error('Detalhes do erro:', error.message);
           
+          // 🎯 TRATAMENTO ESPECÍFICO PARA RATE LIMIT
+          if (error.message && (
+            error.message.includes('User request limit reached') ||
+            error.message.includes('rate limit') ||
+            error.message.includes('400') ||
+            error.response?.status === 400
+          )) {
+            console.error('🚨 RATE LIMIT DETECTADO! Sugerindo reset...');
+            console.error('💡 SOLUÇÃO: Execute resetApiRateLimit() no console e recarregue a página');
+            
+            // Tentar reset automático se a função estiver disponível
+            if (typeof (window as any).resetApiRateLimit === 'function') {
+              console.log('🔄 Tentando reset automático do rate limit...');
+              try {
+                (window as any).resetApiRateLimit();
+                console.log('✅ Reset automático executado! Recarregue a página em alguns segundos.');
+              } catch (resetError) {
+                console.error('❌ Falha no reset automático:', resetError);
+              }
+            }
+          }
+          
           // Log do erro
           console.log('Erro ao carregar Ad Sets:', error.message);
           
@@ -256,37 +323,105 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
       dataSource,
       selectedProduct,
       selectedClient,
-      selectedMonth
+      selectedMonth,
+      isFacebookConnected
     });
                     
-    // Só carregar se há produto selecionado
-    if (selectedProduct && selectedProduct !== 'Todos os Produtos') {
-      console.log('Produto selecionado, carregando Ad Sets...');
+    // Só carregar se há produto selecionado e Meta Ads conectado
+    if (selectedProduct && 
+        selectedProduct !== 'Todos os Produtos' && 
+        selectedProduct !== '' && 
+        selectedClient && 
+        selectedClient !== 'Selecione um cliente' && 
+        selectedClient !== 'Todos os Clientes' &&
+        dataSource === 'facebook' &&
+        isFacebookConnected) {
+      
+      console.log('✅ Condições atendidas, carregando Ad Sets automaticamente...');
+      
+      // Limpar públicos atuais primeiro
+      setAudiences([]);
+      setSelectedAudience('');
             
-      // Delay para garantir que o cache seja limpo
+      // 🎯 CORREÇÃO: Reduzir delay drásticamente e adicionar retry automático
+      const loadWithRetry = async (attempt = 1) => {
+        try {
+          console.log(`🔄 Tentativa ${attempt} de carregamento automático...`);
+          await loadMetaAdsAdSets();
+          console.log('✅ Carregamento automático bem-sucedido!');
+        } catch (error) {
+          console.log(`❌ Tentativa ${attempt} falhou:`, error);
+          
+          // Se falhar, tentar novamente até 3 vezes
+          if (attempt < 3) {
+            setTimeout(() => {
+              loadWithRetry(attempt + 1);
+            }, 1000 * attempt); // Delay progressivo: 1s, 2s, 3s
+          } else {
+            console.log('❌ Todas as tentativas falharam - botões disponíveis para fallback');
+          }
+        }
+      };
+      
+      // Delay mínimo apenas para evitar race conditions
       const timer = setTimeout(() => {
-        loadMetaAdsAdSets();
-      }, 300);
+        loadWithRetry();
+      }, 200); // Reduzido de 500ms para 200ms
       
       return () => clearTimeout(timer);
     } else {
-      console.log('Nenhum produto selecionado, resetando públicos');
-      // Resetar públicos quando não há produto selecionado
+      console.log('Condições não atendidas, resetando públicos. Motivos:', {
+        hasProduct: selectedProduct && selectedProduct !== 'Todos os Produtos' && selectedProduct !== '',
+        hasClient: selectedClient && selectedClient !== 'Selecione um cliente' && selectedClient !== 'Todos os Clientes',
+        isMetaAds: dataSource === 'facebook',
+        isConnected: isFacebookConnected
+      });
+      
+      // Resetar públicos quando condições não são atendidas
       setAudiences([{ id: '1', name: 'Todos os Públicos', productId: 'all', clientId: 'all' }]);
       setSelectedAudience('Todos os Públicos');
     }
-  }, [dataSource, selectedProduct, selectedClient, selectedMonth]);
+  }, [dataSource, selectedProduct, selectedClient, selectedMonth, isFacebookConnected]);
 
      // Listener para evento de campanha selecionada
    useEffect(() => {
      const handleCampaignSelected = (event: Event) => {
        const customEvent = event as CustomEvent;
-       const { campaignId } = customEvent.detail;
-                   
-       // Forçar recarregamento dos Ad Sets após um delay
-       setTimeout(() => {
-                 loadMetaAdsAdSets();
-       }, 500);
+       const { campaignId, productName } = customEvent.detail;
+       
+       console.log('🔍 AudiencePicker - Campanha selecionada:', { campaignId, productName });
+       
+       // 🎯 CORREÇÃO: Garantir que o campaignId seja salvo no localStorage
+       if (campaignId) {
+         localStorage.setItem('selectedCampaignId', campaignId);
+         console.log('✅ AudiencePicker - selectedCampaignId salvo via evento:', campaignId);
+       }
+       
+       // Verificar se todas as condições estão atendidas antes de carregar
+       if (dataSource === 'facebook' && 
+           isFacebookConnected && 
+           selectedClient && 
+           selectedClient !== 'Selecione um cliente' && 
+           selectedClient !== 'Todos os Clientes') {
+         
+         console.log('✅ AudiencePicker - Condições atendidas, recarregando Ad Sets...');
+         
+         // Limpar públicos atuais
+         setAudiences([]);
+         setSelectedAudience('');
+         
+         // 🎯 CORREÇÃO: Aguardar mais tempo para garantir que tudo esteja sincronizado
+         setTimeout(() => {
+           console.log('🔍 AudiencePicker - Executando loadMetaAdsAdSets via campaignSelected...');
+           loadMetaAdsAdSets();
+         }, 1000);
+       } else {
+         console.log('❌ AudiencePicker - Condições não atendidas para recarregar Ad Sets:', {
+           dataSource,
+           isFacebookConnected,
+           selectedClient
+         });
+       }
      };
 
     window.addEventListener('campaignSelected', handleCampaignSelected);
@@ -294,7 +429,126 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
     return () => {
       window.removeEventListener('campaignSelected', handleCampaignSelected);
     };
+  }, [dataSource, isFacebookConnected, selectedClient]);
+
+  // 🎯 NOVO: Listener para carregamento imediato de públicos
+  useEffect(() => {
+    const handleLoadAudiencesForProduct = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { productName, campaignId, immediate } = customEvent.detail;
+      
+      console.log('🚀 AudiencePicker - Carregamento imediato solicitado:', { productName, campaignId, immediate });
+      
+      if (immediate && campaignId) {
+        // Salvar campaign ID imediatamente
+        localStorage.setItem('selectedCampaignId', campaignId);
+        
+        // Carregar públicos imediatamente sem delay
+        console.log('⚡ AudiencePicker - Carregando públicos imediatamente...');
+        loadMetaAdsAdSets();
+      }
+    };
+
+    window.addEventListener('loadAudiencesForProduct', handleLoadAudiencesForProduct);
+
+    return () => {
+      window.removeEventListener('loadAudiencesForProduct', handleLoadAudiencesForProduct);
+    };
   }, []);
+
+  // Listener para evento de produto selecionado
+  useEffect(() => {
+    const handleProductSelected = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { productName, source, campaign } = customEvent.detail;
+      
+      console.log('🔍 AudiencePicker - Produto selecionado:', { productName, source, campaign });
+      
+      // 🎯 CORREÇÃO: Salvar campaignId se disponível no evento
+      if (campaign && campaign.id) {
+        localStorage.setItem('selectedCampaignId', campaign.id);
+        console.log('✅ AudiencePicker - selectedCampaignId salvo via productSelected:', campaign.id);
+      }
+      
+      // 🎯 CORREÇÃO: Verificar condições mais permissivas
+      if (source === 'facebook' && 
+          dataSource === 'facebook' && 
+          isFacebookConnected && 
+          selectedClient && 
+          selectedClient !== 'Selecione um cliente' && 
+          selectedClient !== 'Todos os Clientes') {
+        
+        console.log('✅ AudiencePicker - Produto Meta Ads selecionado, recarregando públicos...');
+        
+        // Limpar públicos atuais
+        setAudiences([]);
+        setSelectedAudience('');
+        
+        // 🎯 CORREÇÃO: Carregamento rápido após seleção de produto
+        setTimeout(() => {
+          console.log('🔍 AudiencePicker - Carregando Ad Sets após seleção de produto...');
+          loadMetaAdsAdSets();
+        }, 300); // Reduzido drasticamente de 1.5s para 300ms
+      } else {
+        console.log('❌ AudiencePicker - Condições não atendidas para carregar públicos:', {
+          source,
+          dataSource,
+          isFacebookConnected,
+          selectedClient
+        });
+      }
+    };
+
+    window.addEventListener('productSelected', handleProductSelected);
+
+    return () => {
+      window.removeEventListener('productSelected', handleProductSelected);
+    };
+  }, [dataSource, isFacebookConnected, selectedClient]);
+
+  // Listener para evento de recarregar produtos (botão refresh no header)
+  useEffect(() => {
+    const handleReloadProducts = () => {
+      console.log('AudiencePicker - Evento reloadProducts recebido');
+      
+      // Se há produto selecionado e condições atendidas, recarregar públicos também
+      if (selectedProduct && 
+          selectedProduct !== 'Todos os Produtos' && 
+          selectedProduct !== '' &&
+          dataSource === 'facebook' && 
+          isFacebookConnected && 
+          selectedClient && 
+          selectedClient !== 'Selecione um cliente' && 
+          selectedClient !== 'Todos os Clientes') {
+        
+        console.log('AudiencePicker - Recarregando públicos após reload de produtos...');
+        
+        // Limpar cache e recarregar
+        const campaignId = localStorage.getItem('selectedCampaignId');
+        if (campaignId) {
+          localStorage.removeItem(`adsets_campaign_${campaignId}`);
+          localStorage.removeItem(`adsets_campaign_${campaignId}_timestamp`);
+        }
+        localStorage.removeItem('metaAds_adsets');
+        localStorage.removeItem('metaAds_adsets_timestamp');
+        
+        // Limpar públicos atuais
+        setAudiences([]);
+        setSelectedAudience('');
+        
+        // Recarregar após delay
+        setTimeout(() => {
+          loadMetaAdsAdSets();
+        }, 1200);
+      }
+    };
+
+    window.addEventListener('reloadProducts', handleReloadProducts);
+
+    return () => {
+      window.removeEventListener('reloadProducts', handleReloadProducts);
+    };
+  }, [selectedProduct, dataSource, isFacebookConnected, selectedClient]);
 
   // Filtrar públicos baseado no termo de busca, produto e cliente selecionados
   const filteredAudiences = audiences.filter(audience => {

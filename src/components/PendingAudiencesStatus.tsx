@@ -106,17 +106,62 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
           }, {} as Record<string, number>);
         } catch {}
 
+        // 🎯 CORREÇÃO: Buscar dados mais recentes do localStorage primeiro (igual ao AnalysisPlanner)
+        const getStorageKey = (client: string, product: string, audience?: string) => {
+          const parts = [client || 'sem-cliente', product || 'sem-produto', audience || 'sem-publico'];
+          return `analysisPlanner_${parts.join('|').toLowerCase().replace(/\s+/g, '_')}`;
+        };
+
+        // Buscar dados do localStorage para cada audiência
+        const localStorageData: Record<string, { lastAnalysisDate?: string; intervalDays?: number }> = {};
+        audienceNames.forEach(name => {
+          try {
+            const storageKey = getStorageKey(selectedClient, selectedProduct, name);
+            const raw = localStorage.getItem(storageKey);
+            if (raw) {
+              const saved = JSON.parse(raw);
+              localStorageData[name] = saved;
+              console.log('🗓️ STORAGE DEBUG - Dados do localStorage para:', { audienceName: name, saved });
+            }
+          } catch (error) {
+            console.log('🗓️ STORAGE DEBUG - Erro ao ler localStorage para:', name, error);
+          }
+        });
+
         const statusList: AudienceStatus[] = audienceNames.map(name => {
           const rec = planners.find(p => (p.audience || '') === name);
-          if (!rec || !rec.lastAnalysisDate || !rec.intervalDays) {
+          const localData = localStorageData[name];
+          
+          // 🎯 CORREÇÃO: Priorizar dados do localStorage (mais recentes) sobre Firestore
+          const lastAnalysisDate = localData?.lastAnalysisDate || rec?.lastAnalysisDate;
+          const intervalDays = localData?.intervalDays || rec?.intervalDays;
+          
+          if (!lastAnalysisDate || !intervalDays) {
+            console.log('🗓️ DATA DEBUG - Dados insuficientes para:', { name, lastAnalysisDate, intervalDays, hasLocalData: !!localData, hasFirestoreData: !!rec });
             return { name, status: 'pending', lastAnalysisDate: undefined, nextAnalysisDate: undefined, plannedBudget: plannedByName[name] };
           }
+          
           // Calcular datas de forma local (sem fuso) e SEM contar o dia atual (começa amanhã)
-          const last = dayjs(rec.lastAnalysisDate, 'YYYY-MM-DD').startOf('day');
-          const next = last.add(Math.max(1, rec.intervalDays), 'day');
+          const last = dayjs(lastAnalysisDate, 'YYYY-MM-DD').startOf('day');
+          const next = last.add(Math.max(1, intervalDays), 'day');
           const pending = today.isAfter(next);
-          const planned = typeof rec.plannedBudget === 'number' ? rec.plannedBudget : plannedByName[name];
-          return { name, status: pending ? 'pending' : 'ok', lastAnalysisDate: rec.lastAnalysisDate, nextAnalysisDate: next.format('YYYY-MM-DD'), plannedBudget: planned };
+          const planned = typeof rec?.plannedBudget === 'number' ? rec.plannedBudget : plannedByName[name];
+          
+          // 🎯 DEBUG: Log para sincronização de datas
+          console.log('🗓️ SYNC DEBUG - PendingAudiencesStatus nextDate calculation:', {
+            audienceName: name,
+            dataSource: localData ? 'localStorage' : 'firestore',
+            lastAnalysisDate: lastAnalysisDate,
+            intervalDays: intervalDays,
+            lastDayjs: last.format('YYYY-MM-DD'),
+            nextDayjs: next.format('YYYY-MM-DD'),
+            nextDateFormatted: next.format('DD/MM/YYYY'),
+            pending,
+            localStorageData: localData,
+            firestoreData: rec ? { lastAnalysisDate: rec.lastAnalysisDate, intervalDays: rec.intervalDays } : null
+          });
+          
+          return { name, status: pending ? 'pending' : 'ok', lastAnalysisDate: lastAnalysisDate, nextAnalysisDate: next.format('YYYY-MM-DD'), plannedBudget: planned };
         });
 
         // 5) Buscar gasto atual por público, priorizando adSetId salvo no planner
@@ -295,6 +340,19 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
               const nextStr = nextDate ? nextDate.format('DD/MM') : '—';
               // Diferença baseada em início do dia para evitar off-by-one (contagem inclusiva)
               const diff = nextDate ? nextDate.startOf('day').diff(dayjs().startOf('day'), 'day') : null; // >=0: em N dias; <0: há N dias
+              
+              // 🎯 DEBUG: Log para verificar formatação e diferença de dias
+              if (nextDate) {
+                console.log('🗓️ DISPLAY DEBUG - PendingAudiencesStatus formatting:', {
+                  audienceName: a.name,
+                  nextAnalysisDate: a.nextAnalysisDate,
+                  nextDateObject: nextDate.format('YYYY-MM-DD'),
+                  nextStr: nextStr,
+                  diff: diff,
+                  today: dayjs().format('YYYY-MM-DD'),
+                  diffExplanation: diff !== null ? (diff >= 0 ? `em ${diff} dias` : `há ${Math.abs(diff)} dias`) : 'sem data'
+                });
+              }
               return (
                 <li key={idx} className="flex flex-col gap-3 p-4 bg-slate-800/40 border border-slate-700/40 rounded-xl hover:border-slate-600/50 transition">
                   <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -366,7 +424,26 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
                         Gastos neste mês
                         <span className="progress-animated-text font-medium">{new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(a.spend || 0)}</span>
                       </span>
-                      {(a.adSetStatus !== 'PAUSED' && a.campaignStatus !== 'PAUSED') && typeof a.plannedBudget === 'number' && (
+                      {(() => {
+                        // 🎯 DEBUG: Log detalhado das condições do orçamento pretendido
+                        const adSetNotPaused = a.adSetStatus !== 'PAUSED';
+                        const campaignNotPaused = a.campaignStatus !== 'PAUSED';
+                        const hasBudget = typeof a.plannedBudget === 'number';
+                        const shouldShow = adSetNotPaused && campaignNotPaused && hasBudget;
+                        
+                        console.log(`🎯 BUDGET DEBUG - ${a.name}:`, {
+                          adSetStatus: a.adSetStatus,
+                          adSetNotPaused,
+                          campaignStatus: a.campaignStatus,
+                          campaignNotPaused,
+                          plannedBudget: a.plannedBudget,
+                          plannedBudgetType: typeof a.plannedBudget,
+                          hasBudget,
+                          shouldShow
+                        });
+                        
+                        return shouldShow;
+                      })() && (
                         <span className="text-slate-500 inline-flex items-center gap-1">
                           {(() => {
                             const { since, until } = getMonthDateRange(selectedMonth);

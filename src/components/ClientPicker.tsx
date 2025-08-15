@@ -71,10 +71,24 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
           setClients(facebookClients);
           
         } catch (error: any) {
-          // Se não conseguiu carregar e não há dados salvos, mostrar mensagem
-          if (!metaAdsService.hasStoredData('business_managers')) {
-      
-          }
+          // Fallback: usar dados em cache local para não travar o seletor
+          try {
+            const cached = (metaAdsService as any).getDataFromStorage?.('business_managers') as any[] | null;
+            if (cached && Array.isArray(cached) && cached.length > 0) {
+              const facebookClients: Client[] = cached.map((bm: any) => ({
+                id: `fb-${bm.id}`,
+                name: bm.name,
+                company: 'Business Manager',
+                source: 'facebook' as const,
+                businessManager: bm
+              }));
+              setClients(facebookClients);
+              console.warn('ClientPicker: usando Business Managers do cache devido a erro na API');
+            } else if (metaAdsService.hasStoredData('business_managers')) {
+              // API interna já valida timestamp; se hasStoredData true mas sem get, mantém estado atual
+              console.warn('ClientPicker: hasStoredData true mas não foi possível ler dados do cache');
+            }
+          } catch {}
         } finally {
           setIsLoading(false);
         }

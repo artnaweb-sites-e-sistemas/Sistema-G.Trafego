@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Clock, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react';
 import { metricsService, type MetricData } from '../services/metricsService';
 import { analysisPlannerService } from '../services/analysisPlannerService';
+import dayjs from 'dayjs';
 
 interface AnalysisPlannerProps {
   selectedClient: string;
@@ -17,14 +18,14 @@ type PlannerStorage = {
 
 const DEFAULT_INTERVAL = 7;
 
+// 🎯 CORREÇÃO: Usar dayjs para evitar problemas de fuso horário
 function formatDateBR(date: Date) {
-  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return dayjs(date).format('DD/MM/YYYY');
 }
 
+// 🎯 CORREÇÃO: Usar dayjs para consistência com PendingAudiencesStatus
 function addDays(base: Date, days: number) {
-  const d = new Date(base);
-  d.setDate(d.getDate() + days);
-  return d;
+  return dayjs(base).add(days, 'day').toDate();
 }
 
 function getStorageKey(client: string, product: string, audience?: string) {
@@ -202,7 +203,18 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient, selec
   const lastDateObj = safeParseDate(lastAnalysisDate);
   const nextDate = useMemo(() => {
     if (!lastDateObj) return null;
-    return addDays(lastDateObj, Math.max(1, intervalDays || DEFAULT_INTERVAL));
+    const calculatedNextDate = addDays(lastDateObj, Math.max(1, intervalDays || DEFAULT_INTERVAL));
+    
+    // 🎯 DEBUG: Log para sincronização de datas
+    console.log('🗓️ SYNC DEBUG - AnalysisPlanner nextDate calculation:', {
+      lastAnalysisDate: lastAnalysisDate,
+      lastDateObj: lastDateObj.toISOString(),
+      intervalDays: intervalDays,
+      calculatedNextDate: calculatedNextDate.toISOString(),
+      formattedNextDate: formatDateBR(calculatedNextDate)
+    });
+    
+    return calculatedNextDate;
   }, [lastDateObj, intervalDays]);
 
   const today = new Date();

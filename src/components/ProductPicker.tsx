@@ -231,9 +231,20 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
     }
     
     // Manter localStorage como fallback/cache local
+    console.log('🔍 DEBUG - ProductPicker - Salvando no localStorage:', {
+      productName: product.name,
+      campaignId: product.campaign?.id,
+      source: product.source
+    });
+    
     localStorage.setItem('currentSelectedProduct', product.name);
     if (product.source === 'facebook' && product.campaign) {
       localStorage.setItem('selectedCampaignId', product.campaign.id);
+      console.log('✅ DEBUG - ProductPicker - selectedCampaignId salvo:', product.campaign.id);
+      
+      // Verificar se foi salvo corretamente
+      const savedId = localStorage.getItem('selectedCampaignId');
+      console.log('🔍 DEBUG - ProductPicker - Verificação localStorage selectedCampaignId:', savedId);
     }
     
     // Emitir evento para notificar outros componentes
@@ -255,6 +266,18 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
           campaignId: product.campaign.id
         }
       }));
+      
+      // 🎯 MELHORIA: Disparar evento específico para carregar públicos imediatamente
+      console.log('🚀 ProductPicker - Disparando carregamento imediato de públicos...');
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('loadAudiencesForProduct', {
+          detail: { 
+            productName: product.name,
+            campaignId: product.campaign.id,
+            immediate: true
+          }
+        }));
+      }, 100); // Delay mínimo para garantir que outros eventos sejam processados primeiro
     }
   };
 

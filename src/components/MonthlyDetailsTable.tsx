@@ -303,6 +303,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   const [isEditingTicket, setIsEditingTicket] = useState(false);
   const [ticketEditValue, setTicketEditValue] = useState('');
   const [ticketEditRawValue, setTicketEditRawValue] = useState('');
+  const [ticketMedioEditedByUser, setTicketMedioEditedByUser] = useState(false); // Flag para detectar edição manual
 
   // Função para gerar dados iniciais zerados
   const getInitialTableData = (): TableRow[] => [
@@ -506,6 +507,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
   // Estado para controlar se devemos sobrescrever valores editados manualmente
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
+  const [lastNotifiedValues, setLastNotifiedValues] = useState({ agendamentos: 0, vendas: 0 });
   
   // Estado para armazenar dados editáveis salvos
   const [savedDetails, setSavedDetails] = useState({ agendamentos: 0, vendas: 0, ticketMedio: 0, cpv: 0, roi: '0% (0.0x)' });
@@ -513,26 +515,91 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   // Estado para armazenar dados calculados dos públicos
   const [audienceCalculatedValues, setAudienceCalculatedValues] = useState({ agendamentos: 0, vendas: 0 });
 
+  // Carregar dados dos públicos para o produto selecionado  
+  const loadAudienceData = useCallback(async () => {
+    if (selectedProduct && selectedProduct !== 'Todos os Produtos' && selectedMonth) {
+      try {
+        console.log('🔍 DEBUG - MonthlyDetailsTable - loadAudienceData iniciando:', { selectedMonth, selectedProduct });
+        
+        // 🎯 CORREÇÃO: Buscar dados diretamente sem filtrar por valores zero
+        const audienceDetails = await metricsService.getAllAudienceDetailsForProduct(
+          selectedMonth,
+          selectedProduct
+        );
+        
+        console.log('🔍 DEBUG - MonthlyDetailsTable - audienceDetails carregados:', audienceDetails);
+        
+        // 🎯 CORREÇÃO: Calcular totais considerando TODOS os registros, incluindo zeros
+        let totalAgendamentos = 0;
+        let totalVendas = 0;
+        
+        audienceDetails.forEach((detail: any) => {
+          const agendamentos = Number(detail.agendamentos) || 0;
+          const vendas = Number(detail.vendas) || 0;
+          
+          console.log('🔍 DEBUG - MonthlyDetailsTable - Processando público:', {
+            audience: detail.audience,
+            agendamentos,
+            vendas,
+            agendamentosOriginal: detail.agendamentos,
+            vendasOriginal: detail.vendas
+          });
+          
+          totalAgendamentos += agendamentos;
+          totalVendas += vendas;
+        });
+        
+        console.log('🔍 DEBUG - MonthlyDetailsTable - Totais finais calculados:', { 
+          totalAgendamentos, 
+          totalVendas,
+          publicosProcessados: audienceDetails.length
+        });
+        
+        console.log('🎯 DEBUG - MonthlyDetailsTable - DEFININDO audienceCalculatedValues:', {
+          agendamentos: totalAgendamentos,
+          vendas: totalVendas,
+          timestamp: new Date().toISOString(),
+          savedTicketMedio: savedDetails.ticketMedio
+        });
+        
+        setAudienceCalculatedValues({
+          agendamentos: totalAgendamentos,
+          vendas: totalVendas
+        });
+      } catch (error) {
+        console.error('🔍 DEBUG - MonthlyDetailsTable - Erro ao carregar dados dos públicos:', error);
+        setAudienceCalculatedValues({ agendamentos: 0, vendas: 0 });
+      }
+    } else {
+      console.log('🔍 DEBUG - MonthlyDetailsTable - loadAudienceData pulado:', { selectedProduct, selectedMonth });
+      setAudienceCalculatedValues({ agendamentos: 0, vendas: 0 });
+    }
+  }, [selectedProduct, selectedMonth]);
+
   // Listener direto para mudanças nos detalhes dos públicos (comunicação mais rápida)
   useEffect(() => {
     const handleAudienceDetailsSaved = (event: CustomEvent) => {
-      console.log('🔍 DEBUG - MonthlyDetailsTable - Evento audienceDetailsSaved recebido:', event.detail);
+      console.log('🟢 DEBUG - MonthlyDetailsTable - EVENTO RECEBIDO: audienceDetailsSaved:', {
+        eventDetail: event.detail,
+        currentProduct: selectedProduct,
+        currentMonth: selectedMonth,
+        isMonthMatch: event.detail?.month === selectedMonth,
+        isProductMatch: event.detail?.product === selectedProduct
+      });
       
       if (event.detail && 
           event.detail.month === selectedMonth && 
           event.detail.product === selectedProduct) {
-        console.log('🔍 DEBUG - MonthlyDetailsTable - Evento corresponde ao produto/mês atual, atualizando imediatamente...');
+        console.log('🟢 DEBUG - MonthlyDetailsTable - EVENTO CORRESPONDE, atualizando imediatamente...');
         
-        // Atualizar imediatamente os valores calculados dos públicos
-        setAudienceCalculatedValues({
-          agendamentos: event.detail.details.agendamentos,
-          vendas: event.detail.details.vendas
-        });
-        
-        console.log('🔍 DEBUG - MonthlyDetailsTable - Valores dos públicos atualizados:', {
-          agendamentos: event.detail.details.agendamentos,
-          vendas: event.detail.details.vendas
-        });
+        // Recarregar todos os valores dos públicos para o mês/produto atual
+        // (garante que todos os públicos sejam considerados, não apenas o editado)
+        setTimeout(() => {
+          console.log('🟢 DEBUG - MonthlyDetailsTable - EXECUTANDO loadAudienceData...');
+          loadAudienceData();
+        }, 200); // Delay para garantir que Firebase foi atualizado
+      } else {
+        console.log('🟢 DEBUG - MonthlyDetailsTable - EVENTO NÃO CORRESPONDE, ignorando');
       }
     };
 
@@ -541,7 +608,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     return () => {
       window.removeEventListener('audienceDetailsSaved', handleAudienceDetailsSaved as EventListener);
     };
-  }, [selectedMonth, selectedProduct]);
+  }, [selectedMonth, selectedProduct, loadAudienceData]);
 
   // Carregar dados salvos do Firebase quando produto ou mês mudar
   useEffect(() => {
@@ -630,60 +697,40 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     loadSavedDetails();
   }, [selectedMonth, selectedProduct]);
 
-  // Carregar dados dos públicos para o produto selecionado
-  const loadAudienceData = useCallback(async () => {
-    if (selectedProduct && selectedProduct !== 'Todos os Produtos' && selectedMonth) {
-      try {
-        const audienceDetails = await metricsService.getAllAudienceDetailsForProduct(
-          selectedMonth,
-          selectedProduct
-        );
-        
-        // Calcular totais dos públicos
-        const totalAgendamentos = audienceDetails.reduce((sum: number, detail: any) => sum + (detail.agendamentos || 0), 0);
-        const totalVendas = audienceDetails.reduce((sum: number, detail: any) => sum + (detail.vendas || 0), 0);
-        
-        setAudienceCalculatedValues({
-          agendamentos: totalAgendamentos,
-          vendas: totalVendas
-        });
-      } catch (error) {
-        setAudienceCalculatedValues({ agendamentos: 0, vendas: 0 });
-      }
-    }
-  }, [selectedProduct, selectedMonth]);
-
-  // Executar carregamento dos públicos imediatamente quando produto/mês mudarem
+  // 🎯 CORREÇÃO: Carregar públicos APÓS savedDetails estar carregado
   useEffect(() => {
-    loadAudienceData();
-  }, [loadAudienceData]);
+    // Só carregar públicos se savedDetails já foi carregado (incluindo primeira vez)
+    if (selectedProduct && selectedMonth) {
+      console.log('🔄 DEBUG - MonthlyDetailsTable - Iniciando carregamento dos públicos após savedDetails...');
+      
+      // Pequeno delay para garantir que savedDetails foi processado
+      const timer = setTimeout(() => {
+        loadAudienceData();
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [selectedProduct, selectedMonth, savedDetails.ticketMedio]); // Depender de savedDetails.ticketMedio como indicador de carregamento
 
-  // Recarregar dados quando o componente for montado ou quando houver mudança de foco
+  // 🎯 CORREÇÃO: Recarregamento inteligente no visibilitychange - só se necessário
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && selectedProduct && selectedMonth) {
-        console.log('🔍 DEBUG - MonthlyDetailsTable - Página voltou ao foco, recarregando dados...');
-        const loadAudienceData = async () => {
-          try {
-            const allAudienceDetails = await metricsService.getAllAudienceDetailsForProduct(selectedMonth, selectedProduct);
-            const totalAgendamentos = allAudienceDetails.reduce((sum, detail) => sum + (detail.agendamentos || 0), 0);
-            const totalVendas = allAudienceDetails.reduce((sum, detail) => sum + (detail.vendas || 0), 0);
-            
-            setAudienceCalculatedValues({
-              agendamentos: totalAgendamentos,
-              vendas: totalVendas
-            });
-            
-            console.log('🔍 DEBUG - MonthlyDetailsTable - Dados recarregados após foco:', {
-              totalAgendamentos,
-              totalVendas
-            });
-          } catch (error) {
-            console.error('Erro ao recarregar dados após foco:', error);
-          }
-        };
+        console.log('👁️ DEBUG - MonthlyDetailsTable - Página voltou ao foco');
         
-        loadAudienceData();
+        // Verificar se os dados estão vazios/incorretos antes de recarregar
+        const needsReload = audienceCalculatedValues.agendamentos === 0 && 
+                           audienceCalculatedValues.vendas === 0 &&
+                           selectedProduct !== 'Todos os Produtos';
+        
+        if (needsReload) {
+          console.log('🔄 DEBUG - MonthlyDetailsTable - Dados parecem vazios, recarregando...');
+          setTimeout(() => {
+            loadAudienceData();
+          }, 500); // Delay maior para evitar conflito
+        } else {
+          console.log('✅ DEBUG - MonthlyDetailsTable - Dados já estão carregados, não recarregando');
+        }
       }
     };
 
@@ -692,13 +739,43 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [selectedMonth, selectedProduct]);
+  }, [selectedMonth, selectedProduct, audienceCalculatedValues, loadAudienceData]);
 
 
 
   // Atualizar valores na tabela quando dados calculados dos públicos mudarem (reativo)
   useEffect(() => {
-    console.log('🔍 DEBUG - MonthlyDetailsTable - Atualizando tabela com valores dos públicos (reativo):', audienceCalculatedValues);
+    console.log('🟢 DEBUG - MonthlyDetailsTable - ATUALIZANDO TABELA com valores dos públicos:', {
+      audienceCalculatedValues,
+      selectedMonth,
+      selectedProduct,
+      selectedClient,
+      ticketMedio,
+      savedDetailsTicketMedio: savedDetails.ticketMedio,
+      timestamp: new Date().toISOString()
+    });
+    
+    // 🎯 CORREÇÃO: Só aguardar carregamento na primeira vez, não quando usuário edita
+    const isInitialLoad = !ticketMedioEditedByUser && 
+                         ticketMedio === 250 && 
+                         savedDetails.ticketMedio > 0 && 
+                         savedDetails.ticketMedio !== 250;
+    
+    if (isInitialLoad) {
+      console.log('⏳ DEBUG - MonthlyDetailsTable - Aguardando carregamento inicial do ticketMedio...', {
+        ticketMedioAtual: ticketMedio,
+        ticketMedioSalvo: savedDetails.ticketMedio,
+        editedByUser: ticketMedioEditedByUser,
+        isInitialLoad: true
+      });
+      return; // Só bloquear na primeira carga, não quando usuário edita
+    }
+    
+    console.log('✅ DEBUG - MonthlyDetailsTable - TicketMedio correto, prosseguindo com cálculos...', {
+      ticketMedio,
+      ticketMedioSalvo: savedDetails.ticketMedio,
+      isFirstTime: savedDetails.ticketMedio === 0
+    });
     
     setTableData(prevData => {
       const newData = prevData.map(row => {
@@ -706,13 +783,21 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         
         if (row.metric === 'Agendamentos') {
           const newValue = audienceCalculatedValues.agendamentos.toLocaleString('pt-BR');
-          console.log(`🔍 DEBUG - MonthlyDetailsTable - Atualizando Agendamentos: ${row.realValue} → ${newValue}`);
+          console.log('🟢 DEBUG - MonthlyDetailsTable - ATUALIZANDO Agendamentos:', {
+            oldValue: row.realValue,
+            newValue: newValue,
+            rawValue: audienceCalculatedValues.agendamentos
+          });
           newRow.realValue = newValue;
         }
         
         if (row.metric === 'Vendas') {
           const newValue = audienceCalculatedValues.vendas.toLocaleString('pt-BR');
-          console.log(`🔍 DEBUG - MonthlyDetailsTable - Atualizando Vendas: ${row.realValue} → ${newValue}`);
+          console.log('🟢 DEBUG - MonthlyDetailsTable - ATUALIZANDO Vendas:', {
+            oldValue: row.realValue,
+            newValue: newValue,
+            rawValue: audienceCalculatedValues.vendas
+          });
           newRow.realValue = newValue;
         }
         
@@ -780,7 +865,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             roiParsed: parseROI(roiRow?.realValue || '0')
           });
           
-          console.log('🔍 DEBUG - MonthlyDetailsTable - Salvando dados dos públicos com CPV/ROI (sem tocar no ticketMedio):', {
+          console.log('🔍 DEBUG - MonthlyDetailsTable - Salvando dados dos públicos com CPV/ROI:', {
             agendamentos,
             vendas,
             cpv,
@@ -790,17 +875,21 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           // CORREÇÃO: Usar o cliente passado via props
           
           // Importante: não enviar ticketMedio aqui para não sobrescrever o valor configurado no Bench
-          metricsService.saveMonthlyDetails({
-            month: selectedMonth,
-            product: selectedProduct,
-            client: selectedClient, // Cliente via props
-            agendamentos: agendamentos,
-            vendas: vendas,
-            cpv: cpv,
-            roi: roiValue
-          }).catch(error => {
-            console.error('Erro ao salvar valores dos públicos:', error);
-          });
+          // Calcular investimento total
+          const investmentRow = finalData.find(r => r.metric === 'Investimento pretendido (Mês)');
+          const totalInvestment = parseCurrency(investmentRow?.realValue || '0');
+          
+                      metricsService.saveMonthlyDetails({
+              month: selectedMonth,
+              product: selectedProduct,
+              client: selectedClient, // Cliente via props
+              agendamentos: agendamentos,
+              vendas: vendas,
+              cpv: cpv,
+              roi: roiValue
+            }).catch(error => {
+              console.error('Erro ao salvar valores dos públicos:', error);
+            });
         }
         
         onValuesChange({ agendamentos, vendas });
@@ -808,14 +897,40 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       
       return finalData;
     });
-  }, [audienceCalculatedValues, onValuesChange]);
+  }, [audienceCalculatedValues, onValuesChange, ticketMedio, savedDetails.ticketMedio, ticketMedioEditedByUser]);
 
-  // Carregar ticketMedio dos dados salvos
+  // Carregar ticketMedio dos dados salvos APENAS na primeira vez
   useEffect(() => {
-    if (savedDetails.ticketMedio > 0) {
+    // 🎯 CORREÇÃO: Só carregar do Firebase se não foi editado pelo usuário e há valor salvo diferente
+    const shouldLoadFromFirebase = !ticketMedioEditedByUser && 
+                                   ticketMedio === 250 && 
+                                   savedDetails.ticketMedio > 0 && 
+                                   savedDetails.ticketMedio !== 250;
+    
+    if (shouldLoadFromFirebase) {
+      console.log('💰 DEBUG - MonthlyDetailsTable - Carregando ticketMedio salvo (primeira vez):', {
+        ticketMedioAnterior: ticketMedio,
+        ticketMedioSalvo: savedDetails.ticketMedio,
+        editedByUser: ticketMedioEditedByUser,
+        shouldLoad: shouldLoadFromFirebase
+      });
       setTicketMedio(savedDetails.ticketMedio);
+    } else {
+      console.log('💰 DEBUG - MonthlyDetailsTable - Mantendo ticketMedio atual:', {
+        ticketMedioAtual: ticketMedio,
+        ticketMedioSalvo: savedDetails.ticketMedio,
+        editedByUser: ticketMedioEditedByUser,
+        shouldLoad: shouldLoadFromFirebase
+      });
     }
-  }, [savedDetails.ticketMedio]);
+  }, [savedDetails.ticketMedio, ticketMedioEditedByUser]);
+
+  // Resetar flag de edição quando mudar produto/cliente/mês
+  useEffect(() => {
+    console.log('🔄 DEBUG - MonthlyDetailsTable - Resetando flag de edição (mudança de contexto)');
+    setTicketMedioEditedByUser(false);
+    setTicketMedio(250); // Resetar para valor padrão
+  }, [selectedProduct, selectedClient, selectedMonth]);
 
   // Atualizar métricas quando houver mudança no produto selecionado ou nas métricas
   useEffect(() => {
@@ -892,13 +1007,31 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     console.log(`🟡 MonthlyDetailsTable: Processando ${metrics.length} métricas`);
     console.log('🟡 MonthlyDetailsTable: Primeira métrica:', metrics[0]);
 
-    const aggregated = metricsService.calculateAggregatedMetrics(metrics);
+    // Usar agregador com fallback à API de campanha para clicks/impressões/custos (alinha com os cards)
+    (async () => {
+      const aggregated = await metricsService.calculateAggregatedMetricsWithMetaFallback(
+        metrics,
+        selectedMonth,
+        selectedProduct,
+        selectedClient
+      );
+      try {
+        console.log('[PlanilhaDiag] monthlyTableAggregates', {
+          month: selectedMonth,
+          client: selectedClient,
+          product: selectedProduct,
+          totalInvestment: aggregated.totalInvestment,
+          totalImpressions: aggregated.totalImpressions,
+          totalClicks: aggregated.totalClicks,
+          avgCTR: aggregated.avgCTR,
+          avgCPC: (aggregated as any).avgCPC
+        });
+      } catch {}
 
-    console.log(`🟢 MonthlyDetailsTable: Métricas agregadas - totalLeads: ${aggregated.totalLeads}`);
-    console.log(`🔍 DEBUG - MonthlyDetailsTable: audienceCalculatedValues:`, audienceCalculatedValues);
-    
+      console.log(`🟢 MonthlyDetailsTable: Métricas agregadas - totalLeads: ${aggregated.totalLeads}`);
+      console.log(`🔍 DEBUG - MonthlyDetailsTable: audienceCalculatedValues:`, audienceCalculatedValues);
 
-    setTableData(prevData => {
+      setTableData(prevData => {
       const updated = prevData.map(row => {
         const newRow: TableRow = { ...row };
 
@@ -935,7 +1068,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             newRow.realValueEditable = false;
             break;
           case 'CPC':
-            // CPC calculado automaticamente: Investimento / Cliques
+            // CPC calculado automaticamente: Investimento / Cliques (usando link_clicks quando disponível)
             if (hasRealData && aggregated.totalClicks > 0) {
               const avgCPC = aggregated.totalInvestment / aggregated.totalClicks;
               newRow.realValue = formatCurrency(avgCPC);
@@ -945,7 +1078,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             newRow.realValueEditable = false;
             break;
           case 'Cliques':
-            // CORREÇÃO: Só sincronizar se há dados reais
+            // Cliques deve refletir link_clicks quando o campo existe
             if (hasRealData) {
               newRow.realValue = aggregated.totalClicks.toLocaleString('pt-BR');
             } else {
@@ -954,7 +1087,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             newRow.realValueEditable = false;
             break;
           case 'CTR':
-            // CORREÇÃO: Só sincronizar se há dados reais
+            // CTR baseada em link_clicks / impressões quando link_clicks existe
             if (hasRealData) {
               newRow.realValue = `${aggregated.avgCTR.toFixed(2)}%`;
             } else {
@@ -1009,20 +1142,25 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       // Recalcular campos dependentes após a sincronização
       const calculatedData = calculateValues(updated);
       
-      // 🎯 CORREÇÃO: Sempre notificar mudanças dos valores de públicos
+      // 🎯 CORREÇÃO: Notificar mudanças apenas se os valores realmente mudaram
       if (onValuesChange) {
         const agendamentos = audienceCalculatedValues.agendamentos;
         const vendas = audienceCalculatedValues.vendas;
         
-        console.log(`🔍 DEBUG - MonthlyDetailsTable: Notificando mudanças - agendamentos: ${agendamentos}, vendas: ${vendas}`);
-        onValuesChange({ agendamentos, vendas });
+        // Evitar loop infinito: só notificar se os valores mudaram
+        if (agendamentos !== lastNotifiedValues.agendamentos || vendas !== lastNotifiedValues.vendas) {
+          console.log(`🔍 DEBUG - MonthlyDetailsTable: Notificando mudanças - agendamentos: ${agendamentos}, vendas: ${vendas}`);
+          setLastNotifiedValues({ agendamentos, vendas });
+          onValuesChange({ agendamentos, vendas });
+        }
       }
       
       if (!hasInitialLoad) {
         setHasInitialLoad(true);
       }
       return calculatedData;
-    });
+      });
+    })();
   }, [metrics, selectedProduct, savedDetails, audienceCalculatedValues]);
 
   // Função para calcular valores automaticamente
@@ -1101,6 +1239,19 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             break;
           case 'Lucro':
             const receita = vendas * ticketMedio;
+            console.log('💰 [LUCRO] Cálculo realizado:', {
+              month: selectedMonth,
+              product: selectedProduct,
+              vendas,
+              ticketMedio,
+              ticketMedioSalvo: savedDetails.ticketMedio,
+              receita,
+              investment,
+              lucro: receita - investment,
+              isTicketCorreto: ticketMedio === savedDetails.ticketMedio || savedDetails.ticketMedio === 0,
+              audienceValues: audienceCalculatedValues,
+              timestamp: new Date().toISOString()
+            });
             newRow.realValue = formatCurrency(receita - investment);
             break;
           case 'ROI / ROAS':
@@ -1109,6 +1260,22 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               const lucro = receita - investment;
               const roiPercent = (lucro / investment) * 100;
               const roiMultiplier = (receita / investment);
+              try {
+                console.log('🧮 [ROI/ROAS] Cálculo realizado:', {
+                  month: selectedMonth,
+                  product: selectedProduct,
+                  investment,
+                  vendas,
+                  ticketMedio,
+                  ticketMedioSalvo: savedDetails.ticketMedio,
+                  receita,
+                  lucro,
+                  roiPercent,
+                  roiMultiplier,
+                  formatted: `${roiPercent.toFixed(0)}% (${roiMultiplier.toFixed(1)}x)`,
+                  isTicketCorreto: ticketMedio === savedDetails.ticketMedio || savedDetails.ticketMedio === 0
+                });
+              } catch {}
               newRow.realValue = `${roiPercent.toFixed(0)}% (${roiMultiplier.toFixed(1)}x)`;
             }
             break;
@@ -1245,12 +1412,32 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   useEffect(() => {
     const calculatedData = calculateValues(tableData);
     setTableData(calculatedData);
-  }, [ticketMedio]);
+    
+    // 🎯 NOVO: Disparar evento imediato quando ticket médio muda (antes mesmo de salvar)
+    if (ticketMedio !== 250 && selectedProduct && selectedMonth && selectedClient && ticketMedioEditedByUser) {
+      console.log('⚡ DEBUG - MonthlyDetailsTable - Disparando evento ticketMedioChangedImmediate...');
+      window.dispatchEvent(new CustomEvent('ticketMedioChangedImmediate', {
+        detail: {
+          month: selectedMonth,
+          product: selectedProduct,
+          client: selectedClient,
+          ticketMedio: ticketMedio,
+          timestamp: new Date().toISOString()
+        }
+      }));
+    }
+  }, [ticketMedio, selectedProduct, selectedMonth, selectedClient, ticketMedioEditedByUser]);
 
   // Salvar ticketMedio automaticamente quando alterado
   useEffect(() => {
     // Só salvar se não for o valor padrão inicial e se há produto/mês/cliente selecionado
     if (ticketMedio !== 250 && selectedProduct && selectedMonth && selectedClient) {
+      // 🎯 CORREÇÃO: Marcar que foi editado pelo usuário
+      if (!ticketMedioEditedByUser) {
+        console.log('✏️ DEBUG - MonthlyDetailsTable - Detectando edição do usuário no ticketMedio');
+        setTicketMedioEditedByUser(true);
+      }
+      
       const timeoutId = setTimeout(() => {
         // Calcular CPV e ROI para salvar
         const cpvRow = tableData.find(r => r.metric === 'CPV' || r.metric === 'CPV (Custo por Venda)');
@@ -1259,13 +1446,18 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         const cpv = parseNumber(cpvRow?.realValue || '0');
         const roiValue = saveROIValue(roiRow?.realValue || '0% (0.0x)');
         
+        // Calcular investimento total
+        const investmentRow = tableData.find(r => r.metric === 'Investimento pretendido (Mês)');
+        const totalInvestment = parseCurrency(investmentRow?.realValue || '0');
+        
         console.log('🔍 DEBUG - MonthlyDetailsTable - Salvando ticket médio com CPV/ROI:', {
           agendamentos: savedDetails.agendamentos,
           vendas: savedDetails.vendas,
           ticketMedio: ticketMedio,
           cpv,
           roi: roiValue,
-          client: selectedClient
+          client: selectedClient,
+          investment: totalInvestment
         });
         
         metricsService.saveMonthlyDetails({
@@ -1277,6 +1469,18 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           ticketMedio: ticketMedio,
           cpv: cpv,
           roi: roiValue
+        }).then(() => {
+          // 🎯 NOVO: Disparar evento para atualizar histórico em tempo real
+          console.log('📡 DEBUG - MonthlyDetailsTable - Disparando evento ticketMedioChanged para atualizar histórico...');
+          window.dispatchEvent(new CustomEvent('ticketMedioChanged', {
+            detail: {
+              month: selectedMonth,
+              product: selectedProduct,
+              client: selectedClient,
+              ticketMedio: ticketMedio,
+              timestamp: new Date().toISOString()
+            }
+          }));
         }).catch(error => {
           console.error('Erro ao salvar ticket médio:', error);
         });
@@ -1483,12 +1687,17 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         const cpv = parseNumber(cpvRow?.realValue || '0');
         const roiValue = saveROIValue(roiRow?.realValue || '0% (0.0x)');
         
+        // Calcular investimento total
+        const investmentRow = recalculatedData.find(r => r.metric === 'Investimento pretendido (Mês)');
+        const totalInvestment = parseCurrency(investmentRow?.realValue || '0');
+        
         console.log('🔍 DEBUG - MonthlyDetailsTable - Salvando dados com CPV/ROI:', {
           agendamentos,
           vendas,
           cpv,
           roi: roiValue,
-          ticketMedio
+          ticketMedio,
+          investment: totalInvestment
         });
         
         // Salvar no Firebase
@@ -1504,7 +1713,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             vendas: vendas,
             ticketMedio: ticketMedio,
             cpv: cpv,
-            roi: roiValue
+            roi: roiValue,
+            investment: totalInvestment
           });
           
           metricsService.saveMonthlyDetails({
