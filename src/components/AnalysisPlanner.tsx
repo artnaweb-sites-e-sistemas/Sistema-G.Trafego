@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import { CalendarDays, Clock, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react';
 import { metricsService, type MetricData } from '../services/metricsService';
 import { analysisPlannerService } from '../services/analysisPlannerService';
 import dayjs from 'dayjs';
 
 interface AnalysisPlannerProps {
-  selectedClient: string;
-  selectedMonth: string;
+  selectedClient?: string;
+  selectedMonth?: string;
   selectedProduct: string;
   selectedAudience?: string;
 }
@@ -100,17 +101,32 @@ function recommendIntervalFromMetrics(metrics: MetricData[]): { days: number; re
   return { days: 7, reason: 'Métricas estáveis. Revisão semanal é suficiente.' };
 }
 
-const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient, selectedMonth, selectedProduct, selectedAudience }) => {
+const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', selectedMonth = '', selectedProduct, selectedAudience = '' }) => {
   const [lastAnalysisDate, setLastAnalysisDate] = useState<string>('');
   const [intervalDays, setIntervalDays] = useState<number>(DEFAULT_INTERVAL);
   const [loadingSuggestion, setLoadingSuggestion] = useState<boolean>(false);
   const [suggested, setSuggested] = useState<{ days: number; reason: string } | null>(null);
   const [hydrated, setHydrated] = useState<boolean>(false);
+  const [forceUpdate, setForceUpdate] = useState<number>(0);
+  const [isUpdating, setIsUpdating] = useState<boolean>(false);
+
+  // Debug das props recebidas e estados
+  useEffect(() => {
+    console.log('🔍 AnalysisPlanner - Props recebidas:', {
+      selectedClient,
+      selectedMonth,
+      selectedProduct,
+      selectedAudience
+    });
+  }, [selectedClient, selectedMonth, selectedProduct, selectedAudience]);
 
   const storageKey = useMemo(() => getStorageKey(selectedClient, selectedProduct, selectedAudience), [selectedClient, selectedProduct, selectedAudience]);
 
   // Carregar preferências
   useEffect(() => {
+    // Reset hydrated state when dependencies change
+    setHydrated(false);
+    
     try {
       const raw = localStorage.getItem(storageKey);
       if (raw) {
@@ -118,46 +134,59 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient, selec
         if (saved.lastAnalysisDate) setLastAnalysisDate(saved.lastAnalysisDate);
         if (typeof saved.intervalDays === 'number') setIntervalDays(saved.intervalDays);
       }
+      
       // Carregar do Firestore (sobrepõe localStorage se existir)
       (async () => {
-        
-        // 1ª tentativa: registro específico do público
-        let record = await analysisPlannerService.getPlanner(selectedClient, selectedProduct, selectedAudience);
-        // Fallback 1: nível do produto
-        if (!record && selectedAudience) {
-          record = await analysisPlannerService.getPlanner(selectedClient, selectedProduct, undefined);
-        }
-        // Fallback 2: procurar por adSetId atual entre todos os planners do produto
-        if (!record) {
-          try {
-            const adSetId = localStorage.getItem('selectedAdSetId') || undefined;
-            if (adSetId) {
-              const all = await analysisPlannerService.listPlannersForProduct(selectedClient, selectedProduct);
-              const byAdSet = all.find(p => p.adSetId === adSetId);
-              if (byAdSet) record = byAdSet;
-            }
-          } catch {}
-        }
-        // Fallback 3: comparar por nome normalizado do público
-        if (!record && selectedAudience) {
-          try {
-            const norm = (s: string) => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
-            const all = await analysisPlannerService.listPlannersForProduct(selectedClient, selectedProduct);
-            const byName = all.find(p => norm(p.audience || '') === norm(selectedAudience));
-            if (byName) record = byName;
-          } catch {}
-        }
-        if (record) {
+        try {
+          console.log('🔄 Carregando dados do planejador...', { selectedClient, selectedProduct, selectedAudience });
           
-          if (record.lastAnalysisDate) setLastAnalysisDate(record.lastAnalysisDate);
-          if (typeof record.intervalDays === 'number') setIntervalDays(record.intervalDays);
-          // Se tinha adSetId no registro mas não está no localStorage, propaga
-          try { if (record.adSetId && !localStorage.getItem('selectedAdSetId')) localStorage.setItem('selectedAdSetId', record.adSetId); } catch {}
+          // 1ª tentativa: registro específico do público
+          let record = await analysisPlannerService.getPlanner(selectedClient, selectedProduct, selectedAudience);
+          // Fallback 1: nível do produto
+          if (!record && selectedAudience) {
+            record = await analysisPlannerService.getPlanner(selectedClient, selectedProduct, undefined);
+          }
+          // Fallback 2: procurar por adSetId atual entre todos os planners do produto
+          if (!record) {
+            try {
+              const adSetId = localStorage.getItem('selectedAdSetId') || undefined;
+              if (adSetId) {
+                const all = await analysisPlannerService.listPlannersForProduct(selectedClient, selectedProduct);
+                const byAdSet = all.find(p => p.adSetId === adSetId);
+                if (byAdSet) record = byAdSet;
+              }
+            } catch {}
+          }
+          // Fallback 3: comparar por nome normalizado do público
+          if (!record && selectedAudience) {
+            try {
+              const norm = (s: string) => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+              const all = await analysisPlannerService.listPlannersForProduct(selectedClient, selectedProduct);
+              const byName = all.find(p => norm(p.audience || '') === norm(selectedAudience));
+              if (byName) record = byName;
+            } catch {}
+          }
+          
+          if (record) {
+            console.log('✅ Dados carregados do Firestore:', record);
+            if (record.lastAnalysisDate) setLastAnalysisDate(record.lastAnalysisDate);
+            if (typeof record.intervalDays === 'number') setIntervalDays(record.intervalDays);
+            // Se tinha adSetId no registro mas não está no localStorage, propaga
+            try { if (record.adSetId && !localStorage.getItem('selectedAdSetId')) localStorage.setItem('selectedAdSetId', record.adSetId); } catch {}
+          } else {
+            console.log('ℹ️ Nenhum dado encontrado no Firestore para este contexto');
+          }
+        } catch (error) {
+          console.error('❌ Erro ao carregar dados do Firestore:', error);
+        } finally {
+          setHydrated(true);
         }
-        setHydrated(true);
       })();
-    } catch {}
-  }, [storageKey]);
+    } catch (error) {
+      console.error('❌ Erro ao carregar preferências:', error);
+      setHydrated(true);
+    }
+  }, [storageKey, selectedClient, selectedProduct, selectedAudience]);
 
   // Salvar preferências
   useEffect(() => {
@@ -200,7 +229,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient, selec
     return () => { cancelled = true; };
   }, [selectedClient, selectedMonth, selectedProduct, selectedAudience]);
 
-  const lastDateObj = safeParseDate(lastAnalysisDate);
+  const lastDateObj = useMemo(() => safeParseDate(lastAnalysisDate), [lastAnalysisDate, forceUpdate]);
   const nextDate = useMemo(() => {
     if (!lastDateObj) return null;
     const calculatedNextDate = addDays(lastDateObj, Math.max(1, intervalDays || DEFAULT_INTERVAL));
@@ -211,37 +240,185 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient, selec
       lastDateObj: lastDateObj.toISOString(),
       intervalDays: intervalDays,
       calculatedNextDate: calculatedNextDate.toISOString(),
-      formattedNextDate: formatDateBR(calculatedNextDate)
+      formattedNextDate: formatDateBR(calculatedNextDate),
+      forceUpdate: forceUpdate
     });
     
     return calculatedNextDate;
-  }, [lastDateObj, intervalDays]);
+  }, [lastDateObj, intervalDays, forceUpdate]);
 
   const today = new Date();
   const isPending = nextDate ? today > nextDate : true;
 
-  const handleMarkAnalyzedToday = () => {
-    const todayIso = new Date().toISOString().slice(0, 10);
-    // Atualiza estados locais
-    setLastAnalysisDate(todayIso);
-    if (suggested?.days) setIntervalDays(suggested.days);
+  // Debug dos estados de data - APÓS definição dos valores computados
+  useEffect(() => {
+    console.log('📅 AnalysisPlanner - Estados atualizados:', {
+      lastAnalysisDate,
+      intervalDays,
+      forceUpdate,
+      lastDateObj: lastDateObj?.toISOString(),
+      nextDate: nextDate?.toISOString(),
+      formattedLastDate: lastAnalysisDate ? formatDateBR(dayjs(lastAnalysisDate).toDate()) : '—',
+      formattedNextDate: nextDate ? formatDateBR(nextDate) : '—'
+    });
+  }, [lastAnalysisDate, intervalDays, forceUpdate, lastDateObj, nextDate]);
 
-    // Persistir imediatamente (além do useEffect) para evitar perda ao navegar rápido
+  const handleMarkAnalyzedToday = useCallback(async () => {
+    setIsUpdating(true);
+    
+    // 🎯 CORREÇÃO: Usar dayjs com fuso horário local para garantir data correta
+    const todayIso = dayjs().format('YYYY-MM-DD');
+    const newIntervalDays = suggested?.days ?? intervalDays;
+    
+    console.log('🔄 Marcando como analisado hoje:', {
+      todayIso,
+      dayjsToday: dayjs().format('YYYY-MM-DD'),
+      jsDateToday: new Date().toISOString().slice(0, 10),
+      localDateString: new Date().toLocaleDateString('pt-BR'),
+      newIntervalDays,
+      selectedClient,
+      selectedProduct,
+      selectedAudience,
+      storageKey,
+      currentStates: { lastAnalysisDate, intervalDays }
+    });
+    
+    // Verificar se as props são válidas
+    if (!selectedClient || selectedClient === 'Selecione um cliente' || selectedClient === '' || !selectedProduct || selectedProduct === 'Todos os Produtos') {
+      console.warn('⚠️ Props inválidas - não é possível salvar análise:', { selectedClient, selectedProduct });
+      alert('Por favor, selecione um cliente válido antes de marcar a análise.');
+      setIsUpdating(false);
+      return;
+    }
+    
+    // Persistir imediatamente ANTES de atualizar estados
     try {
       const adSetId = localStorage.getItem('selectedAdSetId') || undefined;
-      analysisPlannerService
-        .savePlanner(
-          selectedClient,
-          selectedProduct,
-          selectedAudience,
-          { lastAnalysisDate: todayIso, intervalDays: suggested?.days ?? intervalDays, adSetId }
-        )
-        .catch(() => {});
-      // Persistir também no localStorage de forma síncrona
-      const payload: PlannerStorage = { lastAnalysisDate: todayIso, intervalDays: suggested?.days ?? intervalDays };
+      
+      // Persistir também no localStorage de forma síncrona PRIMEIRO
+      const payload: PlannerStorage = { lastAnalysisDate: todayIso, intervalDays: newIntervalDays };
+      console.log('💾 Salvando no localStorage:', { storageKey, payload });
       localStorage.setItem(storageKey, JSON.stringify(payload));
-    } catch {}
-  };
+      
+      // Depois salvar no Firestore
+      console.log('☁️ Salvando no Firestore...');
+      await analysisPlannerService.savePlanner(
+        selectedClient,
+        selectedProduct,
+        selectedAudience,
+        { lastAnalysisDate: todayIso, intervalDays: newIntervalDays, adSetId }
+      );
+      
+      console.log('✅ Dados salvos com sucesso:', payload);
+      
+    } catch (error) {
+      console.error('❌ Erro ao salvar dados de análise:', error);
+      // Em caso de erro, tentar salvar apenas no localStorage
+      try {
+        const payload: PlannerStorage = { lastAnalysisDate: todayIso, intervalDays: newIntervalDays };
+        localStorage.setItem(storageKey, JSON.stringify(payload));
+        console.log('💾 Salvo apenas no localStorage como fallback');
+      } catch (localStorageError) {
+        console.error('❌ Erro crítico - não foi possível salvar nem no localStorage:', localStorageError);
+      }
+    }
+
+    // Atualiza estados locais DEPOIS do salvamento usando flushSync
+    console.log('🔄 Atualizando estados da UI com flushSync...');
+    
+    flushSync(() => {
+      setLastAnalysisDate(() => {
+        console.log('📅 Estado lastAnalysisDate sendo atualizado para:', todayIso);
+        return todayIso;
+      });
+      
+      setIntervalDays(() => {
+        console.log('⏱️ Estado intervalDays sendo atualizado para:', newIntervalDays);
+        return newIntervalDays;
+      });
+      
+      setForceUpdate(prev => {
+        const newValue = prev + 1;
+        console.log('🔄 ForceUpdate incrementado para:', newValue);
+        return newValue;
+      });
+    });
+    
+    // Atualização direta do DOM como fallback
+    const updateDOMDirectly = () => {
+      try {
+        const lastDateSpan = document.querySelector(`[key*="last-date-"]`);
+        const nextDateSpan = document.querySelector(`[key*="next-date-"]`);
+        const intervalSpan = document.querySelector(`[key*="interval-"]`);
+        
+        if (lastDateSpan) {
+          lastDateSpan.textContent = formatDateBR(dayjs(todayIso).toDate());
+          console.log('🔄 DOM - Última análise atualizada diretamente');
+        }
+        
+        if (intervalSpan) {
+          intervalSpan.textContent = newIntervalDays.toString();
+          console.log('🔄 DOM - Intervalo atualizado diretamente');
+        }
+        
+        if (nextDateSpan) {
+          const nextDate = addDays(dayjs(todayIso).toDate(), newIntervalDays);
+          nextDateSpan.textContent = formatDateBR(nextDate);
+          console.log('🔄 DOM - Próxima análise atualizada diretamente');
+        }
+      } catch (domError) {
+        console.warn('⚠️ Erro ao atualizar DOM diretamente:', domError);
+      }
+    };
+    
+    // Atualização imediata do DOM
+    updateDOMDirectly();
+    
+    // Garantir atualização múltipla para casos de React Strict Mode
+    setTimeout(() => {
+      console.log('🔄 Segunda atualização da UI...');
+      setLastAnalysisDate(() => todayIso);
+      setIntervalDays(() => newIntervalDays);
+      setForceUpdate(prev => prev + 1);
+      updateDOMDirectly();
+    }, 50);
+    
+    setTimeout(() => {
+      console.log('🔄 Terceira atualização da UI...');
+      setLastAnalysisDate(() => todayIso);
+      setIntervalDays(() => newIntervalDays);
+      setForceUpdate(prev => prev + 1);
+      updateDOMDirectly();
+      
+      // 🎯 FORÇAR ATUALIZAÇÃO DA SEÇÃO "PÚBLICOS DESTE PRODUTO"
+      console.log('🔄 Forçando atualização da seção de públicos...');
+      
+      // 1. Limpar cache de métricas para forçar recálculo
+      try {
+        if (typeof (window as any).metricsService?.clearCache === 'function') {
+          (window as any).metricsService.clearCache();
+        }
+      } catch (e) {}
+      
+      // 2. Disparar evento customizado para notificar outros componentes
+      window.dispatchEvent(new CustomEvent('analysisUpdated', {
+        detail: {
+          client: selectedClient,
+          product: selectedProduct,
+          audience: selectedAudience,
+          lastAnalysisDate: todayIso,
+          intervalDays: newIntervalDays
+        }
+      }));
+      
+      // 3. Forçar re-render através do localStorage
+      const currentRefreshTrigger = localStorage.getItem('refreshTrigger') || '0';
+      localStorage.setItem('refreshTrigger', (parseInt(currentRefreshTrigger) + 1).toString());
+      
+      console.log('✅ Atualização completa finalizada - Data atual:', dayjs().format('DD/MM/YYYY'));
+      setIsUpdating(false);
+    }, 200);
+  }, [selectedClient, selectedProduct, selectedAudience, suggested, intervalDays, storageKey]);
 
   const applySuggestion = () => {
     if (suggested?.days) setIntervalDays(suggested.days);
@@ -266,7 +443,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient, selec
   }
 
   return (
-    <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 md:p-5 mb-6">
+    <div key={`analysis-planner-${lastAnalysisDate}-${intervalDays}-${forceUpdate}`} className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 md:p-5 mb-6">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <CalendarDays className="w-5 h-5 text-amber-300" />
@@ -290,7 +467,9 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient, selec
           <label className="block text-sm text-slate-300 mb-1">Última análise</label>
           <div className={`flex items-center gap-2 bg-slate-800/70 border border-slate-700/60 rounded-lg px-3 py-2 text-slate-200`}>
             <CalendarDays className="w-4 h-4 text-amber-300" />
-            <span>{lastDateObj ? formatDateBR(lastDateObj) : '—'}</span>
+            <span>
+              {lastAnalysisDate ? formatDateBR(dayjs(lastAnalysisDate).toDate()) : '—'}
+            </span>
           </div>
         </div>
 
@@ -306,7 +485,9 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient, selec
           <label className="block text-sm text-slate-300 mb-1">Próxima análise</label>
           <div className={`flex items-center gap-2 bg-slate-800/70 border border-slate-700/60 rounded-lg px-3 py-2 text-slate-200`}>
             <Clock className="w-4 h-4 text-amber-300" />
-            <span>{nextDate ? formatDateBR(nextDate) : '—'}</span>
+            <span>
+              {nextDate ? formatDateBR(nextDate) : '—'}
+            </span>
           </div>
         </div>
       </div>
@@ -329,9 +510,14 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient, selec
               playButtonClickEffect(e.currentTarget);
               handleMarkAnalyzedToday(); 
             }}
-            className={`relative overflow-hidden px-3 py-2 text-sm rounded-lg border bg-emerald-600/80 hover:bg-emerald-600 active:scale-[0.98] transition transform text-white border-emerald-500/40`}
+            disabled={isUpdating}
+            className={`relative overflow-hidden px-3 py-2 text-sm rounded-lg border transition transform text-white ${
+              isUpdating 
+                ? 'bg-amber-600/80 border-amber-500/40 cursor-wait' 
+                : 'bg-emerald-600/80 hover:bg-emerald-600 active:scale-[0.98] border-emerald-500/40'
+            }`}
           >
-            Marcar como analisado hoje
+            {isUpdating ? 'Atualizando...' : 'Marcar como analisado hoje'}
           </button>
         </div>
       </div>

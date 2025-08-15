@@ -64,6 +64,30 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
   };
   const [tooltip, setTooltip] = useState<{ visible: boolean; x: number; y: number; content: string; color: 'emerald' | 'blue' | 'slate' }>({ visible: false, x: 0, y: 0, content: '', color: 'slate' });
 
+  // Listener para atualizações de análise
+  useEffect(() => {
+    const handleAnalysisUpdate = () => {
+      console.log('🔄 PendingAudiencesStatus - Recebeu evento de atualização de análise');
+      // Força recarregamento dos dados
+      setLoading(true);
+    };
+
+    const handleStorageUpdate = (e: StorageEvent) => {
+      if (e.key === 'refreshTrigger') {
+        console.log('🔄 PendingAudiencesStatus - Recebeu trigger de refresh via localStorage');
+        setLoading(true);
+      }
+    };
+
+    window.addEventListener('analysisUpdated', handleAnalysisUpdate);
+    window.addEventListener('storage', handleStorageUpdate);
+    
+    return () => {
+      window.removeEventListener('analysisUpdated', handleAnalysisUpdate);
+      window.removeEventListener('storage', handleStorageUpdate);
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     const load = async () => {

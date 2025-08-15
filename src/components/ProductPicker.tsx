@@ -267,9 +267,21 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
         }
       }));
       
-      // 🎯 MELHORIA: Disparar evento específico para carregar públicos imediatamente
-      console.log('🚀 ProductPicker - Disparando carregamento imediato de públicos...');
+      // 🎯 CARREGAMENTO IMEDIATO E DUPLO para garantir que funcione
+      console.log('🚀 ProductPicker - Disparando carregamento IMEDIATO de públicos...');
+      
+      // Primeiro disparo imediato
+      window.dispatchEvent(new CustomEvent('loadAudiencesForProduct', {
+        detail: { 
+          productName: product.name,
+          campaignId: product.campaign.id,
+          immediate: true
+        }
+      }));
+      
+      // Segundo disparo com delay para garantir que capture
       setTimeout(() => {
+        console.log('🔄 ProductPicker - Segundo disparo para garantir carregamento...');
         window.dispatchEvent(new CustomEvent('loadAudiencesForProduct', {
           detail: { 
             productName: product.name,
@@ -277,7 +289,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
             immediate: true
           }
         }));
-      }, 100); // Delay mínimo para garantir que outros eventos sejam processados primeiro
+      }, 300);
     }
   };
 
