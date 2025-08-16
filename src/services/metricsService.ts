@@ -2160,10 +2160,10 @@ export const metricsService = {
       }
       
       console.log('🔍 DEBUG - getMonthlyDetails - Nenhum dado encontrado para:', { month, product, client });
-      return { agendamentos: 0, vendas: 0, ticketMedio: 0 };
+      return { agendamentos: 0, vendas: 0, ticketMedio: 250, cpv: 0, roi: '0% (0.0x)' };
     } catch (error) {
       console.error('Erro ao buscar detalhes mensais:', error);
-      return { agendamentos: 0, vendas: 0, ticketMedio: 0 };
+      return { agendamentos: 0, vendas: 0, ticketMedio: 250, cpv: 0, roi: '0% (0.0x)' };
     }
   },
 
@@ -2868,6 +2868,14 @@ export const metricsService = {
       console.log('🔍 DEBUG - getRealValuesForClient - Buscando valores reais para:', { month, client });
       console.log('🎯 CARD DEBUG - getRealValuesForClient - INICIANDO busca de valores reais para os cards');
       
+      // 🔍 DEBUG: Verificar parâmetros de entrada
+      console.log('🔍 DEBUG - getRealValuesForClient - FILTROS APLICADOS:', {
+        monthFilter: month,
+        clientFilter: client,
+        monthType: typeof month,
+        clientType: typeof client
+      });
+      
       // Primeiro, buscar dados da coleção monthlyDetails (dados reais da planilha)
       // CORREÇÃO: Filtrar por mês E cliente para evitar dados de outros clientes
       const monthlyDetailsQuery = query(
@@ -2896,11 +2904,25 @@ export const metricsService = {
       monthlyDetailsSnapshot.forEach((doc) => {
         const data = doc.data();
         
+        // 🔍 DEBUG: Verificar se cada documento está no mês/cliente correto
+        const docMonth = data.month;
+        const docClient = data.client;
+        console.log('🔍 DEBUG - getRealValuesForClient - VERIFICAÇÃO DE FILTRO:', {
+          filtroMes: month,
+          filtroCliente: client,
+          documentoMes: docMonth,
+          documentoCliente: docClient,
+          mesMatch: docMonth === month,
+          clienteMatch: docClient === client,
+          docId: doc.id
+        });
+        
         // CORREÇÃO: Verificar se o documento pertence ao cliente correto
         // Agora que temos filtro por client, todos os documentos são do cliente correto
         console.log('🔍 DEBUG - getRealValuesForClient - MonthlyDetail:', {
           product: data.product,
           client: data.client,
+          month: data.month,
           agendamentos: data.agendamentos,
           vendas: data.vendas,
           cpv: data.cpv,
@@ -2921,7 +2943,19 @@ export const metricsService = {
           allData: data
         });
         
-        // Somar valores de todos os produtos
+        // 🔍 VERIFICAÇÃO ADICIONAL: Garantir que o documento é do mês/cliente correto
+        if (data.month !== month || data.client !== client) {
+          console.error('🚨 ERRO DE FILTRO - getRealValuesForClient - Documento fora do filtro:', {
+            filtroMes: month,
+            filtroCliente: client,
+            documentoMes: data.month,
+            documentoCliente: data.client,
+            docId: doc.id
+          });
+          return; // Pular este documento
+        }
+        
+        // Somar valores de todos os produtos DO MÊS CORRETO
         totalAgendamentos += (data.agendamentos || 0);
         totalVendas += (data.vendas || 0);
         totalCPV += (data.cpv || 0);
@@ -2943,22 +2977,76 @@ export const metricsService = {
         });
       });
       
-      // CORREÇÃO: Se não há DOCUMENTOS para este cliente/mês, retornar valores zerados
-      // MAS se há documentos, mesmo com valores zero, devemos processá-los
+      // CORREÇÃO: Se não há DOCUMENTOS na monthlyDetails, tentar buscar em audienceDetails
       if (productCount === 0) {
-        console.log('🔍 DEBUG - getRealValuesForClient - Nenhum documento encontrado para cliente/mês, retornando valores zerados');
-        console.log('🎯 CARD DEBUG - getRealValuesForClient - SAINDO PRECOCEMENTE - sem documentos:', {
+        console.log('🔍 DEBUG - getRealValuesForClient - Nenhum documento encontrado na monthlyDetails, tentando audienceDetails...');
+        console.log('🎯 CARD DEBUG - getRealValuesForClient - TENTANDO FALLBACK para audienceDetails:', {
           totalAgendamentos,
           totalVendas,
           productCount,
           monthlyDetailsFound: monthlyDetailsSnapshot.size
         });
-        return {
-          agendamentos: 0,
-          vendas: 0,
-          cpv: 0,
-          roi: '0% (0.0x)'
-        };
+        
+        try {
+          // Buscar dados em audienceDetails como fallback
+          const audienceDetailsQuery = query(
+            collection(db, 'audienceDetails'),
+            where('month', '==', month),
+            where('client', '==', client)
+          );
+          
+          const audienceDetailsSnapshot = await getDocs(audienceDetailsQuery);
+          console.log('🔍 DEBUG - getRealValuesForClient - FALLBACK - audienceDetails encontrados:', audienceDetailsSnapshot.size);
+          
+          let fallbackAgendamentos = 0;
+          let fallbackVendas = 0;
+          
+          audienceDetailsSnapshot.forEach((doc) => {
+            const data = doc.data();
+            console.log('🔍 DEBUG - getRealValuesForClient - FALLBACK - audienceDetails documento:', {
+              docId: doc.id,
+              month: data.month,
+              client: data.client,
+              product: data.product,
+              audience: data.audience,
+              agendamentos: data.agendamentos,
+              vendas: data.vendas
+            });
+            
+            fallbackAgendamentos += (data.agendamentos || 0);
+            fallbackVendas += (data.vendas || 0);
+          });
+          
+          console.log('🔍 DEBUG - getRealValuesForClient - FALLBACK - Totais encontrados:', {
+            fallbackAgendamentos,
+            fallbackVendas
+          });
+          
+          // Se encontramos dados em audienceDetails, usar eles
+          if (fallbackAgendamentos > 0 || fallbackVendas > 0) {
+            console.log('🎯 CARD DEBUG - getRealValuesForClient - ✅ USANDO dados do FALLBACK audienceDetails');
+            totalAgendamentos = fallbackAgendamentos;
+            totalVendas = fallbackVendas;
+            productCount = audienceDetailsSnapshot.size;
+          } else {
+            // Se não há dados em nenhuma coleção, retornar zero
+            console.log('🔍 DEBUG - getRealValuesForClient - FALLBACK também não encontrou dados, retornando zeros');
+            return {
+              agendamentos: 0,
+              vendas: 0,
+              cpv: 0,
+              roi: '0% (0.0x)'
+            };
+          }
+        } catch (fallbackError) {
+          console.error('🔍 DEBUG - getRealValuesForClient - Erro no fallback para audienceDetails:', fallbackError);
+          return {
+            agendamentos: 0,
+            vendas: 0,
+            cpv: 0,
+            roi: '0% (0.0x)'
+          };
+        }
       }
       
       console.log('🎯 CARD DEBUG - getRealValuesForClient - PROSSEGUINDO com processamento:', {
@@ -3466,8 +3554,19 @@ export const metricsService = {
       const monthlyDetailsSnapshot = await getDocs(monthlyDetailsQuery);
       const monthsWithData: string[] = [];
       
+      console.log('🔍 DEBUG - checkClientDataInOtherMonths - Documentos encontrados na monthlyDetails:', monthlyDetailsSnapshot.size);
+      
       monthlyDetailsSnapshot.forEach((doc) => {
         const data = doc.data();
+        console.log('🔍 DEBUG - checkClientDataInOtherMonths - Documento encontrado:', {
+          docId: doc.id,
+          month: data.month,
+          client: data.client,
+          product: data.product,
+          agendamentos: data.agendamentos,
+          vendas: data.vendas
+        });
+        
         if (data.month && !monthsWithData.includes(data.month)) {
           monthsWithData.push(data.month);
         }
@@ -3500,6 +3599,76 @@ export const metricsService = {
     } catch (error) {
       console.error('Erro ao verificar dados do cliente em outros meses:', error);
       return [];
+    }
+  },
+
+  // Função de debug para verificar dados de um período específico
+  async debugPeriodData(client: string, month: string) {
+    try {
+      console.log('🔍 DEBUG - debugPeriodData - Verificando dados para:', { client, month });
+      
+      // Verificar monthlyDetails
+      const monthlyDetailsQuery = query(
+        collection(db, 'monthlyDetails'),
+        where('month', '==', month),
+        where('client', '==', client)
+      );
+      const monthlyDetailsSnapshot = await getDocs(monthlyDetailsQuery);
+      
+      console.log('🔍 DEBUG - debugPeriodData - monthlyDetails encontrados:', monthlyDetailsSnapshot.size);
+      
+      monthlyDetailsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        console.log('🔍 DEBUG - debugPeriodData - monthlyDetails documento:', {
+          docId: doc.id,
+          month: data.month,
+          client: data.client,
+          product: data.product,
+          agendamentos: data.agendamentos,
+          vendas: data.vendas,
+          cpv: data.cpv,
+          roi: data.roi,
+          ticketMedio: data.ticketMedio
+        });
+      });
+      
+      // Verificar audienceDetails
+      const audienceDetailsQuery = query(
+        collection(db, 'audienceDetails'),
+        where('month', '==', month),
+        where('client', '==', client)
+      );
+      const audienceDetailsSnapshot = await getDocs(audienceDetailsQuery);
+      
+      console.log('🔍 DEBUG - debugPeriodData - audienceDetails encontrados:', audienceDetailsSnapshot.size);
+      
+      audienceDetailsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        console.log('🔍 DEBUG - debugPeriodData - audienceDetails documento:', {
+          docId: doc.id,
+          month: data.month,
+          client: data.client,
+          product: data.product,
+          audience: data.audience,
+          agendamentos: data.agendamentos,
+          vendas: data.vendas
+        });
+      });
+      
+      // Testar getRealValuesForClient diretamente
+      console.log('🔍 DEBUG - debugPeriodData - Testando getRealValuesForClient...');
+      const result = await this.getRealValuesForClient(month, client);
+      console.log('🔍 DEBUG - debugPeriodData - Resultado getRealValuesForClient:', result);
+      
+      return {
+        monthlyDetailsCount: monthlyDetailsSnapshot.size,
+        audienceDetailsCount: audienceDetailsSnapshot.size,
+        getRealValuesResult: result
+      };
+      
+    } catch (error) {
+      console.error('🔍 DEBUG - debugPeriodData - Erro:', error);
+      return { error: error instanceof Error ? error.message : 'Erro desconhecido' };
     }
   },
 

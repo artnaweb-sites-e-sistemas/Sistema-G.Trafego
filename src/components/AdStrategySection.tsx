@@ -126,19 +126,21 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
         }
       }
       
-      // Sincronizar orçamento apenas das não sincronizadas
-      const toSync = strategies.filter(s => !s.isSynchronized);
-      if (toSync.length > 0) {
-        console.log(`🔍 DEBUG - Sincronizando ${toSync.length} estratégias não sincronizadas`);
-        for (const s of toSync) {
-          const syncKey = `${s.id}-${selectedMonth}`;
-          if (!hasSyncedRef.current.has(syncKey)) {
-            try {
-              await syncStrategyBudgetFromMeta(s);
-              hasSyncedRef.current.add(syncKey);
-              await new Promise(res => setTimeout(res, 300));
-            } catch {}
+      // Sincronizar orçamento de todas as estratégias para o período atual
+      console.log(`🔍 DEBUG - Sincronizando ${strategies.length} estratégias para período ${selectedMonth}`);
+      for (const s of strategies) {
+        const syncKey = `${s.id}-${selectedMonth}`;
+        if (!hasSyncedRef.current.has(syncKey)) {
+          try {
+            console.log(`🔄 DEBUG - Sincronizando estratégia ${s.id} (${s.generatedNames.audience})`);
+            await syncStrategyBudgetFromMeta(s);
+            hasSyncedRef.current.add(syncKey);
+            await new Promise(res => setTimeout(res, 300));
+          } catch (e) {
+            console.warn(`❌ DEBUG - Erro ao sincronizar estratégia ${s.id}:`, e);
           }
+        } else {
+          console.log(`⏭️ DEBUG - Estratégia ${s.id} já foi sincronizada para período ${selectedMonth}`);
         }
       }
       
@@ -505,11 +507,82 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     (value || '')
       .toLowerCase()
       .replace(/\s+/g, ' ')
-      .replace(/[^a-z0-9\s]/g, '')
+      // Keep brackets and parentheses but normalize them
+      .replace(/[\[\]\(\)]/g, ' ')
+      // Remove other special characters but keep letters, numbers, and spaces
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim();
 
   const namesExactlyMatch = (adSetName: string, strategyAudienceName: string): boolean => {
-    return normalizeName(adSetName) === normalizeName(strategyAudienceName);
+    // First try exact match with current normalization
+    if (normalizeName(adSetName) === normalizeName(strategyAudienceName)) {
+      console.log(`✅ DEBUG - namesExactlyMatch: Exact match found:`, {
+        adSetName,
+        strategyAudienceName,
+        adSetNormalized: normalizeName(adSetName),
+        strategyNormalized: normalizeName(strategyAudienceName)
+      });
+      return true;
+    }
+    
+    // If exact match fails, try more flexible matching
+    console.log(`🔍 DEBUG - namesExactlyMatch: Exact match failed, trying flexible matching:`, {
+      adSetName,
+      strategyAudienceName,
+      adSetNormalized: normalizeName(adSetName),
+      strategyNormalized: normalizeName(strategyAudienceName)
+    });
+    
+    return namesFlexiblyMatch(adSetName, strategyAudienceName);
+  };
+
+  // More flexible name matching that handles bracket notation and variations
+  const namesFlexiblyMatch = (adSetName: string, strategyAudienceName: string): boolean => {
+    const adSetNormalized = normalizeName(adSetName);
+    const strategyNormalized = normalizeName(strategyAudienceName);
+    
+    // If either is empty, no match
+    if (!adSetNormalized || !strategyNormalized) return false;
+    
+    // Split into words and filter out very short words
+    const adSetWords = adSetNormalized.split(/\s+/).filter(word => word.length >= 3);
+    const strategyWords = strategyNormalized.split(/\s+/).filter(word => word.length >= 3);
+    
+    // If either has no meaningful words, no match
+    if (adSetWords.length === 0 || strategyWords.length === 0) return false;
+    
+    // Count how many words match between the two names
+    let matchingWords = 0;
+    let totalWords = Math.max(adSetWords.length, strategyWords.length);
+    
+    for (const adSetWord of adSetWords) {
+      if (strategyWords.some(strategyWord => 
+        strategyWord.includes(adSetWord) || adSetWord.includes(strategyWord)
+      )) {
+        matchingWords++;
+      }
+    }
+    
+    // Consider it a match if at least 60% of words match
+    const matchThreshold = 0.6;
+    const isMatch = (matchingWords / totalWords) >= matchThreshold;
+    
+    // Debug logging for name matching
+    console.log(`🔍 DEBUG - namesFlexiblyMatch:`, {
+      adSetName,
+      strategyAudienceName,
+      adSetNormalized,
+      strategyNormalized,
+      adSetWords,
+      strategyWords,
+      matchingWords,
+      totalWords,
+      matchPercentage: (matchingWords / totalWords) * 100,
+      isMatch
+    });
+    
+    return isMatch;
   };
 
   // Sincronizar orçamento de UMA estratégia pela correspondência exata do nome do Ad Set
@@ -521,23 +594,46 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       const isLogged = metaAdsService.isLoggedIn?.() ?? false;
       const hasAccount = !!metaAdsService.getSelectedAccount?.();
       if (!isConfigured || !isLogged || !hasAccount) {
+        console.log(`❌ DEBUG - syncStrategyBudgetFromMeta - Meta Ads não configurado:`, {
+          isConfigured,
+          isLogged,
+          hasAccount,
+          strategyName: strategy.generatedNames.audience
+        });
         return;
       }
 
       const { startDate, endDate } = getMonthDateRange(selectedMonth);
 
       // Buscar Ad Sets da conta no período
+      console.log(`🔍 DEBUG - syncStrategyBudgetFromMeta - Buscando Ad Sets para estratégia: ${strategy.generatedNames.audience}`);
       const adSets = await metaAdsService.getAdSets();
+      console.log(`🔍 DEBUG - syncStrategyBudgetFromMeta - Ad Sets encontrados:`, {
+        totalAdSets: adSets?.length || 0,
+        adSetNames: adSets?.map((ad: any) => ad.name) || [],
+        strategyName: strategy.generatedNames.audience
+      });
 
       const wanted = strategy.generatedNames.audience;
       const matching = (adSets || []).filter((ad: any) => namesExactlyMatch(ad.name, wanted));
+      
+      console.log(`🔍 DEBUG - syncStrategyBudgetFromMeta - Resultado do matching:`, {
+        wanted,
+        matchingCount: matching.length,
+        matchingNames: matching.map((ad: any) => ad.name),
+        allAdSetNames: adSets?.map((ad: any) => ad.name) || []
+      });
 
       let totalSpend = 0;
       if (matching.length > 0) {
+        console.log(`💰 DEBUG - syncStrategyBudgetFromMeta - Buscando insights para ${matching.length} adSets`);
         const allInsights = await Promise.all(
           matching.map((ad: any) => metaAdsService.getAdSetInsights(ad.id, startDate, endDate, { fallbackToLast30Days: false }))
         );
         totalSpend = allInsights.flat().reduce((sum: number, insight: any) => sum + parseFloat(insight.spend || '0'), 0);
+        console.log(`💰 DEBUG - syncStrategyBudgetFromMeta - Total gasto: R$ ${totalSpend}`);
+      } else {
+        console.log(`❌ DEBUG - syncStrategyBudgetFromMeta - Nenhum adSet encontrado para estratégia: ${strategy.generatedNames.audience}`);
       }
 
       // Atualizar apenas para o período atual, não persistir no strategy
@@ -558,6 +654,12 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           isSynchronized: matching.length > 0
         }));
       }
+      
+      console.log(`✅ DEBUG - syncStrategyBudgetFromMeta - Estratégia ${strategy.generatedNames.audience} sincronizada:`, {
+        matchingCount: matching.length,
+        totalSpend,
+        isSynchronized: matching.length > 0
+      });
     } catch (error) {
       console.warn('Erro ao sincronizar orçamento da estratégia:', error);
     }
@@ -590,6 +692,42 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
         normalizedWanted: normalizeName(wanted),
         normalizedAdSetNames: adSets?.map((ad: any) => normalizeName(ad.name)) || []
       });
+      
+      // 🚀 CRÍTICO - Debug detalhado do matching
+      if (matching.length === 0 && adSets && adSets.length > 0) {
+        console.log(`🚨 CRÍTICO - Nenhum Ad Set encontrado para estratégia "${wanted}"`);
+        console.log(`🚨 CRÍTICO - Testando matching individual para cada Ad Set:`);
+        
+        adSets.forEach((ad: any, index: number) => {
+          const isMatch = namesExactlyMatch(ad.name, wanted);
+          console.log(`  ${index + 1}. "${ad.name}" vs "${wanted}" = ${isMatch ? '✅ MATCH' : '❌ NO MATCH'}`);
+          console.log(`     Normalized: "${normalizeName(ad.name)}" vs "${normalizeName(wanted)}"`);
+        });
+        
+        // Tentar matching mais flexível
+        console.log(`🔍 CRÍTICO - Tentando matching mais flexível...`);
+        const flexibleMatches = adSets.filter((ad: any) => {
+          const adNorm = normalizeName(ad.name).toLowerCase();
+          const stratNorm = normalizeName(wanted).toLowerCase();
+          
+          // Verificar se contém palavras-chave da estratégia
+          const stratWords = stratNorm.split(' ').filter(w => w.length >= 3);
+          const matchingWords = stratWords.filter(word => adNorm.includes(word));
+          
+          return matchingWords.length >= Math.min(2, stratWords.length);
+        });
+        
+        console.log(`🔍 CRÍTICO - Matches flexíveis encontrados:`, {
+          count: flexibleMatches.length,
+          matches: flexibleMatches.map((ad: any) => ad.name)
+        });
+        
+        // 🎯 CORREÇÃO CRÍTICA: Usar matches flexíveis se encontrados
+        if (flexibleMatches.length > 0) {
+          console.log(`✅ CRÍTICO - USANDO matches flexíveis para estratégia "${wanted}"`);
+          matching.push(...flexibleMatches);
+        }
+      }
 
       // Buscar insights APENAS para o período específico selecionado
       let totals = { 
@@ -926,7 +1064,22 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
   // Função para obter se está sincronizado no período atual
   const getCurrentPeriodSyncStatus = (strategy: AdStrategy): boolean => {
     const rec = recommendations[strategy.id];
-    return rec?.stats?.adSetsCount > 0 || false;
+    const hasAdSets = rec?.stats?.adSetsCount > 0;
+    const hasSpend = (rec?.stats?.spend || 0) > 0;
+    
+    // Debug logging for sync status
+    console.log(`🔍 DEBUG - getCurrentPeriodSyncStatus for strategy ${strategy.id}:`, {
+      strategyName: strategy.generatedNames?.audience,
+      hasRecommendations: !!rec,
+      adSetsCount: rec?.stats?.adSetsCount || 0,
+      spend: rec?.stats?.spend || 0,
+      hasAdSets,
+      hasSpend,
+      isSynchronized: hasAdSets || hasSpend
+    });
+    
+    // Consider synchronized if we have ad sets OR if we have spend data
+    return hasAdSets || hasSpend;
   };
 
   // Função para calcular frequência (impressões / reach único)
@@ -1012,6 +1165,114 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
   const isLPVRateAcceptable = (lpvRate: number): boolean => {
     return lpvRate >= 70; // LPV/Link Click ≥ 70%
   };
+
+  // Debug function to help understand strategy synchronization
+  const debugStrategySync = () => {
+    console.log('🔍 DEBUG - Strategy Synchronization Status:');
+    strategies.forEach(strategy => {
+      const rec = recommendations[strategy.id];
+      console.log(`  Strategy: ${strategy.generatedNames?.audience}`);
+      console.log(`    ID: ${strategy.id}`);
+      console.log(`    Has Recommendations: ${!!rec}`);
+      console.log(`    AdSets Count: ${rec?.stats?.adSetsCount || 0}`);
+      console.log(`    Is Synchronized: ${getCurrentPeriodSyncStatus(strategy)}`);
+      console.log(`    Budget Current: ${getCurrentPeriodBudget(strategy)}`);
+      console.log(`    Budget Planned: ${strategy.budget.planned}`);
+      console.log('    ---');
+    });
+  };
+
+  // Add debug function to window for easy access
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).debugStrategySync = debugStrategySync;
+      (window as any).syncStrategyManually = (strategyId: string) => {
+        const strategy = strategies.find(s => s.id === strategyId);
+        if (strategy) {
+          console.log(`🔄 DEBUG - Manually syncing strategy: ${strategy.generatedNames?.audience}`);
+          syncStrategyBudgetFromMeta(strategy);
+          evaluateStrategyPerformance(strategy);
+        } else {
+          console.log(`❌ DEBUG - Strategy not found: ${strategyId}`);
+        }
+      };
+      (window as any).syncAllStrategies = () => {
+        console.log('🔄 DEBUG - Manually syncing all strategies');
+        strategies.forEach(strategy => {
+          syncStrategyBudgetFromMeta(strategy);
+          evaluateStrategyPerformance(strategy);
+        });
+      };
+      (window as any).clearSyncCache = () => {
+        console.log('🧹 DEBUG - Clearing synchronization cache');
+        hasEvaluatedRef.current.clear();
+        hasSyncedRef.current.clear();
+        console.log('✅ DEBUG - Synchronization cache cleared');
+      };
+      (window as any).forceResync = () => {
+        console.log('🔄 DEBUG - Force resync of all strategies');
+        hasEvaluatedRef.current.clear();
+        hasSyncedRef.current.clear();
+        strategies.forEach(strategy => {
+          syncStrategyBudgetFromMeta(strategy);
+          evaluateStrategyPerformance(strategy);
+        });
+      };
+      (window as any).testNameMatching = (adSetName: string, strategyName: string) => {
+        console.log('🧪 DEBUG - Testing name matching:');
+        console.log(`  Ad Set Name: "${adSetName}"`);
+        console.log(`  Strategy Name: "${strategyName}"`);
+        console.log(`  Exact Match: ${normalizeName(adSetName) === normalizeName(strategyName)}`);
+        console.log(`  Flexible Match: ${namesFlexiblyMatch(adSetName, strategyName)}`);
+        console.log(`  Final Result: ${namesExactlyMatch(adSetName, strategyName)}`);
+      };
+      console.log('🔧 DEBUG - AdStrategySection - Funções de debug adicionadas:');
+      console.log('  - debugStrategySync() - Ver status de sincronização');
+      console.log('  - syncStrategyManually(strategyId) - Sincronizar estratégia específica');
+      console.log('  - syncAllStrategies() - Sincronizar todas as estratégias');
+      console.log('  - clearSyncCache() - Limpar cache de sincronização');
+      console.log('  - forceResync() - Forçar re-sincronização de todas as estratégias');
+      console.log('  - testNameMatching(adSetName, strategyName) - Testar lógica de matching');
+      
+      (window as any).debugStrategyMatching = async (strategyName: string) => {
+        console.log('🔍 DEBUG - Testando matching para estratégia:', strategyName);
+        
+        try {
+          const { metaAdsService } = await import('../services/metaAdsService');
+          if (!metaAdsService.isLoggedIn()) {
+            console.log('❌ Meta Ads não está logado');
+            return;
+          }
+          
+          const adSets = await metaAdsService.getAdSets();
+          console.log('🔍 Ad Sets encontrados:', adSets?.length || 0);
+          
+          if (adSets && adSets.length > 0) {
+            console.log('🔍 Testando matching exato:');
+            adSets.forEach((ad: any, index: number) => {
+              const isMatch = namesExactlyMatch(ad.name, strategyName);
+              console.log(`  ${index + 1}. "${ad.name}" = ${isMatch ? '✅' : '❌'}`);
+            });
+            
+            console.log('🔍 Testando matching flexível:');
+            const flexibleMatches = adSets.filter((ad: any) => {
+              const adNorm = normalizeName(ad.name).toLowerCase();
+              const stratNorm = normalizeName(strategyName).toLowerCase();
+              const stratWords = stratNorm.split(' ').filter(w => w.length >= 3);
+              const matchingWords = stratWords.filter(word => adNorm.includes(word));
+              return matchingWords.length >= Math.min(2, stratWords.length);
+            });
+            
+            console.log('✅ Matches flexíveis:', flexibleMatches.map((ad: any) => ad.name));
+          }
+        } catch (error) {
+          console.error('❌ Erro ao testar matching:', error);
+        }
+      };
+      
+      console.log('  - debugStrategyMatching("Nome da Estratégia") - Testar matching de estratégia específica');
+    }
+  }, [strategies, recommendations]);
 
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-xl">

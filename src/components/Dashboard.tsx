@@ -352,9 +352,10 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       return;
     }
     
-    // CORREÇÃO: Verificar se já temos dados válidos para evitar carregamentos desnecessários
-    if (realValuesForClient.agendamentos > 0 || realValuesForClient.vendas > 0) {
-      console.log('🎯 CARD DEBUG - Dashboard - Valores já carregados, pulando nova busca:', realValuesForClient);
+    // CORREÇÃO: Permitir recarregamento quando realValuesRefreshTrigger mudar
+    // Só bloquear se for a primeira execução e já houver valores (evitar loops na inicialização)
+    if ((realValuesForClient.agendamentos > 0 || realValuesForClient.vendas > 0) && realValuesRefreshTrigger === 0) {
+      console.log('🎯 CARD DEBUG - Dashboard - Valores já carregados na inicialização, pulando nova busca:', realValuesForClient);
       return;
     }
     
@@ -486,8 +487,23 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       if (event.detail && event.detail.client === selectedClient && event.detail.month === selectedMonth) {
         console.log('🔍 DEBUG - Dashboard - Evento corresponde ao cliente/mês atual, recarregando valores reais...');
         
-        // Forçar recarregamento dos valores reais usando o trigger
-        setRealValuesRefreshTrigger(prev => prev + 1);
+        // 🎯 CORREÇÃO: Limpar cache completamente antes de forçar o recarregamento
+        console.log('🧹 CACHE DEBUG - Dashboard - Limpando cache antes de recarregar valores por edição de público...');
+        metricsService.clearCache();
+        metricsService.clearCacheByClient(selectedClient);
+        
+        // Resetar valores para forçar busca nova
+        setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
+        
+        // 🎯 CORREÇÃO: Adicionar delay pequeno para garantir que Firebase processou a atualização
+        setTimeout(() => {
+          // Forçar recarregamento dos valores reais usando o trigger
+          setRealValuesRefreshTrigger(prev => {
+            const newValue = prev + 1;
+            console.log('🔍 DEBUG - Dashboard - Trigger de refresh incrementado de', prev, 'para', newValue, '(audienceDetailsSaved)');
+            return newValue;
+          });
+        }, 300); // Pequeno delay para garantir sincronização com Firebase
         console.log('🔍 DEBUG - Dashboard - Trigger de refresh dos valores reais acionado');
       }
     };
@@ -954,6 +970,106 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         }
       };
 
+      // 🧹 NOVA FUNÇÃO DEBUG: RESET TOTAL DO SISTEMA
+      (window as any).resetEverything = async () => {
+        console.log('🧹 RESET TOTAL - Iniciando limpeza completa do sistema...');
+        
+        if (!confirm('⚠️ ATENÇÃO: Isso vai APAGAR TODOS OS DADOS do Firebase e cache. Tem certeza?')) {
+          return;
+        }
+        
+        if (!confirm('⚠️ ÚLTIMA CHANCE: Todos os dados da planilha detalhes mensais, públicos, campanhas serão DELETADOS permanentemente. Continuar?')) {
+          return;
+        }
+        
+        try {
+          const { db } = await import('../config/firebase');
+          const { collection, getDocs, deleteDoc } = await import('firebase/firestore');
+          
+          console.log('🧹 RESET TOTAL - Limpando Firebase...');
+          
+          // Limpar todas as coleções principais
+          const collections = [
+            'monthlyDetails',
+            'audienceDetails', 
+            'campaigns',
+            'adSets',
+            'strategies',
+            'benchmarks',
+            'notifications',
+            'tasks',
+            'shares'
+          ];
+          
+          for (const collectionName of collections) {
+            console.log(`🧹 RESET TOTAL - Limpando coleção: ${collectionName}`);
+            const querySnapshot = await getDocs(collection(db, collectionName));
+            
+            console.log(`🧹 RESET TOTAL - Encontrados ${querySnapshot.size} documentos em ${collectionName}`);
+            
+            const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
+            await Promise.all(deletePromises);
+            
+            console.log(`✅ RESET TOTAL - Coleção ${collectionName} limpa!`);
+          }
+          
+          console.log('🧹 RESET TOTAL - Limpando localStorage completo...');
+          
+          // Limpar TODO o localStorage
+          localStorage.clear();
+          
+          console.log('🧹 RESET TOTAL - Limpando sessionStorage...');
+          
+          // Limpar sessionStorage também
+          sessionStorage.clear();
+          
+          console.log('🧹 RESET TOTAL - Limpando cache do metricsService...');
+          
+          // Limpar cache do metricsService
+          const { metricsService } = await import('../services/metricsService');
+          metricsService.clearAllCacheAndStorage();
+          
+          console.log('🧹 RESET TOTAL - Limpando cache do Meta Ads...');
+          
+          // Limpar cache do Meta Ads
+          try {
+            const { metaAdsService } = await import('../services/metaAdsService');
+            metaAdsService.clearMetricsCache();
+          } catch (e) {
+            console.log('Meta Ads service não disponível');
+          }
+          
+          console.log('🧹 RESET TOTAL - Resetando estados do React...');
+          
+          // Resetar estados locais
+          setSelectedClient('Selecione um cliente');
+          setSelectedProduct('');
+          setSelectedAudience('');
+          setSelectedCampaign('');
+          setMetrics([]);
+          setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
+          setRealValuesRefreshTrigger(0);
+          setRefreshTrigger(0);
+          setMonthlyDetailsValues({ agendamentos: 0, vendas: 0 });
+          setAiBenchmarkResults(null);
+          
+          console.log('✅ RESET TOTAL CONCLUÍDO!');
+          console.log('🔄 Recarregando página em 3 segundos...');
+          
+          // Mostrar mensagem de sucesso
+          alert('✅ RESET TOTAL CONCLUÍDO!\n\nTodos os dados foram apagados.\nSistema resetado como primeira vez.\n\nPágina será recarregada...');
+          
+          // Recarregar página após 3 segundos
+          setTimeout(() => {
+            window.location.reload();
+          }, 3000);
+          
+        } catch (error) {
+          console.error('❌ ERRO durante reset total:', error);
+          alert(`❌ ERRO durante reset: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+        }
+      };
+
       // 🎯 NOVA FUNÇÃO DEBUG: Verificar estratégias carregadas
       (window as any).debugStrategies = async (client?: string) => {
         const targetClient = client || selectedClient;
@@ -982,12 +1098,111 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         }
       };
 
+      // 🔍 NOVA FUNÇÃO DEBUG: Verificar filtros de período nos cards
+      (window as any).debugPeriodFilter = async (month?: string, client?: string) => {
+        const targetMonth = month || selectedMonth;
+        const targetClient = client || selectedClient;
+        
+        console.log(`🔍 DEBUG - Testando filtros de período:`, { targetMonth, targetClient });
+        
+        try {
+          const { metricsService } = await import('../services/metricsService');
+          
+          // Testar a função getRealValuesForClient que é usada pelos cards
+          console.log('🔍 DEBUG - Chamando getRealValuesForClient...');
+          const result = await metricsService.getRealValuesForClient(targetMonth, targetClient);
+          
+          console.log('🔍 DEBUG - Resultado dos cards:', {
+            agendamentos: result.agendamentos,
+            vendas: result.vendas,
+            cpv: result.cpv,
+            roi: result.roi
+          });
+          
+          return result;
+        } catch (error) {
+          console.error('❌ Erro ao testar filtros:', error);
+          return { error };
+        }
+      };
+
       console.log('🔧 DEBUG - Funções de debug adicionadas ao window:');
       console.log('  - debugAudienceValues("Janeiro 2025", "Nome do Produto") - Ver dados no Firebase');
       console.log('  - resetProductData("Janeiro 2025", "Nome do Produto") - Limpar TODOS os dados e recomeçar');
       console.log('  - deleteOldAudience() - Deletar o público antigo "[Anúncio Jurídico] UTI Negada"');
       console.log('  - clearAllCache() - 🧹 EMERGÊNCIA: Limpar TODO o cache e localStorage');
+      console.log('  - resetEverything() - 🧹 💣 RESET TOTAL: Apagar TUDO (Firebase + Cache + Estados)');
       console.log('  - debugStrategies("Cliente Nome") - 🎯 VERIFICAR: Estratégias carregadas do Firestore');
+      console.log('  - debugPeriodFilter("Janeiro 2025", "Cliente Nome") - 🔍 VERIFICAR: Filtros de período nos cards');
+      
+      (window as any).debugPeriodData = async (client: string, month: string) => {
+        console.log('🔍 DEBUG - Dashboard - Chamando debugPeriodData...');
+        const result = await metricsService.debugPeriodData(client, month);
+        console.log('🔍 DEBUG - Dashboard - Resultado debugPeriodData:', result);
+        return result;
+      };
+      
+      console.log('  - debugPeriodData("Cliente Nome", "Janeiro 2025") - 🔍 VERIFICAR: Dados específicos de um período');
+      
+      (window as any).debugAdSetsForProduct = async (client: string, product: string, month: string) => {
+        console.log('🔍 DEBUG - Dashboard - Verificando Ad Sets para produto específico...');
+        console.log('🔍 DEBUG - Parâmetros:', { client, product, month });
+        
+        // Verificar se há campaign ID salvo
+        const campaignId = localStorage.getItem('selectedCampaignId');
+        console.log('🔍 DEBUG - Campaign ID no localStorage:', campaignId);
+        
+        // Verificar se Meta Ads está conectado
+        const { metaAdsService } = await import('../services/metaAdsService');
+        if (metaAdsService.isLoggedIn() && metaAdsService.hasSelectedAccount()) {
+          console.log('✅ DEBUG - Meta Ads conectado');
+          
+          try {
+            // Buscar campanhas
+            const campaigns = await metaAdsService.getCampaigns();
+            console.log('🔍 DEBUG - Campanhas encontradas:', {
+              total: campaigns.length,
+              campaigns: campaigns.map((c: any) => ({ id: c.id, name: c.name, status: c.status }))
+            });
+            
+            // Buscar Ad Sets se há campaign ID
+            if (campaignId) {
+              const adSets = await metaAdsService.getAdSets(campaignId);
+              console.log('🔍 DEBUG - Ad Sets da campanha:', {
+                campaignId,
+                total: adSets.length,
+                adSets: adSets.map((ad: any) => ({ id: ad.id, name: ad.name, status: ad.status }))
+              });
+            } else {
+              console.log('❌ DEBUG - Nenhum campaign ID encontrado');
+            }
+            
+          } catch (error) {
+            console.error('❌ DEBUG - Erro ao buscar dados do Meta Ads:', error);
+          }
+        } else {
+          console.log('❌ DEBUG - Meta Ads não conectado');
+        }
+      };
+      
+      console.log('  - debugAdSetsForProduct("Cliente", "Produto", "Janeiro 2025") - 🔍 VERIFICAR: Ad Sets de produto específico');
+      
+      (window as any).forceLoadAdSets = async () => {
+        console.log('🚀 CRÍTICO - Forçando carregamento de Ad Sets...');
+        
+        // Disparar evento para forçar carregamento
+        window.dispatchEvent(new CustomEvent('forceLoadAdSets'));
+        
+        // Também tentar recarregar via AudiencePicker
+        const audiencePickerEvent = new CustomEvent('reloadAudiences', {
+          detail: { force: true }
+        });
+        window.dispatchEvent(audiencePickerEvent);
+        
+        console.log('🚀 CRÍTICO - Eventos de força carregamento disparados!');
+      };
+      
+      console.log('  - forceLoadAdSets() - 🚀 FORÇAR: Recarregar conjuntos de anúncios');
     }
   }, [selectedMonth, selectedProduct]);
 
@@ -1233,10 +1448,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                       metrics={metrics} 
                       selectedClient={selectedClient}
                       selectedMonth={selectedMonth}
-                      realAgendamentos={realValuesForClient.agendamentos}
-                      realVendas={realValuesForClient.vendas}
-                      realCPV={realValuesForClient.cpv}
-                      realROI={realValuesForClient.roi}
                     />
                     
                     {/* Seção de Estratégia de Anúncio - aparece abaixo das métricas iniciais */}

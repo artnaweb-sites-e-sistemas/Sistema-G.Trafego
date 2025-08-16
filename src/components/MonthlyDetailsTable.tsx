@@ -925,11 +925,149 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     }
   }, [savedDetails.ticketMedio, ticketMedioEditedByUser]);
 
+  // 🎯 NOVO: Carregar ticketMedio do Firebase quando mudar produto/mês/cliente
+  useEffect(() => {
+    if (selectedProduct && selectedMonth && selectedClient) {
+      console.log('🔄 DEBUG - MonthlyDetailsTable - Mudança de contexto detectada, carregando ticketMedio do Firebase...');
+      
+      // Resetar flag de edição para permitir carregamento do Firebase
+      setTicketMedioEditedByUser(false);
+      
+      // Carregar dados do Firebase
+      const loadTicketMedioFromFirebase = async () => {
+        try {
+          const details = await metricsService.getMonthlyDetails(
+            selectedMonth,
+            selectedProduct,
+            selectedClient
+          );
+          
+          console.log('💰 DEBUG - MonthlyDetailsTable - TicketMedio carregado do Firebase:', {
+            ticketMedioSalvo: details.ticketMedio,
+            ticketMedioAtual: ticketMedio,
+            produto: selectedProduct,
+            mes: selectedMonth,
+            cliente: selectedClient
+          });
+          
+          // Aplicar valor salvo se for diferente do padrão
+          if (details.ticketMedio && details.ticketMedio > 0 && details.ticketMedio !== 250) {
+            console.log('💰 DEBUG - MonthlyDetailsTable - Aplicando ticketMedio salvo:', details.ticketMedio);
+            setTicketMedio(details.ticketMedio);
+          } else {
+            console.log('💰 DEBUG - MonthlyDetailsTable - Usando ticketMedio padrão (250)');
+            setTicketMedio(250);
+          }
+        } catch (error) {
+          console.error('❌ DEBUG - MonthlyDetailsTable - Erro ao carregar ticketMedio do Firebase:', error);
+          setTicketMedio(250); // Usar valor padrão em caso de erro
+        }
+      };
+      
+      loadTicketMedioFromFirebase();
+    }
+  }, [selectedProduct, selectedMonth, selectedClient]);
+
+  // 🎯 FUNÇÕES DE DEBUG PARA TICKET MÉDIO
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Debug do estado atual do ticket médio
+      (window as any).debugTicketMedio = () => {
+        console.log('💰 DEBUG - Ticket Médio - Estado atual:', {
+          ticketMedio: ticketMedio,
+          ticketMedioEditedByUser: ticketMedioEditedByUser,
+          savedDetails: savedDetails,
+          selectedProduct: selectedProduct,
+          selectedMonth: selectedMonth,
+          selectedClient: selectedClient,
+          timestamp: new Date().toISOString()
+        });
+      };
+
+      // Debug do Firebase para ticket médio
+      (window as any).debugTicketMedioFirebase = async () => {
+        if (!selectedProduct || !selectedMonth || !selectedClient) {
+          console.log('❌ DEBUG - Ticket Médio - Nenhum produto/mês/cliente selecionado');
+          return;
+        }
+
+        try {
+          console.log('🔍 DEBUG - Ticket Médio - Buscando no Firebase...', {
+            produto: selectedProduct,
+            mes: selectedMonth,
+            cliente: selectedClient
+          });
+
+          const details = await metricsService.getMonthlyDetails(
+            selectedMonth,
+            selectedProduct,
+            selectedClient
+          );
+
+          console.log('💰 DEBUG - Ticket Médio - Dados do Firebase:', {
+            agendamentos: details.agendamentos,
+            vendas: details.vendas,
+            ticketMedio: details.ticketMedio,
+            cpv: details.cpv,
+            roi: details.roi,
+            produto: selectedProduct,
+            mes: selectedMonth,
+            cliente: selectedClient
+          });
+
+          return details;
+        } catch (error) {
+          console.error('❌ DEBUG - Ticket Médio - Erro ao buscar no Firebase:', error);
+          return { error };
+        }
+      };
+
+      // Debug para forçar carregamento do Firebase
+      (window as any).forceLoadTicketMedio = async () => {
+        if (!selectedProduct || !selectedMonth || !selectedClient) {
+          console.log('❌ DEBUG - Ticket Médio - Nenhum produto/mês/cliente selecionado');
+          return;
+        }
+
+        try {
+          console.log('🔄 DEBUG - Ticket Médio - Forçando carregamento do Firebase...');
+          
+          // Resetar flag para permitir carregamento
+          setTicketMedioEditedByUser(false);
+          
+          const details = await metricsService.getMonthlyDetails(
+            selectedMonth,
+            selectedProduct,
+            selectedClient
+          );
+
+          if (details.ticketMedio && details.ticketMedio > 0 && details.ticketMedio !== 250) {
+            console.log('💰 DEBUG - Ticket Médio - Aplicando valor do Firebase:', details.ticketMedio);
+            setTicketMedio(details.ticketMedio);
+          } else {
+            console.log('💰 DEBUG - Ticket Médio - Usando valor padrão (250)');
+            setTicketMedio(250);
+          }
+
+          return details;
+        } catch (error) {
+          console.error('❌ DEBUG - Ticket Médio - Erro ao forçar carregamento:', error);
+          return { error };
+        }
+      };
+
+      console.log('🔧 DEBUG - MonthlyDetailsTable - Funções de debug para Ticket Médio adicionadas:');
+      console.log('  - debugTicketMedio() - Ver estado atual do ticket médio');
+      console.log('  - debugTicketMedioFirebase() - 🎯 Testar carregamento do Firebase');
+      console.log('  - forceLoadTicketMedio() - 🔄 Forçar carregamento do Firebase');
+    }
+  }, [ticketMedio, ticketMedioEditedByUser, savedDetails, selectedProduct, selectedMonth, selectedClient]);
+
   // Resetar flag de edição quando mudar produto/cliente/mês
   useEffect(() => {
     console.log('🔄 DEBUG - MonthlyDetailsTable - Resetando flag de edição (mudança de contexto)');
     setTicketMedioEditedByUser(false);
-    setTicketMedio(250); // Resetar para valor padrão
+    // 🎯 CORREÇÃO: NÃO resetar ticketMedio para 250 aqui, deixar o novo useEffect carregar do Firebase
   }, [selectedProduct, selectedClient, selectedMonth]);
 
   // Atualizar métricas quando houver mudança no produto selecionado ou nas métricas
@@ -1502,8 +1640,63 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   const handleTicketSave = () => {
     const newValue = parseFloat(ticketEditRawValue) / 100;
     if (!isNaN(newValue) && newValue > 0) {
+      console.log('💰 DEBUG - MonthlyDetailsTable - handleTicketSave - Salvando novo ticket médio:', {
+        valorAnterior: ticketMedio,
+        novoValor: newValue,
+        produto: selectedProduct,
+        mes: selectedMonth,
+        cliente: selectedClient
+      });
+      
+      // 🎯 CORREÇÃO: Marcar que foi editado pelo usuário ANTES de atualizar o estado
+      setTicketMedioEditedByUser(true);
+      
+      // Atualizar o estado do ticket médio
       setTicketMedio(newValue);
+      
+      // 🎯 NOVO: Salvar imediatamente no Firebase
+      if (selectedProduct && selectedMonth && selectedClient) {
+        console.log('💰 DEBUG - MonthlyDetailsTable - handleTicketSave - Salvando imediatamente no Firebase...');
+        
+        // Calcular CPV e ROI para salvar
+        const cpvRow = tableData.find(r => r.metric === 'CPV' || r.metric === 'CPV (Custo por Venda)');
+        const roiRow = tableData.find(r => r.metric === 'ROI' || r.metric === 'ROI/ROAS' || r.metric === 'ROI / ROAS');
+        
+        const cpv = parseNumber(cpvRow?.realValue || '0');
+        const roiValue = saveROIValue(roiRow?.realValue || '0% (0.0x)');
+        
+        // Calcular investimento total
+        const investmentRow = tableData.find(r => r.metric === 'Investimento pretendido (Mês)');
+        const totalInvestment = parseCurrency(investmentRow?.realValue || '0');
+        
+        metricsService.saveMonthlyDetails({
+          month: selectedMonth,
+          product: selectedProduct,
+          client: selectedClient,
+          agendamentos: savedDetails.agendamentos,
+          vendas: savedDetails.vendas,
+          ticketMedio: newValue, // Usar o novo valor
+          cpv: cpv,
+          roi: roiValue
+        }).then(() => {
+          console.log('✅ DEBUG - MonthlyDetailsTable - handleTicketSave - Ticket médio salvo com sucesso no Firebase!');
+          
+          // 🎯 NOVO: Disparar evento para atualizar histórico em tempo real
+          window.dispatchEvent(new CustomEvent('ticketMedioChanged', {
+            detail: {
+              month: selectedMonth,
+              product: selectedProduct,
+              client: selectedClient,
+              ticketMedio: newValue,
+              timestamp: new Date().toISOString()
+            }
+          }));
+        }).catch(error => {
+          console.error('❌ DEBUG - MonthlyDetailsTable - handleTicketSave - Erro ao salvar ticket médio:', error);
+        });
+      }
     }
+    
     setIsEditingTicket(false);
     setTicketEditValue('');
     setTicketEditRawValue('');
@@ -2218,5 +2411,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     </div>
   );
 };
+
+
 
 export default MonthlyDetailsTable;

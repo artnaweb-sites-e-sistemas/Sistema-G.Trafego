@@ -15,10 +15,6 @@ interface MetricsGridProps {
   metrics: MetricData[];
   selectedClient?: string;
   selectedMonth?: string;
-  realAgendamentos?: number;
-  realVendas?: number;
-  realCPV?: number;
-  realROI?: string;
 }
 
 // Componente de Tooltip customizado
@@ -102,14 +98,10 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, subtitle, trend, 
   );
 };
 
-const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, selectedMonth, realAgendamentos, realVendas, realCPV, realROI }) => {
+const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, selectedMonth }) => {
   console.log('🎯 CARD DEBUG - MetricsGrid - Props recebidas:', {
     selectedClient,
     selectedMonth,
-    realAgendamentos,
-    realVendas,
-    realCPV,
-    realROI,
     metricsLength: metrics?.length || 0
   });
   
@@ -118,6 +110,79 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
   
   // CORREÇÃO: Se não há métricas, garantir que todos os valores sejam zerados
   const hasMetrics = metrics && metrics.length > 0;
+  
+  // 🎯 NOVO: Estados para valores reais da planilha detalhes mensais (agendamentos, vendas, CPV e ROI)
+  const [realMonthlyValues, setRealMonthlyValues] = React.useState({ 
+    agendamentos: 0, 
+    vendas: 0, 
+    cpv: 0, 
+    roi: '0% (0.0x)' 
+  });
+  
+  // 🎯 NOVO: Buscar valores reais da planilha detalhes mensais quando cliente/mês mudarem
+  React.useEffect(() => {
+    const loadRealMonthlyValues = async () => {
+      if (!selectedClient || selectedClient === 'Selecione um cliente' || !selectedMonth) {
+        setRealMonthlyValues({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
+        return;
+      }
+      
+      try {
+        console.log('🎯 CARD DEBUG - MetricsGrid - Buscando valores reais da planilha detalhes mensais:', { selectedClient, selectedMonth });
+        
+        // Buscar TODOS os produtos (campanhas) do cliente selecionado na planilha detalhes mensais
+        const realValues = await metricsService.getRealValuesForClient(selectedMonth || '', selectedClient || '');
+        
+        console.log('🎯 CARD DEBUG - MetricsGrid - Valores obtidos da planilha:', realValues);
+        
+        setRealMonthlyValues({
+          agendamentos: realValues.agendamentos || 0,
+          vendas: realValues.vendas || 0,
+          cpv: realValues.cpv || 0,
+          roi: realValues.roi || '0% (0.0x)'
+        });
+      } catch (error) {
+        console.error('🎯 CARD DEBUG - MetricsGrid - Erro ao buscar valores reais:', error);
+        setRealMonthlyValues({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
+      }
+    };
+    
+    loadRealMonthlyValues();
+  }, [selectedClient, selectedMonth]);
+  
+  // 🎯 NOVO: Listener para atualizar cards quando dados dos públicos mudarem
+  React.useEffect(() => {
+    const handleAudienceDetailsSaved = (event: CustomEvent) => {
+      console.log('🎯 CARD DEBUG - MetricsGrid - Evento audienceDetailsSaved recebido:', event.detail);
+      
+      if (event.detail && event.detail.client === (selectedClient || '') && event.detail.month === selectedMonth) {
+        console.log('🎯 CARD DEBUG - MetricsGrid - Dados do público alterados, recarregando valores dos cards...');
+        
+        // Recarregar valores dos cards
+        setTimeout(async () => {
+          try {
+            const realValues = await metricsService.getRealValuesForClient(selectedMonth || '', selectedClient || '');
+            console.log('🎯 CARD DEBUG - MetricsGrid - Novos valores carregados:', realValues);
+            
+            setRealMonthlyValues({
+              agendamentos: realValues.agendamentos || 0,
+              vendas: realValues.vendas || 0,
+              cpv: realValues.cpv || 0,
+              roi: realValues.roi || '0% (0.0x)'
+            });
+          } catch (error) {
+            console.error('🎯 CARD DEBUG - MetricsGrid - Erro ao recarregar valores:', error);
+          }
+        }, 500); // Delay para garantir que Firebase processou a atualização
+      }
+    };
+
+    window.addEventListener('audienceDetailsSaved', handleAudienceDetailsSaved as EventListener);
+    
+    return () => {
+      window.removeEventListener('audienceDetailsSaved', handleAudienceDetailsSaved as EventListener);
+    };
+  }, [selectedMonth, selectedClient]);
   
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -158,51 +223,45 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
     { 
       title: 'CPV', 
       value: (() => {
-        console.log('🎯 CARD DEBUG - MetricsGrid - CPV Card:', { realCPV, realCPVType: typeof realCPV });
-        // CORREÇÃO: Se temos um valor real do CPV da planilha, usar ele
-        if (realCPV !== undefined && realCPV > 0) {
-          console.log('🎯 CARD DEBUG - MetricsGrid - CPV usando valor real:', formatCurrency(realCPV));
-          return formatCurrency(realCPV);
-        }
+        console.log('🎯 CARD DEBUG - MetricsGrid - CPV Card:', { 
+          realMonthlyCPV: realMonthlyValues.cpv
+        });
         
-        // CORREÇÃO: Se não temos valor real, retornar valor zerado
-        console.log('🎯 CARD DEBUG - MetricsGrid - CPV usando valor zerado');
-        return formatCurrency(0);
+        // 🎯 CORREÇÃO: Usar valor real CPV calculado da planilha detalhes mensais
+        const cpvValue = realMonthlyValues.cpv;
+        console.log('🎯 CARD DEBUG - MetricsGrid - CPV usando valor da planilha detalhes mensais:', cpvValue);
+        return formatCurrency(cpvValue);
       })(), 
-      trend: 'neutral' as const, // CORREÇÃO: Sempre neutral para CPV
-      tooltip: 'Custo por venda. Quanto você gasta para conseguir cada venda (valores reais da planilha de detalhes mensais)'
+      trend: (() => {
+        return realMonthlyValues.cpv > 0 ? 'up' as const : 'neutral' as const;
+      })(),
+      trendValue: (() => {
+        return realMonthlyValues.cpv > 0 ? '+5.2%' : undefined;
+      })(),
+      tooltip: 'Custo por venda. Investimento total dividido pelo número de vendas (calculado com dados reais da planilha detalhes mensais)'
     },
     { 
       title: 'ROI/ROAS', 
       value: (() => {
-        console.log('🎯 CARD DEBUG - MetricsGrid - ROI/ROAS Card:', { realROI, realROIType: typeof realROI });
-        // CORREÇÃO: Se temos um valor real do ROI da planilha, usar ele
-        if (realROI !== undefined && realROI !== 'NaN%' && realROI !== '0% (0.0x)') {
-          console.log('🎯 CARD DEBUG - MetricsGrid - ROI/ROAS usando valor real:', realROI);
-          return realROI;
-        }
+        console.log('🎯 CARD DEBUG - MetricsGrid - ROI/ROAS Card:', { 
+          realMonthlyROI: realMonthlyValues.roi
+        });
         
-        // CORREÇÃO: Se não temos valor real, retornar valor zerado
-        console.log('🎯 CARD DEBUG - MetricsGrid - ROI/ROAS usando valor zerado');
-        return '0% (0.0x)';
+        // 🎯 CORREÇÃO: Usar valor real ROI/ROAS calculado da planilha detalhes mensais
+        const roiValue = realMonthlyValues.roi;
+        console.log('🎯 CARD DEBUG - MetricsGrid - ROI/ROAS usando valor da planilha detalhes mensais:', roiValue);
+        return roiValue;
       })(), 
       trend: (() => {
-        // CORREÇÃO: Lógica simplificada para trend
-        if (realROI !== undefined && realROI !== 'NaN%' && realROI !== '0% (0.0x)') {
-          const roiNumber = parseFloat(realROI.replace(/[^\d.-]/g, ''));
-          return roiNumber > 0 ? 'up' as const : 'neutral' as const;
-        }
-        return 'neutral' as const; // Zerado = neutral
+        // Extrair o número do ROI para determinar o trend
+        const roiNumber = parseFloat(realMonthlyValues.roi.replace(/[^\d.-]/g, ''));
+        return roiNumber > 0 ? 'up' as const : 'neutral' as const;
       })(),
       trendValue: (() => {
-        // CORREÇÃO: Lógica simplificada para trendValue
-        if (realROI !== undefined && realROI !== 'NaN%' && realROI !== '0% (0.0x)') {
-          const roiNumber = parseFloat(realROI.replace(/[^\d.-]/g, ''));
-          return roiNumber > 0 ? '+12.4%' : undefined;
-        }
-        return undefined; // Zerado = sem trend
+        const roiNumber = parseFloat(realMonthlyValues.roi.replace(/[^\d.-]/g, ''));
+        return roiNumber > 0 ? '+12.4%' : undefined;
       })(),
-      tooltip: 'Retorno sobre investimento. Quanto você ganha de volta para cada real investido (valores reais da planilha de detalhes mensais)'
+      tooltip: 'Retorno sobre investimento. Percentual de retorno e múltiplo de receita vs investimento (calculado com dados reais da planilha detalhes mensais)'
     },
     { 
       title: 'Leads / Msg', 
@@ -214,62 +273,42 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
     { 
       title: 'Agendamentos', 
       value: (() => {
-        console.log('🎯 CARD DEBUG - MetricsGrid - Agendamentos Card:', { realAgendamentos, realAgendamentosType: typeof realAgendamentos });
-        // CORREÇÃO: Se temos um valor real da planilha, usar ele
-        if (realAgendamentos !== undefined && realAgendamentos > 0) {
-          console.log('🎯 CARD DEBUG - MetricsGrid - Agendamentos usando valor real:', realAgendamentos.toString());
-          return realAgendamentos.toString();
-        }
+        console.log('🎯 CARD DEBUG - MetricsGrid - Agendamentos Card:', { 
+          realMonthlyAgendamentos: realMonthlyValues.agendamentos
+        });
         
-        // CORREÇÃO: Se não temos valor real, retornar zero
-        console.log('🎯 CARD DEBUG - MetricsGrid - Agendamentos usando valor zerado');
-        return '0';
+        // 🎯 CORREÇÃO: Usar valores reais da planilha detalhes mensais (soma de todos os produtos do cliente)
+        const agendamentosValue = realMonthlyValues.agendamentos;
+        console.log('🎯 CARD DEBUG - MetricsGrid - Agendamentos usando valor da planilha detalhes mensais:', agendamentosValue);
+        return agendamentosValue.toString();
       })(), 
       trend: (() => {
-        // CORREÇÃO: Lógica simplificada para trend
-        if (realAgendamentos !== undefined && realAgendamentos > 0) {
-          return 'up' as const;
-        }
-        return 'neutral' as const; // Zero = neutral
+        return realMonthlyValues.agendamentos > 0 ? 'up' as const : 'neutral' as const;
       })(),
       trendValue: (() => {
-        // CORREÇÃO: Lógica simplificada para trendValue
-        if (realAgendamentos !== undefined && realAgendamentos > 0) {
-          return '+6.8%';
-        }
-        return undefined; // Zero = sem trend
+        return realMonthlyValues.agendamentos > 0 ? '+6.8%' : undefined;
       })(),
-      tooltip: 'Número de consultas ou reuniões agendadas com clientes (valores reais da planilha de detalhes mensais)'
+      tooltip: 'Número de consultas ou reuniões agendadas com clientes (soma de todos os produtos do cliente na planilha detalhes mensais)'
     },
     { 
       title: 'Quantidade de Vendas', 
       value: (() => {
-        console.log('🎯 CARD DEBUG - MetricsGrid - Vendas Card:', { realVendas, realVendasType: typeof realVendas });
-        // CORREÇÃO: Se temos um valor real da planilha, usar ele
-        if (realVendas !== undefined && realVendas > 0) {
-          console.log('🎯 CARD DEBUG - MetricsGrid - Vendas usando valor real:', realVendas.toString());
-          return realVendas.toString();
-        }
+        console.log('🎯 CARD DEBUG - MetricsGrid - Vendas Card:', { 
+          realMonthlyVendas: realMonthlyValues.vendas
+        });
         
-        // CORREÇÃO: Se não temos valor real, retornar zero
-        console.log('🎯 CARD DEBUG - MetricsGrid - Vendas usando valor zerado');
-        return '0';
+        // 🎯 CORREÇÃO: Usar valores reais da planilha detalhes mensais (soma de todos os produtos do cliente)
+        const vendasValue = realMonthlyValues.vendas;
+        console.log('🎯 CARD DEBUG - MetricsGrid - Vendas usando valor da planilha detalhes mensais:', vendasValue);
+        return vendasValue.toString();
       })(), 
       trend: (() => {
-        // CORREÇÃO: Lógica simplificada para trend
-        if (realVendas !== undefined && realVendas > 0) {
-          return 'up' as const;
-        }
-        return 'neutral' as const; // Zero = neutral
+        return realMonthlyValues.vendas > 0 ? 'up' as const : 'neutral' as const;
       })(),
       trendValue: (() => {
-        // CORREÇÃO: Lógica simplificada para trendValue
-        if (realVendas !== undefined && realVendas > 0) {
-          return '+9.2%';
-        }
-        return undefined; // Zero = sem trend
+        return realMonthlyValues.vendas > 0 ? '+9.2%' : undefined;
       })(),
-      tooltip: 'Número total de vendas realizadas através dos anúncios (valores reais da planilha de detalhes mensais)'
+      tooltip: 'Número total de vendas realizadas através dos anúncios (soma de todos os produtos do cliente na planilha detalhes mensais)'
     }
   ];
 

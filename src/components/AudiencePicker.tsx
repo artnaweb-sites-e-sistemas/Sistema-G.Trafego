@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Users, ChevronDown, Search, Plus, Trash2, Facebook, X, RefreshCw } from 'lucide-react';
+import { Users, ChevronDown, Search, Plus, Trash2, Facebook, X } from 'lucide-react';
 import { metaAdsService } from '../services/metaAdsService';
 import { useDropdownPortal } from '../hooks/useDropdownPortal.tsx';
 
@@ -72,6 +72,89 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
       'SEO Avançado': '10'
     };
     return productMap[productName] || 'all';
+  };
+
+  // Função para processar Ad Sets encontrados
+  const processAdSets = async (filteredAdSets: any[]) => {
+    try {
+      console.log('🔄 CRÍTICO - processAdSets - Processando Ad Sets:', filteredAdSets.length);
+      
+      // Log detalhado dos Ad Sets encontrados
+      filteredAdSets.forEach((adSet, index) => {
+        console.log(`🔍 DEBUG - Ad Set ${index + 1}:`, {
+          id: adSet.id,
+          name: adSet.name,
+          status: adSet.status,
+          campaign_id: adSet.campaign_id
+        });
+      });
+      
+      console.log('Ad Sets selecionados para exibição:', filteredAdSets.length);
+
+      // Converter Ad Sets para formato de públicos, buscando targeting atualizado por adset quando possível
+      const facebookAudiences: Audience[] = await Promise.all(filteredAdSets.map(async (adSet) => {
+        // Buscar detalhes do ad set (inclui targeting atualizado)
+        let targeting: any = adSet?.targeting || {};
+        try {
+          const det = await metaAdsService.getAdSetDetails(adSet.id);
+          console.log('DEBUG AudiencePicker - detalhes do adset', adSet.id, det);
+          if (det?.targeting) targeting = det.targeting;
+          console.log('DEBUG AudiencePicker - targeting resolvido', adSet.id, targeting);
+        } catch (e) {
+          console.warn('DEBUG AudiencePicker - falha ao buscar detalhes do adset', adSet.id, e);
+        }
+
+        // Idade: priorizar targeting.age_range [min,max]; fallback para age_min/age_max
+        const arrRange = Array.isArray(targeting?.age_range) && targeting.age_range.length === 2
+          ? { min: Number(targeting.age_range[0]), max: Number(targeting.age_range[1]) }
+          : null;
+        const ageMin = (arrRange?.min ?? (typeof targeting?.age_min === 'number' ? targeting.age_min : undefined));
+        const ageMax = (arrRange?.max ?? (typeof targeting?.age_max === 'number' ? targeting.age_max : undefined));
+        const ageRange = (typeof ageMin === 'number' || typeof ageMax === 'number')
+          ? `${ageMin ?? 18}-${ageMax ?? 65}`
+          : undefined;
+
+        // Localização básica
+        let location: string | undefined = undefined;
+        const geo = targeting?.geo_locations || {};
+        const countries: string[] = Array.isArray(geo.countries) ? geo.countries : [];
+        if (countries.length === 1) {
+          location = countries[0] === 'BR' ? 'Brasil' : countries[0];
+        } else if (countries.length > 1) {
+          location = 'Múltiplos países';
+        } else if (geo.location_types && geo.location_types.length > 0) {
+          location = 'Localização personalizada';
+        }
+
+        return {
+          id: `fb-adset-${adSet.id}`,
+          name: adSet.name,
+          description: `Conjunto de anúncios ${adSet.status === 'ACTIVE' ? 'Ativo' : 'Pausado'}`,
+          ageRange,
+          location,
+          productId: selectedProduct,
+          clientId: selectedClient,
+          source: 'facebook' as const,
+          adSet: adSet
+        } as Audience;
+      }));
+
+      console.log('Públicos convertidos:', facebookAudiences.length);
+      console.log('Primeiro público:', facebookAudiences[0]);
+
+      // Se não há Ad Sets, mostrar lista vazia
+      if (facebookAudiences.length === 0) {
+        console.log('Nenhum público encontrado, definindo lista vazia');
+        setAudiences([]);
+      } else {
+        console.log('✅ CRÍTICO - Definindo públicos encontrados:', facebookAudiences.length);
+        setAudiences(facebookAudiences);
+      }
+      
+    } catch (error) {
+      console.error('🚨 CRÍTICO - Erro ao processar Ad Sets:', error);
+      setAudiences([]);
+    }
   };
 
   // Carregar Ad Sets do Meta Ads
@@ -192,95 +275,91 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         const { startDate, endDate } = getPeriodDates(selectedMonth || '');
         console.log('Período calculado para Ad Sets:', { startDate, endDate });
                 
-        console.log('🚀 Chamando metaAdsService.getAdSets com campaign ID:', campaignId);
+        console.log('🚀 CRÍTICO - AudiencePicker - Chamando metaAdsService.getAdSets com campaign ID:', campaignId);
+        console.log('🚀 CRÍTICO - AudiencePicker - Meta Ads Service Status:', {
+          isLoggedIn: metaAdsService.isLoggedIn(),
+          hasAccount: metaAdsService.hasSelectedAccount(),
+          selectedAccount: metaAdsService.getSelectedAccount()
+        });
+        
         // 🎯 CORREÇÃO: Não enviar parâmetros de data para getAdSets, a API do Meta não aceita
         const adSetsData = await metaAdsService.getAdSets(campaignId);
-        console.log('Ad Sets retornados da API:', adSetsData.length);
-        console.log('Primeiro Ad Set:', adSetsData[0]);
-                
-        // 🎯 CORREÇÃO: Para períodos anteriores, incluir TODOS os Ad Sets, não apenas ativos
-        // Isso permite ver conjuntos de anúncios de campanhas que estavam ativas no período
-        let filteredAdSets;
+        console.log('🚀 CRÍTICO - Ad Sets retornados da API:', {
+          length: adSetsData.length,
+          campaignId: campaignId,
+          adSetsData: adSetsData
+        });
         
-        // Verificar se estamos vendo um período passado (mais de 7 dias atrás)
-        // Usar a variável startDate já declarada acima
-        const periodDate = new Date(startDate);
-        const now = new Date();
-        const daysDifference = Math.floor((now.getTime() - periodDate.getTime()) / (1000 * 60 * 60 * 24));
-        
-        if (daysDifference > 7) {
-          // Para períodos passados, incluir TODOS os Ad Sets
-          filteredAdSets = adSetsData;
-          console.log('🕰️ Período passado detectado - incluindo TODOS os Ad Sets:', filteredAdSets.length);
+        if (adSetsData.length > 0) {
+          console.log('🚀 CRÍTICO - Primeiro Ad Set encontrado:', adSetsData[0]);
+          console.log('🚀 CRÍTICO - Todos os Ad Sets:', adSetsData.map(ad => ({ 
+            id: ad.id, 
+            name: ad.name, 
+            status: ad.status, 
+            campaign_id: ad.campaign_id 
+          })));
         } else {
-          // Para períodos atuais/recentes, filtrar apenas ativos/pausados
-          filteredAdSets = adSetsData.filter(adSet => 
-            adSet.status === 'ACTIVE' || adSet.status === 'PAUSED'
-          );
-          console.log('📅 Período atual/recente - Ad Sets ativos/pausados:', filteredAdSets.length);
-        }
-        
-        console.log('Ad Sets selecionados para exibição:', filteredAdSets.length);
-
-        // Converter Ad Sets para formato de públicos, buscando targeting atualizado por adset quando possível
-        const facebookAudiences: Audience[] = await Promise.all(filteredAdSets.map(async (adSet) => {
-          // Buscar detalhes do ad set (inclui targeting atualizado)
-          let targeting: any = adSet?.targeting || {};
+          console.error('🚨 CRÍTICO - NENHUM AD SET ENCONTRADO! Investigando...');
+          
+          // Tentar buscar todos os Ad Sets da conta para debug
           try {
-            const det = await metaAdsService.getAdSetDetails(adSet.id);
-            console.log('DEBUG AudiencePicker - detalhes do adset', adSet.id, det);
-            if (det?.targeting) targeting = det.targeting;
-            console.log('DEBUG AudiencePicker - targeting resolvido', adSet.id, targeting);
-          } catch (e) {
-            console.warn('DEBUG AudiencePicker - falha ao buscar detalhes do adset', adSet.id, e);
+            console.log('🔍 CRÍTICO - Tentando buscar TODOS os Ad Sets da conta...');
+            const allAdSets = await metaAdsService.getAdSets();
+            console.log('🔍 CRÍTICO - Todos os Ad Sets da conta:', {
+              total: allAdSets.length,
+              adSets: allAdSets.map(ad => ({ 
+                id: ad.id, 
+                name: ad.name, 
+                status: ad.status, 
+                campaign_id: ad.campaign_id 
+              }))
+            });
+            
+            // Verificar se algum Ad Set pertence à campanha selecionada
+            const matchingAdSets = allAdSets.filter(ad => ad.campaign_id === campaignId);
+            console.log('🔍 CRÍTICO - Ad Sets que pertencem à campanha selecionada:', {
+              campaignId,
+              matching: matchingAdSets.length,
+              adSets: matchingAdSets.map(ad => ({ 
+                id: ad.id, 
+                name: ad.name, 
+                status: ad.status 
+              }))
+            });
+            
+            // 🎯 CORREÇÃO CRÍTICA: Se encontrou Ad Sets da campanha, usar eles
+            if (matchingAdSets.length > 0) {
+              console.log('✅ CRÍTICO - USANDO Ad Sets encontrados via fallback!');
+              // Substituir adSetsData vazio pelos Ad Sets encontrados
+              const correctedAdSetsData = matchingAdSets;
+              
+              // Continuar o processamento com os Ad Sets corretos
+              const filteredAdSets = correctedAdSetsData;
+              console.log('📊 CRÍTICO - INCLUINDO Ad Sets via fallback:', filteredAdSets.length);
+              
+              // Converter e processar os Ad Sets encontrados
+              await processAdSets(filteredAdSets);
+              return; // Sair da função após processar
+            }
+            
+          } catch (debugError) {
+            console.error('🚨 CRÍTICO - Erro ao buscar todos os Ad Sets para debug:', debugError);
           }
+        }
+                
+        // 🎯 CORREÇÃO COMPLETA: Para análise de períodos históricos, SEMPRE incluir TODOS os Ad Sets
+        // O usuário quer ver os dados que existiam no período selecionado, independente do status atual
+        console.log('🔍 DEBUG - AudiencePicker - Período selecionado:', selectedMonth);
+        console.log('🔍 DEBUG - AudiencePicker - Data de início do período:', startDate);
+        console.log('🔍 DEBUG - AudiencePicker - Total de Ad Sets retornados da API:', adSetsData.length);
+        
+        // SEMPRE incluir TODOS os Ad Sets para permitir análise histórica
+        const filteredAdSets = adSetsData;
+        console.log('📊 INCLUINDO TODOS OS AD SETS para análise histórica:', filteredAdSets.length);
+        
+        // Processar Ad Sets encontrados
+        await processAdSets(filteredAdSets);
 
-          // Idade: priorizar targeting.age_range [min,max]; fallback para age_min/age_max
-          const arrRange = Array.isArray(targeting?.age_range) && targeting.age_range.length === 2
-            ? { min: Number(targeting.age_range[0]), max: Number(targeting.age_range[1]) }
-            : null;
-          const ageMin = (arrRange?.min ?? (typeof targeting?.age_min === 'number' ? targeting.age_min : undefined));
-          const ageMax = (arrRange?.max ?? (typeof targeting?.age_max === 'number' ? targeting.age_max : undefined));
-          const ageRange = (typeof ageMin === 'number' || typeof ageMax === 'number')
-            ? `${ageMin ?? 18}-${ageMax ?? 65}`
-            : undefined;
-
-          // Localização básica
-          let location: string | undefined = undefined;
-          const geo = targeting?.geo_locations || {};
-          const countries: string[] = Array.isArray(geo.countries) ? geo.countries : [];
-          if (countries.length === 1) {
-            location = countries[0] === 'BR' ? 'Brasil' : countries[0];
-          } else if (countries.length > 1) {
-            location = 'Múltiplos países';
-          } else if (geo.location_types && geo.location_types.length > 0) {
-            location = 'Localização personalizada';
-          }
-
-          return {
-            id: `fb-adset-${adSet.id}`,
-            name: adSet.name,
-            description: `Conjunto de anúncios ${adSet.status === 'ACTIVE' ? 'Ativo' : 'Pausado'}`,
-            ageRange,
-            location,
-            productId: selectedProduct,
-            clientId: selectedClient,
-            source: 'facebook' as const,
-            adSet: adSet
-          } as Audience;
-        }));
-
-        console.log('Públicos convertidos:', facebookAudiences.length);
-        console.log('Primeiro público:', facebookAudiences[0]);
-
-                 // Se não há Ad Sets, mostrar lista vazia
-         if (facebookAudiences.length === 0) {
-           console.log('Nenhum público encontrado, definindo lista vazia');
-           setAudiences([]);
-         } else {
-           console.log('Definindo públicos encontrados:', facebookAudiences.length);
-           setAudiences(facebookAudiences);
-         }
          
 
         
@@ -356,38 +435,42 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         dataSource === 'facebook' &&
         isFacebookConnected) {
       
-      console.log('✅ Condições atendidas, carregando Ad Sets automaticamente...');
+      console.log('🚀 CARREGAMENTO AUTOMÁTICO SUPER AGRESSIVO ATIVADO!');
       
-      // Limpar públicos atuais primeiro
+      // Limpar públicos atuais IMEDIATAMENTE
       setAudiences([]);
       setSelectedAudience('');
             
-      // 🎯 CARREGAMENTO AUTOMÁTICO MAIS AGRESSIVO
-      const loadWithRetry = async (attempt = 1) => {
+      // 🎯 CARREGAMENTO IMEDIATO E SUPER AGRESSIVO - SEM DELAYS!
+      const loadImmediate = async () => {
         try {
-          console.log(`🔄 AudiencePicker useEffect - Tentativa ${attempt} de carregamento automático...`);
+          console.log('⚡ CARREGAMENTO IMEDIATO - Iniciando AGORA!');
           
-          // Limpar cache antes de cada tentativa para garantir dados frescos
+          // Limpar cache completamente
           metaAdsService.clearCacheByType('adsets');
           
+          // Carregar IMEDIATAMENTE
           await loadMetaAdsAdSets();
-          console.log('✅ AudiencePicker useEffect - Carregamento automático bem-sucedido!');
+          console.log('✅ CARREGAMENTO IMEDIATO - SUCESSO!');
         } catch (error) {
-          console.log(`❌ AudiencePicker useEffect - Tentativa ${attempt} falhou:`, error);
+          console.error('❌ CARREGAMENTO IMEDIATO - FALHA:', error);
           
-          // Tentar novamente até 5 vezes com delays menores
-          if (attempt < 5) {
-            setTimeout(() => {
-              loadWithRetry(attempt + 1);
-            }, 300 * attempt); // Delay progressivo mais rápido: 300ms, 600ms, 900ms, 1.2s, 1.5s
-          } else {
-            console.log('❌ AudiencePicker useEffect - Todas as tentativas falharam');
-          }
+          // Retry IMEDIATO se falhar - apenas 1 retry com delay mínimo
+          setTimeout(async () => {
+            try {
+              console.log('🔄 RETRY IMEDIATO...');
+              metaAdsService.clearCacheByType('adsets');
+              await loadMetaAdsAdSets();
+              console.log('✅ RETRY IMEDIATO - SUCESSO!');
+            } catch (retryError) {
+              console.error('❌ RETRY IMEDIATO - FALHA FINAL:', retryError);
+            }
+          }, 50); // Apenas 50ms de delay
         }
       };
       
-      // Carregamento imediato sem delay inicial
-      loadWithRetry();
+      // EXECUÇÃO IMEDIATA - SEM QUALQUER DELAY!
+      loadImmediate();
       
 
     } else {
@@ -519,6 +602,39 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
   }, [dataSource, isFacebookConnected]);
 
   // Listener para evento de produto selecionado
+  // Listener para força carregamento de Ad Sets
+  useEffect(() => {
+    const handleForceLoadAdSets = () => {
+      console.log('🚀 CRÍTICO - AudiencePicker - Recebido evento para forçar carregamento de Ad Sets');
+      if (selectedProduct && selectedClient && dataSource === 'facebook') {
+        console.log('🚀 CRÍTICO - Condições atendidas, forçando loadMetaAdsAdSets...');
+        loadMetaAdsAdSets();
+      } else {
+        console.log('🚀 CRÍTICO - Condições não atendidas:', {
+          selectedProduct,
+          selectedClient,
+          dataSource
+        });
+      }
+    };
+
+    const handleReloadAudiences = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.log('🚀 CRÍTICO - AudiencePicker - Recebido evento para recarregar audiências:', customEvent.detail);
+      if (customEvent.detail?.force) {
+        loadMetaAdsAdSets();
+      }
+    };
+
+    window.addEventListener('forceLoadAdSets', handleForceLoadAdSets);
+    window.addEventListener('reloadAudiences', handleReloadAudiences);
+
+    return () => {
+      window.removeEventListener('forceLoadAdSets', handleForceLoadAdSets);
+      window.removeEventListener('reloadAudiences', handleReloadAudiences);
+    };
+  }, [selectedProduct, selectedClient, dataSource]);
+
   useEffect(() => {
     const handleProductSelected = (event: Event) => {
       const customEvent = event as CustomEvent;
@@ -860,28 +976,33 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
                 <X className="w-4 h-4 mr-1" />
                 Limpar
               </button>
+              
+              {/* Botão Carregar Públicos - Lado direito */}
               <button
                 onClick={() => {
-                  // Limpar cache do Meta Ads
-                  const campaignId = localStorage.getItem('selectedCampaignId');
-                  if (campaignId) {
-                    localStorage.removeItem(`adsets_campaign_${campaignId}`);
-                    localStorage.removeItem(`adsets_campaign_${campaignId}_timestamp`);
-                  }
-                  // Limpar cache geral
-                  localStorage.removeItem('metaAds_adsets');
-                  localStorage.removeItem('metaAds_adsets_timestamp');
-                  
-                  // Recarregar dados
-                  loadMetaAdsAdSets();
-                  setIsOpen(false);
+                  console.log('🚀 CRÍTICO - Botão Carregar clicado - Forçando carregamento de Ad Sets...');
+                  setIsLoading(true);
+                  loadMetaAdsAdSets().finally(() => setIsLoading(false));
                 }}
-                className="flex items-center px-3 py-1.5 text-sm font-medium text-yellow-400 hover:text-yellow-200 hover:bg-slate-800 rounded-md transition-all duration-200 ease-in-out"
-                title="Limpar cache e recarregar dados do Meta Ads"
+                disabled={isLoading}
+                className="flex items-center px-3 py-1.5 text-sm font-medium text-blue-400 hover:text-blue-200 hover:bg-slate-800 rounded-md transition-all duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Forçar carregamento dos conjuntos de anúncios"
               >
-                <RefreshCw className="w-4 h-4 mr-1" />
-                Recarregar
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 mr-1 animate-spin rounded-full border-2 border-blue-400 border-t-transparent"></div>
+                    Carregando...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Carregar
+                  </>
+                )}
               </button>
+              {/* BOTÃO REMOVIDO - Sincronização é automática */}
               {/* Remover botão de adicionar público - só deve ser feito via Meta */}
               {/* <button
                 className="flex items-center px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-md transition-all duration-200 ease-in-out shadow-sm hover:shadow-md"
@@ -990,10 +1111,13 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
                    ? (
                      <div>
                        <div className="mb-3">
-                         {`Nenhum conjunto de anúncios ativo encontrado para esta campanha (${selectedProduct})`}
+                         {`Nenhum conjunto de anúncios encontrado para esta campanha (${selectedProduct})`}
                        </div>
                        <div className="text-xs text-slate-500 mt-2">
-                         Os conjuntos de anúncios são carregados automaticamente do Meta Ads
+                         Os conjuntos são sincronizados automaticamente do Meta Ads
+                       </div>
+                       <div className="text-xs text-yellow-400 mt-3">
+                         💡 Verifique se a campanha existe no Meta Ads e tem conjuntos de anúncios
                        </div>
                      </div>
                    )
