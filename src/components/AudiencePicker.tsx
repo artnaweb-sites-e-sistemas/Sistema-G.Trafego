@@ -282,8 +282,41 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
           selectedAccount: metaAdsService.getSelectedAccount()
         });
         
+        // 🎯 DEBUG DETALHADO: Verificar estado completo antes da chamada
+        console.log('🔍 DEBUG DETALHADO - Estado antes de getAdSets:', {
+          campaignId,
+          selectedProduct,
+          selectedClient,
+          selectedMonth,
+          dataSource,
+          isFacebookConnected,
+          metaAdsLoggedIn: metaAdsService.isLoggedIn(),
+          metaAdsHasAccount: metaAdsService.hasSelectedAccount(),
+          metaAdsSelectedAccount: metaAdsService.getSelectedAccount(),
+          localStorage: {
+            selectedCampaignId: localStorage.getItem('selectedCampaignId'),
+            currentSelectedProduct: localStorage.getItem('currentSelectedProduct'),
+            selectedAdAccount: localStorage.getItem('selectedAdAccount')
+          }
+        });
+        
         // 🎯 CORREÇÃO: Não enviar parâmetros de data para getAdSets, a API do Meta não aceita
-        const adSetsData = await metaAdsService.getAdSets(campaignId);
+        console.log('🔍 DEBUG - Iniciando chamada para metaAdsService.getAdSets...');
+        let adSetsData;
+        try {
+          adSetsData = await metaAdsService.getAdSets(campaignId);
+          console.log('✅ DEBUG - Chamada para getAdSets bem-sucedida');
+        } catch (apiError) {
+          console.error('❌ DEBUG - Erro na chamada para getAdSets:', apiError);
+          console.error('❌ DEBUG - Detalhes do erro:', {
+            message: apiError.message,
+            status: apiError.response?.status,
+            statusText: apiError.response?.statusText,
+            data: apiError.response?.data
+          });
+          throw apiError; // Re-throw para ser capturado pelo catch externo
+        }
+        
         console.log('🚀 CRÍTICO - Ad Sets retornados da API:', {
           length: adSetsData.length,
           campaignId: campaignId,
@@ -300,6 +333,13 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
           })));
         } else {
           console.error('🚨 CRÍTICO - NENHUM AD SET ENCONTRADO! Investigando...');
+          console.log('🔍 DEBUG - Possíveis causas:', {
+            campaignId,
+            campaignExists: !!campaignId,
+            campaignIdValid: campaignId && campaignId.length > 0,
+            metaAdsConnected: metaAdsService.isLoggedIn() && metaAdsService.hasSelectedAccount(),
+            accountSelected: !!metaAdsService.getSelectedAccount()
+          });
           
           // Tentar buscar todos os Ad Sets da conta para debug
           try {
@@ -1113,9 +1153,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
                        <div className="mb-3">
                          {`Nenhum conjunto de anúncios encontrado para esta campanha (${selectedProduct})`}
                        </div>
-                       <div className="text-xs text-slate-500 mt-2">
-                         Os conjuntos são sincronizados automaticamente do Meta Ads
-                       </div>
+
                        <div className="text-xs text-yellow-400 mt-3">
                          💡 Verifique se a campanha existe no Meta Ads e tem conjuntos de anúncios
                        </div>

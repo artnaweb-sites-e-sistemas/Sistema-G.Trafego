@@ -16,7 +16,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
   selectedClient, 
   selectedMonth, 
   onStrategyCreated 
-}) => {
+}): JSX.Element => {
   const [strategies, setStrategies] = useState<AdStrategy[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentStrategy, setCurrentStrategy] = useState<Partial<AdStrategy>>({
@@ -57,6 +57,9 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
   // Refs para controlar execução
   const hasEvaluatedRef = useRef<Set<string>>(new Set());
   const hasSyncedRef = useRef<Set<string>>(new Set());
+  
+  // 🎯 NOVO: Estado para armazenar status dos conjuntos de anúncios
+  const [adSetStatusMap, setAdSetStatusMap] = useState<Record<string, 'ACTIVE' | 'PAUSED' | 'UNKNOWN'>>({});
 
   // Bloquear scroll quando modal estiver aberto
   useEffect(() => {
@@ -66,6 +69,61 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       document.body.style.overflow = '';
     }
   }, [isModalOpen]);
+
+  // 🎯 NOVO: Função para carregar status dos conjuntos de anúncios
+  const loadAdSetStatuses = async () => {
+    try {
+      const isConfigured = metaAdsService.isConfigured?.() ?? false;
+      const isLogged = metaAdsService.isLoggedIn?.() ?? false;
+      const hasAccount = !!metaAdsService.getSelectedAccount?.();
+      
+      if (!isConfigured || !isLogged || !hasAccount) {
+        console.log('🔍 DEBUG - Meta Ads não configurado, pulando carregamento de status');
+        return;
+      }
+
+      console.log('🔍 DEBUG - Carregando status dos conjuntos de anúncios...');
+      const adSets = await metaAdsService.getAdSets();
+      
+      if (adSets && adSets.length > 0) {
+        const statusMap: Record<string, 'ACTIVE' | 'PAUSED' | 'UNKNOWN'> = {};
+        
+        // 🎯 DEBUG DETALHADO: Log de cada ad set individualmente
+        console.log('🔍 DEBUG - AdSets retornados pelo Meta Ads:');
+        adSets.forEach((adSet: any, index: number) => {
+          const normalizedName = normalizeName(adSet.name);
+          const status = adSet.status === 'PAUSED' ? 'PAUSED' : 
+                        adSet.status === 'ACTIVE' ? 'ACTIVE' : 'UNKNOWN';
+          statusMap[normalizedName] = status;
+          
+          console.log(`  ${index + 1}. ID: ${adSet.id} | Nome: "${adSet.name}" | Status: ${adSet.status} | Normalizado: "${normalizedName}"`);
+          
+          // 🎯 ESPECIAL: Verificar se é o ad set "Salvador"
+          if (adSet.name.includes('Salvador') || normalizedName.includes('salvador')) {
+            console.log(`🎯 SALVADOR ENCONTRADO! ID: ${adSet.id} | Status: ${adSet.status} | Nome: "${adSet.name}" | Normalizado: "${normalizedName}"`);
+          }
+          
+          // 🎯 ESPECIAL: Verificar se é o ad set "Brasil" (que pode estar causando o problema)
+          if (adSet.name.includes('Brasil') || normalizedName.includes('brasil')) {
+            console.log(`🎯 BRASIL ENCONTRADO! ID: ${adSet.id} | Status: ${adSet.status} | Nome: "${adSet.name}" | Normalizado: "${normalizedName}"`);
+          }
+        });
+        
+        console.log('🔍 DEBUG - Status dos conjuntos carregados:', {
+          total: adSets.length,
+          paused: Object.values(statusMap).filter(s => s === 'PAUSED').length,
+          active: Object.values(statusMap).filter(s => s === 'ACTIVE').length,
+          statusMap
+        });
+        
+        setAdSetStatusMap(statusMap);
+      } else {
+        console.log('🔍 DEBUG - Nenhum ad set retornado pelo Meta Ads');
+      }
+    } catch (error) {
+      console.error('❌ DEBUG - Erro ao carregar status dos conjuntos:', error);
+    }
+  };
 
   // Carregar estratégias existentes (todas do cliente)
   useEffect(() => {
@@ -77,6 +135,9 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           // Resetar refs quando mudar cliente/mês
           hasEvaluatedRef.current.clear();
           hasSyncedRef.current.clear();
+          
+          // 🎯 NOVO: Carregar status dos conjuntos de anúncios
+          await loadAdSetStatuses();
         } catch (error) {
           console.error('Erro ao carregar estratégias:', error);
           // Fallback para método síncrono se houver erro
@@ -184,6 +245,35 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
   // Função para extrair dígitos
   const extractDigits = (value: string): string => {
     return value.replace(/\D/g, '');
+  };
+
+  // 🎯 NOVO: Função para verificar se estratégia tem conjunto pausado
+  const isStrategyPaused = (strategy: AdStrategy): boolean => {
+    const strategyAudienceName = strategy.generatedNames.audience;
+    if (!strategyAudienceName) return false;
+    
+    const normalizedStrategyName = normalizeName(strategyAudienceName);
+    const adSetStatus = adSetStatusMap[normalizedStrategyName];
+    
+    // 🎯 DEBUG ESPECIAL: Log detalhado para estratégia "Salvador"
+    const isSalvadorStrategy = strategyAudienceName.includes('Salvador') || normalizedStrategyName.includes('salvador');
+    if (isSalvadorStrategy) {
+      console.log(`🎯 SALVADOR STRATEGY PAUSED CHECK - "${strategyAudienceName}":`, {
+        normalizedName: normalizedStrategyName,
+        adSetStatus,
+        isPaused: adSetStatus === 'PAUSED',
+        adSetStatusMapKeys: Object.keys(adSetStatusMap),
+        adSetStatusMapValues: Object.values(adSetStatusMap)
+      });
+    }
+    
+    console.log(`🔍 DEBUG - Verificando status da estratégia "${strategyAudienceName}":`, {
+      normalizedName: normalizedStrategyName,
+      adSetStatus,
+      isPaused: adSetStatus === 'PAUSED'
+    });
+    
+    return adSetStatus === 'PAUSED';
   };
 
   // Função para abrir modal
@@ -526,12 +616,29 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       return true;
     }
     
+    // 🎯 CORREÇÃO CRÍTICA: Verificar se há diferenças de localização antes de tentar matching flexível
+    const extractLocation = (name: string): string => {
+      const locationMatch = name.match(/localização\s*-\s*([^\]]+)/i);
+      return locationMatch ? locationMatch[1].trim().toLowerCase() : '';
+    };
+    
+    const adSetLocation = extractLocation(adSetName);
+    const strategyLocation = extractLocation(strategyAudienceName);
+    
+    // Se ambas têm localização e são diferentes, NÃO fazer match
+    if (adSetLocation && strategyLocation && adSetLocation !== strategyLocation) {
+      console.log(`🚫 DEBUG - namesExactlyMatch: Localizações diferentes - AdSet: "${adSetLocation}" vs Strategy: "${strategyLocation}"`);
+      return false;
+    }
+    
     // If exact match fails, try more flexible matching
     console.log(`🔍 DEBUG - namesExactlyMatch: Exact match failed, trying flexible matching:`, {
       adSetName,
       strategyAudienceName,
       adSetNormalized: normalizeName(adSetName),
-      strategyNormalized: normalizeName(strategyAudienceName)
+      strategyNormalized: normalizeName(strategyAudienceName),
+      adSetLocation,
+      strategyLocation
     });
     
     return namesFlexiblyMatch(adSetName, strategyAudienceName);
@@ -544,6 +651,22 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     
     // If either is empty, no match
     if (!adSetNormalized || !strategyNormalized) return false;
+    
+    // 🎯 CORREÇÃO CRÍTICA: Verificar se há diferenças de localização
+    // Extrair localizações dos nomes
+    const extractLocation = (name: string): string => {
+      const locationMatch = name.match(/localização\s*-\s*([^\]]+)/i);
+      return locationMatch ? locationMatch[1].trim().toLowerCase() : '';
+    };
+    
+    const adSetLocation = extractLocation(adSetName);
+    const strategyLocation = extractLocation(strategyAudienceName);
+    
+    // Se ambas têm localização e são diferentes, NÃO fazer match
+    if (adSetLocation && strategyLocation && adSetLocation !== strategyLocation) {
+      console.log(`🚫 DEBUG - namesFlexiblyMatch: Localizações diferentes - AdSet: "${adSetLocation}" vs Strategy: "${strategyLocation}"`);
+      return false;
+    }
     
     // Split into words and filter out very short words
     const adSetWords = adSetNormalized.split(/\s+/).filter(word => word.length >= 3);
@@ -574,6 +697,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       strategyAudienceName,
       adSetNormalized,
       strategyNormalized,
+      adSetLocation,
+      strategyLocation,
       adSetWords,
       strategyWords,
       matchingWords,
@@ -679,9 +804,40 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       const { startDate, endDate } = getMonthDateRange(selectedMonth);
       console.log(`🔍 DEBUG - evaluateStrategyPerformance - Estratégia ${strategy.id} (${strategy.generatedNames.audience}) - Período: ${startDate} a ${endDate}`);
       
+      // 🎯 DEBUG ESPECIAL: Verificar se é a estratégia "Salvador"
+      const isSalvadorStrategy = strategy.generatedNames.audience.includes('Salvador') || normalizeName(strategy.generatedNames.audience).includes('salvador');
+      if (isSalvadorStrategy) {
+        console.log(`🎯 SALVADOR EVALUATION START - Estratégia: "${strategy.generatedNames.audience}"`);
+        console.log(`🎯 SALVADOR - Dados atuais da estratégia:`, {
+          id: strategy.id,
+          budget: strategy.budget,
+          isSynchronized: strategy.isSynchronized,
+          month: strategy.month
+        });
+      }
+      
       const adSets = await metaAdsService.getAdSets();
       const wanted = strategy.generatedNames.audience;
       const matching = (adSets || []).filter((ad: any) => namesExactlyMatch(ad.name, wanted));
+      
+      // 🎯 DEBUG ESPECIAL: Verificar se é a estratégia "Salvador" (usando a variável já declarada)
+      if (isSalvadorStrategy) {
+        console.log(`🎯 SALVADOR STRATEGY DETECTED! Estratégia: "${wanted}"`);
+        console.log(`🎯 SALVADOR - Todos os ad sets disponíveis:`);
+        adSets?.forEach((ad: any, index: number) => {
+          const isMatch = namesExactlyMatch(ad.name, wanted);
+          console.log(`  ${index + 1}. "${ad.name}" (ID: ${ad.id}) - Match: ${isMatch ? '✅' : '❌'}`);
+          
+          // 🎯 DEBUG DETALHADO: Mostrar localizações extraídas
+          const extractLocation = (name: string): string => {
+            const locationMatch = name.match(/localização\s*-\s*([^\]]+)/i);
+            return locationMatch ? locationMatch[1].trim().toLowerCase() : '';
+          };
+          const adLocation = extractLocation(ad.name);
+          const strategyLocation = extractLocation(wanted);
+          console.log(`     Localização AdSet: "${adLocation}" vs Strategy: "${strategyLocation}"`);
+        });
+      }
       
       console.log(`🔍 DEBUG - evaluateStrategyPerformance - AdSets encontrados:`, {
         wanted,
@@ -729,7 +885,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
         }
       }
 
-      // Buscar insights APENAS para o período específico selecionado
+      // 🎯 CORREÇÃO: Buscar dados específicos dos conjuntos de anúncios
       let totals = { 
         spend: 0, 
         leads: 0, 
@@ -749,19 +905,55 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       if (matching.length > 0) {
         console.log(`🔍 DEBUG - evaluateStrategyPerformance - Buscando insights para ${matching.length} adSets`);
         
+        // 🎯 CORREÇÃO: Buscar insights específicos de cada conjunto
         const allInsights = await Promise.all(
-          matching.map((ad: any) => metaAdsService.getAdSetInsights(ad.id, startDate, endDate, { fallbackToLast30Days: false }))
+          matching.map(async (ad: any) => {
+            try {
+              const insights = await metaAdsService.getAdSetInsights(ad.id, startDate, endDate, { fallbackToLast30Days: false });
+              
+              // 🎯 DEBUG ESPECIAL: Log detalhado para ad sets "Salvador"
+              const isSalvadorAdSet = ad.name.includes('Salvador') || normalizeName(ad.name).includes('salvador');
+              if (isSalvadorAdSet) {
+                console.log(`🎯 SALVADOR AD SET INSIGHTS - "${ad.name}" (${ad.id}):`, {
+                  insightsCount: insights.length,
+                  totalSpend: insights.reduce((sum: number, i: any) => sum + parseFloat(i.spend || '0'), 0),
+                  insights: insights.map((i: any) => ({
+                    date: i.date_start,
+                    spend: i.spend,
+                    impressions: i.impressions,
+                    clicks: i.clicks
+                  }))
+                });
+              }
+              
+              console.log(`🔍 DEBUG - Insights para "${ad.name}" (${ad.id}):`, {
+                insightsCount: insights.length,
+                totalSpend: insights.reduce((sum: number, i: any) => sum + parseFloat(i.spend || '0'), 0),
+                insights: insights.map((i: any) => ({
+                  date: i.date_start,
+                  spend: i.spend,
+                  impressions: i.impressions,
+                  clicks: i.clicks
+                }))
+              });
+              return insights;
+            } catch (error) {
+              console.error(`❌ DEBUG - Erro ao buscar insights para "${ad.name}":`, error);
+              return [];
+            }
+          })
         );
         
         console.log(`🔍 DEBUG - evaluateStrategyPerformance - Insights brutos retornados:`, {
           totalInsights: allInsights.flat().length,
           insightsPerAdSet: allInsights.map((insights, i) => ({
             adSetName: matching[i].name,
-            insightsCount: insights.length
+            insightsCount: insights.length,
+            totalSpend: insights.reduce((sum: number, i: any) => sum + parseFloat(i.spend || '0'), 0)
           }))
         });
         
-        // Filtrar apenas insights do período específico (sem fallback para outros períodos)
+        // 🎯 CORREÇÃO: Filtrar apenas insights com gasto real no período
         insightsFlat = allInsights.flat().filter((i: any) => {
           const insightDate = new Date(i.date_start);
           const start = new Date(startDate);
@@ -769,11 +961,25 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           const isInPeriod = insightDate >= start && insightDate <= end;
           const hasSpend = parseFloat(i.spend || '0') > 0;
           
+          // 🎯 DEBUG ESPECIAL: Log detalhado para insights com spend > 0
+          if (hasSpend && isSalvadorStrategy) {
+            console.log(`🎯 SALVADOR INSIGHT COM SPEND - Data: ${i.date_start}, Spend: ${i.spend}, In Period: ${isInPeriod}`);
+          }
+          
+          console.log(`🔍 DEBUG - Filtrando insight:`, {
+            date: i.date_start,
+            spend: i.spend,
+            isInPeriod,
+            hasSpend,
+            included: isInPeriod && hasSpend
+          });
+          
           return isInPeriod && hasSpend;
         });
         
         console.log(`🔍 DEBUG - evaluateStrategyPerformance - Insights filtrados para período:`, {
           totalFiltered: insightsFlat.length,
+          totalSpend: insightsFlat.reduce((sum: number, i: any) => sum + parseFloat(i.spend || '0'), 0),
           insights: insightsFlat.map((i: any) => ({
             date: i.date_start,
             spend: i.spend,
@@ -782,23 +988,49 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           }))
         });
         
-        const metricData = insightsFlat.length > 0
-          ? metaAdsService.convertToMetricData(insightsFlat, selectedMonth, selectedClient, strategy.product.name, strategy.generatedNames.audience)
-          : [];
-
-        totals = (metricData || []).reduce(
-          (acc: any, m: any) => {
-            acc.spend += m.investment || 0;
-            acc.leads += m.leads || 0;
-            acc.sales += m.sales || 0;
-            acc.clicks += m.clicks || 0;
-            acc.impressions += m.impressions || 0;
-            acc.reach += m.reach || 0;
-            acc.lpv += m.lpv || 0;
-            acc.linkClicks += m.linkClicks || 0;
-            acc.revenue += m.revenue || 0;
-            acc.cprSamples.push(m.cpr || 0);
-            acc.cplSamples.push(m.cpl || 0);
+        // 🎯 DEBUG ESPECIAL: Log detalhado para estratégia "Salvador"
+        if (isSalvadorStrategy) {
+          console.log(`🎯 SALVADOR FILTERED INSIGHTS - Total: ${insightsFlat.length}, Total Spend: ${insightsFlat.reduce((sum: number, i: any) => sum + parseFloat(i.spend || '0'), 0)}`);
+          if (insightsFlat.length > 0) {
+            console.log(`🎯 SALVADOR INSIGHTS DETAILS:`, insightsFlat.map((i: any) => ({
+              date: i.date_start,
+              spend: i.spend,
+              impressions: i.impressions,
+              clicks: i.clicks
+            })));
+          }
+        }
+        
+                      // 🎯 CORREÇÃO: Calcular totais diretamente dos insights filtrados
+      if (insightsFlat.length > 0) {
+        // 🎯 DEBUG ESPECIAL: Log detalhado para estratégia "Salvador" antes do cálculo
+        if (isSalvadorStrategy) {
+          console.log(`🎯 SALVADOR ANTES DO CÁLCULO - Insights filtrados:`, insightsFlat.map((i: any) => ({
+            date: i.date_start,
+            spend: i.spend,
+            adSetId: i.adset_id || 'N/A',
+            adSetName: 'Será identificado abaixo'
+          })));
+        }
+        
+        totals = insightsFlat.reduce(
+          (acc: any, i: any) => {
+            const spend = parseFloat(i.spend || '0');
+            acc.spend += spend;
+            acc.leads += parseInt(i.actions?.find((a: any) => a.action_type === 'lead')?.value || '0');
+            acc.sales += parseInt(i.actions?.find((a: any) => a.action_type === 'purchase')?.value || '0');
+            acc.clicks += parseInt(i.clicks || '0');
+            acc.impressions += parseInt(i.impressions || '0');
+            acc.reach += parseInt(i.reach || '0');
+            acc.lpv += parseInt(i.landing_page_views || '0');
+            acc.linkClicks += parseInt(i.link_clicks || '0');
+            acc.revenue += parseFloat(i.actions?.find((a: any) => a.action_type === 'purchase')?.value || '0');
+            
+            // 🎯 DEBUG ESPECIAL: Log para cada insight da estratégia "Salvador"
+            if (isSalvadorStrategy) {
+              console.log(`🎯 SALVADOR INSIGHT PROCESSADO - Data: ${i.date_start}, Spend: ${spend}, AdSet ID: ${i.adset_id || 'N/A'}`);
+            }
+            
             return acc;
           },
           { 
@@ -816,9 +1048,33 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           }
         );
         
-        console.log(`🔍 DEBUG - evaluateStrategyPerformance - Totais calculados:`, totals);
+        console.log(`🔍 DEBUG - evaluateStrategyPerformance - Totais calculados diretamente:`, totals);
+        
+        // 🎯 DEBUG ESPECIAL: Log detalhado para estratégia "Salvador"
+        if (isSalvadorStrategy) {
+          console.log(`🎯 SALVADOR TOTAIS CALCULADOS - Spend: ${totals.spend}, Clicks: ${totals.clicks}, Impressions: ${totals.impressions}`);
+          console.log(`🎯 SALVADOR - AdSets que contribuíram para estes totais:`, matching.map((ad: any) => ({
+            id: ad.id,
+            name: ad.name,
+            status: ad.status
+          })));
+        }
+      } else {
+        console.log(`🔍 DEBUG - evaluateStrategyPerformance - Nenhum insight com gasto encontrado para o período`);
+        
+        // 🎯 DEBUG ESPECIAL: Log para estratégia "Salvador" sem insights
+        if (isSalvadorStrategy) {
+          console.log(`🎯 SALVADOR SEM INSIGHTS - Nenhum insight com gasto encontrado para o período ${startDate} a ${endDate}`);
+        }
+      }
       } else {
         console.log(`🔍 DEBUG - evaluateStrategyPerformance - Nenhum adSet encontrado para a estratégia`);
+        
+        // 🎯 DEBUG ESPECIAL: Log para estratégia "Salvador" sem ad sets
+        if (isSalvadorStrategy) {
+          console.log(`🎯 SALVADOR SEM AD SETS - Nenhum ad set encontrado para a estratégia "${wanted}"`);
+          console.log(`🎯 SALVADOR - Todos os ad sets disponíveis:`, adSets?.map((ad: any) => ad.name) || []);
+        }
       }
 
       // Calcular métricas principais
@@ -1450,7 +1706,14 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                               {/* Barra de progresso do orçamento */}
                               <div className="bg-gradient-to-r from-slate-700/50 to-slate-800/50 rounded-lg px-4 py-3 border border-slate-600/30">
                                 <div className="flex items-center justify-between mb-3">
-                                  <span className="text-xs text-slate-300 font-semibold uppercase tracking-wide">ORÇAMENTO</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-slate-300 font-semibold uppercase tracking-wide">ORÇAMENTO</span>
+                                    {isStrategyPaused(strategy) && (
+                                      <span className="text-xs bg-blue-900/30 text-blue-400 px-2 py-1 rounded-full border border-blue-500/30 animate-pulse">
+                                        PAUSADO
+                                      </span>
+                                    )}
+                                  </div>
                                   <div className="flex items-center gap-2">
                                     {(() => {
                                       const currentBudget = getCurrentPeriodBudget(strategy);
@@ -1516,10 +1779,23 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                   </div>
                                 </div>
                                 <div className="w-full bg-slate-600/50 rounded-full h-2.5 overflow-hidden">
-                                  <div 
-                                    className="bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500 h-2.5 rounded-full transition-all duration-500 shadow-sm"
-                                    style={{ width: `${Math.min((getCurrentPeriodBudget(strategy) / strategy.budget.planned) * 100, 100)}%` }}
-                                  />
+                                  {(() => {
+                                    const isPaused = isStrategyPaused(strategy);
+                                    const progressPercentage = isPaused 
+                                      ? 100 
+                                      : Math.min((getCurrentPeriodBudget(strategy) / strategy.budget.planned) * 100, 100);
+                                    
+                                    return (
+                                      <div 
+                                        className={`h-2.5 rounded-full transition-all duration-500 shadow-sm ${
+                                          isPaused 
+                                            ? 'bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 animate-pulse' 
+                                            : 'bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500'
+                                        }`}
+                                        style={{ width: `${progressPercentage}%` }}
+                                      />
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             </div>

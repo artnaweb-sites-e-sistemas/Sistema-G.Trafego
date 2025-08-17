@@ -1071,6 +1071,19 @@ header {
   pointer-events: auto !important;
 }
 
+/* Estilos específicos para tooltips de sugestão */
+.suggestion-tooltip {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  pointer-events: none !important;
+  transform: translate3d(0, 0, 0) !important;
+  isolation: isolate !important;
+  contain: layout !important;
+  backface-visibility: hidden !important;
+  perspective: 1000px !important;
+  will-change: transform !important;
+}
+
 /* Solução específica para garantir que os dropdowns apareçam acima de tudo */
 .dropdown-menu,
 .dropdown-menu-large,

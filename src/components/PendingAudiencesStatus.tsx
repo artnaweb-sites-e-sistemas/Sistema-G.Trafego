@@ -387,13 +387,80 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
                         onMouseEnter={(e)=>{
                           const rect = e.currentTarget.getBoundingClientRect();
                           const tooltipWidth = 300; // largura aproximada
-                          const offset = 12; // abrir para a direita
-                          const x = Math.min(window.innerWidth - tooltipWidth - 10, rect.right + offset);
-                          const y = Math.max(10, rect.top - 8);
+                          const tooltipHeight = 80; // altura aproximada
+                          const margin = 10;
+                          
+                          // Com position: fixed, getBoundingClientRect() já considera o scroll
+                          // Não precisamos adicionar scrollX/scrollY manualmente
+                          
+                          // Tentar posicionar à direita primeiro (lado direito do ícone)
+                          let x = rect.right + margin;
+                          let y = rect.top + (rect.height / 2) - (tooltipHeight / 2);
+                          
+                          // Se não cabe à direita, posicionar à esquerda (lado esquerdo do ícone)
+                          if (x + tooltipWidth > window.innerWidth) {
+                            x = rect.left - tooltipWidth - margin;
+                            y = rect.top + (rect.height / 2) - (tooltipHeight / 2); // Manter na mesma altura
+                          }
+                          
+                          // Se ainda não cabe à esquerda, posicionar acima
+                          if (x < 0) {
+                            x = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+                            y = rect.top - tooltipHeight - margin; // Posicionar acima
+                          }
+                          
+                          // Se não cabe acima, posicionar embaixo como último recurso
+                          if (y < 0) {
+                            y = rect.bottom + margin; // Posicionar embaixo
+                          }
+                          
+                          // Ajustar horizontalmente se sair da tela
+                          if (x < margin) {
+                            x = margin;
+                          } else if (x + tooltipWidth > window.innerWidth - margin) {
+                            x = window.innerWidth - tooltipWidth - margin;
+                          }
+                          
+                          // Ajustar verticalmente se sair da tela
+                          if (y < margin) {
+                            y = margin;
+                          } else if (y + tooltipHeight > window.innerHeight - margin) {
+                            y = window.innerHeight - tooltipHeight - margin;
+                          }
+                          
+                          // Determinar estratégia de posicionamento usada
+                          let strategy = 'right'; // padrão
+                          if (rect.right + margin + tooltipWidth > window.innerWidth) {
+                            strategy = 'left';
+                            if (rect.left - tooltipWidth - margin < 0) {
+                              strategy = 'above';
+                              if (rect.top - tooltipHeight - margin < 0) {
+                                strategy = 'below';
+                              }
+                            }
+                          }
+                          
+                          // Debug do posicionamento
+                          console.log('🎯 TOOLTIP DEBUG:', {
+                            audienceName: a.name,
+                            strategy: strategy,
+                            elementRect: {
+                              top: rect.top,
+                              left: rect.left,
+                              right: rect.right,
+                              bottom: rect.bottom,
+                              width: rect.width,
+                              height: rect.height
+                            },
+                            finalPosition: { x, y },
+                            windowSize: { width: window.innerWidth, height: window.innerHeight },
+                            tooltipSize: { width: tooltipWidth, height: tooltipHeight }
+                          });
+                          
                           setTooltip({
                             visible: true,
-                            x,
-                            y,
+                            x: Math.max(margin, x),
+                            y: Math.max(margin, y),
                             content: a.suggestionTooltip || 'Aguardando otimização/mais dados.',
                             color: a.suggestionType==='vertical' ? 'emerald' : a.suggestionType==='horizontal' ? 'blue' : 'slate'
                           });
@@ -560,7 +627,7 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
       {/* Tooltip Portal global para ficar acima de tudo */}
       {tooltip.visible && createPortal(
         <div
-          className="dropdown-menu"
+          className="suggestion-tooltip"
           style={{ 
             position: 'fixed', 
             left: tooltip.x, 
@@ -571,7 +638,8 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
             contain: 'layout',
             backfaceVisibility: 'hidden',
             perspective: '1000px',
-            willChange: 'transform'
+            willChange: 'transform',
+            pointerEvents: 'none'
           }}
         >
           <div className={`min-w-[240px] max-w-[320px] text-xs rounded-lg shadow-xl border ${

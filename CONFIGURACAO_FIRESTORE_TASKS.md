@@ -102,3 +102,4 @@ Para desenvolvimento e uso normal: **A solução atual é suficiente**
 Para produção com muitos usuários: **Considere criar o índice composto**
 
 
+

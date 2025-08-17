@@ -503,7 +503,31 @@ const TaskItem: React.FC<TaskItemProps> = React.memo(({ task, onToggle, onDelete
         >
           {task.text}
         </p>
-        {/* Informações de data/hora removidas conforme solicitado */}
+        
+        {/* Datas das tarefas */}
+        <div className="flex items-center justify-between mt-2 text-xs">
+          {/* Data de criação (sempre presente) */}
+          <span className="text-green-400 flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            Criada: {task.createdAt.toLocaleDateString('pt-BR', { 
+              day: '2-digit', 
+              month: '2-digit', 
+              year: 'numeric'
+            })}
+          </span>
+          
+          {/* Data de conclusão (apenas para tarefas concluídas) */}
+          {task.completed && task.completedAt && (
+            <span className="text-red-400 flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" />
+              Concluída: {task.completedAt.toLocaleDateString('pt-BR', { 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: 'numeric'
+              })}
+            </span>
+          )}
+        </div>
       </div>
 
       <button

@@ -231,6 +231,14 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
     return () => { cancelled = true; };
   }, [selectedClient, selectedMonth, selectedProduct, selectedAudience]);
 
+  // Aplicar automaticamente a sugestão quando ela for calculada
+  useEffect(() => {
+    if (suggested?.days && hydrated) {
+      console.log('🎯 Aplicando sugestão automaticamente:', suggested.days, 'dias');
+      setIntervalDays(suggested.days);
+    }
+  }, [suggested, hydrated]);
+
   const lastDateObj = useMemo(() => safeParseDate(lastAnalysisDate), [lastAnalysisDate, forceUpdate]);
   const nextDate = useMemo(() => {
     if (!lastDateObj) return null;

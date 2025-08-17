@@ -1416,7 +1416,16 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                       />
                     )}
                     {/* Quando apenas produto estiver selecionado, mostrar status dos públicos (sem planner/sugestões) */}
-                    {(!selectedAudience || selectedAudience === 'Todos os Públicos') ? (
+                    {(() => {
+                      const shouldShowPending = (!selectedAudience || selectedAudience === 'Todos os Públicos');
+                      console.log(`🔍 DEBUG - Dashboard PendingAudiencesStatus render:`, {
+                        selectedAudience,
+                        shouldShowPending,
+                        selectedProduct,
+                        selectedClient
+                      });
+                      return shouldShowPending;
+                    })() ? (
                       <PendingAudiencesStatus
                         selectedClient={selectedClient}
                         selectedProduct={selectedProduct}

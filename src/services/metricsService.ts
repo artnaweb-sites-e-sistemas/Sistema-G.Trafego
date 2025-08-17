@@ -1328,8 +1328,47 @@ export const metricsService = {
         console.log('🎯 HISTORY DEBUG - Usando todos os dados Meta Ads como fallback final');
       }
 
-      // Filtrar apenas métricas com investimento > 0 (evita meses sem veiculação)
-      const valid = scoped.filter(m => (m.investment || 0) > 0);
+      // 🎯 CORREÇÃO: Incluir dados históricos de conjuntos pausados
+      // Estratégia: Manter dados com investimento > 0 OU que pertençam a conjuntos que já tiveram gasto
+      
+      // 1. Identificar todos os adSets/públicos que já tiveram investimento em algum momento
+      const adSetsWithHistoricalSpend = new Set<string>();
+      const audiencesWithHistoricalSpend = new Set<string>();
+      
+      scoped.forEach(m => {
+        if ((m.investment || 0) > 0) {
+          if (m.adSetId) adSetsWithHistoricalSpend.add(m.adSetId);
+          if (m.audience) audiencesWithHistoricalSpend.add(m.audience);
+        }
+      });
+      
+      console.log('🎯 HISTORY CORREÇÃO - Conjuntos com histórico de gasto:', {
+        adSetsWithSpend: adSetsWithHistoricalSpend.size,
+        audiencesWithSpend: audiencesWithHistoricalSpend.size,
+        adSetIds: Array.from(adSetsWithHistoricalSpend),
+        audiences: Array.from(audiencesWithHistoricalSpend)
+      });
+      
+      // 2. Incluir dados com investimento > 0 OU que pertençam a conjuntos com histórico
+      const valid = scoped.filter(m => {
+        const hasInvestment = (m.investment || 0) > 0;
+        const hasHistoricalSpend = (m.adSetId && adSetsWithHistoricalSpend.has(m.adSetId)) || 
+                                 (m.audience && audiencesWithHistoricalSpend.has(m.audience));
+        
+        const shouldInclude = hasInvestment || hasHistoricalSpend;
+        
+        if (hasHistoricalSpend && !hasInvestment) {
+          console.log(`🎯 HISTORY CORREÇÃO - Incluindo dado histórico sem investimento:`, {
+            month: m.month,
+            audience: m.audience,
+            adSetId: m.adSetId,
+            investment: m.investment,
+            reason: 'conjunto tem histórico de gasto'
+          });
+        }
+        
+        return shouldInclude;
+      });
       
       // 🎯 DIAGNÓSTICO: Análise completa dos dados válidos
       const validDataAnalysis = {
