@@ -550,9 +550,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
         totals.impressions += impressionsValue;
         totals.leads += leadsValue;
         totals.compras += comprasValue;
-        
 
-      
         // Calcular médias
         const totalInvestment = parseFloat(totals.investment.replace(/[^\d,.-]/g, '').replace(',', '.'));
         const totalImpressions = totals.impressions;
@@ -626,10 +624,6 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       </td>
     </tr>
   );
-
-
-
-
 
   return (
     <>

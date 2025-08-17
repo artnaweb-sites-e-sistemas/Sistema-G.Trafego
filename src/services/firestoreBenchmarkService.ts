@@ -85,7 +85,7 @@ class FirestoreBenchmarkService {
         await addDoc(collection(db, this.COLLECTION_NAME), benchmarkData);
       }
       
-      console.log('Benchmark salvo no Firestore:', { productName, clientName, month });
+      
     } catch (error) {
       console.error('Erro ao salvar benchmark no Firestore:', error);
       throw error;
@@ -183,7 +183,7 @@ class FirestoreBenchmarkService {
         timestamp: Timestamp.now()
       });
       
-      console.log('Benchmark atualizado no Firestore:', { productName, clientName, month });
+      
     } catch (error) {
       console.error('Erro ao atualizar benchmark no Firestore:', error);
       throw error;
@@ -222,7 +222,7 @@ class FirestoreBenchmarkService {
         await deleteDoc(docSnapshot.ref);
       }
       
-      console.log('Benchmark(s) removido(s) do Firestore:', { productName, clientName, month });
+      
     } catch (error) {
       console.error('Erro ao remover benchmark do Firestore:', error);
       throw error;
@@ -276,13 +276,13 @@ class FirestoreBenchmarkService {
     try {
       const localData = localStorage.getItem('ai_benchmark_results');
       if (!localData) {
-        console.log('Nenhum dado de benchmarks encontrado no localStorage');
+        
         return 0;
       }
 
       const benchmarks = JSON.parse(localData);
       if (!Object.keys(benchmarks).length) {
-        console.log('Nenhum benchmark para migrar');
+        
         return 0;
       }
 
@@ -313,7 +313,7 @@ class FirestoreBenchmarkService {
         }
       }
 
-      console.log(`Migração de benchmarks concluída: ${migratedCount} benchmarks migrados`);
+      
       return migratedCount;
     } catch (error) {
       console.error('Erro durante migração de benchmarks:', error);
@@ -348,7 +348,7 @@ class FirestoreBenchmarkService {
         }
       }
 
-      console.log(`Limpeza de benchmarks concluída: ${cleanedCount} benchmarks antigos removidos`);
+      
       return cleanedCount;
     } catch (error) {
       console.error('Erro durante limpeza de benchmarks:', error);

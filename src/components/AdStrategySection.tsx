@@ -78,47 +78,42 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       const hasAccount = !!metaAdsService.getSelectedAccount?.();
       
       if (!isConfigured || !isLogged || !hasAccount) {
-        console.log('🔍 DEBUG - Meta Ads não configurado, pulando carregamento de status');
+        
         return;
       }
 
-      console.log('🔍 DEBUG - Carregando status dos conjuntos de anúncios...');
+      
       const adSets = await metaAdsService.getAdSets();
       
       if (adSets && adSets.length > 0) {
         const statusMap: Record<string, 'ACTIVE' | 'PAUSED' | 'UNKNOWN'> = {};
         
         // 🎯 DEBUG DETALHADO: Log de cada ad set individualmente
-        console.log('🔍 DEBUG - AdSets retornados pelo Meta Ads:');
+        
         adSets.forEach((adSet: any, index: number) => {
           const normalizedName = normalizeName(adSet.name);
           const status = adSet.status === 'PAUSED' ? 'PAUSED' : 
                         adSet.status === 'ACTIVE' ? 'ACTIVE' : 'UNKNOWN';
           statusMap[normalizedName] = status;
           
-          console.log(`  ${index + 1}. ID: ${adSet.id} | Nome: "${adSet.name}" | Status: ${adSet.status} | Normalizado: "${normalizedName}"`);
+          
           
           // 🎯 ESPECIAL: Verificar se é o ad set "Salvador"
           if (adSet.name.includes('Salvador') || normalizedName.includes('salvador')) {
-            console.log(`🎯 SALVADOR ENCONTRADO! ID: ${adSet.id} | Status: ${adSet.status} | Nome: "${adSet.name}" | Normalizado: "${normalizedName}"`);
+            
           }
           
           // 🎯 ESPECIAL: Verificar se é o ad set "Brasil" (que pode estar causando o problema)
           if (adSet.name.includes('Brasil') || normalizedName.includes('brasil')) {
-            console.log(`🎯 BRASIL ENCONTRADO! ID: ${adSet.id} | Status: ${adSet.status} | Nome: "${adSet.name}" | Normalizado: "${normalizedName}"`);
+            
           }
         });
         
-        console.log('🔍 DEBUG - Status dos conjuntos carregados:', {
-          total: adSets.length,
-          paused: Object.values(statusMap).filter(s => s === 'PAUSED').length,
-          active: Object.values(statusMap).filter(s => s === 'ACTIVE').length,
-          statusMap
-        });
+        
         
         setAdSetStatusMap(statusMap);
       } else {
-        console.log('🔍 DEBUG - Nenhum ad set retornado pelo Meta Ads');
+        
       }
     } catch (error) {
       console.error('❌ DEBUG - Erro ao carregar status dos conjuntos:', error);
@@ -165,17 +160,17 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
 
       if (!strategies || strategies.length === 0) return;
       
-      console.log(`🔍 DEBUG - useEffect avaliação - Iniciando para ${strategies.length} estratégias no período ${selectedMonth}`);
+      
       
       // Avaliar sequencialmente para reduzir rate limit
       for (const s of strategies) {
         const evaluationKey = `${s.id}-${selectedMonth}`;
         if (!hasEvaluatedRef.current.has(evaluationKey)) {
           try {
-            console.log(`🔍 DEBUG - Avaliando estratégia ${s.id} (${s.generatedNames.audience}) para período ${selectedMonth}`);
+            
             await evaluateStrategyPerformance(s);
             hasEvaluatedRef.current.add(evaluationKey);
-            console.log(`✅ DEBUG - Estratégia ${s.id} avaliada com sucesso`);
+            
             // Pausa maior para aliviar rate limit Meta Ads
             await new Promise(res => setTimeout(res, 1000));
           } catch (e) {
@@ -183,17 +178,17 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
             // segue para próxima
           }
         } else {
-          console.log(`⏭️ DEBUG - Estratégia ${s.id} já foi avaliada para período ${selectedMonth}`);
+          
         }
       }
       
       // Sincronizar orçamento de todas as estratégias para o período atual
-      console.log(`🔍 DEBUG - Sincronizando ${strategies.length} estratégias para período ${selectedMonth}`);
+      
       for (const s of strategies) {
         const syncKey = `${s.id}-${selectedMonth}`;
         if (!hasSyncedRef.current.has(syncKey)) {
           try {
-            console.log(`🔄 DEBUG - Sincronizando estratégia ${s.id} (${s.generatedNames.audience})`);
+            
             await syncStrategyBudgetFromMeta(s);
             hasSyncedRef.current.add(syncKey);
             await new Promise(res => setTimeout(res, 300));
@@ -201,11 +196,11 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
             console.warn(`❌ DEBUG - Erro ao sincronizar estratégia ${s.id}:`, e);
           }
         } else {
-          console.log(`⏭️ DEBUG - Estratégia ${s.id} já foi sincronizada para período ${selectedMonth}`);
+          
         }
       }
       
-      console.log(`🔍 DEBUG - useEffect avaliação - Concluído`);
+      
     };
     run();
   }, [strategies, selectedClient, selectedMonth]);
@@ -258,20 +253,10 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     // 🎯 DEBUG ESPECIAL: Log detalhado para estratégia "Salvador"
     const isSalvadorStrategy = strategyAudienceName.includes('Salvador') || normalizedStrategyName.includes('salvador');
     if (isSalvadorStrategy) {
-      console.log(`🎯 SALVADOR STRATEGY PAUSED CHECK - "${strategyAudienceName}":`, {
-        normalizedName: normalizedStrategyName,
-        adSetStatus,
-        isPaused: adSetStatus === 'PAUSED',
-        adSetStatusMapKeys: Object.keys(adSetStatusMap),
-        adSetStatusMapValues: Object.values(adSetStatusMap)
-      });
+      
     }
     
-    console.log(`🔍 DEBUG - Verificando status da estratégia "${strategyAudienceName}":`, {
-      normalizedName: normalizedStrategyName,
-      adSetStatus,
-      isPaused: adSetStatus === 'PAUSED'
-    });
+    
     
     return adSetStatus === 'PAUSED';
   };
@@ -607,12 +592,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
   const namesExactlyMatch = (adSetName: string, strategyAudienceName: string): boolean => {
     // First try exact match with current normalization
     if (normalizeName(adSetName) === normalizeName(strategyAudienceName)) {
-      console.log(`✅ DEBUG - namesExactlyMatch: Exact match found:`, {
-        adSetName,
-        strategyAudienceName,
-        adSetNormalized: normalizeName(adSetName),
-        strategyNormalized: normalizeName(strategyAudienceName)
-      });
+      
       return true;
     }
     
@@ -627,19 +607,12 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     
     // Se ambas têm localização e são diferentes, NÃO fazer match
     if (adSetLocation && strategyLocation && adSetLocation !== strategyLocation) {
-      console.log(`🚫 DEBUG - namesExactlyMatch: Localizações diferentes - AdSet: "${adSetLocation}" vs Strategy: "${strategyLocation}"`);
+      
       return false;
     }
     
     // If exact match fails, try more flexible matching
-    console.log(`🔍 DEBUG - namesExactlyMatch: Exact match failed, trying flexible matching:`, {
-      adSetName,
-      strategyAudienceName,
-      adSetNormalized: normalizeName(adSetName),
-      strategyNormalized: normalizeName(strategyAudienceName),
-      adSetLocation,
-      strategyLocation
-    });
+    
     
     return namesFlexiblyMatch(adSetName, strategyAudienceName);
   };
@@ -664,7 +637,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     
     // Se ambas têm localização e são diferentes, NÃO fazer match
     if (adSetLocation && strategyLocation && adSetLocation !== strategyLocation) {
-      console.log(`🚫 DEBUG - namesFlexiblyMatch: Localizações diferentes - AdSet: "${adSetLocation}" vs Strategy: "${strategyLocation}"`);
+      
       return false;
     }
     
@@ -692,20 +665,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     const isMatch = (matchingWords / totalWords) >= matchThreshold;
     
     // Debug logging for name matching
-    console.log(`🔍 DEBUG - namesFlexiblyMatch:`, {
-      adSetName,
-      strategyAudienceName,
-      adSetNormalized,
-      strategyNormalized,
-      adSetLocation,
-      strategyLocation,
-      adSetWords,
-      strategyWords,
-      matchingWords,
-      totalWords,
-      matchPercentage: (matchingWords / totalWords) * 100,
-      isMatch
-    });
+    
     
     return isMatch;
   };
@@ -719,46 +679,32 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       const isLogged = metaAdsService.isLoggedIn?.() ?? false;
       const hasAccount = !!metaAdsService.getSelectedAccount?.();
       if (!isConfigured || !isLogged || !hasAccount) {
-        console.log(`❌ DEBUG - syncStrategyBudgetFromMeta - Meta Ads não configurado:`, {
-          isConfigured,
-          isLogged,
-          hasAccount,
-          strategyName: strategy.generatedNames.audience
-        });
+        
         return;
       }
 
       const { startDate, endDate } = getMonthDateRange(selectedMonth);
 
       // Buscar Ad Sets da conta no período
-      console.log(`🔍 DEBUG - syncStrategyBudgetFromMeta - Buscando Ad Sets para estratégia: ${strategy.generatedNames.audience}`);
+      
       const adSets = await metaAdsService.getAdSets();
-      console.log(`🔍 DEBUG - syncStrategyBudgetFromMeta - Ad Sets encontrados:`, {
-        totalAdSets: adSets?.length || 0,
-        adSetNames: adSets?.map((ad: any) => ad.name) || [],
-        strategyName: strategy.generatedNames.audience
-      });
+      
 
       const wanted = strategy.generatedNames.audience;
       const matching = (adSets || []).filter((ad: any) => namesExactlyMatch(ad.name, wanted));
       
-      console.log(`🔍 DEBUG - syncStrategyBudgetFromMeta - Resultado do matching:`, {
-        wanted,
-        matchingCount: matching.length,
-        matchingNames: matching.map((ad: any) => ad.name),
-        allAdSetNames: adSets?.map((ad: any) => ad.name) || []
-      });
+      
 
       let totalSpend = 0;
       if (matching.length > 0) {
-        console.log(`💰 DEBUG - syncStrategyBudgetFromMeta - Buscando insights para ${matching.length} adSets`);
+        
         const allInsights = await Promise.all(
           matching.map((ad: any) => metaAdsService.getAdSetInsights(ad.id, startDate, endDate, { fallbackToLast30Days: false }))
         );
         totalSpend = allInsights.flat().reduce((sum: number, insight: any) => sum + parseFloat(insight.spend || '0'), 0);
-        console.log(`💰 DEBUG - syncStrategyBudgetFromMeta - Total gasto: R$ ${totalSpend}`);
+        
       } else {
-        console.log(`❌ DEBUG - syncStrategyBudgetFromMeta - Nenhum adSet encontrado para estratégia: ${strategy.generatedNames.audience}`);
+        
       }
 
       // Atualizar apenas para o período atual, não persistir no strategy
@@ -780,11 +726,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
         }));
       }
       
-      console.log(`✅ DEBUG - syncStrategyBudgetFromMeta - Estratégia ${strategy.generatedNames.audience} sincronizada:`, {
-        matchingCount: matching.length,
-        totalSpend,
-        isSynchronized: matching.length > 0
-      });
+      
     } catch (error) {
       console.warn('Erro ao sincronizar orçamento da estratégia:', error);
     }
@@ -802,18 +744,13 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       }
 
       const { startDate, endDate } = getMonthDateRange(selectedMonth);
-      console.log(`🔍 DEBUG - evaluateStrategyPerformance - Estratégia ${strategy.id} (${strategy.generatedNames.audience}) - Período: ${startDate} a ${endDate}`);
+      
       
       // 🎯 DEBUG ESPECIAL: Verificar se é a estratégia "Salvador"
       const isSalvadorStrategy = strategy.generatedNames.audience.includes('Salvador') || normalizeName(strategy.generatedNames.audience).includes('salvador');
       if (isSalvadorStrategy) {
-        console.log(`🎯 SALVADOR EVALUATION START - Estratégia: "${strategy.generatedNames.audience}"`);
-        console.log(`🎯 SALVADOR - Dados atuais da estratégia:`, {
-          id: strategy.id,
-          budget: strategy.budget,
-          isSynchronized: strategy.isSynchronized,
-          month: strategy.month
-        });
+        
+        
       }
       
       const adSets = await metaAdsService.getAdSets();
@@ -822,11 +759,11 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       
       // 🎯 DEBUG ESPECIAL: Verificar se é a estratégia "Salvador" (usando a variável já declarada)
       if (isSalvadorStrategy) {
-        console.log(`🎯 SALVADOR STRATEGY DETECTED! Estratégia: "${wanted}"`);
-        console.log(`🎯 SALVADOR - Todos os ad sets disponíveis:`);
+        
+        
         adSets?.forEach((ad: any, index: number) => {
           const isMatch = namesExactlyMatch(ad.name, wanted);
-          console.log(`  ${index + 1}. "${ad.name}" (ID: ${ad.id}) - Match: ${isMatch ? '✅' : '❌'}`);
+          
           
           // 🎯 DEBUG DETALHADO: Mostrar localizações extraídas
           const extractLocation = (name: string): string => {
@@ -835,33 +772,25 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           };
           const adLocation = extractLocation(ad.name);
           const strategyLocation = extractLocation(wanted);
-          console.log(`     Localização AdSet: "${adLocation}" vs Strategy: "${strategyLocation}"`);
+          
         });
       }
       
-      console.log(`🔍 DEBUG - evaluateStrategyPerformance - AdSets encontrados:`, {
-        wanted,
-        totalAdSets: adSets?.length || 0,
-        matchingCount: matching.length,
-        matchingNames: matching.map((ad: any) => ad.name),
-        allAdSetNames: adSets?.map((ad: any) => ad.name) || [],
-        normalizedWanted: normalizeName(wanted),
-        normalizedAdSetNames: adSets?.map((ad: any) => normalizeName(ad.name)) || []
-      });
+      
       
       // 🚀 CRÍTICO - Debug detalhado do matching
       if (matching.length === 0 && adSets && adSets.length > 0) {
-        console.log(`🚨 CRÍTICO - Nenhum Ad Set encontrado para estratégia "${wanted}"`);
-        console.log(`🚨 CRÍTICO - Testando matching individual para cada Ad Set:`);
+        
+        
         
         adSets.forEach((ad: any, index: number) => {
           const isMatch = namesExactlyMatch(ad.name, wanted);
-          console.log(`  ${index + 1}. "${ad.name}" vs "${wanted}" = ${isMatch ? '✅ MATCH' : '❌ NO MATCH'}`);
-          console.log(`     Normalized: "${normalizeName(ad.name)}" vs "${normalizeName(wanted)}"`);
+          
+          
         });
         
         // Tentar matching mais flexível
-        console.log(`🔍 CRÍTICO - Tentando matching mais flexível...`);
+        
         const flexibleMatches = adSets.filter((ad: any) => {
           const adNorm = normalizeName(ad.name).toLowerCase();
           const stratNorm = normalizeName(wanted).toLowerCase();
@@ -873,14 +802,11 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           return matchingWords.length >= Math.min(2, stratWords.length);
         });
         
-        console.log(`🔍 CRÍTICO - Matches flexíveis encontrados:`, {
-          count: flexibleMatches.length,
-          matches: flexibleMatches.map((ad: any) => ad.name)
-        });
+        
         
         // 🎯 CORREÇÃO CRÍTICA: Usar matches flexíveis se encontrados
         if (flexibleMatches.length > 0) {
-          console.log(`✅ CRÍTICO - USANDO matches flexíveis para estratégia "${wanted}"`);
+          
           matching.push(...flexibleMatches);
         }
       }
@@ -903,7 +829,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       let insightsFlat: any[] = [];
       
       if (matching.length > 0) {
-        console.log(`🔍 DEBUG - evaluateStrategyPerformance - Buscando insights para ${matching.length} adSets`);
+        
         
         // 🎯 CORREÇÃO: Buscar insights específicos de cada conjunto
         const allInsights = await Promise.all(
@@ -914,28 +840,10 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
               // 🎯 DEBUG ESPECIAL: Log detalhado para ad sets "Salvador"
               const isSalvadorAdSet = ad.name.includes('Salvador') || normalizeName(ad.name).includes('salvador');
               if (isSalvadorAdSet) {
-                console.log(`🎯 SALVADOR AD SET INSIGHTS - "${ad.name}" (${ad.id}):`, {
-                  insightsCount: insights.length,
-                  totalSpend: insights.reduce((sum: number, i: any) => sum + parseFloat(i.spend || '0'), 0),
-                  insights: insights.map((i: any) => ({
-                    date: i.date_start,
-                    spend: i.spend,
-                    impressions: i.impressions,
-                    clicks: i.clicks
-                  }))
-                });
+                
               }
               
-              console.log(`🔍 DEBUG - Insights para "${ad.name}" (${ad.id}):`, {
-                insightsCount: insights.length,
-                totalSpend: insights.reduce((sum: number, i: any) => sum + parseFloat(i.spend || '0'), 0),
-                insights: insights.map((i: any) => ({
-                  date: i.date_start,
-                  spend: i.spend,
-                  impressions: i.impressions,
-                  clicks: i.clicks
-                }))
-              });
+              
               return insights;
             } catch (error) {
               console.error(`❌ DEBUG - Erro ao buscar insights para "${ad.name}":`, error);
@@ -944,14 +852,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           })
         );
         
-        console.log(`🔍 DEBUG - evaluateStrategyPerformance - Insights brutos retornados:`, {
-          totalInsights: allInsights.flat().length,
-          insightsPerAdSet: allInsights.map((insights, i) => ({
-            adSetName: matching[i].name,
-            insightsCount: insights.length,
-            totalSpend: insights.reduce((sum: number, i: any) => sum + parseFloat(i.spend || '0'), 0)
-          }))
-        });
+        
         
         // 🎯 CORREÇÃO: Filtrar apenas insights com gasto real no período
         insightsFlat = allInsights.flat().filter((i: any) => {
@@ -963,41 +864,21 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           
           // 🎯 DEBUG ESPECIAL: Log detalhado para insights com spend > 0
           if (hasSpend && isSalvadorStrategy) {
-            console.log(`🎯 SALVADOR INSIGHT COM SPEND - Data: ${i.date_start}, Spend: ${i.spend}, In Period: ${isInPeriod}`);
+            
           }
           
-          console.log(`🔍 DEBUG - Filtrando insight:`, {
-            date: i.date_start,
-            spend: i.spend,
-            isInPeriod,
-            hasSpend,
-            included: isInPeriod && hasSpend
-          });
+          
           
           return isInPeriod && hasSpend;
         });
         
-        console.log(`🔍 DEBUG - evaluateStrategyPerformance - Insights filtrados para período:`, {
-          totalFiltered: insightsFlat.length,
-          totalSpend: insightsFlat.reduce((sum: number, i: any) => sum + parseFloat(i.spend || '0'), 0),
-          insights: insightsFlat.map((i: any) => ({
-            date: i.date_start,
-            spend: i.spend,
-            impressions: i.impressions,
-            clicks: i.clicks
-          }))
-        });
+        
         
         // 🎯 DEBUG ESPECIAL: Log detalhado para estratégia "Salvador"
         if (isSalvadorStrategy) {
-          console.log(`🎯 SALVADOR FILTERED INSIGHTS - Total: ${insightsFlat.length}, Total Spend: ${insightsFlat.reduce((sum: number, i: any) => sum + parseFloat(i.spend || '0'), 0)}`);
+          
           if (insightsFlat.length > 0) {
-            console.log(`🎯 SALVADOR INSIGHTS DETAILS:`, insightsFlat.map((i: any) => ({
-              date: i.date_start,
-              spend: i.spend,
-              impressions: i.impressions,
-              clicks: i.clicks
-            })));
+            
           }
         }
         
@@ -1005,12 +886,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       if (insightsFlat.length > 0) {
         // 🎯 DEBUG ESPECIAL: Log detalhado para estratégia "Salvador" antes do cálculo
         if (isSalvadorStrategy) {
-          console.log(`🎯 SALVADOR ANTES DO CÁLCULO - Insights filtrados:`, insightsFlat.map((i: any) => ({
-            date: i.date_start,
-            spend: i.spend,
-            adSetId: i.adset_id || 'N/A',
-            adSetName: 'Será identificado abaixo'
-          })));
+          
         }
         
         totals = insightsFlat.reduce(
@@ -1028,7 +904,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
             
             // 🎯 DEBUG ESPECIAL: Log para cada insight da estratégia "Salvador"
             if (isSalvadorStrategy) {
-              console.log(`🎯 SALVADOR INSIGHT PROCESSADO - Data: ${i.date_start}, Spend: ${spend}, AdSet ID: ${i.adset_id || 'N/A'}`);
+              
             }
             
             return acc;
@@ -1048,32 +924,28 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           }
         );
         
-        console.log(`🔍 DEBUG - evaluateStrategyPerformance - Totais calculados diretamente:`, totals);
+        
         
         // 🎯 DEBUG ESPECIAL: Log detalhado para estratégia "Salvador"
         if (isSalvadorStrategy) {
-          console.log(`🎯 SALVADOR TOTAIS CALCULADOS - Spend: ${totals.spend}, Clicks: ${totals.clicks}, Impressions: ${totals.impressions}`);
-          console.log(`🎯 SALVADOR - AdSets que contribuíram para estes totais:`, matching.map((ad: any) => ({
-            id: ad.id,
-            name: ad.name,
-            status: ad.status
-          })));
+          
+          
         }
       } else {
-        console.log(`🔍 DEBUG - evaluateStrategyPerformance - Nenhum insight com gasto encontrado para o período`);
+        
         
         // 🎯 DEBUG ESPECIAL: Log para estratégia "Salvador" sem insights
         if (isSalvadorStrategy) {
-          console.log(`🎯 SALVADOR SEM INSIGHTS - Nenhum insight com gasto encontrado para o período ${startDate} a ${endDate}`);
+          
         }
       }
       } else {
-        console.log(`🔍 DEBUG - evaluateStrategyPerformance - Nenhum adSet encontrado para a estratégia`);
+        
         
         // 🎯 DEBUG ESPECIAL: Log para estratégia "Salvador" sem ad sets
         if (isSalvadorStrategy) {
-          console.log(`🎯 SALVADOR SEM AD SETS - Nenhum ad set encontrado para a estratégia "${wanted}"`);
-          console.log(`🎯 SALVADOR - Todos os ad sets disponíveis:`, adSets?.map((ad: any) => ad.name) || []);
+          
+          
         }
       }
 
@@ -1198,27 +1070,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
         }
       }
 
-      console.log(`🔍 DEBUG - evaluateStrategyPerformance - Recomendação final:`, {
-        strategyId: strategy.id,
-        recommendation: rec,
-        stats: {
-          spend: totals.spend,
-          ctr,
-          cpl: objective === 'mensagens' ? cplStrict : cpc,
-          cpr,
-          clicks: totals.clicks,
-          impressions: totals.impressions,
-          leads: totals.leads,
-          sales: totals.sales,
-          frequency,
-          roas,
-          lpvRate,
-          objective,
-          adSetsCount: matching.length,
-          periodStart: startDate,
-          periodEnd: endDate
-        }
-      });
+      
 
       setRecommendations(prev => ({
         ...prev,
@@ -1265,37 +1117,28 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       const rec = recommendations[s.id];
       const createdInPeriod = s.month === selectedMonth;
 
-      console.log(`🔍 DEBUG - Filtragem estratégia ${s.id}:`, {
-        strategyName: s.generatedNames.audience,
-        hasRec: !!rec,
-        hasStats: !!rec?.stats,
-        spend: rec?.stats?.spend,
-        adSetsCount: rec?.stats?.adSetsCount,
-        createdInPeriod,
-        strategyMonth: s.month,
-        currentMonth: selectedMonth
-      });
+      
 
       // NOVA LÓGICA SIMPLIFICADA:
       // 1. Se foi criada no período atual, sempre mostrar
       if (createdInPeriod) {
-        console.log(`✅ Estratégia ${s.id} exibida: criada no período atual`);
+        
         return true;
       }
 
       // 2. Se é uma estratégia salva/existente, sempre mostrar 
       // (estratégias salvas devem aparecer para permitir análise histórica)
       if (s.id && s.generatedNames?.audience) {
-        console.log(`✅ Estratégia ${s.id} exibida: estratégia salva existente`);
+        
         return true;
       }
 
       // 3. Fallback: ocultar apenas se não for uma estratégia válida
-      console.log(`❌ Estratégia ${s.id} filtrada: não é uma estratégia válida`);
+      
       return false;
     });
     
-    console.log(`🔍 DEBUG - Total de estratégias após filtragem: ${filtered.length}`);
+    
     
     return filtered.reduce((acc, strategy) => {
     const productKey = `${strategy.product.name}-${strategy.product.niche}`;
@@ -1324,15 +1167,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     const hasSpend = (rec?.stats?.spend || 0) > 0;
     
     // Debug logging for sync status
-    console.log(`🔍 DEBUG - getCurrentPeriodSyncStatus for strategy ${strategy.id}:`, {
-      strategyName: strategy.generatedNames?.audience,
-      hasRecommendations: !!rec,
-      adSetsCount: rec?.stats?.adSetsCount || 0,
-      spend: rec?.stats?.spend || 0,
-      hasAdSets,
-      hasSpend,
-      isSynchronized: hasAdSets || hasSpend
-    });
+    
     
     // Consider synchronized if we have ad sets OR if we have spend data
     return hasAdSets || hasSpend;
@@ -1424,17 +1259,17 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
 
   // Debug function to help understand strategy synchronization
   const debugStrategySync = () => {
-    console.log('🔍 DEBUG - Strategy Synchronization Status:');
+    
     strategies.forEach(strategy => {
       const rec = recommendations[strategy.id];
-      console.log(`  Strategy: ${strategy.generatedNames?.audience}`);
-      console.log(`    ID: ${strategy.id}`);
-      console.log(`    Has Recommendations: ${!!rec}`);
-      console.log(`    AdSets Count: ${rec?.stats?.adSetsCount || 0}`);
-      console.log(`    Is Synchronized: ${getCurrentPeriodSyncStatus(strategy)}`);
-      console.log(`    Budget Current: ${getCurrentPeriodBudget(strategy)}`);
-      console.log(`    Budget Planned: ${strategy.budget.planned}`);
-      console.log('    ---');
+      
+      
+      
+      
+      
+      
+      
+      
     });
   };
 
@@ -1445,28 +1280,28 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       (window as any).syncStrategyManually = (strategyId: string) => {
         const strategy = strategies.find(s => s.id === strategyId);
         if (strategy) {
-          console.log(`🔄 DEBUG - Manually syncing strategy: ${strategy.generatedNames?.audience}`);
+          
           syncStrategyBudgetFromMeta(strategy);
           evaluateStrategyPerformance(strategy);
         } else {
-          console.log(`❌ DEBUG - Strategy not found: ${strategyId}`);
+          
         }
       };
       (window as any).syncAllStrategies = () => {
-        console.log('🔄 DEBUG - Manually syncing all strategies');
+        
         strategies.forEach(strategy => {
           syncStrategyBudgetFromMeta(strategy);
           evaluateStrategyPerformance(strategy);
         });
       };
       (window as any).clearSyncCache = () => {
-        console.log('🧹 DEBUG - Clearing synchronization cache');
+        
         hasEvaluatedRef.current.clear();
         hasSyncedRef.current.clear();
-        console.log('✅ DEBUG - Synchronization cache cleared');
+        
       };
       (window as any).forceResync = () => {
-        console.log('🔄 DEBUG - Force resync of all strategies');
+        
         hasEvaluatedRef.current.clear();
         hasSyncedRef.current.clear();
         strategies.forEach(strategy => {
@@ -1475,42 +1310,42 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
         });
       };
       (window as any).testNameMatching = (adSetName: string, strategyName: string) => {
-        console.log('🧪 DEBUG - Testing name matching:');
-        console.log(`  Ad Set Name: "${adSetName}"`);
-        console.log(`  Strategy Name: "${strategyName}"`);
-        console.log(`  Exact Match: ${normalizeName(adSetName) === normalizeName(strategyName)}`);
-        console.log(`  Flexible Match: ${namesFlexiblyMatch(adSetName, strategyName)}`);
-        console.log(`  Final Result: ${namesExactlyMatch(adSetName, strategyName)}`);
+        
+        
+        
+        
+        
+        
       };
-      console.log('🔧 DEBUG - AdStrategySection - Funções de debug adicionadas:');
-      console.log('  - debugStrategySync() - Ver status de sincronização');
-      console.log('  - syncStrategyManually(strategyId) - Sincronizar estratégia específica');
-      console.log('  - syncAllStrategies() - Sincronizar todas as estratégias');
-      console.log('  - clearSyncCache() - Limpar cache de sincronização');
-      console.log('  - forceResync() - Forçar re-sincronização de todas as estratégias');
-      console.log('  - testNameMatching(adSetName, strategyName) - Testar lógica de matching');
+      
+      
+      
+      
+      
+      
+      
       
       (window as any).debugStrategyMatching = async (strategyName: string) => {
-        console.log('🔍 DEBUG - Testando matching para estratégia:', strategyName);
+        
         
         try {
           const { metaAdsService } = await import('../services/metaAdsService');
           if (!metaAdsService.isLoggedIn()) {
-            console.log('❌ Meta Ads não está logado');
+            
             return;
           }
           
           const adSets = await metaAdsService.getAdSets();
-          console.log('🔍 Ad Sets encontrados:', adSets?.length || 0);
+          
           
           if (adSets && adSets.length > 0) {
-            console.log('🔍 Testando matching exato:');
+            
             adSets.forEach((ad: any, index: number) => {
               const isMatch = namesExactlyMatch(ad.name, strategyName);
-              console.log(`  ${index + 1}. "${ad.name}" = ${isMatch ? '✅' : '❌'}`);
+              
             });
             
-            console.log('🔍 Testando matching flexível:');
+            
             const flexibleMatches = adSets.filter((ad: any) => {
               const adNorm = normalizeName(ad.name).toLowerCase();
               const stratNorm = normalizeName(strategyName).toLowerCase();
@@ -1519,14 +1354,14 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
               return matchingWords.length >= Math.min(2, stratWords.length);
             });
             
-            console.log('✅ Matches flexíveis:', flexibleMatches.map((ad: any) => ad.name));
+            
           }
         } catch (error) {
           console.error('❌ Erro ao testar matching:', error);
         }
       };
       
-      console.log('  - debugStrategyMatching("Nome da Estratégia") - Testar matching de estratégia específica');
+      
     }
   }, [strategies, recommendations]);
 

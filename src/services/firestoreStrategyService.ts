@@ -54,7 +54,7 @@ class FirestoreStrategyService {
     try {
       const strategyData = this.toFirestoreFormat(strategy);
       await addDoc(collection(db, this.COLLECTION_NAME), strategyData);
-      console.log('Estratégia salva no Firestore:', strategy.id);
+      
     } catch (error) {
       console.error('Erro ao salvar estratégia no Firestore:', error);
       throw error;
@@ -182,7 +182,7 @@ class FirestoreStrategyService {
       delete strategyData.userId; // Não atualizar userId
       
       await updateDoc(docRef, strategyData);
-      console.log('Estratégia atualizada no Firestore:', strategy.id);
+      
     } catch (error) {
       console.error('Erro ao atualizar estratégia no Firestore:', error);
       throw error;
@@ -208,7 +208,7 @@ class FirestoreStrategyService {
       if (!querySnapshot.empty) {
         const docRefFromField = querySnapshot.docs[0].ref;
         await deleteDoc(docRefFromField);
-        console.log('Estratégia removida do Firestore (via campo id):', strategyId);
+        
         return;
       }
 
@@ -217,7 +217,7 @@ class FirestoreStrategyService {
       const directSnap = await getDoc(directRef);
       if (directSnap.exists()) {
         await deleteDoc(directRef);
-        console.log('Estratégia removida do Firestore (via docId):', strategyId);
+        
         return;
       }
 
@@ -242,13 +242,13 @@ class FirestoreStrategyService {
       // Buscar dados do localStorage
       const localData = localStorage.getItem('adStrategies');
       if (!localData) {
-        console.log('Nenhum dado de estratégias encontrado no localStorage');
+        
         return 0;
       }
 
       const strategies: AdStrategy[] = JSON.parse(localData);
       if (!strategies.length) {
-        console.log('Nenhuma estratégia para migrar');
+        
         return 0;
       }
 
@@ -275,7 +275,7 @@ class FirestoreStrategyService {
         }
       }
 
-      console.log(`Migração concluída: ${migratedCount} estratégias migradas`);
+      
       return migratedCount;
     } catch (error) {
       console.error('Erro durante migração de estratégias:', error);

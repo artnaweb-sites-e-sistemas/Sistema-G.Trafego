@@ -23,4 +23,3 @@ const ProgressBar: React.FC<ProgressBarProps> = ({ value, className = '', varian
 
 export default ProgressBar;
 
-

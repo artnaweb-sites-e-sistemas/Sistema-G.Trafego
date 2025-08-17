@@ -204,8 +204,7 @@ class TaskService {
       });
       
       await Promise.all(updatePromises);
-      console.log(`${validTaskIds.length} tarefas reordenadas com sucesso`);
-    } catch (error) {
+      } catch (error) {
       console.error('Erro ao reordenar tarefas:', error);
       throw new Error('Falha ao reordenar tarefas');
     }

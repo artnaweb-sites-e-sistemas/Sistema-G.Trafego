@@ -85,12 +85,30 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
 
   const handleYearChange = (increment: number) => {
     const newYear = selectedYear + increment;
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+    
+    // Impedir seleção de meses futuros
+    if (newYear > currentYear || (newYear === currentYear && selectedMonthIndex > currentMonth)) {
+      return; // Não permitir meses futuros
+    }
+    
     setSelectedYear(newYear);
     const newMonthString = `${months[selectedMonthIndex]} ${newYear}`;
     setSelectedMonth(newMonthString);
   };
 
   const handleMonthSelect = (monthIndex: number) => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+    
+    // Impedir seleção de meses futuros
+    if (selectedYear > currentYear || (selectedYear === currentYear && monthIndex > currentMonth)) {
+      return; // Não permitir meses futuros
+    }
+    
     setSelectedMonthIndex(monthIndex);
     const newMonthString = `${months[monthIndex]} ${selectedYear}`;
     setSelectedMonth(newMonthString);
@@ -193,6 +211,15 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
               value={selectedYear}
               onChange={(e) => {
                 const newYear = parseInt(e.target.value) || new Date().getFullYear();
+                const currentDate = new Date();
+                const currentYear = currentDate.getFullYear();
+                const currentMonth = currentDate.getMonth();
+                
+                // Impedir seleção de meses futuros
+                if (newYear > currentYear || (newYear === currentYear && selectedMonthIndex > currentMonth)) {
+                  return; // Não permitir meses futuros
+                }
+                
                 setSelectedYear(newYear);
                 const newMonthString = `${months[selectedMonthIndex]} ${newYear}`;
                 setSelectedMonth(newMonthString);
@@ -201,7 +228,12 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
             />
             <button
               onClick={() => handleYearChange(1)}
-              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors"
+              className={`p-1 rounded transition-colors ${
+                selectedYear >= new Date().getFullYear() && selectedMonthIndex >= new Date().getMonth()
+                  ? 'text-slate-600 cursor-not-allowed'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              }`}
+              disabled={selectedYear >= new Date().getFullYear() && selectedMonthIndex >= new Date().getMonth()}
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -210,19 +242,29 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({ selectedMonth, setSel
           {/* Month grid */}
           <div className="p-3">
             <div className="grid grid-cols-4 gap-1">
-              {monthAbbreviations.map((month, index) => (
-                <button
-                  key={month}
-                  onClick={() => handleMonthSelect(index)}
-                  className={`p-2 text-sm rounded transition-colors ${
-                    index === selectedMonthIndex
-                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700'
-                      : 'text-slate-300 hover:bg-slate-800 hover:text-slate-100'
-                  }`}
-                >
-                  {month}
-                </button>
-              ))}
+              {monthAbbreviations.map((month, index) => {
+                const currentDate = new Date();
+                const currentYear = currentDate.getFullYear();
+                const currentMonth = currentDate.getMonth();
+                const isFutureMonth = selectedYear > currentYear || (selectedYear === currentYear && index > currentMonth);
+                
+                return (
+                  <button
+                    key={month}
+                    onClick={() => handleMonthSelect(index)}
+                    disabled={isFutureMonth}
+                    className={`p-2 text-sm rounded transition-colors ${
+                      index === selectedMonthIndex
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700'
+                        : isFutureMonth
+                          ? 'text-slate-600 cursor-not-allowed'
+                          : 'text-slate-300 hover:bg-slate-800 hover:text-slate-100'
+                    }`}
+                  >
+                    {month}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

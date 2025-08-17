@@ -49,48 +49,38 @@ class MigrationService {
       return result;
     }
 
-    console.log('🔄 Iniciando migração completa dos dados para Firestore...');
-
     try {
       // Migrar estratégias
-      console.log('📋 Migrando estratégias...');
       try {
         result.strategiesMigrated = await firestoreStrategyService.migrateFromLocalStorage();
-        console.log(`✅ Estratégias migradas: ${result.strategiesMigrated}`);
-      } catch (error) {
+        } catch (error) {
         const errorMsg = `Erro ao migrar estratégias: ${error}`;
         console.error(errorMsg);
         result.errors.push(errorMsg);
       }
 
       // Migrar links de compartilhamento
-      console.log('🔗 Migrando links de compartilhamento...');
       try {
         result.linksMigrated = await firestoreShareService.migrateFromLocalStorage();
-        console.log(`✅ Links migrados: ${result.linksMigrated}`);
-      } catch (error) {
+        } catch (error) {
         const errorMsg = `Erro ao migrar links: ${error}`;
         console.error(errorMsg);
         result.errors.push(errorMsg);
       }
 
       // Migrar benchmarks
-      console.log('📊 Migrando benchmarks...');
       try {
         result.benchmarksMigrated = await firestoreBenchmarkService.migrateFromLocalStorage();
-        console.log(`✅ Benchmarks migrados: ${result.benchmarksMigrated}`);
-      } catch (error) {
+        } catch (error) {
         const errorMsg = `Erro ao migrar benchmarks: ${error}`;
         console.error(errorMsg);
         result.errors.push(errorMsg);
       }
 
       // Migrar detalhes mensais
-      console.log('📅 Migrando detalhes mensais...');
       try {
         result.detailsMigrated = await firestoreDetailsService.migrateFromLocalStorage();
-        console.log(`✅ Detalhes mensais migrados: ${result.detailsMigrated}`);
-      } catch (error) {
+        } catch (error) {
         const errorMsg = `Erro ao migrar detalhes mensais: ${error}`;
         console.error(errorMsg);
         result.errors.push(errorMsg);
@@ -103,8 +93,6 @@ class MigrationService {
       // Determinar sucesso
       result.success = result.errors.length === 0 || result.totalMigrated > 0;
 
-      console.log(`🎉 Migração concluída! Total de itens migrados: ${result.totalMigrated}`);
-      
       if (result.errors.length > 0) {
         console.warn('⚠️ Algumas migrações apresentaram erros:', result.errors);
       }
@@ -128,18 +116,15 @@ class MigrationService {
       // Verificar se já foi feita migração (verificando uma flag no localStorage)
       const migrationFlag = localStorage.getItem('firestore_migration_completed');
       if (migrationFlag) {
-        console.log('Migração já foi realizada anteriormente');
         return true;
       }
 
-      console.log('🔄 Executando migração automática no login...');
       const result = await this.migrateAllData();
 
       if (result.success) {
         // Marcar migração como concluída
         localStorage.setItem('firestore_migration_completed', 'true');
         localStorage.setItem('firestore_migration_date', new Date().toISOString());
-        console.log('✅ Migração automática concluída com sucesso');
         return true;
       } else {
         console.warn('⚠️ Migração automática teve problemas:', result.errors);
@@ -181,8 +166,7 @@ class MigrationService {
         localStorage.removeItem(key);
       }
 
-      console.log('🧹 localStorage limpo após migração');
-    } catch (error) {
+      } catch (error) {
       console.error('Erro ao limpar localStorage:', error);
     }
   }
@@ -191,8 +175,7 @@ class MigrationService {
   resetMigrationFlag(): void {
     localStorage.removeItem('firestore_migration_completed');
     localStorage.removeItem('firestore_migration_date');
-    console.log('🔄 Flag de migração resetada');
-  }
+    }
 
   // Obter status da migração
   getMigrationStatus(): { completed: boolean; date?: string } {

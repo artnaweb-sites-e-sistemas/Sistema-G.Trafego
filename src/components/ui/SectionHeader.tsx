@@ -30,4 +30,3 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({ title, subtitle, icon, cl
 
 export default SectionHeader;
 
-

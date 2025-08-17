@@ -67,14 +67,14 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
   // Listener para atualizações de análise
   useEffect(() => {
     const handleAnalysisUpdate = () => {
-      console.log('🔄 PendingAudiencesStatus - Recebeu evento de atualização de análise');
+      
       // Força recarregamento dos dados
       setLoading(true);
     };
 
     const handleStorageUpdate = (e: StorageEvent) => {
       if (e.key === 'refreshTrigger') {
-        console.log('🔄 PendingAudiencesStatus - Recebeu trigger de refresh via localStorage');
+        
         setLoading(true);
       }
     };
@@ -145,10 +145,10 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
             if (raw) {
               const saved = JSON.parse(raw);
               localStorageData[name] = saved;
-              console.log('🗓️ STORAGE DEBUG - Dados do localStorage para:', { audienceName: name, saved });
+              
             }
           } catch (error) {
-            console.log('🗓️ STORAGE DEBUG - Erro ao ler localStorage para:', name, error);
+            
           }
         });
 
@@ -161,7 +161,7 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
           const intervalDays = localData?.intervalDays || rec?.intervalDays;
           
           if (!lastAnalysisDate || !intervalDays) {
-            console.log('🗓️ DATA DEBUG - Dados insuficientes para:', { name, lastAnalysisDate, intervalDays, hasLocalData: !!localData, hasFirestoreData: !!rec });
+            
             return { name, status: 'pending', lastAnalysisDate: undefined, nextAnalysisDate: undefined, plannedBudget: plannedByName[name] };
           }
           
@@ -172,18 +172,7 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
           const planned = typeof rec?.plannedBudget === 'number' ? rec.plannedBudget : plannedByName[name];
           
           // 🎯 DEBUG: Log para sincronização de datas
-          console.log('🗓️ SYNC DEBUG - PendingAudiencesStatus nextDate calculation:', {
-            audienceName: name,
-            dataSource: localData ? 'localStorage' : 'firestore',
-            lastAnalysisDate: lastAnalysisDate,
-            intervalDays: intervalDays,
-            lastDayjs: last.format('YYYY-MM-DD'),
-            nextDayjs: next.format('YYYY-MM-DD'),
-            nextDateFormatted: next.format('DD/MM/YYYY'),
-            pending,
-            localStorageData: localData,
-            firestoreData: rec ? { lastAnalysisDate: rec.lastAnalysisDate, intervalDays: rec.intervalDays } : null
-          });
+          
           
           return { name, status: pending ? 'pending' : 'ok', lastAnalysisDate: lastAnalysisDate, nextAnalysisDate: next.format('YYYY-MM-DD'), plannedBudget: planned };
         });
@@ -367,15 +356,7 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
               
               // 🎯 DEBUG: Log para verificar formatação e diferença de dias
               if (nextDate) {
-                console.log('🗓️ DISPLAY DEBUG - PendingAudiencesStatus formatting:', {
-                  audienceName: a.name,
-                  nextAnalysisDate: a.nextAnalysisDate,
-                  nextDateObject: nextDate.format('YYYY-MM-DD'),
-                  nextStr: nextStr,
-                  diff: diff,
-                  today: dayjs().format('YYYY-MM-DD'),
-                  diffExplanation: diff !== null ? (diff >= 0 ? `em ${diff} dias` : `há ${Math.abs(diff)} dias`) : 'sem data'
-                });
+                
               }
               return (
                 <li key={idx} className="flex flex-col gap-3 p-4 bg-slate-800/40 border border-slate-700/40 rounded-xl hover:border-slate-600/50 transition">
@@ -441,21 +422,7 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
                           }
                           
                           // Debug do posicionamento
-                          console.log('🎯 TOOLTIP DEBUG:', {
-                            audienceName: a.name,
-                            strategy: strategy,
-                            elementRect: {
-                              top: rect.top,
-                              left: rect.left,
-                              right: rect.right,
-                              bottom: rect.bottom,
-                              width: rect.width,
-                              height: rect.height
-                            },
-                            finalPosition: { x, y },
-                            windowSize: { width: window.innerWidth, height: window.innerHeight },
-                            tooltipSize: { width: tooltipWidth, height: tooltipHeight }
-                          });
+                          
                           
                           setTooltip({
                             visible: true,
@@ -522,16 +489,7 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
                         const hasBudget = typeof a.plannedBudget === 'number';
                         const shouldShow = adSetNotPaused && campaignNotPaused && hasBudget;
                         
-                        console.log(`🎯 BUDGET DEBUG - ${a.name}:`, {
-                          adSetStatus: a.adSetStatus,
-                          adSetNotPaused,
-                          campaignStatus: a.campaignStatus,
-                          campaignNotPaused,
-                          plannedBudget: a.plannedBudget,
-                          plannedBudgetType: typeof a.plannedBudget,
-                          hasBudget,
-                          shouldShow
-                        });
+                        
                         
                         return shouldShow;
                       })() && (

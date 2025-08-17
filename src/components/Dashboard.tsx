@@ -150,7 +150,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
   // Debug: verificar mudanças no selectedClient
   useEffect(() => {
-    console.log('🔍 DEBUG - Dashboard - selectedClient alterado para:', selectedClient);
+    
     
     // Salvar cliente selecionado no localStorage para uso em outros componentes
     if (selectedClient && selectedClient !== 'Selecione um cliente') {
@@ -192,7 +192,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         const { firestoreCampaignSyncService } = await import('../services/firestoreCampaignSyncService');
         const selection = await firestoreCampaignSyncService.getUserSelection();
         if (selection && RESTORE_SELECTION_ON_LOAD) {
-          console.log('✅ Seleção carregada do Firestore (restauração habilitada):', selection);
+          
           if (selection.selectedCampaignId) {
             const campaign = await firestoreCampaignSyncService.getCampaignById(selection.selectedCampaignId);
             if (campaign) {
@@ -230,7 +230,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     const loadMetrics = async () => {
       
       // CORREÇÃO: Limpeza mais agressiva do cache quando cliente muda
-      console.log('🔍 DEBUG - Dashboard - Cliente alterado, limpando cache...');
+      
       
       // Limpar TODAS as chaves de cache do metricsService
       metricsService.clearCache();
@@ -341,13 +341,13 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
   // Carregar valores reais de agendamentos e vendas do cliente
   useEffect(() => {
-    console.log('🔍 DEBUG - Dashboard - useEffect loadRealValuesForClient INICIADO');
-    console.log('🔍 DEBUG - Dashboard - Estados atuais:', { selectedClient, selectedMonth, realValuesRefreshTrigger });
-    console.log('🎯 CARD DEBUG - Dashboard - Trigger para atualização dos cards ativado:', { realValuesRefreshTrigger });
+    
+    
+    
     
     // Evitar execução desnecessária se não há cliente selecionado
     if (!selectedClient || selectedClient === 'Selecione um cliente' || selectedClient === 'Todos os Clientes') {
-      console.log('🔍 DEBUG - Dashboard - Cliente não selecionado, definindo valores zerados');
+      
       setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
       return;
     }
@@ -355,40 +355,40 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     // CORREÇÃO: Permitir recarregamento quando realValuesRefreshTrigger mudar
     // Só bloquear se for a primeira execução e já houver valores (evitar loops na inicialização)
     if ((realValuesForClient.agendamentos > 0 || realValuesForClient.vendas > 0) && realValuesRefreshTrigger === 0) {
-      console.log('🎯 CARD DEBUG - Dashboard - Valores já carregados na inicialização, pulando nova busca:', realValuesForClient);
+      
       return;
     }
     
     // Evitar loop infinito - limitar o número de chamadas consecutivas
     if (realValuesRefreshTrigger > 50) {
-      console.log('🔍 DEBUG - Dashboard - Muitas chamadas consecutivas detectadas, pausando...');
+      
       return;
     }
     
     const loadRealValuesForClient = async () => {
-      console.log('🔍 DEBUG - Dashboard - useEffect loadRealValuesForClient executado');
-      console.log('🔍 DEBUG - Dashboard - selectedClient:', selectedClient);
-      console.log('🔍 DEBUG - Dashboard - selectedMonth:', selectedMonth);
-      console.log('🔍 DEBUG - Dashboard - realValuesRefreshTrigger:', realValuesRefreshTrigger);
-      console.log('🎯 CARD DEBUG - Dashboard - Iniciando carregamento dos valores reais dos cards...');
+      
+      
+      
+      
+      
       
       try {
-        console.log('🔍 DEBUG - Dashboard - Carregando valores reais para cliente:', selectedClient);
+        
         
         // CORREÇÃO: Limpar cache completamente para evitar dados incorretos de contextos anteriores
-        console.log('🧹 CACHE DEBUG - Dashboard - FORCE CLEAR - Limpando TODO o cache antes de carregar valores...');
+        
         metricsService.clearCache();
         
         // CORREÇÃO: Também limpar cache específico do cliente
-        console.log('🔍 DEBUG - Dashboard - Limpando cache para novo cliente...');
+        
         metricsService.clearCacheByClient(selectedClient);
         
         // Debug: verificar dados na coleção monthlyDetails
-        console.log('🔍 DEBUG - Dashboard - Verificando dados na coleção monthlyDetails...');
+        
         await metricsService.debugMonthlyDetails(selectedMonth);
         
         // 🎯 CARD DEBUG: Verificar dados específicos para este cliente
-        console.log('🎯 CARD DEBUG - Dashboard - Verificando dados específicos para o cliente:', selectedClient);
+        
         try {
           const { db } = await import('../config/firebase');
           const { collection, query, where, getDocs } = await import('firebase/firestore');
@@ -401,39 +401,26 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
           );
           
           const testSnapshot = await getDocs(testQuery);
-          console.log('🎯 CARD DEBUG - Dashboard - Documentos encontrados para este cliente:', testSnapshot.size);
+          
           
           testSnapshot.forEach((doc) => {
-            console.log('🎯 CARD DEBUG - Dashboard - Documento encontrado:', {
-              id: doc.id,
-              data: doc.data()
-            });
+            
           });
         } catch (debugError) {
           console.error('🎯 CARD DEBUG - Dashboard - Erro ao verificar dados:', debugError);
         }
         
-        console.log('🔍 DEBUG - Dashboard - Chamando getRealValuesForClient...');
+        
         const realValues = await metricsService.getRealValuesForClient(selectedMonth, selectedClient);
-        console.log('🔍 DEBUG - Dashboard - Resultado da busca:', realValues);
-        console.log('🔍 DEBUG - Dashboard - Tipo do resultado:', typeof realValues);
-        console.log('🔍 DEBUG - Dashboard - Estrutura do resultado:', JSON.stringify(realValues, null, 2));
-        console.log('🔍 DEBUG - Dashboard - Valores CPV e ROI:', {
-          cpv: realValues.cpv,
-          roi: realValues.roi,
-          cpvType: typeof realValues.cpv,
-          roiType: typeof realValues.roi
-        });
-        console.log('🎯 CARD DEBUG - Dashboard - Valores recebidos para os cards:', {
-          agendamentos: realValues.agendamentos,
-          vendas: realValues.vendas,
-          cpv: realValues.cpv,
-          roi: realValues.roi
-        });
+        
+        
+        
+        
+        
         
         // CORREÇÃO: Se não há dados para o mês atual, retornar valores zerados
         // Não buscar dados de outros meses nem criar dados de teste automaticamente
-        console.log('🔍 DEBUG - Dashboard - Definindo valores reais:', realValues);
+        
         
         const finalValues = {
           agendamentos: realValues.agendamentos || 0,
@@ -442,10 +429,10 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
           roi: typeof realValues.roi === 'string' ? realValues.roi : '0% (0.0x)'
         };
         
-        console.log('🎯 CARD DEBUG - Dashboard - Valores finais que serão definidos nos cards:', finalValues);
+        
         setRealValuesForClient(finalValues);
-        console.log('🔍 DEBUG - Dashboard - Valores reais carregados:', realValues);
-        console.log('🎯 CARD DEBUG - Dashboard - setRealValuesForClient executado com sucesso!');
+        
+        
       } catch (error) {
         console.error('🔍 DEBUG - Dashboard - Erro ao carregar valores reais do cliente:', error);
         console.error('🔍 DEBUG - Dashboard - Stack trace do erro:', error instanceof Error ? error.stack : 'N/A');
@@ -458,21 +445,21 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
   // CORREÇÃO: Reset completo de cache e valores quando cliente ou mês mudam
   useEffect(() => {
-    console.log('🔍 DEBUG - Dashboard - Reset valores por mudança cliente/mês');
+    
     
     // CORREÇÃO: Limpar TODO o cache E localStorage quando cliente ou mês mudam
-    console.log('🧹 CACHE DEBUG - Dashboard - Limpando COMPLETAMENTE todo o cache E localStorage por mudança de contexto');
+    
     metricsService.clearAllCacheAndStorage();
     
     // CORREÇÃO: Salvar cliente e mês atuais no localStorage para filtros
     if (selectedClient && selectedClient !== 'Selecione um cliente') {
       localStorage.setItem('currentSelectedClient', selectedClient);
-      console.log('🔍 DEBUG - Dashboard - Cliente salvo no localStorage:', selectedClient);
+      
     }
     
     if (selectedMonth && selectedMonth !== 'Selecione um mês') {
       localStorage.setItem('currentSelectedMonth', selectedMonth);
-      console.log('🔍 DEBUG - Dashboard - Mês salvo no localStorage:', selectedMonth);
+      
     }
     
     setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
@@ -482,13 +469,13 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Listener para atualizar valores reais quando dados dos públicos mudarem
   useEffect(() => {
     const handleAudienceDetailsSaved = (event: CustomEvent) => {
-      console.log('🔍 DEBUG - Dashboard - Evento audienceDetailsSaved recebido:', event.detail);
+      
       
       if (event.detail && event.detail.client === selectedClient && event.detail.month === selectedMonth) {
-        console.log('🔍 DEBUG - Dashboard - Evento corresponde ao cliente/mês atual, recarregando valores reais...');
+        
         
         // 🎯 CORREÇÃO: Limpar cache completamente antes de forçar o recarregamento
-        console.log('🧹 CACHE DEBUG - Dashboard - Limpando cache antes de recarregar valores por edição de público...');
+        
         metricsService.clearCache();
         metricsService.clearCacheByClient(selectedClient);
         
@@ -500,11 +487,11 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
           // Forçar recarregamento dos valores reais usando o trigger
           setRealValuesRefreshTrigger(prev => {
             const newValue = prev + 1;
-            console.log('🔍 DEBUG - Dashboard - Trigger de refresh incrementado de', prev, 'para', newValue, '(audienceDetailsSaved)');
+            
             return newValue;
           });
         }, 300); // Pequeno delay para garantir sincronização com Firebase
-        console.log('🔍 DEBUG - Dashboard - Trigger de refresh dos valores reais acionado');
+        
       }
     };
 
@@ -518,14 +505,14 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Listener para mudanças na planilha detalhes mensais
   useEffect(() => {
     const handleMonthlyDetailsChanged = (event: CustomEvent) => {
-      console.log('🔍 DEBUG - Dashboard - Evento monthlyDetailsChanged recebido:', event.detail);
+      
 
       if (event.detail && event.detail.month === selectedMonth) {
-        console.log('🔍 DEBUG - Dashboard - Planilha detalhes mensais alterada, recarregando valores reais...');
+        
 
         // Forçar recarregamento dos valores reais usando o trigger
         setRealValuesRefreshTrigger(prev => prev + 1);
-        console.log('🔍 DEBUG - Dashboard - Trigger de refresh dos valores reais acionado (planilha)');
+        
       }
     };
 
@@ -539,31 +526,31 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Listener para mudanças nas campanhas (valores editados na planilha)
   useEffect(() => {
     const handleCampaignValuesChanged = (event: CustomEvent) => {
-      console.log('🔍 DEBUG - Dashboard - Evento campaignValuesChanged recebido:', event.detail);
-      console.log('🔍 DEBUG - Dashboard - Mês do evento:', event.detail?.month);
-      console.log('🔍 DEBUG - Dashboard - Mês selecionado:', selectedMonth);
-      console.log('🔍 DEBUG - Dashboard - Cliente selecionado:', selectedClient);
+      
+      
+      
+      
 
       if (event.detail && event.detail.month === selectedMonth) {
-        console.log('🔍 DEBUG - Dashboard - Valores das campanhas alterados, recarregando valores reais...');
+        
 
         // Forçar recarregamento dos valores reais usando o trigger
         setRealValuesRefreshTrigger(prev => {
           const newValue = prev + 1;
-          console.log('🔍 DEBUG - Dashboard - Trigger incrementado de', prev, 'para', newValue, '(campanhas)');
+          
           return newValue;
         });
-        console.log('🔍 DEBUG - Dashboard - Trigger de refresh dos valores reais acionado (campanhas)');
+        
       } else {
-        console.log('🔍 DEBUG - Dashboard - Evento não corresponde ao mês/cliente atual');
+        
       }
     };
 
-    console.log('🔍 DEBUG - Dashboard - Registrando listener para campaignValuesChanged');
+    
     window.addEventListener('campaignValuesChanged', handleCampaignValuesChanged as EventListener);
 
     return () => {
-      console.log('🔍 DEBUG - Dashboard - Removendo listener para campaignValuesChanged');
+      
       window.removeEventListener('campaignValuesChanged', handleCampaignValuesChanged as EventListener);
     };
   }, [selectedMonth, selectedClient]);
@@ -571,13 +558,13 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Listener para quando o relatório é atualizado
   useEffect(() => {
     const handleReportUpdated = (event: CustomEvent) => {
-      console.log('🔍 DEBUG - Dashboard - Evento reportUpdated recebido:', event.detail);
+      
 
-      console.log('🔍 DEBUG - Dashboard - Relatório atualizado, recarregando valores reais...');
+      
 
       // Forçar recarregamento dos valores reais usando o trigger
       setRealValuesRefreshTrigger(prev => prev + 1);
-      console.log('🔍 DEBUG - Dashboard - Trigger de refresh dos valores reais acionado (relatório atualizado)');
+      
     };
 
     window.addEventListener('reportUpdated', handleReportUpdated as EventListener);
@@ -590,25 +577,25 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Listener para quando o cliente é selecionado/changado
   useEffect(() => {
     const handleClientSelectionChanged = () => {
-      console.log('🔍 DEBUG - Dashboard - Cliente selecionado/changado, forçando refresh dos valores reais...');
-      console.log('🔍 DEBUG - Dashboard - Cliente selecionado:', selectedClient);
-      console.log('🔍 DEBUG - Dashboard - Mês selecionado:', selectedMonth);
+      
+      
+      
       
       // Forçar recarregamento dos valores reais usando o trigger
       setRealValuesRefreshTrigger(prev => {
         const newValue = prev + 1;
-        console.log('🔍 DEBUG - Dashboard - Trigger incrementado de', prev, 'para', newValue);
+        
         return newValue;
       });
-      console.log('🔍 DEBUG - Dashboard - Trigger de refresh dos valores reais acionado (seleção de cliente)');
+      
     };
 
     // Disparar evento quando selectedClient mudar
     if (selectedClient && selectedClient !== 'Selecione um cliente' && selectedClient !== 'Todos os Clientes') {
-      console.log('🔍 DEBUG - Dashboard - Cliente válido selecionado, executando handleClientSelectionChanged...');
+      
       handleClientSelectionChanged();
     } else {
-      console.log('🔍 DEBUG - Dashboard - Cliente inválido ou não selecionado:', selectedClient);
+      
     }
   }, [selectedClient]);
 
@@ -709,7 +696,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Listener para limpeza de cliente
   useEffect(() => {
     const handleClientCleared = (event: Event) => {
-      console.log('🔍 DEBUG - Dashboard - Cliente limpo');
+      
       setSelectedClient('Selecione um cliente');
       setSelectedProduct('');
       setSelectedAudience('');
@@ -735,7 +722,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       const customEvent = event as CustomEvent;
       const { clientName } = customEvent.detail;
   
-      console.log('🔍 DEBUG - Dashboard - Evento noProductsFound recebido para cliente:', clientName);
+      
       
       // Zerar métricas quando não há produtos
       setMetrics([]);
@@ -746,7 +733,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       // Zerar valores reais quando não há produtos
       setRealValuesForClient({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0%' });
       
-      console.log('🔍 DEBUG - Dashboard - Valores zerados devido à ausência de produtos');
+      
     };
 
     window.addEventListener('noProductsFound', handleNoProductsFound);
@@ -825,7 +812,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       const customEvent = event as CustomEvent;
       const { clientName, source, businessManager, adAccount } = customEvent.detail;
 
-      console.log('🎯 CARD DEBUG - Dashboard - handleClientChanged CHAMADO:', { clientName, source });
+      
       
       // Atualizar o cliente selecionado
       setSelectedClient(clientName);
@@ -847,7 +834,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
           setRefreshTrigger(prev => prev + 1);
           
           // 🎯 CORREÇÃO: Forçar atualização dos cards de valores reais imediatamente
-          console.log('🎯 CORREÇÃO - Dashboard - Forçando atualização dos cards após mudança de cliente Facebook');
+          
           setRealValuesRefreshTrigger(prev => prev + 1);
         } catch (error) {
           console.warn('🔴 Dashboard: Erro ao limpar cache:', error);
@@ -861,7 +848,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         setRefreshTrigger(prev => prev + 1);
         
         // 🎯 CORREÇÃO: Forçar atualização dos cards de valores reais imediatamente
-        console.log('🎯 CORREÇÃO - Dashboard - Forçando atualização dos cards após mudança de cliente manual');
+        
         setRealValuesRefreshTrigger(prev => prev + 1);
 
       }
@@ -883,15 +870,15 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
           const currentMonth = month || selectedMonth;
           const currentProduct = product || selectedProduct;
           
-          console.log('🔍 DEBUG - Iniciando debug dos valores de público:', { currentMonth, currentProduct });
+          
           
           if (!currentMonth || !currentProduct || currentProduct === 'Todos os Produtos') {
-            console.log('❌ DEBUG - Parâmetros insuficientes. Use: debugAudienceValues("mês", "produto")');
+            
             return { error: 'Parâmetros insuficientes' };
           }
           
           const result = await metricsService.debugAudienceData(currentMonth, currentProduct);
-          console.log('🔍 DEBUG - Resultado completo:', result);
+          
           
           return result;
         } catch (error) {
@@ -907,19 +894,19 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
           const currentMonth = month || selectedMonth;
           const currentProduct = product || selectedProduct;
           
-          console.log('🧹 DEBUG - Iniciando reset completo dos dados:', { currentMonth, currentProduct });
+          
           
           if (!currentMonth || !currentProduct || currentProduct === 'Todos os Produtos') {
-            console.log('❌ DEBUG - Parâmetros insuficientes. Use: resetProductData("mês", "produto")');
+            
             return { error: 'Parâmetros insuficientes' };
           }
           
           const result = await metricsService.resetProductData(currentMonth, currentProduct);
-          console.log('🧹 DEBUG - Reset concluído:', result);
+          
           
           // Forçar recarregamento da página para garantir estado limpo
           if (result.success) {
-            console.log('🔄 DEBUG - Recarregando página para estado limpo...');
+            
             setTimeout(() => {
               window.location.reload();
             }, 2000);
@@ -935,24 +922,24 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       // Função específica para deletar o público antigo renomeado
       (window as any).deleteOldAudience = async () => {
         if (!selectedMonth || !selectedProduct || !selectedClient) {
-          console.log('❌ Selecione um cliente, mês e produto primeiro');
+          
           return;
         }
 
         try {
-          console.log('🗑️ Resetando dados do produto para limpar duplicação...');
+          
           
           // Usar a função resetProductData que já funciona
           const { metricsService } = await import('../services/metricsService');
           const result = await metricsService.resetProductData(selectedMonth, selectedProduct);
           
           if (result.success) {
-            console.log('✅ Dados limpos com sucesso! A página será recarregada...');
+            
             setTimeout(() => {
               window.location.reload();
             }, 1000);
           } else {
-            console.log('❌ Erro ao limpar dados:', result.error);
+            
           }
         } catch (error) {
           console.error('❌ Erro ao deletar público antigo:', error);
@@ -961,7 +948,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
       // 🧹 NOVA FUNÇÃO DEBUG: Limpeza de emergência do cache
       (window as any).clearAllCache = () => {
-        console.log('🧹 EMERGÊNCIA - Limpando TODO o cache e localStorage...');
+        
         metricsService.clearAllCacheAndStorage();
         
         // Forçar reload da página para garantir estado limpo
@@ -972,7 +959,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
       // 🧹 NOVA FUNÇÃO DEBUG: RESET TOTAL DO SISTEMA
       (window as any).resetEverything = async () => {
-        console.log('🧹 RESET TOTAL - Iniciando limpeza completa do sistema...');
+        
         
         if (!confirm('⚠️ ATENÇÃO: Isso vai APAGAR TODOS OS DADOS do Firebase e cache. Tem certeza?')) {
           return;
@@ -986,7 +973,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
           const { db } = await import('../config/firebase');
           const { collection, getDocs, deleteDoc } = await import('firebase/firestore');
           
-          console.log('🧹 RESET TOTAL - Limpando Firebase...');
+          
           
           // Limpar todas as coleções principais
           const collections = [
@@ -1002,44 +989,44 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
           ];
           
           for (const collectionName of collections) {
-            console.log(`🧹 RESET TOTAL - Limpando coleção: ${collectionName}`);
+            
             const querySnapshot = await getDocs(collection(db, collectionName));
             
-            console.log(`🧹 RESET TOTAL - Encontrados ${querySnapshot.size} documentos em ${collectionName}`);
+            
             
             const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
             await Promise.all(deletePromises);
             
-            console.log(`✅ RESET TOTAL - Coleção ${collectionName} limpa!`);
+            
           }
           
-          console.log('🧹 RESET TOTAL - Limpando localStorage completo...');
+          
           
           // Limpar TODO o localStorage
           localStorage.clear();
           
-          console.log('🧹 RESET TOTAL - Limpando sessionStorage...');
+          
           
           // Limpar sessionStorage também
           sessionStorage.clear();
           
-          console.log('🧹 RESET TOTAL - Limpando cache do metricsService...');
+          
           
           // Limpar cache do metricsService
           const { metricsService } = await import('../services/metricsService');
           metricsService.clearAllCacheAndStorage();
           
-          console.log('🧹 RESET TOTAL - Limpando cache do Meta Ads...');
+          
           
           // Limpar cache do Meta Ads
           try {
             const { metaAdsService } = await import('../services/metaAdsService');
             metaAdsService.clearMetricsCache();
           } catch (e) {
-            console.log('Meta Ads service não disponível');
+            
           }
           
-          console.log('🧹 RESET TOTAL - Resetando estados do React...');
+          
           
           // Resetar estados locais
           setSelectedClient('Selecione um cliente');
@@ -1053,8 +1040,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
           setMonthlyDetailsValues({ agendamentos: 0, vendas: 0 });
           setAiBenchmarkResults(null);
           
-          console.log('✅ RESET TOTAL CONCLUÍDO!');
-          console.log('🔄 Recarregando página em 3 segundos...');
+          
+          
           
           // Mostrar mensagem de sucesso
           alert('✅ RESET TOTAL CONCLUÍDO!\n\nTodos os dados foram apagados.\nSistema resetado como primeira vez.\n\nPágina será recarregada...');
@@ -1073,22 +1060,15 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       // 🎯 NOVA FUNÇÃO DEBUG: Verificar estratégias carregadas
       (window as any).debugStrategies = async (client?: string) => {
         const targetClient = client || selectedClient;
-        console.log(`🎯 DEBUG - Verificando estratégias para cliente: ${targetClient}`);
+        
         
         try {
           const { firestoreStrategyService } = await import('../services/firestoreStrategyService');
           const strategies = await firestoreStrategyService.getStrategiesByClient(targetClient);
           
-          console.log(`🎯 DEBUG - Estratégias encontradas no Firestore: ${strategies.length}`);
+          
           strategies.forEach((strategy, index) => {
-            console.log(`🎯 DEBUG - Estratégia ${index + 1}:`, {
-              id: strategy.id,
-              name: strategy.generatedNames?.audience || 'Nome não gerado',
-              product: strategy.product?.name || 'Produto sem nome',
-              month: strategy.month,
-              client: strategy.client,
-              synchronized: strategy.isSynchronized
-            });
+            
           });
           
           return strategies;
@@ -1103,21 +1083,16 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         const targetMonth = month || selectedMonth;
         const targetClient = client || selectedClient;
         
-        console.log(`🔍 DEBUG - Testando filtros de período:`, { targetMonth, targetClient });
+        
         
         try {
           const { metricsService } = await import('../services/metricsService');
           
           // Testar a função getRealValuesForClient que é usada pelos cards
-          console.log('🔍 DEBUG - Chamando getRealValuesForClient...');
+          
           const result = await metricsService.getRealValuesForClient(targetMonth, targetClient);
           
-          console.log('🔍 DEBUG - Resultado dos cards:', {
-            agendamentos: result.agendamentos,
-            vendas: result.vendas,
-            cpv: result.cpv,
-            roi: result.roi
-          });
+          
           
           return result;
         } catch (error) {
@@ -1126,69 +1101,62 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         }
       };
 
-      console.log('🔧 DEBUG - Funções de debug adicionadas ao window:');
-      console.log('  - debugAudienceValues("Janeiro 2025", "Nome do Produto") - Ver dados no Firebase');
-      console.log('  - resetProductData("Janeiro 2025", "Nome do Produto") - Limpar TODOS os dados e recomeçar');
-      console.log('  - deleteOldAudience() - Deletar o público antigo "[Anúncio Jurídico] UTI Negada"');
-      console.log('  - clearAllCache() - 🧹 EMERGÊNCIA: Limpar TODO o cache e localStorage');
-      console.log('  - resetEverything() - 🧹 💣 RESET TOTAL: Apagar TUDO (Firebase + Cache + Estados)');
-      console.log('  - debugStrategies("Cliente Nome") - 🎯 VERIFICAR: Estratégias carregadas do Firestore');
-      console.log('  - debugPeriodFilter("Janeiro 2025", "Cliente Nome") - 🔍 VERIFICAR: Filtros de período nos cards');
+      
+      
+      
+      
+      
+      
+      
+      
       
       (window as any).debugPeriodData = async (client: string, month: string) => {
-        console.log('🔍 DEBUG - Dashboard - Chamando debugPeriodData...');
+        
         const result = await metricsService.debugPeriodData(client, month);
-        console.log('🔍 DEBUG - Dashboard - Resultado debugPeriodData:', result);
+        
         return result;
       };
       
-      console.log('  - debugPeriodData("Cliente Nome", "Janeiro 2025") - 🔍 VERIFICAR: Dados específicos de um período');
+      
       
       (window as any).debugAdSetsForProduct = async (client: string, product: string, month: string) => {
-        console.log('🔍 DEBUG - Dashboard - Verificando Ad Sets para produto específico...');
-        console.log('🔍 DEBUG - Parâmetros:', { client, product, month });
+        
+        
         
         // Verificar se há campaign ID salvo
         const campaignId = localStorage.getItem('selectedCampaignId');
-        console.log('🔍 DEBUG - Campaign ID no localStorage:', campaignId);
+        
         
         // Verificar se Meta Ads está conectado
         const { metaAdsService } = await import('../services/metaAdsService');
         if (metaAdsService.isLoggedIn() && metaAdsService.hasSelectedAccount()) {
-          console.log('✅ DEBUG - Meta Ads conectado');
+          
           
           try {
             // Buscar campanhas
             const campaigns = await metaAdsService.getCampaigns();
-            console.log('🔍 DEBUG - Campanhas encontradas:', {
-              total: campaigns.length,
-              campaigns: campaigns.map((c: any) => ({ id: c.id, name: c.name, status: c.status }))
-            });
+            
             
             // Buscar Ad Sets se há campaign ID
             if (campaignId) {
               const adSets = await metaAdsService.getAdSets(campaignId);
-              console.log('🔍 DEBUG - Ad Sets da campanha:', {
-                campaignId,
-                total: adSets.length,
-                adSets: adSets.map((ad: any) => ({ id: ad.id, name: ad.name, status: ad.status }))
-              });
+              
             } else {
-              console.log('❌ DEBUG - Nenhum campaign ID encontrado');
+              
             }
             
           } catch (error) {
             console.error('❌ DEBUG - Erro ao buscar dados do Meta Ads:', error);
           }
         } else {
-          console.log('❌ DEBUG - Meta Ads não conectado');
+          
         }
       };
       
-      console.log('  - debugAdSetsForProduct("Cliente", "Produto", "Janeiro 2025") - 🔍 VERIFICAR: Ad Sets de produto específico');
+      
       
       (window as any).forceLoadAdSets = async () => {
-        console.log('🚀 CRÍTICO - Forçando carregamento de Ad Sets...');
+        
         
         // Disparar evento para forçar carregamento
         window.dispatchEvent(new CustomEvent('forceLoadAdSets'));
@@ -1199,10 +1167,10 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
         });
         window.dispatchEvent(audiencePickerEvent);
         
-        console.log('🚀 CRÍTICO - Eventos de força carregamento disparados!');
+        
       };
       
-      console.log('  - forceLoadAdSets() - 🚀 FORÇAR: Recarregar conjuntos de anúncios');
+      
     }
   }, [selectedMonth, selectedProduct]);
 
@@ -1212,14 +1180,14 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
   // Função para atualizar origem dos dados
   const handleDataSourceChange = (source: 'manual' | 'facebook' | null, connected: boolean) => {
-    console.log('🔍 DEBUG - Dashboard - handleDataSourceChange chamado:', { source, connected });
+    
     
     // Verificar se há usuário salvo antes de limpar dados
     const savedUser = localStorage.getItem('facebookUser');
     
     // Se está tentando mudar para manual mas há usuário salvo, não permitir
     if (source === 'manual' && savedUser) {
-      console.log('🔍 Usuário salvo encontrado, mantendo conexão Facebook');
+      
       return;
     }
     
@@ -1262,7 +1230,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
   // Handler para quando uma estratégia é criada
   const handleStrategyCreated = (strategy: any) => {
-    console.log('🔍 DEBUG - Dashboard - Estratégia criada:', strategy);
+    
     setAdStrategies(prev => [...prev, strategy]);
     toast.success('Estratégia de anúncio criada com sucesso!');
   };
@@ -1418,12 +1386,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                     {/* Quando apenas produto estiver selecionado, mostrar status dos públicos (sem planner/sugestões) */}
                     {(() => {
                       const shouldShowPending = (!selectedAudience || selectedAudience === 'Todos os Públicos');
-                      console.log(`🔍 DEBUG - Dashboard PendingAudiencesStatus render:`, {
-                        selectedAudience,
-                        shouldShowPending,
-                        selectedProduct,
-                        selectedClient
-                      });
+                      
                       return shouldShowPending;
                     })() ? (
                       <PendingAudiencesStatus

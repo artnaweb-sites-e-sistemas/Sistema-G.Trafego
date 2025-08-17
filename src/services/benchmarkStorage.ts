@@ -45,8 +45,7 @@ class BenchmarkStorageService {
       if (this.isUserAuthenticated()) {
         try {
           await firestoreBenchmarkService.saveBenchmark(productName, results, clientName, month);
-          console.log('Benchmark salvo no localStorage e Firestore');
-        } catch (error) {
+          } catch (error) {
           console.error('Erro ao salvar benchmark no Firestore (usando localStorage):', error);
         }
       }
@@ -67,7 +66,6 @@ class BenchmarkStorageService {
       try {
         const firestoreResult = await firestoreBenchmarkService.loadBenchmark(productName, clientName, month);
         if (firestoreResult) {
-          console.log('Benchmark carregado do Firestore');
           return firestoreResult;
         }
       } catch (error) {

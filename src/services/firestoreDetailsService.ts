@@ -92,8 +92,7 @@ class FirestoreDetailsService {
         });
       }
       
-      console.log('Detalhes mensais salvos no Firestore:', { client, product, month, audience });
-    } catch (error) {
+      } catch (error) {
       console.error('Erro ao salvar detalhes mensais no Firestore:', error);
       throw error;
     }
@@ -165,8 +164,7 @@ class FirestoreDetailsService {
         updatedAt: Timestamp.now()
       });
       
-      console.log('Detalhes mensais atualizados no Firestore:', id);
-    } catch (error) {
+      } catch (error) {
       console.error('Erro ao atualizar detalhes mensais no Firestore:', error);
       throw error;
     }
@@ -241,8 +239,7 @@ class FirestoreDetailsService {
     try {
       const docRef = doc(db, this.COLLECTION_NAME, id);
       await deleteDoc(docRef);
-      console.log('Detalhes mensais removidos do Firestore:', id);
-    } catch (error) {
+      } catch (error) {
       console.error('Erro ao remover detalhes mensais do Firestore:', error);
       throw error;
     }
@@ -333,7 +330,6 @@ class FirestoreDetailsService {
         }
       }
 
-      console.log(`Migração de detalhes mensais concluída: ${migratedCount} registros migrados`);
       return migratedCount;
     } catch (error) {
       console.error('Erro durante migração de detalhes mensais:', error);
@@ -368,7 +364,6 @@ class FirestoreDetailsService {
         }
       }
 
-      console.log(`Limpeza de detalhes antigos concluída: ${cleanedCount} registros removidos`);
       return cleanedCount;
     } catch (error) {
       console.error('Erro durante limpeza de detalhes:', error);

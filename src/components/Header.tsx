@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { User, LogOut, Facebook, Database, RefreshCw, CheckSquare } from 'lucide-react';
+import { User, LogOut, Facebook, Database, RefreshCw, CheckSquare, Wrench } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import MetaAdsConfig from './MetaAdsConfig';
 import ShareReport from './ShareReport';
 import MonthYearPicker from './MonthYearPicker';
@@ -62,11 +63,24 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const [hasGeneratedLinks, setHasGeneratedLinks] = useState(false);
   const [isTaskManagerOpen, setIsTaskManagerOpen] = useState(false);
+  const [isAutoFixing, setIsAutoFixing] = useState(false);
+  const [tooltip, setTooltip] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    content: string;
+    title: string;
+    color: string;
+  }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    content: '',
+    title: '',
+    color: 'slate'
+  });
 
-  // Debug: monitorar mudanças no estado do modal
-  useEffect(() => {
-    console.log('🔍 TaskManager Modal State:', isTaskManagerOpen);
-  }, [isTaskManagerOpen]);
+  // Monitorar mudanças no estado do modal
 
   // Função para obter o ID do usuário do Meta Ads
   const getMetaAdsUserId = (): string => {
@@ -97,6 +111,76 @@ const Header: React.FC<HeaderProps> = ({
       setHasGeneratedLinks(false);
     }
   }, []);
+
+  // Função para correção automática inteligente
+  const handleAutoFix = async () => {
+    setIsAutoFixing(true);
+    
+    try {
+      console.log('🔧 INICIANDO CORREÇÃO AUTOMÁTICA GLOBAL...');
+      
+      // 1. Limpar rate limit
+      const rateLimitKeys = ['metaAdsRateLimit', 'metaAdsRateLimitTimestamp', 'globalRateLimit', 'globalRateLimitTimestamp'];
+      rateLimitKeys.forEach(key => localStorage.removeItem(key));
+      console.log('✅ Rate limit limpo');
+      
+      // 2. Verificar e corrigir campaign ID
+      let campaignId = localStorage.getItem('selectedCampaignId');
+      if (!campaignId) {
+        console.log('❌ Campaign ID não encontrado - tentando encontrar campanha...');
+        const campaigns = localStorage.getItem('metaAdsData_campaigns');
+        if (campaigns) {
+          try {
+            const parsedCampaigns = JSON.parse(campaigns);
+            if (parsedCampaigns.length > 0) {
+              const activeCampaign = parsedCampaigns.find((c: any) => c.status === 'ACTIVE') || parsedCampaigns[0];
+              localStorage.setItem('selectedCampaignId', activeCampaign.id);
+              campaignId = activeCampaign.id;
+              console.log(`✅ Campaign ID definido: ${campaignId}`);
+            }
+          } catch (e) {
+            console.log('❌ Erro ao processar campanhas');
+          }
+        }
+      }
+      
+      // 3. Limpar cache de Ad Sets
+      const cacheKeys = ['metaAdsData_adsets', 'metaAdsData_adsets_timestamp', 'adsets_cache', 'adsets_cache_timestamp'];
+      cacheKeys.forEach(key => localStorage.removeItem(key));
+      
+      if (campaignId) {
+        localStorage.removeItem(`adsets_campaign_${campaignId}`);
+        localStorage.removeItem(`adsets_campaign_${campaignId}_timestamp`);
+      }
+      console.log('✅ Cache limpo');
+      
+      // 4. Limpar cache do serviço
+      if ((window as any).metaAdsService && (window as any).metaAdsService.clearCacheByType) {
+        try {
+          (window as any).metaAdsService.clearCacheByType('adsets');
+          console.log('✅ Cache do serviço limpo');
+        } catch (e) {
+          console.log('⚠️ Erro ao limpar cache do serviço');
+        }
+      }
+      
+      // 5. Aguardar um pouco para o rate limit ser resetado
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // 6. Disparar evento para recarregar produtos
+      window.dispatchEvent(new CustomEvent('reloadProducts'));
+      
+      // 7. Disparar evento para recarregar públicos
+      window.dispatchEvent(new CustomEvent('reloadAudiences', { detail: { force: true } }));
+      
+      console.log('✅ CORREÇÃO AUTOMÁTICA GLOBAL CONCLUÍDA!');
+      
+    } catch (error) {
+      console.error('❌ Erro na correção automática:', error);
+    } finally {
+      setIsAutoFixing(false);
+    }
+  };
 
   // Listener para quando um link for gerado
   useEffect(() => {
@@ -135,6 +219,15 @@ const Header: React.FC<HeaderProps> = ({
     };
   }, [isTaskManagerOpen]);
 
+  // Expor setTooltip para outros componentes
+  useEffect(() => {
+    (window as any).setHeaderTooltip = setTooltip;
+    
+    return () => {
+      delete (window as any).setHeaderTooltip;
+    };
+  }, []);
+
   return (
     <header className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700/50 shadow-xl">
       <div className="max-w-7xl mx-auto px-8 py-6">
@@ -154,37 +247,126 @@ const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
           
-          {/* User Section */}
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <button 
-                onClick={() => {
-                  console.log('🔍 CLICK - Botão de tarefas clicado!', { isFacebookConnected, isTaskManagerOpen });
-                  if (isFacebookConnected) {
-                    setIsTaskManagerOpen(true);
-                  }
-                }}
-                className={`p-3 rounded-xl transition-all duration-300 group shadow-sm hover:shadow-md ${
-                  isFacebookConnected 
-                    ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/50 cursor-pointer' 
-                    : 'text-slate-600 cursor-not-allowed opacity-50'
-                }`}
-                title={isFacebookConnected ? "Tarefas" : "Conecte-se ao Meta Ads para usar tarefas"}
-                disabled={!isFacebookConnected}
-              >
-                <CheckSquare className={`w-5 h-5 transition-transform ${
-                  isFacebookConnected ? 'group-hover:scale-110' : ''
-                }`} />
-              </button>
-              <NotificationButton 
-                selectedClient={selectedClient}
-                selectedProduct={selectedProduct}
-                selectedAudience={selectedAudience}
-                selectedMonth={selectedMonth}
-                isFacebookConnected={isFacebookConnected}
-                metaAdsUserId={getMetaAdsUserId()}
-              />
-            </div>
+                     {/* User Section */}
+           <div className="flex items-center space-x-4">
+             <div className="flex items-center space-x-2">
+                                               {/* Botão de Correção Automática */}
+                <div className="relative group">
+                  <button 
+                    onClick={handleAutoFix}
+                    onMouseEnter={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const tooltipWidth = 300;
+                      const tooltipHeight = 80;
+                      const margin = 10;
+                      
+                      let x = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+                      let y = rect.bottom + margin;
+                      
+                      // Ajustar horizontalmente se sair da tela
+                      if (x < margin) {
+                        x = margin;
+                      } else if (x + tooltipWidth > window.innerWidth - margin) {
+                        x = window.innerWidth - tooltipWidth - margin;
+                      }
+                      
+                      // Ajustar verticalmente se sair da tela
+                      if (y + tooltipHeight > window.innerHeight - margin) {
+                        y = rect.top - tooltipHeight - margin;
+                      }
+                      
+                      setTooltip({
+                        visible: true,
+                        x: Math.max(margin, x),
+                        y: Math.max(margin, y),
+                        title: 'Correção Automática',
+                        content: isFacebookConnected 
+                          ? "Resolve automaticamente problemas de rate limit, campaign ID nulo e cache desatualizado"
+                          : "Conecte-se ao Meta Ads para usar correção automática",
+                        color: 'green'
+                      });
+                    }}
+                    onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
+                    disabled={isAutoFixing || !isFacebookConnected}
+                    className={`p-3 rounded-xl transition-all duration-300 group shadow-sm hover:shadow-md ${
+                      isFacebookConnected 
+                        ? 'text-slate-400 hover:text-green-300 hover:bg-slate-700/50 cursor-pointer' 
+                        : 'text-slate-600 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    {isAutoFixing ? (
+                      <div className="w-5 h-5 animate-spin rounded-full border-2 border-green-400 border-t-transparent"></div>
+                    ) : (
+                      <Wrench className={`w-5 h-5 transition-transform ${
+                        isFacebookConnected ? 'group-hover:scale-110' : ''
+                      }`} />
+                    )}
+                  </button>
+                </div>
+               
+                                               {/* Botão de Tarefas */}
+                <div className="relative group">
+                  <button 
+                    onClick={() => {
+                      if (isFacebookConnected) {
+                        setIsTaskManagerOpen(true);
+                      }
+                    }}
+                    onMouseEnter={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const tooltipWidth = 300;
+                      const tooltipHeight = 80;
+                      const margin = 10;
+                      
+                      let x = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+                      let y = rect.bottom + margin;
+                      
+                      // Ajustar horizontalmente se sair da tela
+                      if (x < margin) {
+                        x = margin;
+                      } else if (x + tooltipWidth > window.innerWidth - margin) {
+                        x = window.innerWidth - tooltipWidth - margin;
+                      }
+                      
+                      // Ajustar verticalmente se sair da tela
+                      if (y + tooltipHeight > window.innerHeight - margin) {
+                        y = rect.top - tooltipHeight - margin;
+                      }
+                      
+                      setTooltip({
+                        visible: true,
+                        x: Math.max(margin, x),
+                        y: Math.max(margin, y),
+                        title: 'Gerenciador de Tarefas',
+                        content: isFacebookConnected 
+                          ? "Gerencie tarefas, lembretes e acompanhe o progresso das campanhas do Meta Ads"
+                          : "Conecte-se ao Meta Ads para usar o gerenciador de tarefas",
+                        color: 'blue'
+                      });
+                    }}
+                    onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
+                    className={`p-3 rounded-xl transition-all duration-300 group shadow-sm hover:shadow-md ${
+                      isFacebookConnected 
+                        ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/50 cursor-pointer' 
+                        : 'text-slate-600 cursor-not-allowed opacity-50'
+                    }`}
+                    disabled={!isFacebookConnected}
+                  >
+                    <CheckSquare className={`w-5 h-5 transition-transform ${
+                      isFacebookConnected ? 'group-hover:scale-110' : ''
+                    }`} />
+                  </button>
+                </div>
+               
+               <NotificationButton 
+                 selectedClient={selectedClient}
+                 selectedProduct={selectedProduct}
+                 selectedAudience={selectedAudience}
+                 selectedMonth={selectedMonth}
+                 isFacebookConnected={isFacebookConnected}
+                 metaAdsUserId={getMetaAdsUserId()}
+               />
+             </div>
 
             <div className="h-8 w-px bg-gradient-to-b from-slate-600 to-transparent"></div>
             
@@ -244,17 +426,19 @@ const Header: React.FC<HeaderProps> = ({
             <div className="flex flex-col items-center space-y-1 w-1/4 header-filter-item">
               <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Produto</label>
               <div className="relative bg-slate-800/60 rounded-lg border border-slate-600/40 p-2 shadow-sm hover:shadow-md transition-all duration-200 w-full backdrop-blur-sm dropdown-container">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const ev = new CustomEvent('reloadProducts');
-                    window.dispatchEvent(ev);
-                  }}
-                  className="absolute top-1 right-1 p-1 rounded-md text-slate-400 hover:text-yellow-300 hover:bg-slate-700/60 transition-colors"
-                  title="Recarregar campanhas"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
+                <div className="absolute top-1 right-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const ev = new CustomEvent('reloadProducts');
+                      window.dispatchEvent(ev);
+                    }}
+                    className="p-1 rounded-md text-slate-400 hover:text-yellow-300 hover:bg-slate-700/60 transition-colors"
+                    title="Recarregar campanhas"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                </div>
                 <ProductPicker 
                   selectedProduct={selectedProduct}
                   setSelectedProduct={setSelectedProduct}
@@ -315,17 +499,49 @@ const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Task Manager Modal */}
-      {isFacebookConnected && (
-        <TaskManager
-          isOpen={isTaskManagerOpen}
-          onClose={() => setIsTaskManagerOpen(false)}
-          userId={getMetaAdsUserId()}
-          onMetaAdsDisconnect={() => setIsTaskManagerOpen(false)}
-        />
-      )}
-    </header>
-  );
-};
+             {/* Task Manager Modal */}
+       {isFacebookConnected && (
+         <TaskManager
+           isOpen={isTaskManagerOpen}
+           onClose={() => setIsTaskManagerOpen(false)}
+           userId={getMetaAdsUserId()}
+           onMetaAdsDisconnect={() => setIsTaskManagerOpen(false)}
+         />
+       )}
+
+       {/* Tooltip Portal global para ficar acima de tudo */}
+       {tooltip.visible && createPortal(
+         <div
+           className="suggestion-tooltip"
+           style={{ 
+             position: 'fixed', 
+             left: tooltip.x, 
+             top: tooltip.y, 
+             zIndex: 2147483647,
+             transform: 'translate3d(0, 0, 0)',
+             isolation: 'isolate',
+             contain: 'layout',
+             backfaceVisibility: 'hidden',
+             perspective: '1000px',
+             willChange: 'transform',
+             pointerEvents: 'none'
+           }}
+         >
+           <div className={`min-w-[240px] max-w-[320px] text-xs rounded-lg shadow-xl border ${
+             tooltip.color==='green' ? 'border-green-500/40' : tooltip.color==='blue' ? 'border-blue-500/40' : tooltip.color==='purple' ? 'border-purple-500/40' : 'border-slate-600/40'
+           }`}>
+             <div className="p-3 bg-slate-900 rounded-lg border-slate-600/40">
+               <div className={`font-semibold mb-1 ${
+                 tooltip.color==='green' ? 'text-green-400' : tooltip.color==='blue' ? 'text-blue-400' : tooltip.color==='purple' ? 'text-purple-400' : 'text-slate-200'
+               }`}>{tooltip.title}</div>
+               <div className="text-slate-300 leading-relaxed whitespace-pre-line">{tooltip.content}</div>
+             </div>
+           </div>
+         </div>,
+         document.body
+       )}
+     </header>
+   );
+ };
 
 export default Header;

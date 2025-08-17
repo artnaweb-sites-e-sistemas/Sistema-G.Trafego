@@ -38,7 +38,7 @@ const PublicReportView: React.FC = () => {
     
     const today = new Date();
     
-    // console.log('PublicReportView: Gerando dados para', monthName, yearStr, '- Data atual:', today.toISOString().split('T')[0]);
+    // 
     
     const startDate = new Date(year, month, 1);
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -79,9 +79,9 @@ const PublicReportView: React.FC = () => {
     
     // Adicionar dados das métricas
     const relevantMetrics = metrics.filter(metric => metric.month === reportInfo.month);
-    console.log('PublicReportView: generateDailyData - Processando', relevantMetrics.length, 'métricas para', reportInfo.month);
-    console.log('PublicReportView: generateDailyData - Primeira métrica exemplo:', relevantMetrics[0]);
-    console.log('PublicReportView: generateDailyData - Total de métricas disponíveis:', metrics.length);
+    
+    
+    
     
     // Mapa de data → mapa de serviço → métrica mais recente
     const dailyServiceMap = new Map<string, Map<string, any>>();
@@ -91,13 +91,7 @@ const PublicReportView: React.FC = () => {
       const serviceKey = metric.service || 'Desconhecido';
       
       if (index < 3) {
-        console.log(`PublicReportView: Métrica ${index + 1}:`, {
-          date: metric.date,
-          service: serviceKey,
-          investment: metric.investment,
-          leads: metric.leads,
-          updatedAt: metric.updatedAt
-        });
+        
       }
       
       if (!dailyServiceMap.has(dateKey)) {
@@ -131,7 +125,7 @@ const PublicReportView: React.FC = () => {
       dailyMetricsMap.set(dateKey, agg);
     });
     
-    console.log('PublicReportView: Métricas agregadas por data:', Object.fromEntries(dailyMetricsMap));
+    
     
     // Agora aplicar os valores agregados aos dias
     dailyMetricsMap.forEach((aggregated, dateKey) => {
@@ -186,7 +180,7 @@ const PublicReportView: React.FC = () => {
 
   // Calcular valores baseados no controle diário
   const calculateDailyBasedMetrics = useMemo(() => {
-    console.log('PublicReportView: calculateDailyBasedMetrics iniciado com dailyData.length:', dailyData.length);
+    
     
     const totals = {
       investment: 0,
@@ -203,12 +197,7 @@ const PublicReportView: React.FC = () => {
       const leadsValue = row.leads || 0;
       
       if (index < 5 && (investmentValue > 0 || leadsValue > 0)) { // Log apenas primeiros dias com dados
-        console.log(`PublicReportView: Dia ${index + 1}:`, {
-          date: row.date,
-          investment: investmentValue,
-          leads: leadsValue,
-          status: row.status
-        });
+        
       }
       
       totals.investment += investmentValue;
@@ -221,7 +210,7 @@ const PublicReportView: React.FC = () => {
       }
     });
     
-    console.log('PublicReportView: Totais calculados:', totals);
+    
 
     // Calcular métricas derivadas
     const avgCPM = totals.impressions > 0 ? (totals.investment / totals.impressions) * 1000 : 0;
@@ -283,11 +272,7 @@ const PublicReportView: React.FC = () => {
   // Componente do Painel Executivo (Resumo do que realmente importa)
   const ExecutiveSummary: React.FC = () => {
     const aggregated = calculateDailyBasedMetrics;
-    console.log('PublicReportView: ExecutiveSummary renderizado com aggregated:', {
-      totalInvestment: aggregated.totalInvestment,
-      totalLeads: aggregated.totalLeads,
-      refreshTrigger
-    });
+    
     const [tooltipStates, setTooltipStates] = useState<{ [key: string]: boolean }>({});
 
     const formatCurrency = (value: number) => {
@@ -671,7 +656,7 @@ const PublicReportView: React.FC = () => {
   useEffect(() => {
     const loadPublicReport = async () => {
       try {
-        console.log('PublicReportView: loadPublicReport iniciado, refreshTrigger:', refreshTrigger);
+        
         setLoading(true);
         
         // Extrair parâmetros da URL
@@ -700,32 +685,32 @@ const PublicReportView: React.FC = () => {
         });
         
         // Carregar métricas públicas - priorizar dados da campanha (produto)
-        console.log('PublicReportView: Carregando métricas para:', { month, client, product, audience });
+        
         
         // Se temos um produto específico, carregar dados da campanha
         if (product && product !== 'Todos os Produtos' && product !== '') {
           const data = await metricsService.getPublicMetrics(month, client, product, 'Todos os Públicos');
-          console.log('PublicReportView: Métricas da campanha carregadas:', data.length, 'registros');
+          
           setMetrics(data);
         } else if (audience && audience !== 'Todos os Públicos' && audience !== '') {
           // Fallback para dados do público se não há produto específico
           const data = await metricsService.getPublicMetrics(month, client, 'Todos os Produtos', audience);
-          console.log('PublicReportView: Métricas do público carregadas:', data.length, 'registros');
+          
           setMetrics(data);
         } else {
           // Carregar dados gerais
           const data = await metricsService.getPublicMetrics(month, client, 'Todos os Produtos', 'Todos os Públicos');
-          console.log('PublicReportView: Métricas gerais carregadas:', data.length, 'registros');
+          
           setMetrics(data);
         }
         
         // Sempre tentar buscar detalhes mensais mais recentes salvos no Firebase
         if (product && month && client) {
           try {
-            console.log('🔍 DEBUG - PublicReportView - Buscando detalhes mensais:', { month, product, client });
+            
             const savedDetails = await metricsService.getMonthlyDetails(month, product, client);
             if (savedDetails) {
-              console.log('🔍 DEBUG - PublicReportView - Detalhes encontrados:', savedDetails);
+              
               setReportInfo(prev => ({
                 ...prev,
                 monthlyDetails: {
@@ -740,7 +725,7 @@ const PublicReportView: React.FC = () => {
           }
         }
         
-        console.log('PublicReportView: loadPublicReport concluído');
+        
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -769,14 +754,14 @@ const PublicReportView: React.FC = () => {
           if (updateData.timestamp > lastUpdateTimestamp) {
             lastUpdateTimestamp = updateData.timestamp;
             isProcessingUpdate = true;
-            console.log('PublicReportView: Atualização detectada via localStorage:', updateData);
+            
             
             // Aguardar um pouco para garantir que o Firebase foi atualizado
             setTimeout(() => {
-              console.log('PublicReportView: Iniciando reload das métricas...');
+              
               setRefreshTrigger(prev => {
                 const newValue = prev + 1;
-                console.log('PublicReportView: RefreshTrigger atualizado para:', newValue);
+                
                 return newValue;
               });
               // Reset do flag após processamento
@@ -797,11 +782,11 @@ const PublicReportView: React.FC = () => {
 
     // Verificar a cada 5 segundos para atualizações mais rápidas
     const interval = setInterval(checkForUpdates, 5000);
-    console.log('PublicReportView: Monitoramento de localStorage iniciado (5s)');
+    
 
     return () => {
       clearInterval(interval);
-      console.log('PublicReportView: Monitoramento de localStorage parado');
+      
     };
   }, []);
 
@@ -811,12 +796,12 @@ const PublicReportView: React.FC = () => {
       if (e.key === 'metaAdsDataRefreshed' && e.newValue) {
         try {
           const updateData = JSON.parse(e.newValue);
-          console.log('PublicReportView: Mudança detectada no localStorage:', updateData);
+          
           
           // Forçar reload imediato
           setRefreshTrigger(prev => {
             const newValue = prev + 1;
-            console.log('PublicReportView: RefreshTrigger atualizado (storage event):', newValue);
+            
             return newValue;
           });
         } catch (error) {

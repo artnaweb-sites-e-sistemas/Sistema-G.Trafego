@@ -70,8 +70,7 @@ class FirestoreNotificationService {
       const ref = doc(db, this.collection, notificationId);
       await setDoc(ref, notificationData);
       
-      console.log('📨 Notificação salva no Firestore:', notificationId);
-    } catch (error) {
+      } catch (error) {
       console.error('❌ Erro ao salvar notificação no Firestore:', error);
       throw error;
     }
@@ -128,8 +127,7 @@ class FirestoreNotificationService {
         updatedAt: serverTimestamp()
       }, { merge: true });
       
-      console.log('✅ Notificação marcada como lida:', notificationId);
-    } catch (error) {
+      } catch (error) {
       console.error('❌ Erro ao marcar notificação como lida:', error);
       throw error;
     }
@@ -148,8 +146,7 @@ class FirestoreNotificationService {
       );
       
       await Promise.all(promises);
-      console.log(`✅ ${unreadNotifications.length} notificações marcadas como lidas`);
-    } catch (error) {
+      } catch (error) {
       console.error('❌ Erro ao marcar todas as notificações como lidas:', error);
       throw error;
     }
@@ -221,8 +218,7 @@ class FirestoreNotificationService {
         }
       }
 
-      console.log(`🔄 Sincronização de notificações concluída para ${pendingAnalyses.length} análises`);
-    } catch (error) {
+      } catch (error) {
       console.error('❌ Erro ao sincronizar notificações de análises pendentes:', error);
       throw error;
     }
@@ -242,8 +238,7 @@ class FirestoreNotificationService {
         updatedAt: serverTimestamp()
       }, { merge: true });
       
-      console.log('🔄 Notificação atualizada:', notificationId);
-    } catch (error) {
+      } catch (error) {
       console.error('❌ Erro ao atualizar notificação:', error);
       throw error;
     }
@@ -267,8 +262,7 @@ class FirestoreNotificationService {
       const deletePromises = snapshot.docs.map(doc => doc.ref.delete());
       
       await Promise.all(deletePromises);
-      console.log(`🗑️ ${snapshot.size} notificações antigas removidas`);
-    } catch (error) {
+      } catch (error) {
       console.error('❌ Erro ao limpar notificações antigas:', error);
     }
   }

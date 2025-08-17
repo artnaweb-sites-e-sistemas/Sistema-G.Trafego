@@ -41,12 +41,7 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
 
   // Calcular vendas do Meta Ads para este público específico (mesma lógica do MonthlyDetailsTable)
   const metaAdsVendas = React.useMemo(() => {
-    console.log('🔍 DEBUG - Todas as métricas disponíveis:', metrics.map(m => ({
-      month: m.month,
-      product: m.product,
-      audience: m.audience,
-      sales: m.sales
-    })));
+    
 
     // Filtrar métricas apenas para este público específico
     const relevantMetrics = metrics.filter(metric => 
@@ -58,7 +53,7 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
     // Se não encontrou métricas exatas, tentar filtro mais flexível
     let flexMetrics = relevantMetrics;
     if (relevantMetrics.length === 0) {
-      console.log('🔍 DEBUG - Nenhuma métrica encontrada com filtro exato, tentando filtro flexível...');
+      
       
       // Tentar apenas com mês e produto
       flexMetrics = metrics.filter(metric => 
@@ -66,12 +61,7 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
         metric.product === selectedProduct
       );
       
-      console.log('🔍 DEBUG - Métricas com filtro flexível (mês + produto):', flexMetrics.map(m => ({
-        month: m.month,
-        product: m.product,
-        audience: m.audience,
-        sales: m.sales
-      })));
+      
     }
 
     // Somar todas as vendas do Meta Ads para este público (mesma lógica do calculateAggregatedMetrics)
@@ -79,16 +69,7 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
       return total + (metric.sales || 0);
     }, 0);
 
-    console.log('🔍 DEBUG - metaAdsVendas calculado:', {
-      selectedMonth,
-      selectedProduct,
-      selectedAudience,
-      relevantMetricsCount: relevantMetrics.length,
-      flexMetricsCount: flexMetrics.length,
-      relevantMetrics: relevantMetrics.map(m => ({ sales: m.sales, date: m.date })),
-      flexMetrics: flexMetrics.map(m => ({ sales: m.sales, date: m.date })),
-      total
-    });
+    
 
     return total;
   }, [metrics, selectedMonth, selectedProduct, selectedAudience]);
@@ -101,23 +82,18 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
       try {
         setIsLoading(true);
         const savedDetails = await metricsService.getAudienceDetails(selectedMonth, selectedProduct, selectedAudience);
-        console.log('🔍 DEBUG - loadSavedDetails:', {
-          selectedMonth,
-          selectedProduct,
-          selectedAudience,
-          savedDetails
-        });
+        
         if (savedDetails) {
-          console.log('🔍 DEBUG - AudienceDetailsTable - Dados salvos encontrados:', savedDetails);
+          
           
           // Carregar o modo salvo (se existir)
           if (savedDetails.vendasAuto !== undefined) {
-            console.log('🔍 DEBUG - Modo salvo encontrado:', savedDetails.vendasAuto ? 'automático' : 'manual');
+            
             setVendasAuto(savedDetails.vendasAuto);
             
             // Se há valor manual salvo, carregá-lo
             if (savedDetails.manualVendasValue !== undefined) {
-              console.log('🔍 DEBUG - Valor manual salvo encontrado:', savedDetails.manualVendasValue);
+              
               setManualVendasValue(savedDetails.manualVendasValue);
             }
             
@@ -128,14 +104,14 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
                 agendamentos: savedDetails.agendamentos || 0,
                 vendas: metaAdsVendas || 0
               });
-              console.log('🔍 DEBUG - Modo automático: usando valor do Meta Ads:', metaAdsVendas);
+              
             } else {
               // Modo manual: usar valor salvo
               setDetails({
                 agendamentos: savedDetails.agendamentos || 0,
                 vendas: savedDetails.vendas || 0
               });
-              console.log('🔍 DEBUG - Modo manual: usando valor salvo:', savedDetails.vendas);
+              
             }
           } else {
             // Se não há modo salvo, verificar se foi inserido manualmente
@@ -145,14 +121,14 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
               // Se o valor salvo é diferente do Meta Ads, significa que foi editado manualmente
               const metaAdsValue = metaAdsVendas || 0;
               if (savedDetails.vendas !== metaAdsValue) {
-                console.log('🔍 DEBUG - Valor manual detectado, mudando para modo manual');
+                
                 setVendasAuto(false); // Mudar para modo manual
                 setDetails({
                   agendamentos: savedDetails.agendamentos || 0,
                   vendas: savedDetails.vendas || 0
                 });
               } else {
-                console.log('🔍 DEBUG - Valor igual ao Meta Ads, mantendo modo automático');
+                
                 setVendasAuto(true); // Manter modo automático
                 setDetails({
                   agendamentos: savedDetails.agendamentos || 0,
@@ -173,7 +149,7 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
           setVendasAuto(true);
         }
       } catch (error) {
-        console.log('Nenhum detalhe salvo encontrado para este público');
+        
         // Se não há dados salvos, manter modo automático
         setVendasAuto(true);
       } finally {
@@ -186,14 +162,10 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
 
   // Sincronizar vendas com Meta Ads quando vendasAuto estiver ativo
   useEffect(() => {
-    console.log('🔍 DEBUG - useEffect vendasAuto:', {
-      vendasAuto,
-      metaAdsVendas,
-      currentDetails: details
-    });
+    
     
     if (vendasAuto) {
-      console.log('🔍 DEBUG - Atualizando vendas para Meta Ads:', metaAdsVendas);
+      
       setDetails(prev => ({
         ...prev,
         vendas: metaAdsVendas
@@ -249,23 +221,14 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
     let newValue: number;
     let newManualVendasValue = manualVendasValue;
     
-    console.log('🔵 DEBUG - AudienceDetailsTable - INÍCIO DO SALVAMENTO:', {
-      editingField,
-      editValue,
-      selectedAudience,
-      selectedProduct,
-      selectedMonth,
-      currentDetails: details,
-      vendasAuto,
-      manualVendasValue
-    });
+    
     
     if (editingField === 'vendas') {
       // Para vendas, usar número simples (quantidade de vendas)
       newValue = parseInt(editValue) || 0;
       // Se estiver em modo manual, salvar como valor manual
       if (!vendasAuto) {
-        console.log('🔍 DEBUG - AudienceDetailsTable - Salvando valor manual de vendas:', newValue);
+        
         newManualVendasValue = newValue;
         setManualVendasValue(newValue);
       }
@@ -281,19 +244,7 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
         [editingField]: newValue
       };
 
-      console.log('🔵 DEBUG - AudienceDetailsTable - DADOS PARA SALVAR:', {
-        month: selectedMonth,
-        product: selectedProduct,
-        audience: selectedAudience,
-        agendamentos: updatedDetails.agendamentos,
-        vendas: updatedDetails.vendas,
-        vendasAuto: vendasAuto,
-        manualVendasValue: newManualVendasValue,
-        editingField,
-        newValue,
-        isManualMode: !vendasAuto,
-        updatedDetails
-      });
+      
 
       await metricsService.saveAudienceDetails({
         month: selectedMonth,
@@ -312,16 +263,7 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
       toast.success('Valor atualizado com sucesso!');
       
       // Disparar evento para notificar outros componentes
-      console.log('🔵 DEBUG - AudienceDetailsTable - SALVAMENTO CONCLUÍDO E DISPARANDO EVENTO:', {
-        savedData: updatedDetails,
-        eventDetails: {
-          month: selectedMonth,
-          product: selectedProduct,
-          audience: selectedAudience,
-          client: selectedClient,
-          details: updatedDetails
-        }
-      });
+      
       
       window.dispatchEvent(new CustomEvent('audienceDetailsSaved', {
         detail: { 
@@ -333,7 +275,7 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
         }
       }));
       
-      console.log('🔵 DEBUG - AudienceDetailsTable - EVENTO DISPARADO: audienceDetailsSaved');
+      
     } catch (error) {
       console.error('Erro ao salvar detalhes do público:', error);
       toast.error('Erro ao salvar valor');
@@ -343,24 +285,19 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
   };
 
   const toggleVendasAuto = () => {
-    console.log('🔍 DEBUG - toggleVendasAuto chamado:', {
-      currentVendasAuto: vendasAuto,
-      metaAdsVendas,
-      currentDetails: details,
-      manualVendasValue
-    });
+    
 
     const newVendasAuto = !vendasAuto;
     setVendasAuto(newVendasAuto);
     
     if (vendasAuto) {
       // Mudando de automático para manual
-      console.log('🔍 DEBUG - Mudando de automático para manual');
+      
       toast.success('Modo manual ativado - você pode editar o valor');
       
       // Restaurar o valor manual se existir
       if (manualVendasValue > 0) {
-        console.log('🔍 DEBUG - Restaurando valor manual:', manualVendasValue);
+        
         setDetails(prev => ({
           ...prev,
           vendas: manualVendasValue
@@ -368,21 +305,21 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
       }
     } else {
       // Mudando de manual para automático
-      console.log('🔍 DEBUG - Mudando de manual para automático, metaAdsVendas:', metaAdsVendas);
+      
       toast.success('Sincronização automática ativada');
       
       // Salvar o valor atual como valor manual ANTES de mudar para automático
-      console.log('🔍 DEBUG - Salvando valor manual atual:', details.vendas);
+      
       setManualVendasValue(details.vendas);
       
       // Atualizar imediatamente com o valor do Meta Ads (mesmo que seja 0)
-      console.log('🔍 DEBUG - Atualizando details com metaAdsVendas:', metaAdsVendas);
+      
       setDetails(prev => {
         const newDetails = {
           ...prev,
           vendas: metaAdsVendas
         };
-        console.log('🔍 DEBUG - Novos details:', newDetails);
+        
         return newDetails;
       });
     }
@@ -390,13 +327,7 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
     // Salvar o modo no Firebase
     if (selectedAudience && selectedAudience !== 'Todos os Públicos') {
       const finalVendas = newVendasAuto ? metaAdsVendas : details.vendas;
-      console.log('🔍 DEBUG - AudienceDetailsTable - Salvando mudança de modo:', {
-        newVendasAuto,
-        finalVendas,
-        metaAdsVendas,
-        currentDetailsVendas: details.vendas,
-        manualVendasValue
-      });
+      
       
       metricsService.saveAudienceDetails({
         month: selectedMonth,
@@ -408,7 +339,7 @@ const AudienceDetailsTable: React.FC<AudienceDetailsTableProps> = ({
         manualVendasValue: manualVendasValue, // Salvar o valor manual
         ticketMedio: 250
       }).then(() => {
-        console.log('🔍 DEBUG - AudienceDetailsTable - Modo salvo com sucesso, disparando evento');
+        
         
         // Disparar evento após salvar
         window.dispatchEvent(new CustomEvent('audienceDetailsSaved', {

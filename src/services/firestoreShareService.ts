@@ -55,8 +55,7 @@ class FirestoreShareService {
     try {
       const linkData = this.toFirestoreFormat(shareLink);
       await setDoc(doc(db, this.COLLECTION_NAME, shareLink.shortCode), linkData);
-      console.log('Link de compartilhamento salvo no Firestore:', shareLink.shortCode);
-    } catch (error) {
+      } catch (error) {
       console.error('Erro ao salvar link no Firestore:', error);
       throw error;
     }
@@ -118,8 +117,7 @@ class FirestoreShareService {
       const linkData = this.toFirestoreFormat(shareLink);
       delete linkData.userId; // Não atualizar userId
       await setDoc(docRef, linkData, { merge: true });
-      console.log('Link atualizado no Firestore:', shareLink.shortCode);
-    } catch (error) {
+      } catch (error) {
       console.error('Erro ao atualizar link no Firestore:', error);
       throw error;
     }
@@ -133,7 +131,6 @@ class FirestoreShareService {
     try {
       const docRef = doc(db, this.COLLECTION_NAME, shortCode);
       await updateDoc(docRef, { isActive: false });
-      console.log('Link desativado no Firestore:', shortCode);
       return true;
     } catch (error) {
       console.error('Erro ao desativar link no Firestore:', error);
@@ -149,7 +146,6 @@ class FirestoreShareService {
     try {
       const docRef = doc(db, this.COLLECTION_NAME, shortCode);
       await deleteDoc(docRef);
-      console.log('Link deletado do Firestore:', shortCode);
       return true;
     } catch (error) {
       console.error('Erro ao deletar link do Firestore:', error);
@@ -168,13 +164,11 @@ class FirestoreShareService {
     try {
       const localData = localStorage.getItem('shareLinks');
       if (!localData) {
-        console.log('Nenhum dado de links encontrado no localStorage');
         return 0;
       }
 
       const links = JSON.parse(localData);
       if (!Object.keys(links).length) {
-        console.log('Nenhum link para migrar');
         return 0;
       }
 
@@ -204,7 +198,6 @@ class FirestoreShareService {
         }
       }
 
-      console.log(`Migração de links concluída: ${migratedCount} links migrados`);
       return migratedCount;
     } catch (error) {
       console.error('Erro durante migração de links:', error);
@@ -229,7 +222,6 @@ class FirestoreShareService {
         }
       }
 
-      console.log(`Limpeza concluída: ${cleanedCount} links expirados removidos`);
       return cleanedCount;
     } catch (error) {
       console.error('Erro durante limpeza de links:', error);

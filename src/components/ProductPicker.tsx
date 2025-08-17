@@ -98,17 +98,14 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
 
         const { startDate, endDate } = getPeriodDates(selectedMonth || '');
         
-        console.log('🔍 DEBUG - ProductPicker - Período selecionado:', { selectedMonth, startDate, endDate });
+        
         
         // 🎯 CORREÇÃO: Para análise histórica, buscar TODAS as campanhas sem filtro de data
         // O usuário quer ver produtos que têm dados no período, independente de quando foram criados
-        console.log('🔍 DEBUG - ProductPicker - Buscando TODAS as campanhas para análise histórica...');
+        
         const campaignsData = await metaAdsService.getCampaigns();
         
-        console.log('🔍 DEBUG - ProductPicker - Campanhas encontradas:', {
-          total: campaignsData.length,
-          campaigns: campaignsData.map(c => ({ id: c.id, name: c.name, status: c.status }))
-        });
+//         
         
         // 🎯 CORREÇÃO: Para análise histórica, incluir campanhas PAUSED e ARCHIVED também
         // Campanhas pausadas ou arquivadas podem ter dados históricos importantes
@@ -116,10 +113,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
           campaign.status === 'ACTIVE' || campaign.status === 'PAUSED' || campaign.status === 'ARCHIVED'
         );
         
-        console.log('🔍 DEBUG - ProductPicker - Campanhas filtradas para exibição:', {
-          total: activeCampaigns.length,
-          filtered: activeCampaigns.map(c => ({ id: c.id, name: c.name, status: c.status }))
-        });
+//         
         
         const facebookProducts: Product[] = activeCampaigns.map((campaign, index) => ({
           id: `fb-campaign-${campaign.id}`,
@@ -238,30 +232,23 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
           selectedClient: selectedClient !== 'Selecione um cliente' ? selectedClient : undefined
         });
         
-        console.log('✅ Seleção salva no Firestore:', {
-          campaignId: product.campaign.id,
-          productName: product.name
-        });
+//         
       } catch (error) {
         console.error('Erro ao salvar seleção no Firestore:', error);
       }
     }
     
     // Manter localStorage como fallback/cache local
-    console.log('🔍 DEBUG - ProductPicker - Salvando no localStorage:', {
-      productName: product.name,
-      campaignId: product.campaign?.id,
-      source: product.source
-    });
+//     
     
     localStorage.setItem('currentSelectedProduct', product.name);
     if (product.source === 'facebook' && product.campaign) {
       localStorage.setItem('selectedCampaignId', product.campaign.id);
-      console.log('✅ DEBUG - ProductPicker - selectedCampaignId salvo:', product.campaign.id);
+      
       
       // Verificar se foi salvo corretamente
       const savedId = localStorage.getItem('selectedCampaignId');
-      console.log('🔍 DEBUG - ProductPicker - Verificação localStorage selectedCampaignId:', savedId);
+      
     }
     
     // Emitir evento para notificar outros componentes
@@ -285,7 +272,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
       }));
       
       // 🎯 CARREGAMENTO IMEDIATO E DUPLO para garantir que funcione
-      console.log('🚀 ProductPicker - Disparando carregamento IMEDIATO de públicos...');
+      
       
       // Primeiro disparo imediato
       window.dispatchEvent(new CustomEvent('loadAudiencesForProduct', {
@@ -298,7 +285,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
       
       // Segundo disparo com delay para garantir que capture
       setTimeout(() => {
-        console.log('🔄 ProductPicker - Segundo disparo para garantir carregamento...');
+        
         window.dispatchEvent(new CustomEvent('loadAudiencesForProduct', {
           detail: { 
             productName: product.name,
@@ -351,26 +338,20 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
 
         const { startDate, endDate } = getPeriodDates(selectedMonth || '');
         
-        console.log('🔍 DEBUG - ProductPicker.loadMetaAdsCampaignsForClient - Período selecionado:', { selectedMonth, startDate, endDate });
+        
         
         // 🎯 CORREÇÃO: Para análise histórica, buscar TODAS as campanhas sem filtro de data
-        console.log('🔍 DEBUG - ProductPicker.loadMetaAdsCampaignsForClient - Buscando TODAS as campanhas...');
+        
         const campaignsData = await metaAdsService.getCampaigns();
         
-        console.log('🔍 DEBUG - ProductPicker.loadMetaAdsCampaignsForClient - Campanhas encontradas:', {
-          total: campaignsData.length,
-          campaigns: campaignsData.map(c => ({ id: c.id, name: c.name, status: c.status }))
-        });
+//         
         
         // 🎯 CORREÇÃO: Incluir campanhas ARCHIVED também para análise histórica
         const activeCampaigns = campaignsData.filter(campaign => 
           campaign.status === 'ACTIVE' || campaign.status === 'PAUSED' || campaign.status === 'ARCHIVED'
         );
         
-        console.log('🔍 DEBUG - ProductPicker.loadMetaAdsCampaignsForClient - Campanhas filtradas:', {
-          total: activeCampaigns.length,
-          filtered: activeCampaigns.map(c => ({ id: c.id, name: c.name, status: c.status }))
-        });
+//         
         
         // Sincronizar campanhas com Firestore
         try {
@@ -385,7 +366,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
               selectedAccount.business_id || 'unknown',
               selectedAccount.id
             );
-            console.log('✅ Campanhas sincronizadas com Firestore');
+            
           }
         } catch (error) {
           console.error('Erro ao sincronizar campanhas com Firestore:', error);

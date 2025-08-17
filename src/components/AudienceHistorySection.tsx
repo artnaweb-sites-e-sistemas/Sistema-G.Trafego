@@ -48,19 +48,12 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
       
       // Só atualizar se for o produto e cliente atual
       if (product === selectedProduct && client === selectedClient) {
-        console.log('🔄 DEBUG - AudienceHistorySection - Ticket médio mudou, atualizando histórico...', {
-          product,
-          client,
-          ticketMedio: event.detail.ticketMedio
-        });
-        
         setLoading(true);
         try {
           // Recarregar dados do histórico com novo ticket médio
           const data = await metricsService.getProductHistoryAllPeriods(selectedClient, selectedProduct, { onlyPrimaryAdSet: false });
           setRows(data);
-          console.log('✅ DEBUG - AudienceHistorySection - Histórico atualizado com novos valores ROI/ROAS');
-        } catch (error) {
+          } catch (error) {
           console.error('❌ Erro ao atualizar histórico:', error);
         } finally {
           setLoading(false);
@@ -73,12 +66,6 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
       
       // Só processar se for o produto e cliente atual
       if (product === selectedProduct && client === selectedClient) {
-        console.log('⚡ DEBUG - AudienceHistorySection - Ticket médio mudou IMEDIATAMENTE, agendando atualização...', {
-          product,
-          client,
-          ticketMedio: event.detail.ticketMedio
-        });
-        
         // Cancelar timeout anterior se existir
         if (updateTimeout) {
           clearTimeout(updateTimeout);
@@ -86,12 +73,10 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
         
         // Agendar atualização com debounce de 300ms para evitar muitas requisições
         updateTimeout = setTimeout(async () => {
-          console.log('🔄 DEBUG - AudienceHistorySection - Executando atualização imediata do histórico...');
           try {
             const data = await metricsService.getProductHistoryAllPeriods(selectedClient, selectedProduct, { onlyPrimaryAdSet: false });
             setRows(data);
-            console.log('✅ DEBUG - AudienceHistorySection - Histórico atualizado IMEDIATAMENTE');
-          } catch (error) {
+            } catch (error) {
             console.error('❌ Erro ao atualizar histórico imediatamente:', error);
           }
           // Não mostrar loading para atualização imediata para manter fluidez
@@ -324,5 +309,4 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
 };
 
 export default AudienceHistorySection;
-
 

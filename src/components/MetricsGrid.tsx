@@ -99,11 +99,6 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, subtitle, trend, 
 };
 
 const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, selectedMonth }) => {
-  console.log('🎯 CARD DEBUG - MetricsGrid - Props recebidas:', {
-    selectedClient,
-    selectedMonth,
-    metricsLength: metrics?.length || 0
-  });
   
   // CORREÇÃO: Garantir que aggregated seja calculado corretamente mesmo sem métricas
   const aggregated = metricsService.calculateAggregatedMetrics(metrics || []);
@@ -128,12 +123,8 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
       }
       
       try {
-        console.log('🎯 CARD DEBUG - MetricsGrid - Buscando valores reais da planilha detalhes mensais:', { selectedClient, selectedMonth });
-        
         // Buscar TODOS os produtos (campanhas) do cliente selecionado na planilha detalhes mensais
         const realValues = await metricsService.getRealValuesForClient(selectedMonth || '', selectedClient || '');
-        
-        console.log('🎯 CARD DEBUG - MetricsGrid - Valores obtidos da planilha:', realValues);
         
         setRealMonthlyValues({
           agendamentos: realValues.agendamentos || 0,
@@ -153,16 +144,11 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
   // 🎯 NOVO: Listener para atualizar cards quando dados dos públicos mudarem
   React.useEffect(() => {
     const handleAudienceDetailsSaved = (event: CustomEvent) => {
-      console.log('🎯 CARD DEBUG - MetricsGrid - Evento audienceDetailsSaved recebido:', event.detail);
-      
       if (event.detail && event.detail.client === (selectedClient || '') && event.detail.month === selectedMonth) {
-        console.log('🎯 CARD DEBUG - MetricsGrid - Dados do público alterados, recarregando valores dos cards...');
-        
         // Recarregar valores dos cards
         setTimeout(async () => {
           try {
             const realValues = await metricsService.getRealValuesForClient(selectedMonth || '', selectedClient || '');
-            console.log('🎯 CARD DEBUG - MetricsGrid - Novos valores carregados:', realValues);
             
             setRealMonthlyValues({
               agendamentos: realValues.agendamentos || 0,
@@ -223,13 +209,8 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
     { 
       title: 'CPV', 
       value: (() => {
-        console.log('🎯 CARD DEBUG - MetricsGrid - CPV Card:', { 
-          realMonthlyCPV: realMonthlyValues.cpv
-        });
-        
         // 🎯 CORREÇÃO: Usar valor real CPV calculado da planilha detalhes mensais
         const cpvValue = realMonthlyValues.cpv;
-        console.log('🎯 CARD DEBUG - MetricsGrid - CPV usando valor da planilha detalhes mensais:', cpvValue);
         return formatCurrency(cpvValue);
       })(), 
       trend: (() => {
@@ -243,13 +224,8 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
     { 
       title: 'ROI/ROAS', 
       value: (() => {
-        console.log('🎯 CARD DEBUG - MetricsGrid - ROI/ROAS Card:', { 
-          realMonthlyROI: realMonthlyValues.roi
-        });
-        
         // 🎯 CORREÇÃO: Usar valor real ROI/ROAS calculado da planilha detalhes mensais
         const roiValue = realMonthlyValues.roi;
-        console.log('🎯 CARD DEBUG - MetricsGrid - ROI/ROAS usando valor da planilha detalhes mensais:', roiValue);
         return roiValue;
       })(), 
       trend: (() => {
@@ -273,13 +249,8 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
     { 
       title: 'Agendamentos', 
       value: (() => {
-        console.log('🎯 CARD DEBUG - MetricsGrid - Agendamentos Card:', { 
-          realMonthlyAgendamentos: realMonthlyValues.agendamentos
-        });
-        
         // 🎯 CORREÇÃO: Usar valores reais da planilha detalhes mensais (soma de todos os produtos do cliente)
         const agendamentosValue = realMonthlyValues.agendamentos;
-        console.log('🎯 CARD DEBUG - MetricsGrid - Agendamentos usando valor da planilha detalhes mensais:', agendamentosValue);
         return agendamentosValue.toString();
       })(), 
       trend: (() => {
@@ -293,13 +264,8 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics, selectedClient, sele
     { 
       title: 'Quantidade de Vendas', 
       value: (() => {
-        console.log('🎯 CARD DEBUG - MetricsGrid - Vendas Card:', { 
-          realMonthlyVendas: realMonthlyValues.vendas
-        });
-        
         // 🎯 CORREÇÃO: Usar valores reais da planilha detalhes mensais (soma de todos os produtos do cliente)
         const vendasValue = realMonthlyValues.vendas;
-        console.log('🎯 CARD DEBUG - MetricsGrid - Vendas usando valor da planilha detalhes mensais:', vendasValue);
         return vendasValue.toString();
       })(), 
       trend: (() => {

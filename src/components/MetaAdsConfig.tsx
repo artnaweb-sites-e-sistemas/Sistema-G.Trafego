@@ -59,7 +59,6 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
   const setManualData = () => {
     const savedUser = localStorage.getItem('facebookUser');
     if (savedUser) {
-      console.log('Usuario salvo encontrado, nao mudando para manual');
       return;
     }
     
@@ -104,13 +103,9 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
   };
 
   useEffect(() => {
-    console.log('MetaAdsConfig useEffect inicial');
-    
     const savedUser = localStorage.getItem('facebookUser');
-    console.log('savedUser:', savedUser);
     
     if (savedUser) {
-      console.log('Usuario salvo encontrado, configurando Facebook');
       try {
         const user = JSON.parse(savedUser);
         setUser(user);
@@ -119,12 +114,10 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
         setFacebookData();
         checkLoginStatus();
       } catch (error) {
-        console.log('Erro ao processar usuario salvo:', error);
         localStorage.removeItem('facebookUser');
         setManualData();
       }
     } else {
-      console.log('Usuario nao salvo, configurando manual');
       setManualData();
     }
 
@@ -135,7 +128,6 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
     }
 
     const handleLoginSuccess = (event: CustomEvent) => {
-      console.log('Evento facebookLoginSuccess recebido');
       const user = event.detail;
       setUser(user);
       metaAdsService.setUser(user);
@@ -402,7 +394,6 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
                         </p>
                         <button
                           onClick={async () => {
-                            console.log('🔄 MetaAdsConfig - Botão resetar contador clicado');
                             try {
                               metaAdsService.resetOAuthRateLimit();
                               
@@ -410,8 +401,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
                               setTimeout(async () => {
                                 const newStatus = await metaAdsService.getOAuthRateLimitStatus();
                                 setRateLimitStatus(newStatus);
-                                console.log('🔄 MetaAdsConfig - Status recarregado após reset:', newStatus);
-                              }, 100);
+                                }, 100);
                               
                             } catch (error) {
                               console.error('🔄 MetaAdsConfig - Erro ao resetar contador:', error);

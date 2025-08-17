@@ -65,12 +65,10 @@ const NotificationButton: React.FC<NotificationButtonProps> = ({
   // Listener para eventos de conexão/desconexão do Meta Ads
   useEffect(() => {
     const handleMetaAdsConnected = () => {
-      console.log('📨 NotificationButton - Meta Ads conectado, recarregando notificações');
       loadNotifications();
     };
 
     const handleMetaAdsDisconnected = () => {
-      console.log('📨 NotificationButton - Meta Ads desconectado, limpando notificações');
       setNotificationData({
         pendingAnalyses: [],
         totalPending: 0,
@@ -80,7 +78,6 @@ const NotificationButton: React.FC<NotificationButtonProps> = ({
     };
 
     const handleAnalysisUpdated = () => {
-      console.log('📨 NotificationButton - Análise atualizada, recarregando notificações');
       if (isFacebookConnected) {
         loadNotifications();
       }
@@ -161,20 +158,59 @@ const NotificationButton: React.FC<NotificationButtonProps> = ({
     return <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />;
   };
 
-  return (
-    <div className="relative" ref={dropdownRef}>
+    return (
+    <div className="relative group" ref={dropdownRef}>
     <button 
       onClick={handleClick}
+      onMouseEnter={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const tooltipWidth = 300;
+        const tooltipHeight = 80;
+        const margin = 10;
+        
+        let x = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+        let y = rect.bottom + margin;
+        
+        // Ajustar horizontalmente se sair da tela
+        if (x < margin) {
+          x = margin;
+        } else if (x + tooltipWidth > window.innerWidth - margin) {
+          x = window.innerWidth - tooltipWidth - margin;
+        }
+        
+        // Ajustar verticalmente se sair da tela
+        if (y + tooltipHeight > window.innerHeight - margin) {
+          y = rect.top - tooltipHeight - margin;
+        }
+        
+        // Usar o mesmo sistema de tooltip do Header
+        if (typeof window !== 'undefined' && (window as any).setHeaderTooltip) {
+          (window as any).setHeaderTooltip({
+            visible: true,
+            x: Math.max(margin, x),
+            y: Math.max(margin, y),
+            title: 'Central de Notificações',
+            content: isFacebookConnected 
+              ? (notificationData.totalPending > 0 
+                  ? `${notificationData.totalPending} análise(s) pendente(s) de processamento`
+                  : "Sem notificações pendentes"
+                )
+              : "Conecte-se ao Meta Ads para ver notificações e análises pendentes",
+            color: 'purple'
+          });
+        }
+      }}
+      onMouseLeave={() => {
+        if (typeof window !== 'undefined' && (window as any).setHeaderTooltip) {
+          (window as any).setHeaderTooltip((prev: any) => ({ ...prev, visible: false }));
+        }
+      }}
         ref={triggerRef}
         className={`p-3 rounded-xl transition-all duration-300 group shadow-sm hover:shadow-md relative ${
           isFacebookConnected 
             ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/50 cursor-pointer' 
             : 'text-slate-600 cursor-not-allowed opacity-50'
         }`}
-        title={isFacebookConnected 
-          ? (notificationData.totalPending > 0 ? `${notificationData.totalPending} análise(s) pendente(s)` : 'Sem notificações')
-          : 'Conecte-se ao Meta Ads para ver notificações'
-        }
         disabled={!isFacebookConnected}
       >
         {getBellIcon()}

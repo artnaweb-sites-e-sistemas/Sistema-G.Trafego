@@ -88,4 +88,3 @@ export const useDropdownPortal = ({ isOpen, triggerRef }: UseDropdownPortalProps
   return { renderDropdown, position };
 };
 
-

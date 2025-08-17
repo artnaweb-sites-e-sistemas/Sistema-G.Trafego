@@ -242,4 +242,3 @@ class ShareService {
 
 export const shareService = ShareService.getInstance();
 
-

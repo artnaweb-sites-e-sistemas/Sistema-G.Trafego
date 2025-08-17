@@ -9,7 +9,7 @@
     <!-- Facebook SDK -->
     <script>
       window.fbAsyncInit = function() {
-        console.log('Facebook SDK carregado, inicializando...');
+        
         
         // Usar App ID do environment variable se disponível
         const appId = '1793110515418498'; // Novo App ID com permissões avançadas
@@ -21,29 +21,29 @@
           version: 'v18.0'
         });
         
-        console.log('Facebook SDK inicializado com sucesso!');
-        console.log('App ID:', appId);
-        console.log('Versão:', 'v18.0');
+        
+        
+        
           
         FB.AppEvents.logPageView();
         
         // Verificar status de login quando a página carrega
         FB.getLoginStatus(function(response) {
-          console.log('Status de login na inicialização:', response);
+          
           if (response.status === 'connected') {
-            console.log('Usuário já está logado:', response.authResponse);
+            
           } else {
-            console.log('Usuário não está logado. Status:', response.status);
+            
           }
         });
       };
 
       // Função para processar mudanças de status
       function statusChangeCallback(response) {
-        console.log('statusChangeCallback chamado:', response);
+        
         
         if (response.status === 'connected') {
-          console.log('Usuário conectado com sucesso!');
+          
           
           // Buscar dados completos do usuário
           FB.api('/me', { fields: 'name,email' }, function(userInfo) {
@@ -60,7 +60,7 @@
             };
             
             localStorage.setItem('facebookUser', JSON.stringify(completeUser));
-            console.log('Dados do usuário salvos:', completeUser);
+            
             
             // Disparar evento customizado para o React
             window.dispatchEvent(new CustomEvent('facebookLoginSuccess', {
@@ -69,10 +69,10 @@
           });
           
         } else if (response.status === 'not_authorized') {
-          console.log('Usuário não autorizou o app');
+          
           localStorage.removeItem('facebookUser');
         } else {
-          console.log('Usuário não está logado');
+          
           localStorage.removeItem('facebookUser');
         }
       }
@@ -84,7 +84,7 @@
         js = d.createElement(s); js.id = id;
         js.src = "https://connect.facebook.net/pt_BR/sdk.js";
         fjs.parentNode.insertBefore(js, fjs);
-        console.log('Script do Facebook SDK carregado');
+        
       }(document, 'script', 'facebook-jssdk'));
     </script>
   </head>

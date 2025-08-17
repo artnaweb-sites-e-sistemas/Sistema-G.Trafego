@@ -68,8 +68,7 @@ class FirestoreCampaignSyncService {
     for (const operation of batch) {
       await operation;
     }
-    
-    console.log(`✅ Sincronizadas ${campaigns.length} campanhas para o Firestore`);
+
   }
 
   // Buscar campanhas do cliente no Firestore
@@ -125,8 +124,7 @@ class FirestoreCampaignSyncService {
         lastUpdatedAt: serverTimestamp()
       }, { merge: true });
       
-      console.log('✅ Seleção do usuário salva no Firestore');
-    } catch (error) {
+      } catch (error) {
       console.error('Erro ao salvar seleção do usuário:', error);
     }
   }
@@ -180,8 +178,7 @@ class FirestoreCampaignSyncService {
         });
       }
       
-      console.log(`✅ Nome da campanha ${campaignId} atualizado para: ${newName}`);
-    } catch (error) {
+      } catch (error) {
       console.error('Erro ao atualizar nome da campanha:', error);
     }
   }

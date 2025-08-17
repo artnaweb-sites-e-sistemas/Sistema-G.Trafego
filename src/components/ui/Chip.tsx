@@ -67,4 +67,3 @@ const Chip: React.FC<ChipProps> = ({ children, color = 'slate', variant = 'soft'
 
 export default Chip;
 
-

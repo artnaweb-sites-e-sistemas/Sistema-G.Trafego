@@ -114,38 +114,27 @@ const TaskManager: React.FC<TaskManagerProps> = ({ isOpen, onClose, userId, onMe
   }, []);
 
   const handleDragEnd = async (result: DropResult) => {
-    console.log('🎯 DRAG DEBUG - handleDragEnd iniciado:', result);
+    
     
     const { destination, source, draggableId } = result;
 
-    console.log('🎯 DRAG DEBUG - Dados do drag:', {
-      destination,
-      source,
-      draggableId,
-      activeTab,
-      pendingTasksCount: pendingTasks.length,
-      completedTasksCount: completedTasks.length
-    });
+//     
 
     // Se não há destino, o item foi solto fora da lista
     if (!destination) {
-      console.log('🎯 DRAG DEBUG - Sem destino, cancelando');
+      
       return;
     }
 
     // Se o item foi solto na mesma posição, não há mudança
     if (destination.index === source.index) {
-      console.log('🎯 DRAG DEBUG - Mesma posição, cancelando');
+      
       return;
     }
 
     // Verificar se o draggableId existe na lista atual
     const currentTasks = activeTab === 'pending' ? pendingTasks : completedTasks;
-    console.log('🎯 DRAG DEBUG - Lista atual:', {
-      activeTab,
-      currentTasksCount: currentTasks.length,
-      taskIds: currentTasks.map(t => t.id)
-    });
+//     
 
     const draggedTask = currentTasks.find(task => task.id === draggableId);
     
@@ -158,18 +147,14 @@ const TaskManager: React.FC<TaskManagerProps> = ({ isOpen, onClose, userId, onMe
       return;
     }
 
-    console.log('🎯 DRAG DEBUG - Tarefa encontrada:', draggedTask);
+    
     
     // Criar uma nova array com a ordem alterada
     const reorderedTasks = Array.from(currentTasks);
     const [removed] = reorderedTasks.splice(source.index, 1);
     reorderedTasks.splice(destination.index, 0, removed);
 
-    console.log('🎯 DRAG DEBUG - Reordenação:', {
-      original: currentTasks.map(t => ({ id: t.id, order: t.order })),
-      reordered: reorderedTasks.map(t => ({ id: t.id, order: t.order })),
-      removedTask: removed
-    });
+//     
 
     // Atualizar ordens sequenciais
     const updatedTasks = reorderedTasks.map((task, index) => ({
@@ -177,9 +162,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ isOpen, onClose, userId, onMe
       order: index + 1
     }));
 
-    console.log('🎯 DRAG DEBUG - Tarefas com nova ordem:', 
-      updatedTasks.map(t => ({ id: t.id, order: t.order }))
-    );
+//     
 
     // Atualizar o estado local
     const newAllTasks = tasks.map(task => {
@@ -187,15 +170,15 @@ const TaskManager: React.FC<TaskManagerProps> = ({ isOpen, onClose, userId, onMe
       return updatedTask || task;
     });
     
-    console.log('🎯 DRAG DEBUG - Atualizando estado local...');
+    
     setTasks(newAllTasks);
 
     // Atualizar no banco de dados
     try {
       const taskIds = updatedTasks.map(task => task.id);
-      console.log('🎯 DRAG DEBUG - Salvando no banco:', taskIds);
+      
       await taskService.reorderTasks(userId, taskIds);
-      console.log('🎯 DRAG DEBUG - Salvo com sucesso!');
+      
     } catch (error) {
       console.error('🎯 DRAG DEBUG - Erro ao salvar:', error);
       await loadTasks();
@@ -320,10 +303,10 @@ const TaskManager: React.FC<TaskManagerProps> = ({ isOpen, onClose, userId, onMe
             <DragDropContext 
               onDragEnd={handleDragEnd}
               onDragStart={(start) => {
-                console.log('🎯 DRAG DEBUG - Drag iniciado:', start);
+                
               }}
               onDragUpdate={(update) => {
-                console.log('🎯 DRAG DEBUG - Drag update:', update);
+                
               }}
             >
               <div className="p-4">
@@ -339,11 +322,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ isOpen, onClose, userId, onMe
                           }`}
                         >
                           {pendingTasks.map((task, index) => {
-                            console.log('🎯 DRAG DEBUG - Criando Draggable pendente:', { 
-                              taskId: task.id, 
-                              index, 
-                              isLoading 
-                            });
+//                             
                             return (
                               <Draggable 
                                 key={task.id}
@@ -397,11 +376,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ isOpen, onClose, userId, onMe
                           }`}
                         >
                           {completedTasks.map((task, index) => {
-                            console.log('🎯 DRAG DEBUG - Criando Draggable completa:', { 
-                              taskId: task.id, 
-                              index, 
-                              isLoading 
-                            });
+//                             
                             return (
                               <Draggable 
                                 key={task.id}

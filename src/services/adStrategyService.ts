@@ -230,4 +230,3 @@ class AdStrategyService {
 
 export const adStrategyService = new AdStrategyService();
 
-

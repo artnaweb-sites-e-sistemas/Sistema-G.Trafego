@@ -114,12 +114,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
 
   // Debug das props recebidas e estados
   useEffect(() => {
-    console.log('🔍 AnalysisPlanner - Props recebidas:', {
-      selectedClient,
-      selectedMonth,
-      selectedProduct,
-      selectedAudience
-    });
+//     
   }, [selectedClient, selectedMonth, selectedProduct, selectedAudience]);
 
   const storageKey = useMemo(() => getStorageKey(selectedClient, selectedProduct, selectedAudience), [selectedClient, selectedProduct, selectedAudience]);
@@ -140,7 +135,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
       // Carregar do Firestore (sobrepõe localStorage se existir)
       (async () => {
         try {
-          console.log('🔄 Carregando dados do planejador...', { selectedClient, selectedProduct, selectedAudience });
+          
           
           // 1ª tentativa: registro específico do público
           let record = await analysisPlannerService.getPlanner(selectedClient, selectedProduct, selectedAudience, metaAdsUserId);
@@ -170,13 +165,13 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
           }
           
           if (record) {
-            console.log('✅ Dados carregados do Firestore:', record);
+            
             if (record.lastAnalysisDate) setLastAnalysisDate(record.lastAnalysisDate);
             if (typeof record.intervalDays === 'number') setIntervalDays(record.intervalDays);
             // Se tinha adSetId no registro mas não está no localStorage, propaga
             try { if (record.adSetId && !localStorage.getItem('selectedAdSetId')) localStorage.setItem('selectedAdSetId', record.adSetId); } catch {}
           } else {
-            console.log('ℹ️ Nenhum dado encontrado no Firestore para este contexto');
+            
           }
         } catch (error) {
           console.error('❌ Erro ao carregar dados do Firestore:', error);
@@ -197,7 +192,6 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
       const payload: PlannerStorage = { lastAnalysisDate, intervalDays };
       localStorage.setItem(storageKey, JSON.stringify(payload));
       const adSetId = localStorage.getItem('selectedAdSetId') || undefined;
-      console.debug('🧭 Planner|autosave ->', { client: selectedClient, product: selectedProduct, audience: selectedAudience, payload, adSetId });
       analysisPlannerService.savePlanner(selectedClient, selectedProduct, selectedAudience, { ...payload, adSetId }).catch(() => {});
     } catch {}
   }, [storageKey, lastAnalysisDate, intervalDays, hydrated]);
@@ -234,7 +228,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
   // Aplicar automaticamente a sugestão quando ela for calculada
   useEffect(() => {
     if (suggested?.days && hydrated) {
-      console.log('🎯 Aplicando sugestão automaticamente:', suggested.days, 'dias');
+      
       setIntervalDays(suggested.days);
     }
   }, [suggested, hydrated]);
@@ -245,14 +239,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
     const calculatedNextDate = addDays(lastDateObj, Math.max(1, intervalDays || DEFAULT_INTERVAL));
     
     // 🎯 DEBUG: Log para sincronização de datas
-    console.log('🗓️ SYNC DEBUG - AnalysisPlanner nextDate calculation:', {
-      lastAnalysisDate: lastAnalysisDate,
-      lastDateObj: lastDateObj.toISOString(),
-      intervalDays: intervalDays,
-      calculatedNextDate: calculatedNextDate.toISOString(),
-      formattedNextDate: formatDateBR(calculatedNextDate),
-      forceUpdate: forceUpdate
-    });
+//     
     
     return calculatedNextDate;
   }, [lastDateObj, intervalDays, forceUpdate]);
@@ -262,15 +249,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
 
   // Debug dos estados de data - APÓS definição dos valores computados
   useEffect(() => {
-    console.log('📅 AnalysisPlanner - Estados atualizados:', {
-      lastAnalysisDate,
-      intervalDays,
-      forceUpdate,
-      lastDateObj: lastDateObj?.toISOString(),
-      nextDate: nextDate?.toISOString(),
-      formattedLastDate: lastAnalysisDate ? formatDateBR(dayjs(lastAnalysisDate).toDate()) : '—',
-      formattedNextDate: nextDate ? formatDateBR(nextDate) : '—'
-    });
+//     
   }, [lastAnalysisDate, intervalDays, forceUpdate, lastDateObj, nextDate]);
 
   const handleMarkAnalyzedToday = useCallback(async () => {
@@ -280,18 +259,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
     const todayIso = dayjs().format('YYYY-MM-DD');
     const newIntervalDays = suggested?.days ?? intervalDays;
     
-    console.log('🔄 Marcando como analisado hoje:', {
-      todayIso,
-      dayjsToday: dayjs().format('YYYY-MM-DD'),
-      jsDateToday: new Date().toISOString().slice(0, 10),
-      localDateString: new Date().toLocaleDateString('pt-BR'),
-      newIntervalDays,
-      selectedClient,
-      selectedProduct,
-      selectedAudience,
-      storageKey,
-      currentStates: { lastAnalysisDate, intervalDays }
-    });
+//     
     
     // Verificar se as props são válidas
     if (!selectedClient || selectedClient === 'Selecione um cliente' || selectedClient === '' || !selectedProduct || selectedProduct === 'Todos os Produtos') {
@@ -307,11 +275,11 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
       
       // Persistir também no localStorage de forma síncrona PRIMEIRO
       const payload: PlannerStorage = { lastAnalysisDate: todayIso, intervalDays: newIntervalDays };
-      console.log('💾 Salvando no localStorage:', { storageKey, payload });
+      
       localStorage.setItem(storageKey, JSON.stringify(payload));
       
       // Depois salvar no Firestore
-      console.log('☁️ Salvando no Firestore...');
+      
       await analysisPlannerService.savePlanner(
         selectedClient,
         selectedProduct,
@@ -320,7 +288,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
         metaAdsUserId
       );
       
-      console.log('✅ Dados salvos com sucesso:', payload);
+      
       
     } catch (error) {
       console.error('❌ Erro ao salvar dados de análise:', error);
@@ -328,29 +296,29 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
       try {
         const payload: PlannerStorage = { lastAnalysisDate: todayIso, intervalDays: newIntervalDays };
         localStorage.setItem(storageKey, JSON.stringify(payload));
-        console.log('💾 Salvo apenas no localStorage como fallback');
+        
       } catch (localStorageError) {
         console.error('❌ Erro crítico - não foi possível salvar nem no localStorage:', localStorageError);
       }
     }
 
     // Atualiza estados locais DEPOIS do salvamento usando flushSync
-    console.log('🔄 Atualizando estados da UI com flushSync...');
+    
     
     flushSync(() => {
       setLastAnalysisDate(() => {
-        console.log('📅 Estado lastAnalysisDate sendo atualizado para:', todayIso);
+        
         return todayIso;
       });
       
       setIntervalDays(() => {
-        console.log('⏱️ Estado intervalDays sendo atualizado para:', newIntervalDays);
+        
         return newIntervalDays;
       });
       
       setForceUpdate(prev => {
         const newValue = prev + 1;
-        console.log('🔄 ForceUpdate incrementado para:', newValue);
+        
         return newValue;
       });
     });
@@ -364,18 +332,18 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
         
         if (lastDateSpan) {
           lastDateSpan.textContent = formatDateBR(dayjs(todayIso).toDate());
-          console.log('🔄 DOM - Última análise atualizada diretamente');
+          
         }
         
         if (intervalSpan) {
           intervalSpan.textContent = newIntervalDays.toString();
-          console.log('🔄 DOM - Intervalo atualizado diretamente');
+          
         }
         
         if (nextDateSpan) {
           const nextDate = addDays(dayjs(todayIso).toDate(), newIntervalDays);
           nextDateSpan.textContent = formatDateBR(nextDate);
-          console.log('🔄 DOM - Próxima análise atualizada diretamente');
+          
         }
       } catch (domError) {
         console.warn('⚠️ Erro ao atualizar DOM diretamente:', domError);
@@ -387,7 +355,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
     
     // Garantir atualização múltipla para casos de React Strict Mode
     setTimeout(() => {
-      console.log('🔄 Segunda atualização da UI...');
+      
       setLastAnalysisDate(() => todayIso);
       setIntervalDays(() => newIntervalDays);
       setForceUpdate(prev => prev + 1);
@@ -395,14 +363,14 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
     }, 50);
     
     setTimeout(() => {
-      console.log('🔄 Terceira atualização da UI...');
+      
       setLastAnalysisDate(() => todayIso);
       setIntervalDays(() => newIntervalDays);
       setForceUpdate(prev => prev + 1);
       updateDOMDirectly();
       
       // 🎯 FORÇAR ATUALIZAÇÃO DA SEÇÃO "PÚBLICOS DESTE PRODUTO"
-      console.log('🔄 Forçando atualização da seção de públicos...');
+      
       
       // 1. Limpar cache de métricas para forçar recálculo
       try {
@@ -426,7 +394,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
       const currentRefreshTrigger = localStorage.getItem('refreshTrigger') || '0';
       localStorage.setItem('refreshTrigger', (parseInt(currentRefreshTrigger) + 1).toString());
       
-      console.log('✅ Atualização completa finalizada - Data atual:', dayjs().format('DD/MM/YYYY'));
+      
       setIsUpdating(false);
     }, 200);
   }, [selectedClient, selectedProduct, selectedAudience, suggested, intervalDays, storageKey]);

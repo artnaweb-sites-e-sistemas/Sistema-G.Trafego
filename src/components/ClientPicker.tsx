@@ -126,16 +126,11 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
   }, []);
 
   const handleClientSelect = async (client: Client) => {
-    console.log('🔍 DEBUG - ClientPicker - Cliente selecionado:', client.name);
-    
     // Capturar cliente anterior ANTES de trocar
     const previousClient = localStorage.getItem('currentSelectedClient');
-    console.log('🔍 DEBUG - ClientPicker - Cliente anterior:', previousClient);
     
     // Limpar cache do cliente anterior especificamente
     if (previousClient && previousClient !== client.name) {
-      console.log('🔍 DEBUG - ClientPicker - Limpando cache do cliente anterior:', previousClient);
-      
       // Limpar TODAS as chaves de cache do metricsService
       const { metricsService } = await import('../services/metricsService');
       metricsService.clearCache();
@@ -152,8 +147,6 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
         'metaAdsDataRefreshed'
       ];
       keysToRemove.forEach(key => localStorage.removeItem(key));
-      
-      console.log('🔍 DEBUG - ClientPicker - Cache limpo completamente');
     }
     
     setSelectedClient(client.name);
@@ -337,14 +330,7 @@ const ClientPicker: React.FC<ClientPickerProps> = ({
   const isPickerActive = dataSource === 'facebook' && isFacebookConnected;
   const isClientSelected = selectedClient && selectedClient !== 'Selecione um cliente' && selectedClient !== 'Todos os Clientes' && selectedClient !== '' && selectedClient !== undefined && selectedClient !== null;
 
-  // Debug: verificar status do picker
-  console.log('🔍 DEBUG - ClientPicker - Status:', {
-    dataSource,
-    isFacebookConnected,
-    isPickerActive,
-    clientsCount: clients.length,
-    isLoading
-  });
+  // Status do picker verificado
 
   return (
     <div className="relative dropdown-container" ref={pickerRef}>

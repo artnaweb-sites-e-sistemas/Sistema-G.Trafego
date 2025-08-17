@@ -97,12 +97,7 @@ class MetaAdsService {
     // Carregar rate limit persistente na inicialização
     this.loadPersistentRateLimit();
     
-    console.log('🔄 DEBUG - MetaAdsService constructor - Rate limit carregado:', {
-      oauthAttempts: this.oauthAttempts,
-      lastOAuthAttempt: this.lastOAuthAttempt,
-      facebookRateLimitActive: this.facebookRateLimitActive,
-      facebookRateLimitUntil: this.facebookRateLimitUntil
-    });
+//     
   }
   
   // Sistema de cache para reduzir chamadas à API
@@ -138,25 +133,20 @@ class MetaAdsService {
   private loadPersistentRateLimit(): void {
     try {
       const stored = localStorage.getItem(this.RATE_LIMIT_STORAGE_KEY);
-      console.log('🔄 DEBUG - loadPersistentRateLimit - Dados no localStorage:', stored);
+      
       
       if (stored) {
         const data = JSON.parse(stored);
-        console.log('🔄 DEBUG - loadPersistentRateLimit - Dados parseados:', data);
+        
         
         this.oauthAttempts = data.oauthAttempts || 0;
         this.lastOAuthAttempt = data.lastOAuthAttempt || 0;
         this.facebookRateLimitActive = data.facebookRateLimitActive || false;
         this.facebookRateLimitUntil = data.facebookRateLimitUntil || 0;
         
-        console.log('🔄 DEBUG - loadPersistentRateLimit - Rate limit carregado:', {
-          oauthAttempts: this.oauthAttempts,
-          lastOAuthAttempt: this.lastOAuthAttempt,
-          facebookRateLimitActive: this.facebookRateLimitActive,
-          facebookRateLimitUntil: this.facebookRateLimitUntil
-        });
+//         
       } else {
-        console.log('🔄 DEBUG - loadPersistentRateLimit - Nenhum dado persistente encontrado');
+        
       }
     } catch (error) {
       console.error('🔄 DEBUG - loadPersistentRateLimit - Erro ao carregar:', error);
@@ -174,9 +164,9 @@ class MetaAdsService {
         timestamp: Date.now()
       };
       
-      console.log('🔄 DEBUG - savePersistentRateLimit - Salvando dados:', data);
+      
       localStorage.setItem(this.RATE_LIMIT_STORAGE_KEY, JSON.stringify(data));
-      console.log('🔄 DEBUG - savePersistentRateLimit - Dados salvos com sucesso');
+      
     } catch (error) {
       console.error('🔄 DEBUG - savePersistentRateLimit - Erro ao salvar:', error);
     }
@@ -632,7 +622,7 @@ class MetaAdsService {
 
   // Resetar rate limit do OAuth
   resetOAuthRateLimit(): void {
-    console.log('🔄 DEBUG - resetOAuthRateLimit - Resetando contador de rate limit');
+    
     
     // Resetar variáveis em memória
     this.oauthAttempts = 0;
@@ -644,7 +634,7 @@ class MetaAdsService {
     try {
       localStorage.removeItem(this.RATE_LIMIT_STORAGE_KEY);
       localStorage.removeItem(this.GLOBAL_RATE_LIMIT_KEY);
-      console.log('🔄 DEBUG - resetOAuthRateLimit - localStorage limpo com sucesso');
+      
     } catch (error) {
       console.error('🔄 DEBUG - resetOAuthRateLimit - Erro ao limpar localStorage:', error);
     }
@@ -652,17 +642,12 @@ class MetaAdsService {
     // 🎯 CORREÇÃO: Salvar estado resetado no localStorage
     this.savePersistentRateLimit();
     
-    console.log('🔄 DEBUG - resetOAuthRateLimit - Reset concluído:', {
-      oauthAttempts: this.oauthAttempts,
-      lastOAuthAttempt: this.lastOAuthAttempt,
-      facebookRateLimitActive: this.facebookRateLimitActive,
-      facebookRateLimitUntil: this.facebookRateLimitUntil
-    });
+//     
   }
 
   // 🎯 NOVA FUNÇÃO: Resetar rate limit da API do Meta Ads
   resetApiRateLimit(): void {
-    console.log('🔄 DEBUG - resetApiRateLimit - Resetando rate limit da API do Meta Ads');
+    
     
     try {
       // Limpar rate limit global para todos os usuários
@@ -677,8 +662,8 @@ class MetaAdsService {
       // Salvar estado resetado
       this.savePersistentRateLimit();
       
-      console.log('🔄 DEBUG - resetApiRateLimit - API rate limit resetado com sucesso');
-      console.log('🔄 DEBUG - resetApiRateLimit - globalKey removido:', globalKey);
+      
+      
       
     } catch (error) {
       console.error('🔄 DEBUG - resetApiRateLimit - Erro ao resetar rate limit da API:', error);
@@ -1107,16 +1092,16 @@ class MetaAdsService {
       const cacheValid = cacheTimestamp && (Date.now() - parseInt(cacheTimestamp)) < 5 * 60 * 1000;
       
       if (cachedData && cacheValid) {
-        console.log(`Usando ${JSON.parse(cachedData).length} Ad Sets em cache para campanha ${campaignId}`);
+        
         return JSON.parse(cachedData);
       } else if (cachedData) {
-        console.log(`Cache expirado encontrado para campanha ${campaignId} com ${JSON.parse(cachedData).length} Ad Sets, mas continuando com API...`);
+        
       }
     } else {
       // Verificar se há dados salvos no localStorage para busca geral
       const savedData = this.getDataFromStorage('adsets');
       if (savedData && savedData.length > 0) {
-        // console.log(`Usando ${savedData.length} Ad Sets salvos do cache`);
+        // 
         return savedData;
       }
     }
@@ -1155,35 +1140,35 @@ class MetaAdsService {
       // Importante: a API de listagem de Ad Sets não suporta time_range em nenhuma variação.
       // Removemos qualquer envio de time_range para evitar 400 (Bad Request).
 
-      console.log(`Buscando Ad Sets em: ${endpoint}`);
-      console.log(`Parâmetros:`, params);
-      console.log(`Token de acesso: ${this.user!.accessToken.substring(0, 20)}...`);
-      console.log(`Conta selecionada: ${this.selectedAccount!.id}`);
+      
+      
+      
+      
 
       let response;
       try {
         response = await axios.get(endpoint, { params });
-        console.log(`Resposta da API - status: ${response.status}`);
-        console.log(`Resposta da API - data:`, response.data);
+        
+        
       } catch (err: any) {
-        console.log(`Erro na primeira tentativa - status: ${err?.response?.status}, message: ${err?.response?.data?.error?.message || err.message}`);
+        
         // Se der 400/429, tentar sem campos extras (reduzir payload) após um pequeno atraso
         if (err?.response?.status === 400 || err?.response?.status === 429) {
-          console.log('Tentando novamente com parâmetros reduzidos...');
+          
           await new Promise(res => setTimeout(res, 500));
           response = await axios.get(endpoint, { params: { access_token: this.user!.accessToken, limit: 100 } });
-          console.log(`Resposta da API (segunda tentativa) - status: ${response.status}`);
-          console.log(`Resposta da API (segunda tentativa) - data:`, response.data);
+          
+          
         } else {
           throw err;
         }
       }
 
       const data = response.data.data || [];
-      console.log(`Ad Sets retornados: ${data.length}`);
+      
       if (data.length > 0) {
-        console.log(`Primeiro Ad Set:`, data[0]);
-        console.log(`Status dos Ad Sets:`, data.map((ad: any) => ({ id: ad.id, name: ad.name, status: ad.status })));
+        
+        
       }
       
       // Salvar dados no localStorage
@@ -1192,7 +1177,7 @@ class MetaAdsService {
         const cacheKey = `adsets_campaign_${campaignId}`;
         localStorage.setItem(cacheKey, JSON.stringify(data));
         localStorage.setItem(`${cacheKey}_timestamp`, Date.now().toString());
-        console.log(`Ad Sets da campanha ${campaignId} salvos no cache`);
+        
       } else {
         // Cache geral
         this.saveDataAfterLoad('adsets', data);
@@ -1210,13 +1195,13 @@ class MetaAdsService {
           const cacheKey = `adsets_campaign_${campaignId}`;
           const cachedData = localStorage.getItem(cacheKey);
           if (cachedData) {
-            console.log('Usando cache expirado para Ad Sets da campanha (degradação)');
+            
             return JSON.parse(cachedData);
           }
         } else {
           const savedData = this.getDataFromStorage('adsets');
           if (savedData && savedData.length > 0) {
-            console.log('Usando cache expirado para Ad Sets gerais (degradação)');
+            
             return savedData;
           }
         }
@@ -1273,28 +1258,28 @@ class MetaAdsService {
       const insights = response.data.data || [];
       // Log detalhado dos primeiros insights para debug
       if (insights.length > 0) {
-        console.log('🔍 DEBUG - getCampaignInsights - Primeiro insight:', insights[0]);
+        
         // Verificar se há actions no primeiro insight
         if (insights[0].actions && insights[0].actions.length > 0) {
-          console.log('🔍 DEBUG - getCampaignInsights - Actions encontradas:', insights[0].actions);
+          
           // Verificar especificamente por messaging_conversations_started
           const messagingAction = insights[0].actions.find((action: any) => 
             action.action_type === 'messaging_conversations_started' || 
             action.action_type === 'onsite_conversion.messaging_conversation_started_7d'
           );
-          console.log('🔍 DEBUG - getCampaignInsights - Messaging action encontrada:', messagingAction);
+          
         } else {
-          console.log('🔍 DEBUG - getCampaignInsights - Nenhuma action encontrada');
+          
         }
         
         // Verificar cost_per_action_type
         if (insights[0].cost_per_action_type && insights[0].cost_per_action_type.length > 0) {
-          console.log('🔍 DEBUG - getCampaignInsights - Cost per action type encontrado:', insights[0].cost_per_action_type);
+          
         } else {
-          console.log('🔍 DEBUG - getCampaignInsights - Nenhum cost_per_action_type encontrado');
+          
         }
       } else {
-        console.log('🔍 DEBUG - getCampaignInsights - Nenhum insight encontrado');
+        
       }
 
       return insights;
@@ -1309,7 +1294,7 @@ class MetaAdsService {
       throw new Error('Usuário não está logado. Faça login primeiro.');
     }
 
-    console.log(`Buscando insights para adSet ${adSetId} no período ${dateStart} a ${dateEnd}`);
+    
 
     try {
       // Primeira tentativa: período específico
@@ -1329,11 +1314,11 @@ class MetaAdsService {
       );
 
       let insights = response.data.data || [];
-      console.log(`Insights retornados para adSet ${adSetId} (período específico):`, insights.length);
+      
       
       // Se não encontrou insights no período específico, só tentar período mais amplo se explicitamente habilitado
       if (insights.length === 0 && options?.fallbackToLast30Days) {
-        console.log(`Nenhum insight encontrado no período específico. Fallback para últimos 30 dias habilitado, tentando período mais amplo...`);
+        
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const today = new Date();
@@ -1352,34 +1337,34 @@ class MetaAdsService {
           }
         );
         insights = response.data.data || [];
-        console.log(`Insights retornados para adSet ${adSetId} (últimos 30 dias):`, insights.length);
+        
       }
       
       // Log detalhado dos primeiros insights para debug
       if (insights.length > 0) {
-        console.log(`🔍 DEBUG - getAdSetInsights - Primeiro insight para adSet ${adSetId}:`, insights[0]);
+        
         // Verificar se há actions no primeiro insight
         if (insights[0].actions && insights[0].actions.length > 0) {
-          console.log(`🔍 DEBUG - getAdSetInsights - Actions encontradas para adSet ${adSetId}:`, insights[0].actions);
-                      console.log(`Actions encontradas no insight:`, insights[0].actions);
+          
+                      
             // Verificar especificamente por messaging_conversations_started
             const messagingAction = insights[0].actions.find((action: any) => 
               action.action_type === 'messaging_conversations_started' || 
               action.action_type === 'onsite_conversion.messaging_conversation_started_7d'
             );
-            console.log(`Messaging action encontrada:`, messagingAction);
+            
             
             // Verificar cost_per_action_type
             if (insights[0].cost_per_action_type && insights[0].cost_per_action_type.length > 0) {
-              console.log(`🔍 DEBUG - getAdSetInsights - Cost per action type encontrado para adSet ${adSetId}:`, insights[0].cost_per_action_type);
+              
             } else {
-              console.log(`🔍 DEBUG - getAdSetInsights - Nenhum cost_per_action_type encontrado para adSet ${adSetId}`);
+              
             }
         } else {
-          console.log(`Nenhuma action encontrada no insight para adSet ${adSetId}`);
+          
         }
       } else {
-        console.log(`Nenhum insight encontrado para adSet ${adSetId} em nenhum período`);
+        
       }
 
       return insights;
@@ -1395,7 +1380,7 @@ class MetaAdsService {
       throw new Error('Usuário não está logado. Faça login primeiro.');
     }
 
-    console.log(`Buscando insights diretamente do anúncio ${adId} no período ${dateStart} a ${dateEnd} (agregado: ${aggregated})`);
+    
 
     try {
       // Primeira tentativa: período específico
@@ -1415,11 +1400,11 @@ class MetaAdsService {
       );
 
       let insights = response.data.data || [];
-      console.log(`Insights retornados para anúncio ${adId} (período específico):`, insights.length);
+      
       
       // Se não encontrou insights no período específico, só tentar período mais amplo se explicitamente habilitado
       if (insights.length === 0 && options?.fallbackToLast30Days) {
-        console.log(`Nenhum insight encontrado no período específico. Fallback para últimos 30 dias habilitado, tentando período mais amplo...`);
+        
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const today = new Date();
@@ -1438,18 +1423,18 @@ class MetaAdsService {
           }
         );
         insights = response.data.data || [];
-        console.log(`Insights retornados para anúncio ${adId} (últimos 30 dias):`, insights.length);
+        
       }
       
       if (insights.length > 0) {
-        console.log(`Primeiro insight para anúncio ${adId}:`, insights[0]);
+        
         if (insights[0].actions && insights[0].actions.length > 0) {
-          console.log(`Actions encontradas no insight do anúncio:`, insights[0].actions);
+          
         } else {
-          console.log(`Nenhuma action encontrada no insight para anúncio ${adId}`);
+          
         }
       } else {
-        console.log(`Nenhum insight encontrado para anúncio ${adId} em nenhum período`);
+        
       }
 
       return insights;
@@ -1775,11 +1760,11 @@ class MetaAdsService {
       
       // Log do total de leads encontrados
       const totalLeads = metrics.reduce((sum, metric) => sum + metric.leads, 0);
-      console.log(`Total de leads encontrados: ${totalLeads}`);
+      
       
       // Log do total de vendas encontradas
       const totalSales = metrics.reduce((sum, metric) => sum + metric.sales, 0);
-      console.log(`Total de vendas encontradas: ${totalSales}`);
+      
       
       return metrics;
     } catch (error: any) {
@@ -1804,12 +1789,12 @@ class MetaAdsService {
 
   // Método de debug para verificar estado da conexão
   debugConnectionStatus(): void {
-    console.log('Debugging connection status...');
-    console.log('User logged in:', this.isLoggedIn());
-    console.log('User connected:', this.isConnected());
-    console.log('User:', this.user);
-    console.log('Selected Account:', this.selectedAccount);
-    console.log('Access Token:', this.getAccessToken());
+    
+    
+    
+    
+    
+    
   }
 
   // Verificar status de login
@@ -2177,9 +2162,9 @@ class MetaAdsService {
       };
 
       try {
-        console.log(`Buscando detalhes do anúncio ${adId}`);
+        
         const response = await axios.get(url, { params });
-        console.log(`Detalhes do anúncio ${adId} obtidos:`, response.data);
+        
         return response.data;
       } catch (error: any) {
         console.error(`Erro ao buscar detalhes do anúncio ${adId}:`, error.response?.data || error.message);
@@ -2208,9 +2193,9 @@ class MetaAdsService {
       };
 
       try {
-        console.log(`Buscando detalhes da campanha ${campaignId}`);
+        
         const response = await axios.get(url, { params });
-        console.log(`Detalhes da campanha ${campaignId} obtidos:`, response.data);
+        
         return response.data;
       } catch (error: any) {
         console.error(`Erro ao buscar detalhes da campanha ${campaignId}:`, error.response?.data || error.message);
@@ -2240,9 +2225,9 @@ class MetaAdsService {
       };
 
       try {
-        console.log(`Buscando detalhes do conjunto de anúncios ${adSetId}`);
+        
         const response = await axios.get(url, { params });
-        console.log(`Detalhes do conjunto ${adSetId} obtidos:`, response.data);
+        
         return response.data;
       } catch (error: any) {
         console.error(`Erro ao buscar detalhes do conjunto ${adSetId}:`, error.response?.data || error.message);
@@ -2253,7 +2238,7 @@ class MetaAdsService {
 
   async getPostIdsFromPage(pageId: string, pageAccessToken: string): Promise<string[]> {
     try {
-      console.log(`Buscando post IDs da página ${pageId}`);
+      
       
       const url = `${this.baseURL}/${pageId}/posts`;
       const params = {
@@ -2266,21 +2251,21 @@ class MetaAdsService {
       
       if (response.data && response.data.data) {
         const posts = response.data.data;
-        console.log(`Encontrados ${posts.length} posts na página ${pageId}`);
+        
         
         // Extrair apenas o postId (parte após o "_")
         const postIds = posts.map((post: any) => {
           const fullId = post.id;
           const postId = fullId.split('_')[1]; // Pega a parte após o "_"
-          console.log(`Post ID extraído: ${fullId} -> ${postId}`);
+          
           return postId;
         });
         
-        console.log(`Post IDs extraídos:`, postIds);
+        
         return postIds;
       }
       
-      console.log(`Nenhum post encontrado para a página ${pageId}`);
+      
       return [];
     } catch (error: any) {
       console.error(`Erro ao buscar posts da página ${pageId}:`, error.response?.data || error.message);
@@ -2335,16 +2320,16 @@ class MetaAdsService {
       };
 
       try {
-        console.log('Buscando adcreatives com effective_object_story_id...');
+        
         const response = await axios.get(url, { params });
-        console.log('Adcreatives obtidos:', response.data);
+        
         
         const creatives = response.data.data || [];
         const creativesWithEffectiveStory = creatives.filter((creative: any) => creative.effective_object_story_id);
         
-        console.log(`Creatives com effective_object_story_id: ${creativesWithEffectiveStory.length}/${creatives.length}`);
+        
         creativesWithEffectiveStory.forEach((creative: any) => {
-          console.log(`Creative ${creative.id}: effective_object_story_id = ${creative.effective_object_story_id}`);
+          
         });
         
         return creativesWithEffectiveStory;
@@ -2366,7 +2351,7 @@ class MetaAdsService {
       throw new Error('Token de acesso não disponível');
     }
 
-    console.log('Testando disponibilidade de dados na conta...');
+    
 
     // Testar diferentes períodos
     const periods = [
@@ -2392,7 +2377,7 @@ class MetaAdsService {
 
         const response = await axios.get(url, { params });
         const insights = response.data.data || [];
-        console.log(`${period.name}: ${insights.length} insights encontrados`);
+        
         
         if (insights.length > 0) {
           results.push(`${period.name}: ${insights.length} insights`);
@@ -2407,8 +2392,8 @@ class MetaAdsService {
     }
 
     const hasData = results.length > 0;
-    console.log(`Resultado do teste de disponibilidade: ${hasData ? 'Dados encontrados' : 'Nenhum dado encontrado'}`);
-    console.log('Períodos com dados:', results);
+    
+    
 
     return { hasData, periods: results };
   }
