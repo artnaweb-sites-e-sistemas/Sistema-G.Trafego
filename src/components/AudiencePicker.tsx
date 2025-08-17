@@ -306,21 +306,21 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
           
           // Tentar buscar todos os Ad Sets da conta para debug
           try {
-            console.log('🔍 Tentando buscar todos os Ad Sets da conta...');
+            
             const allAdSets = await metaAdsService.getAdSets();
-            console.log(`📊 Total de Ad Sets encontrados na conta: ${allAdSets.length}`);
+            
             
             if (allAdSets.length > 0) {
-              console.log('📋 Primeiros Ad Sets:', allAdSets.slice(0, 3));
+              
             }
             
             // Verificar se algum Ad Set pertence à campanha selecionada
             const matchingAdSets = allAdSets.filter(ad => ad.campaign_id === campaignId);
-            console.log(`🎯 Ad Sets da campanha ${campaignId}: ${matchingAdSets.length}`);
+            
             
             // 🎯 CORREÇÃO CRÍTICA: Se encontrou Ad Sets da campanha, usar eles
             if (matchingAdSets.length > 0) {
-              console.log('✅ Encontrou Ad Sets da campanha! Usando dados corrigidos...');
+              
               
               // Substituir adSetsData vazio pelos Ad Sets encontrados
               const correctedAdSetsData = matchingAdSets;
@@ -382,14 +382,14 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
             
             // Tentar reset automático se a função estiver disponível
             if (typeof (window as any).fixAudienceIssues?.fixAllIssues === 'function') {
-              console.log('🔄 Tentando correção automática...');
+              
               try {
                 (window as any).fixAudienceIssues.fixAllIssues();
               } catch (resetError) {
                 console.error('❌ Falha na correção automática:', resetError);
               }
             } else if (typeof (window as any).resetApiRateLimit === 'function') {
-              console.log('🔄 Tentando reset automático...');
+              
               try {
                 (window as any).resetApiRateLimit();
               } catch (resetError) {

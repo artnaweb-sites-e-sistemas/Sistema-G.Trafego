@@ -114,71 +114,96 @@ const Header: React.FC<HeaderProps> = ({
 
   // Função para correção automática inteligente
   const handleAutoFix = async () => {
+    console.log('🔧 DEBUG - handleAutoFix - INICIANDO CORREÇÃO AUTOMÁTICA');
     setIsAutoFixing(true);
     
     try {
-      console.log('🔧 INICIANDO CORREÇÃO AUTOMÁTICA GLOBAL...');
       
       // 1. Limpar rate limit
+      console.log('🔧 DEBUG - handleAutoFix - 1. Limpando rate limits...');
       const rateLimitKeys = ['metaAdsRateLimit', 'metaAdsRateLimitTimestamp', 'globalRateLimit', 'globalRateLimitTimestamp'];
-      rateLimitKeys.forEach(key => localStorage.removeItem(key));
-      console.log('✅ Rate limit limpo');
+      rateLimitKeys.forEach(key => {
+        const hadValue = localStorage.getItem(key);
+        localStorage.removeItem(key);
+        console.log(`🔧 DEBUG - handleAutoFix - Removido: ${key} (tinha valor: ${!!hadValue})`);
+      });
       
       // 2. Verificar e corrigir campaign ID
+      console.log('🔧 DEBUG - handleAutoFix - 2. Verificando campaign ID...');
       let campaignId = localStorage.getItem('selectedCampaignId');
+      console.log(`🔧 DEBUG - handleAutoFix - Campaign ID atual: ${campaignId || 'NENHUM'}`);
+      
       if (!campaignId) {
-        console.log('❌ Campaign ID não encontrado - tentando encontrar campanha...');
+        console.log('🔧 DEBUG - handleAutoFix - Campaign ID não encontrado, buscando campanhas...');
         const campaigns = localStorage.getItem('metaAdsData_campaigns');
         if (campaigns) {
           try {
             const parsedCampaigns = JSON.parse(campaigns);
+            console.log(`🔧 DEBUG - handleAutoFix - Encontradas ${parsedCampaigns.length} campanhas`);
+            
             if (parsedCampaigns.length > 0) {
               const activeCampaign = parsedCampaigns.find((c: any) => c.status === 'ACTIVE') || parsedCampaigns[0];
               localStorage.setItem('selectedCampaignId', activeCampaign.id);
               campaignId = activeCampaign.id;
-              console.log(`✅ Campaign ID definido: ${campaignId}`);
+              console.log(`🔧 DEBUG - handleAutoFix - Campaign ID definido: ${campaignId} (status: ${activeCampaign.status})`);
             }
           } catch (e) {
-            console.log('❌ Erro ao processar campanhas');
+            console.error('🔧 DEBUG - handleAutoFix - Erro ao processar campanhas:', e);
           }
+        } else {
+          console.log('🔧 DEBUG - handleAutoFix - Nenhuma campanha encontrada no localStorage');
         }
       }
       
       // 3. Limpar cache de Ad Sets
+      console.log('🔧 DEBUG - handleAutoFix - 3. Limpando cache de Ad Sets...');
       const cacheKeys = ['metaAdsData_adsets', 'metaAdsData_adsets_timestamp', 'adsets_cache', 'adsets_cache_timestamp'];
-      cacheKeys.forEach(key => localStorage.removeItem(key));
+      cacheKeys.forEach(key => {
+        const hadValue = localStorage.getItem(key);
+        localStorage.removeItem(key);
+        console.log(`🔧 DEBUG - handleAutoFix - Removido: ${key} (tinha valor: ${!!hadValue})`);
+      });
       
       if (campaignId) {
-        localStorage.removeItem(`adsets_campaign_${campaignId}`);
-        localStorage.removeItem(`adsets_campaign_${campaignId}_timestamp`);
+        const campaignCacheKey = `adsets_campaign_${campaignId}`;
+        const hadValue = localStorage.getItem(campaignCacheKey);
+        localStorage.removeItem(campaignCacheKey);
+        localStorage.removeItem(`${campaignCacheKey}_timestamp`);
+        console.log(`🔧 DEBUG - handleAutoFix - Removido cache da campanha: ${campaignCacheKey} (tinha valor: ${!!hadValue})`);
       }
-      console.log('✅ Cache limpo');
       
       // 4. Limpar cache do serviço
+      console.log('🔧 DEBUG - handleAutoFix - 4. Limpando cache do serviço...');
       if ((window as any).metaAdsService && (window as any).metaAdsService.clearCacheByType) {
         try {
           (window as any).metaAdsService.clearCacheByType('adsets');
-          console.log('✅ Cache do serviço limpo');
+          console.log('🔧 DEBUG - handleAutoFix - Cache do serviço limpo com sucesso');
         } catch (e) {
-          console.log('⚠️ Erro ao limpar cache do serviço');
+          console.error('🔧 DEBUG - handleAutoFix - Erro ao limpar cache do serviço:', e);
         }
+      } else {
+        console.log('🔧 DEBUG - handleAutoFix - MetaAdsService não disponível no window');
       }
       
       // 5. Aguardar um pouco para o rate limit ser resetado
+      console.log('🔧 DEBUG - handleAutoFix - 5. Aguardando 1 segundo...');
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // 6. Disparar evento para recarregar produtos
+      console.log('🔧 DEBUG - handleAutoFix - 6. Disparando evento reloadProducts...');
       window.dispatchEvent(new CustomEvent('reloadProducts'));
       
       // 7. Disparar evento para recarregar públicos
+      console.log('🔧 DEBUG - handleAutoFix - 7. Disparando evento reloadAudiences...');
       window.dispatchEvent(new CustomEvent('reloadAudiences', { detail: { force: true } }));
       
-      console.log('✅ CORREÇÃO AUTOMÁTICA GLOBAL CONCLUÍDA!');
+      console.log('🔧 DEBUG - handleAutoFix - CORREÇÃO AUTOMÁTICA CONCLUÍDA COM SUCESSO!');
       
     } catch (error) {
       console.error('❌ Erro na correção automática:', error);
     } finally {
       setIsAutoFixing(false);
+      console.log('🔧 DEBUG - handleAutoFix - Estado de correção resetado');
     }
   };
 

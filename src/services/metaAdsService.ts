@@ -1123,7 +1123,7 @@ class MetaAdsService {
       return useExpiredFromLimit();
     }
 
-    const execPromise = (async () => {
+          const execPromise = (async () => {
       try {
       const params: any = {
         access_token: this.user!.accessToken,
@@ -1145,26 +1145,57 @@ class MetaAdsService {
       
       
 
-      let response;
-      try {
-        response = await axios.get(endpoint, { params });
+      // 🎯 CORREÇÃO: Implementar paginação para buscar TODOS os Ad Sets
+      let allData: any[] = [];
+      let nextUrl: string | null = null;
+      let pageCount = 0;
+      const maxPages = 10; // Limite de segurança
+      
+      do {
+        pageCount++;
         
-        
-      } catch (err: any) {
-        
-        // Se der 400/429, tentar sem campos extras (reduzir payload) após um pequeno atraso
-        if (err?.response?.status === 400 || err?.response?.status === 429) {
+        let response;
+        try {
+          if (nextUrl) {
+            response = await axios.get(nextUrl);
+          } else {
+            response = await axios.get(endpoint, { params });
+          }
           
-          await new Promise(res => setTimeout(res, 500));
-          response = await axios.get(endpoint, { params: { access_token: this.user!.accessToken, limit: 100 } });
           
+        } catch (err: any) {
           
-        } else {
-          throw err;
+          // Se der 400/429, tentar sem campos extras (reduzir payload) após um pequeno atraso
+          if (err?.response?.status === 400 || err?.response?.status === 429) {
+            
+            await new Promise(res => setTimeout(res, 500));
+            if (nextUrl) {
+              response = await axios.get(nextUrl);
+            } else {
+              response = await axios.get(endpoint, { params: { access_token: this.user!.accessToken, limit: 100 } });
+            }
+            
+            
+          } else {
+            throw err;
+          }
         }
-      }
 
-      const data = response.data.data || [];
+        const pageData = response.data.data || [];
+        allData = allData.concat(pageData);
+        
+        // 🎯 DEBUG: Log de cada página
+        
+        
+        // Verificar se há próxima página
+        nextUrl = response.data.paging?.next || null;
+        
+      } while (nextUrl && pageCount < maxPages);
+
+      const data = allData;
+      
+      // 🎯 DEBUG DETALHADO: Log de todos os Ad Sets retornados pela API
+      
       
       if (data.length > 0) {
         

@@ -685,25 +685,60 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
 
       const { startDate, endDate } = getMonthDateRange(selectedMonth);
 
+      // 🎯 DEBUG DETALHADO: Log inicial da estratégia
+      
+
       // Buscar Ad Sets da conta no período
       
       const adSets = await metaAdsService.getAdSets();
       
+      // 🎯 DEBUG DETALHADO: Log de todos os Ad Sets encontrados
+      
+      
+      // 🎯 DEBUG ESPECIAL: Log detalhado do status de cada Ad Set
+      adSets?.forEach((ad: any, index: number) => {
+        
+      });
 
       const wanted = strategy.generatedNames.audience;
-      const matching = (adSets || []).filter((ad: any) => namesExactlyMatch(ad.name, wanted));
+      // 🎯 CORREÇÃO: Filtrar conjuntos ATIVOS ou PAUSADOS (não rascunhos)
+      const matching = (adSets || []).filter((ad: any) => 
+        namesExactlyMatch(ad.name, wanted) && (ad.status === 'ACTIVE' || ad.status === 'PAUSED')
+      );
       
+      // 🎯 DEBUG DETALHADO: Log do matching
       
 
       let totalSpend = 0;
       if (matching.length > 0) {
         
+        // 🎯 DEBUG DETALHADO: Log antes de buscar insights
+        
+        
         const allInsights = await Promise.all(
-          matching.map((ad: any) => metaAdsService.getAdSetInsights(ad.id, startDate, endDate, { fallbackToLast30Days: false }))
+          matching.map(async (ad: any) => {
+            try {
+              const insights = await metaAdsService.getAdSetInsights(ad.id, startDate, endDate, { fallbackToLast30Days: false });
+              
+              // 🎯 DEBUG DETALHADO: Log dos insights de cada Ad Set
+              
+              
+              return insights;
+            } catch (error) {
+              console.error(`❌ DEBUG - Erro ao buscar insights para "${ad.name}":`, error);
+              return [];
+            }
+          })
         );
+        
         totalSpend = allInsights.flat().reduce((sum: number, insight: any) => sum + parseFloat(insight.spend || '0'), 0);
         
+        // 🎯 DEBUG DETALHADO: Log do total gasto
+        
+        
       } else {
+        
+        // 🎯 DEBUG DETALHADO: Log quando não encontra matching
         
       }
 
@@ -745,6 +780,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
 
       const { startDate, endDate } = getMonthDateRange(selectedMonth);
       
+      // 🎯 DEBUG DETALHADO: Log inicial da avaliação de performance
+      
       
       // 🎯 DEBUG ESPECIAL: Verificar se é a estratégia "Salvador"
       const isSalvadorStrategy = strategy.generatedNames.audience.includes('Salvador') || normalizeName(strategy.generatedNames.audience).includes('salvador');
@@ -754,8 +791,23 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       }
       
       const adSets = await metaAdsService.getAdSets();
+      
+      // 🎯 DEBUG DETALHADO: Log de todos os Ad Sets encontrados
+      
+      
+      // 🎯 DEBUG ESPECIAL: Log detalhado do status de cada Ad Set
+      adSets?.forEach((ad: any, index: number) => {
+        
+      });
+      
       const wanted = strategy.generatedNames.audience;
-      const matching = (adSets || []).filter((ad: any) => namesExactlyMatch(ad.name, wanted));
+      // 🎯 CORREÇÃO: Filtrar conjuntos ATIVOS ou PAUSADOS (não rascunhos)
+      const matching = (adSets || []).filter((ad: any) => 
+        namesExactlyMatch(ad.name, wanted) && (ad.status === 'ACTIVE' || ad.status === 'PAUSED')
+      );
+      
+      // 🎯 DEBUG DETALHADO: Log do matching
+      
       
       // 🎯 DEBUG ESPECIAL: Verificar se é a estratégia "Salvador" (usando a variável já declarada)
       if (isSalvadorStrategy) {
@@ -789,25 +841,76 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           
         });
         
-        // Tentar matching mais flexível
+        // Tentar matching mais flexível - MAS COM CRITÉRIOS MAIS RIGOROSOS
         
         const flexibleMatches = adSets.filter((ad: any) => {
           const adNorm = normalizeName(ad.name).toLowerCase();
           const stratNorm = normalizeName(wanted).toLowerCase();
           
-          // Verificar se contém palavras-chave da estratégia
+          // 🎯 CORREÇÃO CRÍTICA: Extrair localização de ambos
+          const extractLocation = (name: string): string => {
+            const locationMatch = name.match(/localização\s*-\s*([^\]]+)/i);
+            return locationMatch ? locationMatch[1].trim().toLowerCase() : '';
+          };
+          
+          const adLocation = extractLocation(ad.name);
+          const strategyLocation = extractLocation(wanted);
+          
+          // 🎯 CORREÇÃO: LOCALIZAÇÃO DEVE SER EXATA OU MUITO SIMILAR
+          const locationMatches = adLocation === strategyLocation || 
+                                 adLocation.includes(strategyLocation) || 
+                                 strategyLocation.includes(adLocation);
+          
+          // Se as localizações não batem, NÃO fazer match
+          if (!locationMatches) {
+            return false;
+          }
+          
+          // Verificar se contém palavras-chave da estratégia (mas ser mais rigoroso)
           const stratWords = stratNorm.split(' ').filter(w => w.length >= 3);
           const matchingWords = stratWords.filter(word => adNorm.includes(word));
           
-          return matchingWords.length >= Math.min(2, stratWords.length);
+          // 🎯 CORREÇÃO: Exigir pelo menos 70% das palavras-chave importantes
+          const requiredWords = Math.max(3, Math.floor(stratWords.length * 0.7));
+          
+          return matchingWords.length >= requiredWords;
         });
         
+        // 🎯 DEBUG DETALHADO: Log dos flexible matches
         
         
-        // 🎯 CORREÇÃO CRÍTICA: Usar matches flexíveis se encontrados
-        if (flexibleMatches.length > 0) {
+        // 🎯 DEBUG DETALHADO: Log do processo de matching flexível
+        adSets.forEach((ad: any) => {
+          const adNorm = normalizeName(ad.name).toLowerCase();
+          const stratNorm = normalizeName(wanted).toLowerCase();
           
-          matching.push(...flexibleMatches);
+          const extractLocation = (name: string): string => {
+            const locationMatch = name.match(/localização\s*-\s*([^\]]+)/i);
+            return locationMatch ? locationMatch[1].trim().toLowerCase() : '';
+          };
+          
+          const adLocation = extractLocation(ad.name);
+          const strategyLocation = extractLocation(wanted);
+          
+          const locationMatches = adLocation === strategyLocation || 
+                                 adLocation.includes(strategyLocation) || 
+                                 strategyLocation.includes(adLocation);
+          
+          const stratWords = stratNorm.split(' ').filter(w => w.length >= 3);
+          const matchingWords = stratWords.filter(word => adNorm.includes(word));
+          const requiredWords = Math.max(3, Math.floor(stratWords.length * 0.7));
+          
+          
+        });
+        
+        // 🎯 CORREÇÃO CRÍTICA: Usar matches flexíveis se encontrados, MAS APENAS OS ATIVOS OU PAUSADOS
+        const activeFlexibleMatches = flexibleMatches.filter((ad: any) => ad.status === 'ACTIVE' || ad.status === 'PAUSED');
+        
+        
+        
+        if (activeFlexibleMatches.length > 0) {
+          
+          matching.push(...activeFlexibleMatches);
         }
       }
 
@@ -830,12 +933,17 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       
       if (matching.length > 0) {
         
+        // 🎯 DEBUG DETALHADO: Log antes de buscar insights
+        
         
         // 🎯 CORREÇÃO: Buscar insights específicos de cada conjunto
         const allInsights = await Promise.all(
           matching.map(async (ad: any) => {
             try {
               const insights = await metaAdsService.getAdSetInsights(ad.id, startDate, endDate, { fallbackToLast30Days: false });
+              
+              // 🎯 DEBUG DETALHADO: Log dos insights de cada Ad Set
+              
               
               // 🎯 DEBUG ESPECIAL: Log detalhado para ad sets "Salvador"
               const isSalvadorAdSet = ad.name.includes('Salvador') || normalizeName(ad.name).includes('salvador');
@@ -852,6 +960,9 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           })
         );
         
+        
+        
+        // 🎯 DEBUG DETALHADO: Log antes de filtrar insights
         
         
         // 🎯 CORREÇÃO: Filtrar apenas insights com gasto real no período
@@ -871,6 +982,9 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           
           return isInPeriod && hasSpend;
         });
+        
+        // 🎯 DEBUG DETALHADO: Log após filtrar insights
+        
         
         
         
@@ -923,6 +1037,9 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
             cplSamples: [] as number[] 
           }
         );
+        
+        // 🎯 DEBUG DETALHADO: Log dos totais calculados
+        
         
         
         
@@ -1116,24 +1233,38 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     const filtered = strategies.filter((s) => {
       const rec = recommendations[s.id];
       const createdInPeriod = s.month === selectedMonth;
-
+      const hasSpendInPeriod = (rec?.stats?.spend || 0) > 0;
       
-
-      // NOVA LÓGICA SIMPLIFICADA:
-      // 1. Se foi criada no período atual, sempre mostrar
+      // 🎯 CORREÇÃO: LÓGICA DE VISIBILIDADE POR PERÍODO
+      
+      // 1. Se foi criada no período atual/futuro, sempre mostrar
       if (createdInPeriod) {
         
         return true;
       }
-
-      // 2. Se é uma estratégia salva/existente, sempre mostrar 
-      // (estratégias salvas devem aparecer para permitir análise histórica)
-      if (s.id && s.generatedNames?.audience) {
+      
+      // 2. Se tem gasto no período atual, mostrar
+      if (hasSpendInPeriod) {
         
         return true;
       }
-
-      // 3. Fallback: ocultar apenas se não for uma estratégia válida
+      
+      // 3. Verificar se é período passado sem gasto - NÃO mostrar
+      const currentMonth = new Date();
+      const strategyMonth = new Date(s.month + ' 1, 2025'); // Assumindo 2025
+      
+      if (strategyMonth < currentMonth && !hasSpendInPeriod) {
+        
+        return false;
+      }
+      
+      // 4. Se é período futuro, mostrar
+      if (strategyMonth > currentMonth) {
+        
+        return true;
+      }
+      
+      // 5. Fallback: não mostrar se não atender nenhum critério
       
       return false;
     });
