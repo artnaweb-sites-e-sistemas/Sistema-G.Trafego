@@ -121,11 +121,29 @@ const Header: React.FC<HeaderProps> = ({
       
       // 1. Limpar rate limit
       console.log('🔧 DEBUG - handleAutoFix - 1. Limpando rate limits...');
-      const rateLimitKeys = ['metaAdsRateLimit', 'metaAdsRateLimitTimestamp', 'globalRateLimit', 'globalRateLimitTimestamp'];
+      const rateLimitKeys = [
+        'metaAdsRateLimit', 
+        'metaAdsRateLimitTimestamp', 
+        'globalRateLimit', 
+        'globalRateLimitTimestamp',
+        'metaAdsGlobalRateLimit',
+        'metaAdsGlobalRateLimitTimestamp'
+      ];
+      
+      // Limpar todas as chaves de rate limit
       rateLimitKeys.forEach(key => {
         const hadValue = localStorage.getItem(key);
         localStorage.removeItem(key);
         console.log(`🔧 DEBUG - handleAutoFix - Removido: ${key} (tinha valor: ${!!hadValue})`);
+      });
+      
+      // Limpar rate limits globais por usuário (com hash)
+      const allKeys = Object.keys(localStorage);
+      const globalRateLimitKeys = allKeys.filter(key => key.includes('metaAdsGlobalRateLimit_'));
+      globalRateLimitKeys.forEach(key => {
+        const hadValue = localStorage.getItem(key);
+        localStorage.removeItem(key);
+        console.log(`🔧 DEBUG - handleAutoFix - Removido rate limit global: ${key} (tinha valor: ${!!hadValue})`);
       });
       
       // 2. Verificar e corrigir campaign ID
@@ -172,14 +190,36 @@ const Header: React.FC<HeaderProps> = ({
         console.log(`🔧 DEBUG - handleAutoFix - Removido cache da campanha: ${campaignCacheKey} (tinha valor: ${!!hadValue})`);
       }
       
-      // 4. Limpar cache do serviço
-      console.log('🔧 DEBUG - handleAutoFix - 4. Limpando cache do serviço...');
-      if ((window as any).metaAdsService && (window as any).metaAdsService.clearCacheByType) {
+      // 4. Limpar cache e rate limits do serviço
+      console.log('🔧 DEBUG - handleAutoFix - 4. Limpando cache e rate limits do serviço...');
+      if ((window as any).metaAdsService) {
         try {
-          (window as any).metaAdsService.clearCacheByType('adsets');
-          console.log('🔧 DEBUG - handleAutoFix - Cache do serviço limpo com sucesso');
+          // Limpar cache de Ad Sets
+          if ((window as any).metaAdsService.clearCacheByType) {
+            (window as any).metaAdsService.clearCacheByType('adsets');
+            console.log('🔧 DEBUG - handleAutoFix - Cache do serviço limpo com sucesso');
+          }
+          
+          // Resetar rate limits da API
+          if ((window as any).metaAdsService.resetApiRateLimit) {
+            (window as any).metaAdsService.resetApiRateLimit();
+            console.log('🔧 DEBUG - handleAutoFix - Rate limits da API resetados com sucesso');
+          }
+          
+          // Resetar rate limits do OAuth
+          if ((window as any).metaAdsService.resetOAuthRateLimit) {
+            (window as any).metaAdsService.resetOAuthRateLimit();
+            console.log('🔧 DEBUG - handleAutoFix - Rate limits do OAuth resetados com sucesso');
+          }
+          
+          // 🎯 NOVO: Resetar rate limits para todos os usuários (para multi-usuário)
+          if ((window as any).metaAdsService.resetAllUsersRateLimit) {
+            (window as any).metaAdsService.resetAllUsersRateLimit();
+            console.log('🔧 DEBUG - handleAutoFix - Rate limits para todos os usuários resetados com sucesso');
+          }
+          
         } catch (e) {
-          console.error('🔧 DEBUG - handleAutoFix - Erro ao limpar cache do serviço:', e);
+          console.error('🔧 DEBUG - handleAutoFix - Erro ao limpar cache/rate limits do serviço:', e);
         }
       } else {
         console.log('🔧 DEBUG - handleAutoFix - MetaAdsService não disponível no window');

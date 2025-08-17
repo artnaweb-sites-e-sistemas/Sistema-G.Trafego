@@ -215,8 +215,25 @@ class MetaAdsService {
 
   // Método para obter identificador único do usuário
   private getUserIdentifier(): string {
-    // Em produção, isso seria o ID do usuário logado
-    // Por enquanto, vamos usar uma combinação de dados do navegador
+    // 🎯 MELHORIA PARA MULTI-USUÁRIO: Usar ID do usuário logado quando disponível
+    const currentUser = this.user;
+    if (currentUser && currentUser.id) {
+      return `user_${currentUser.id}`;
+    }
+    
+    // Fallback: usar ID da conta selecionada
+    const selectedAccount = this.selectedAccount;
+    if (selectedAccount && selectedAccount.id) {
+      return `account_${selectedAccount.id}`;
+    }
+    
+    // Fallback: usar cliente selecionado
+    const currentClient = localStorage.getItem('currentSelectedClient');
+    if (currentClient) {
+      return `client_${currentClient}`;
+    }
+    
+    // Fallback: usar dados do navegador (menos ideal para multi-usuário)
     const userAgent = navigator.userAgent;
     const screenRes = `${screen.width}x${screen.height}`;
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -230,7 +247,7 @@ class MetaAdsService {
       hash = hash & hash; // Convert to 32bit integer
     }
     
-    return Math.abs(hash).toString();
+    return `browser_${Math.abs(hash).toString()}`;
   }
 
   // Método para verificar se podemos tentar OAuth novamente
@@ -292,6 +309,10 @@ class MetaAdsService {
 
   // Métodos de cache
   private getCacheKey(type: string, params: any = {}): string {
+    // 🎯 MELHORIA PARA MULTI-USUÁRIO: Incluir identificador do usuário no cache
+    const userIdentifier = this.getUserIdentifier();
+    params.user = userIdentifier;
+    
     // Incluir cliente atual e conta selecionada nos parâmetros de cache
     const currentClient = localStorage.getItem('currentSelectedClient');
     if (currentClient) {
@@ -647,13 +668,14 @@ class MetaAdsService {
 
   // 🎯 NOVA FUNÇÃO: Resetar rate limit da API do Meta Ads
   resetApiRateLimit(): void {
-    
+    console.log('🔄 DEBUG - resetApiRateLimit - Iniciando reset do rate limit da API');
     
     try {
-      // Limpar rate limit global para todos os usuários
+      // Limpar rate limit global para o usuário atual
       const userIdentifier = this.getUserIdentifier();
       const globalKey = `${this.GLOBAL_RATE_LIMIT_KEY}_${userIdentifier}`;
       localStorage.removeItem(globalKey);
+      console.log(`🔄 DEBUG - resetApiRateLimit - Rate limit removido para usuário: ${userIdentifier}`);
       
       // Resetar rate limit do Facebook também
       this.facebookRateLimitActive = false;
@@ -662,11 +684,80 @@ class MetaAdsService {
       // Salvar estado resetado
       this.savePersistentRateLimit();
       
-      
-      
+      console.log('🔄 DEBUG - resetApiRateLimit - Rate limit da API resetado com sucesso');
       
     } catch (error) {
       console.error('🔄 DEBUG - resetApiRateLimit - Erro ao resetar rate limit da API:', error);
+    }
+  }
+
+  // 🎯 NOVA FUNÇÃO: Resetar rate limit para todos os usuários (admin)
+  resetAllUsersRateLimit(): void {
+    console.log('🔄 DEBUG - resetAllUsersRateLimit - Iniciando reset de rate limit para todos os usuários');
+    
+    try {
+      // Limpar todos os rate limits globais
+      const allKeys = Object.keys(localStorage);
+      const globalRateLimitKeys = allKeys.filter(key => key.includes('metaAdsGlobalRateLimit_'));
+      
+      globalRateLimitKeys.forEach(key => {
+        localStorage.removeItem(key);
+        console.log(`🔄 DEBUG - resetAllUsersRateLimit - Removido: ${key}`);
+      });
+      
+      // Resetar rate limit do Facebook
+      this.facebookRateLimitActive = false;
+      this.facebookRateLimitUntil = 0;
+      
+      // Salvar estado resetado
+      this.savePersistentRateLimit();
+      
+      console.log(`🔄 DEBUG - resetAllUsersRateLimit - Resetados ${globalRateLimitKeys.length} rate limits`);
+      
+    } catch (error) {
+      console.error('🔄 DEBUG - resetAllUsersRateLimit - Erro ao resetar rate limits:', error);
+    }
+  }
+
+  // 🎯 NOVA FUNÇÃO: Verificar rate limit de usuário específico
+  async getUserRateLimitStatus(userId?: string): Promise<{
+    userId: string;
+    isActive: boolean;
+    remainingTime?: number;
+    canMakeRequest: boolean;
+  }> {
+    try {
+      const targetUserId = userId || this.getUserIdentifier();
+      const globalKey = `${this.GLOBAL_RATE_LIMIT_KEY}_${targetUserId}`;
+      const stored = localStorage.getItem(globalKey);
+      
+      if (!stored) {
+        return {
+          userId: targetUserId,
+          isActive: false,
+          canMakeRequest: true
+        };
+      }
+      
+      const data = JSON.parse(stored);
+      const now = Date.now();
+      const isActive = now < data.until;
+      const remainingTime = isActive ? data.until - now : 0;
+      
+      return {
+        userId: targetUserId,
+        isActive,
+        remainingTime,
+        canMakeRequest: !isActive
+      };
+      
+    } catch (error) {
+      console.error('Erro ao verificar rate limit do usuário:', error);
+      return {
+        userId: userId || 'unknown',
+        isActive: false,
+        canMakeRequest: true
+      };
     }
   }
 

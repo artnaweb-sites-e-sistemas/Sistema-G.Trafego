@@ -261,6 +261,10 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     }).format(value / 100);
   };
 
+  const formatNumber = (value: number) => {
+    return new Intl.NumberFormat('pt-BR').format(value);
+  };
+
   const parseCurrency = (value: string): number => {
     return parseFloat(value.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
   };
@@ -321,8 +325,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     {
       category: 'Desempenho do Anúncio e Custo por Lead',
       metric: 'Impressões',
-      benchmark: '0',
-      realValue: '0',
+      benchmark: formatNumber(0),
+      realValue: formatNumber(0),
       status: '',
       statusColor: 'neutral',
       benchmarkEditable: false,
@@ -341,8 +345,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     {
       category: 'Desempenho do Anúncio e Custo por Lead',
       metric: 'Cliques',
-      benchmark: '0',
-      realValue: '0',
+      benchmark: formatNumber(0),
+      realValue: formatNumber(0),
       status: '',
       statusColor: 'neutral',
       benchmarkEditable: false,
@@ -361,8 +365,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     {
       category: 'Desempenho do Anúncio e Custo por Lead',
       metric: 'Leads / Msgs',
-      benchmark: '0',
-      realValue: '0',
+      benchmark: formatNumber(0),
+      realValue: formatNumber(0),
       status: '',
       statusColor: 'neutral',
       benchmarkEditable: false,
@@ -393,8 +397,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     {
       category: 'Funil de Agendamento',
       metric: 'Agendamentos',
-      benchmark: '0',
-      realValue: '0',
+      benchmark: formatNumber(0),
+      realValue: formatNumber(0),
       status: '',
       statusColor: 'neutral',
       benchmarkEditable: false,
@@ -415,8 +419,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     {
       category: 'Resultados Finais da Venda',
       metric: 'Vendas',
-      benchmark: '0',
-      realValue: '0',
+      benchmark: formatNumber(0),
+      realValue: formatNumber(0),
       status: '',
       statusColor: 'neutral',
       benchmarkEditable: false,
@@ -724,13 +728,13 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         const newRow = { ...row };
         
         if (row.metric === 'Agendamentos') {
-          const newValue = audienceCalculatedValues.agendamentos.toLocaleString('pt-BR');
+          const newValue = formatNumber(audienceCalculatedValues.agendamentos);
           
           newRow.realValue = newValue;
         }
         
         if (row.metric === 'Vendas') {
-          const newValue = audienceCalculatedValues.vendas.toLocaleString('pt-BR');
+          const newValue = formatNumber(audienceCalculatedValues.vendas);
           
           newRow.realValue = newValue;
         }
@@ -810,12 +814,35 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             });
         }
         
-        onValuesChange({ agendamentos, vendas });
+        // 🎯 CORREÇÃO: Removido onValuesChange daqui para evitar warning
+        // Será chamado em um useEffect separado
       }
       
       return finalData;
     });
-  }, [audienceCalculatedValues, onValuesChange, ticketMedio, savedDetails.ticketMedio, ticketMedioEditedByUser]);
+  }, [audienceCalculatedValues, ticketMedio, savedDetails.ticketMedio, ticketMedioEditedByUser]);
+
+  // 🎯 CORREÇÃO: useEffect separado para chamar onValuesChange
+  useEffect(() => {
+    if (tableData.length > 0) {
+      // Calcular totais dos dados da tabela
+      let agendamentos = 0;
+      let vendas = 0;
+      
+      tableData.forEach(row => {
+        if (row.metric === 'Agendamentos' || row.metric === 'Agendamentos (Mês)') {
+          agendamentos += parseInt(row.realValue.replace(/[^\d]/g, '') || '0');
+        }
+        if (row.metric === 'Vendas' || row.metric === 'Vendas (Mês)') {
+          vendas += parseInt(row.realValue.replace(/[^\d]/g, '') || '0');
+        }
+      });
+      
+      if (onValuesChange) {
+        onValuesChange({ agendamentos, vendas });
+      }
+    }
+  }, [tableData, onValuesChange]);
 
   // Carregar ticketMedio dos dados salvos APENAS na primeira vez
   useEffect(() => {
@@ -972,7 +999,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               newRow.realValueEditable = false;
               break;
             case 'Impressões':
-              newRow.realValue = '0';
+              newRow.realValue = formatNumber(0);
               newRow.realValueEditable = false;
               break;
             case 'CPC':
@@ -980,7 +1007,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               newRow.realValueEditable = false;
               break;
             case 'Cliques':
-              newRow.realValue = '0';
+              newRow.realValue = formatNumber(0);
               newRow.realValueEditable = false;
               break;
             case 'CTR':
@@ -988,7 +1015,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               newRow.realValueEditable = false;
               break;
             case 'Leads / Msgs':
-              newRow.realValue = '0';
+              newRow.realValue = formatNumber(0);
               newRow.realValueEditable = false;
               break;
             case 'CPL (Custo por Lead)':
@@ -996,11 +1023,11 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               newRow.realValueEditable = false;
               break;
             case 'Agendamentos':
-              newRow.realValue = audienceCalculatedValues.agendamentos.toLocaleString('pt-BR');
+              newRow.realValue = formatNumber(audienceCalculatedValues.agendamentos);
               newRow.realValueEditable = false; // CORREÇÃO: Sempre não editável
               break;
             case 'Vendas':
-              newRow.realValue = audienceCalculatedValues.vendas.toLocaleString('pt-BR');
+              newRow.realValue = formatNumber(audienceCalculatedValues.vendas);
               newRow.realValueEditable = false; // CORREÇÃO: Sempre não editável
               break;
             default:
@@ -1071,9 +1098,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           case 'Impressões':
             // CORREÇÃO: Só sincronizar se há dados reais
             if (hasRealData) {
-              newRow.realValue = aggregated.totalImpressions.toLocaleString('pt-BR');
+              newRow.realValue = formatNumber(aggregated.totalImpressions);
             } else {
-              newRow.realValue = '0';
+              newRow.realValue = formatNumber(0);
             }
             newRow.realValueEditable = false;
             break;
@@ -1090,9 +1117,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           case 'Cliques':
             // Cliques deve refletir link_clicks quando o campo existe
             if (hasRealData) {
-              newRow.realValue = aggregated.totalClicks.toLocaleString('pt-BR');
+              newRow.realValue = formatNumber(aggregated.totalClicks);
             } else {
-              newRow.realValue = '0';
+              newRow.realValue = formatNumber(0);
             }
             newRow.realValueEditable = false;
             break;
@@ -1109,10 +1136,10 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             // CORREÇÃO: Só sincronizar se há dados reais
             if (hasRealData) {
               
-              newRow.realValue = aggregated.totalLeads.toLocaleString('pt-BR');
+              newRow.realValue = formatNumber(aggregated.totalLeads);
             } else {
               
-              newRow.realValue = '0';
+              newRow.realValue = formatNumber(0);
             }
             newRow.realValueEditable = false;
             break;
@@ -1128,13 +1155,13 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           case 'Agendamentos':
             // 🎯 CORREÇÃO: Sempre usar os valores calculados dos públicos
             
-            newRow.realValue = audienceCalculatedValues.agendamentos.toLocaleString('pt-BR');
+            newRow.realValue = formatNumber(audienceCalculatedValues.agendamentos);
             newRow.realValueEditable = false; // CORREÇÃO: Sempre não editável
             break;
           case 'Vendas':
             // 🎯 CORREÇÃO: Sempre usar os valores calculados dos públicos
             
-            newRow.realValue = audienceCalculatedValues.vendas.toLocaleString('pt-BR');
+            newRow.realValue = formatNumber(audienceCalculatedValues.vendas);
             newRow.realValueEditable = false; // CORREÇÃO: Sempre não editável
             break;
           default:

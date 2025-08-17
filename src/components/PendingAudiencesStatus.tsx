@@ -450,13 +450,16 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
                       {typeof a.activeDaysTotal === 'number' && (
                         <Chip size="xs" color="slate" icon={<Clock className="w-4 h-4 text-slate-400" />}> <span className="text-slate-400">Ativo há</span> <b className="text-slate-200">{a.activeDaysTotal} dias</b> </Chip>
                       )}
-                    <Chip size="xs" color="slate" icon={<CalendarDays className="w-4 h-4 text-slate-400" />}> <span className="text-slate-400">Próxima análise em</span>
-                      {diff !== null && (diff >= 0
-                        ? <span className="text-slate-300"> <b className="text-slate-200 font-semibold">{diff}</b> dias</span>
-                        : <span className="text-slate-300"> há <b className="text-slate-200 font-semibold">{Math.abs(diff)}</b> dias</span>)}
-                      <span className="text-slate-400"> - </span>
-                      {nextStr}
-                    </Chip>
+                      {/* Ocultar "Próxima análise" quando o conjunto de anúncios estiver pausado */}
+                      {(a.adSetStatus !== 'PAUSED' && a.campaignStatus !== 'PAUSED') && (
+                        <Chip size="xs" color="slate" icon={<CalendarDays className="w-4 h-4 text-slate-400" />}> <span className="text-slate-400">Próxima análise em</span>
+                          {diff !== null && (diff >= 0
+                            ? <span className="text-slate-300"> <b className="text-slate-200 font-semibold">{diff}</b> dias</span>
+                            : <span className="text-slate-300"> há <b className="text-slate-200 font-semibold">{Math.abs(diff)}</b> dias</span>)}
+                          <span className="text-slate-400"> - </span>
+                          {nextStr}
+                        </Chip>
+                      )}
                       <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs tracking-wide border ${
                       (a.adSetStatus === 'PAUSED' || a.campaignStatus === 'PAUSED')
                         ? 'bg-amber-500/15 text-amber-200 border-amber-400/30'

@@ -306,7 +306,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
       
       
       
-
+      
       // Buscar anúncios do Meta Ads
       
       const metaAds = await metaAdsService.getAds(selectedAdSetId, selectedCampaignId);
@@ -330,9 +330,9 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
           
           if (ad.effective_object_story_id) {
             
-          } else {
+            } else {
             
-          }
+            }
           
           // Buscar insights separadamente: período selecionado, últimos 7 dias, últimos 3 dias, períodos anteriores e período total
           let periodInsights: any[] = [];
@@ -373,7 +373,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               // Buscar insights dos 3 dias anteriores (para comparação de alertas)
               previous3DaysInsights = await metaAdsService.getAdInsights(ad.id, previous3DaysStart, previous3DaysEnd, false);
               
-            } else {
+              } else {
               // Fallback: usar os mesmos dados do período selecionado
               
               periodInsights = await metaAdsService.getAdInsights(ad.id, startDate, endDate, false);
@@ -458,7 +458,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                     }
                   } else {
                     
-                  }
+                    }
                 }
               } catch (apiError) {
                 console.error(`❌ Erro ao buscar adcreatives:`, apiError);
@@ -524,9 +524,9 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                   }
                   
                   
-                } else {
+                  } else {
                   
-                }
+                  }
                 
                 // Estratégia 8: Buscar post IDs da página via API (como fallback)
                 try {
@@ -548,10 +548,10 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                       return postUrl;
                     } else {
                       
-                    }
+                      }
                   } else {
                     
-                  }
+                    }
                 } catch (apiError) {
                   console.error(`❌ Erro ao buscar post IDs via API:`, apiError);
                 }
@@ -610,7 +610,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               // Log para debug dos actions
               if (insight.actions && insight.actions.length > 0) {
                 
-              }
+                }
               
               // Somar conversões
               const messagingConversations = insight.actions?.find((action: any) => 
@@ -714,7 +714,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               last7DaysConversions = last7DaysTotalConversions;
               
               
-            }
+              }
             
             // Calcular métricas dos últimos 3 dias
             if (last3DaysInsights.length > 0) {
@@ -758,7 +758,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               last3DaysConversions = last3DaysTotalConversions;
               
               
-            }
+              }
             
             // Calcular métricas dos 7 dias anteriores (para comparação de tendência)
             if (previous7DaysInsights.length > 0) {
@@ -802,7 +802,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               previous7DaysConversions = previous7DaysTotalConversions;
               
               
-            }
+              }
             
             // Calcular métricas dos 3 dias anteriores (para comparação de alertas)
             if (previous3DaysInsights.length > 0) {
@@ -846,7 +846,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               previous3DaysConversions = previous3DaysTotalConversions;
               
               
-            }
+              }
             
             // Calcular métricas para Performance Score usando dados de todos os meses ativos
             let performanceScoreCpr = 0;
@@ -921,7 +921,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
                 performanceScoreConversions = 0;
                 performanceScoreFrequency = 0;
                 
-              }
+                }
             } catch (error) {
               console.error(`❌ Erro ao calcular métricas para Performance Score:`, error);
               // Fallback para métricas zeradas
@@ -984,7 +984,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
             
             
             
-                      // Determinar status do anúncio baseado na hierarquia: Campanha > Conjunto > Anúncio
+            // Determinar status do anúncio baseado na hierarquia: Campanha > Conjunto > Anúncio
           let status: 'active' | 'paused' | 'draft' = 'active';
           
           try {
@@ -996,7 +996,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               const campaignDetails = await metaAdsService.getCampaignDetails(ad.campaign_id);
               campaignStatus = campaignDetails?.status || 'UNKNOWN';
               
-            } catch (error) {
+              } catch (error) {
               console.error(`Erro ao buscar status da campanha ${ad.campaign_id}:`, error);
             }
             
@@ -1006,7 +1006,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
               const adSetDetails = await metaAdsService.getAdSetDetails(ad.adset_id);
               adSetStatus = adSetDetails?.status || 'UNKNOWN';
               
-            } catch (error) {
+              } catch (error) {
               console.error(`Erro ao buscar status do conjunto ${ad.adset_id}:`, error);
             }
             
@@ -1086,7 +1086,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
             const { cprIdeal, objetivo, tipoConversao } = determinarCprIdealEObjetivo(tempAdData);
             
             
-
+            
             // Calcular Performance Score usando métricas de todos os meses ativos
             const performanceScore = calcularPerformanceScore({
               cprAtual: performanceScoreCpr,
@@ -1247,7 +1247,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
       
       
       
-
+      
       // Filtrar apenas anúncios com gasto maior que R$ 0,00
       const adsWithSpend = adsWithValidInsights.filter(ad => ad.metrics.spend > 0);
       
@@ -1294,7 +1294,7 @@ const PerformanceAdsSection: React.FC<PerformanceAdsSectionProps> = ({ onBack })
         setAds(sortedAds);
         setLastSync(new Date().toLocaleString('pt-BR'));
         
-      } else {
+        } else {
         
         setAds([]);
         setLastSync('Nenhum anúncio veiculado no período');
