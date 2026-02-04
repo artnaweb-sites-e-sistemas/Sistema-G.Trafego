@@ -14,6 +14,7 @@ import PerformanceAdsSection from '../components/PerformanceAdsSection';
 import PendingAudiencesStatus from '../components/PendingAudiencesStatus';
 import { analysisPlannerService } from '../services/analysisPlannerService';
 import AdStrategySection from '../components/AdStrategySection';
+import AureaDecisionPanel from '../components/AureaDecisionPanel';
 import RateLimitModal from '../components/RateLimitModal';
 import { User } from '../services/authService';
 import { metricsService, type MetricData } from '../services/metricsService';
@@ -1419,6 +1420,23 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                         </div>
                       </div>
                     )}
+
+                    {/* 🎯 MODO ÁUREA: Painel de Decisão Rápida */}
+                    <AureaDecisionPanel
+                      selectedClient={selectedClient}
+                      selectedMonth={selectedMonth}
+                      selectedProduct={selectedProduct}
+                      currentSpend={metrics.reduce((sum, m) => sum + (m.investment || 0), 0)}
+                      conversions={metrics.reduce((sum, m) => sum + (m.leads || 0), 0)}
+                      adSets={metrics.map(m => ({
+                        id: m.id || String(Date.now()),
+                        name: m.audience || m.product || 'Sem nome',
+                        spend: m.investment || 0,
+                        conversions: m.leads || 0,
+                        cpa: m.leads ? (m.investment || 0) / m.leads : undefined,
+                        ctr: m.ctr || 0
+                      }))}
+                    />
 
                     <MetricsGrid
                       metrics={metrics}
