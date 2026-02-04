@@ -1177,3 +1177,18 @@ header {
 .modalzindex {
   z-index: 9 !important;
 }
+
+/* ===== ANIMAÇÃO FADE IN PARA TABS ===== */
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Ocultar scrollbar mantendo funcionalidade */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
