@@ -1520,6 +1520,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                         selectedMonth={selectedMonth}
                         hasGeneratedLinks={false}
                         metrics={metrics}
+                        monthlyDetailsValues={monthlyDetailsValues}
                       />
                     </TabContent>
                   </>
