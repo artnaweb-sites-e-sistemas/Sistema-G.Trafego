@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Modal de Reconexão</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1e293b;
+            color: white;
+            padding: 20px;
+        }
+        .test-button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            font-size: 16px;
+        }
+        .test-button:hover {
+            background: #2563eb;
+        }
+        .info {
+            background: #1e40af;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste do Modal de Reconexão do Meta Ads</h1>
+    
+    <div class="info">
+        <h3>📋 Como testar:</h3>
+        <ol>
+            <li>Clique no botão "Simular Rate Limit" para testar o modal</li>
+            <li>Clique no botão "Simular Erro 400" para testar outro cenário</li>
+            <li>Verifique se o modal aparece com a mensagem correta</li>
+            <li>Teste os botões de reconexão e fechar</li>
+        </ol>
+    </div>
+
+    <button class="test-button" onclick="simulateRateLimit()">
+        🚨 Simular Rate Limit
+    </button>
+    
+    <button class="test-button" onclick="simulateError400()">
+        ⚠️ Simular Erro 400
+    </button>
+
+    <button class="test-button" onclick="simulateUserRequestLimit()">
+        🔒 Simular "User request limit reached"
+    </button>
+
+    <script>
+        // Simular evento de rate limit
+        function simulateRateLimit() {
+            const event = new CustomEvent('metaAdsRateLimit', {
+                detail: {
+                    message: 'Rate limit exceeded. Too many requests.',
+                    timestamp: Date.now(),
+                    service: 'MetaAdsService'
+                }
+            });
+            window.dispatchEvent(event);
+            
+        }
+
+        // Simular erro 400
+        function simulateError400() {
+            const event = new CustomEvent('metaAdsRateLimit', {
+                detail: {
+                    message: 'Bad Request (400) - Invalid parameters',
+                    timestamp: Date.now(),
+                    service: 'MetaAdsService'
+                }
+            });
+            window.dispatchEvent(event);
+            
+        }
+
+        // Simular erro específico do Meta Ads
+        function simulateUserRequestLimit() {
+            const event = new CustomEvent('metaAdsRateLimit', {
+                detail: {
+                    message: 'User request limit reached',
+                    timestamp: Date.now(),
+                    service: 'MetaAdsService'
+                }
+            });
+            window.dispatchEvent(event);
+            
+        }
+
+        // Log quando a página carrega
+        
+        
+    </script>
+</body>
+</html>

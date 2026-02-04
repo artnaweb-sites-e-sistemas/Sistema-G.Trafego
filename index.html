@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard Analytics Moderno</title>
+    
+    <!-- Facebook SDK -->
+    <script>
+      window.fbAsyncInit = function() {
+        
+        
+        // Usar App ID do environment variable se disponível
+        const appId = '1793110515418498'; // Novo App ID com permissões avançadas
+        
+        FB.init({
+          appId: appId,
+          cookie: true,
+          xfbml: true,
+          version: 'v18.0'
+        });
+        
+        
+        
+        
+          
+        FB.AppEvents.logPageView();
+        
+        // Verificar status de login quando a página carrega
+        FB.getLoginStatus(function(response) {
+          
+          if (response.status === 'connected') {
+            
+          } else {
+            
+          }
+        });
+      };
+
+      // Função para processar mudanças de status
+      function statusChangeCallback(response) {
+        
+        
+        if (response.status === 'connected') {
+          
+          
+          // Buscar dados completos do usuário
+          FB.api('/me', { fields: 'name,email' }, function(userInfo) {
+            if (userInfo.error) {
+              console.error('Erro ao buscar dados do usuário:', userInfo.error);
+              return;
+            }
+            
+            const completeUser = {
+              id: response.authResponse.userID,
+              name: userInfo.name,
+              email: userInfo.email,
+              accessToken: response.authResponse.accessToken
+            };
+            
+            localStorage.setItem('facebookUser', JSON.stringify(completeUser));
+            
+            
+            // Disparar evento customizado para o React
+            window.dispatchEvent(new CustomEvent('facebookLoginSuccess', {
+              detail: completeUser
+            }));
+          });
+          
+        } else if (response.status === 'not_authorized') {
+          
+          localStorage.removeItem('facebookUser');
+        } else {
+          
+          localStorage.removeItem('facebookUser');
+        }
+      }
+
+      // Carregar Facebook SDK
+      (function(d, s, id) {
+        var js, fjs = d.getElementsByTagName(s)[0];
+        if (d.getElementById(id)) return;
+        js = d.createElement(s); js.id = id;
+        js.src = "https://connect.facebook.net/pt_BR/sdk.js";
+        fjs.parentNode.insertBefore(js, fjs);
+        
+      }(document, 'script', 'facebook-jssdk'));
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

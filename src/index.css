@@ -1,0 +1,1179 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilos específicos para o modal do Meta Ads */
+/* Utilitários globais para tooltips e overlays de métricas */
+.tooltip-portal,
+.force-topmost {
+  position: relative;
+  z-index: 2147483647; /* topo de tudo */
+}
+
+.allow-overflow-visible {
+  overflow: visible !important;
+}
+.meta-ads-modal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+.meta-ads-modal-content {
+  width: 100%;
+  max-width: 28rem;
+  margin: 0 auto;
+  position: relative;
+  transform: translateZ(0);
+}
+
+/* Garantir que o conteúdo do modal seja responsivo */
+@media (max-width: 640px) {
+  .meta-ads-modal {
+    padding: 0.5rem;
+  }
+  
+  .meta-ads-modal-content {
+    max-width: 100%;
+  }
+}
+
+/* Melhorar a aparência do backdrop */
+.modal-backdrop {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ===== CORREÇÕES DE LAYOUT DOS DROPDOWNS ===== */
+
+/* Container principal do header - garantir que não interfira com dropdowns */
+header {
+  position: relative;
+  z-index: 10;
+}
+
+/* Estilos base para todos os dropdowns */
+.dropdown-container {
+  position: relative;
+  z-index: 999999;
+}
+
+/* Dropdown específico - garantir que apareça acima de tudo */
+.dropdown-menu {
+  position: absolute !important;
+  top: 100% !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 999999 !important;
+  border-radius: 0.5rem !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  overflow: hidden !important;
+  min-width: 300px !important;
+  max-height: 400px !important;
+}
+
+/* Garantir que os dropdowns não sejam cortados */
+.dropdown-menu-large {
+  min-width: 350px;
+  max-height: 500px;
+}
+
+/* Estilos para dropdowns que precisam de mais espaço */
+.dropdown-menu-wide {
+  min-width: 400px;
+  max-width: 500px;
+}
+
+/* Scroll interno dos dropdowns */
+.dropdown-scroll {
+  max-height: 250px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #1f2937;
+}
+
+/* Estilização do scrollbar para Webkit (Chrome, Safari, Edge) */
+.dropdown-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dropdown-scroll::-webkit-scrollbar-track {
+  background: #1f2937;
+  border-radius: 3px;
+}
+
+.dropdown-scroll::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+.dropdown-scroll::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Scrollbar para Firefox */
+.dropdown-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #1f2937;
+}
+
+/* ===== SCROLLBARS GLOBAIS COM TEMA DARK ===== */
+
+/* Scrollbar global para toda a aplicação */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #1f2937;
+}
+
+/* Estilização global do scrollbar para Webkit */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1f2937;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+::-webkit-scrollbar-corner {
+  background: #1f2937;
+}
+
+/* Scrollbar mais fino para elementos específicos */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #1f2937;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #1f2937;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Scrollbar para modais e overlays */
+.modal-content,
+.modal-overlay,
+.facebook-modal-content,
+.facebook-modal-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #1f2937;
+}
+
+.modal-content::-webkit-scrollbar,
+.modal-overlay::-webkit-scrollbar,
+.facebook-modal-content::-webkit-scrollbar,
+.facebook-modal-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-content::-webkit-scrollbar-track,
+.modal-overlay::-webkit-scrollbar-track,
+.facebook-modal-content::-webkit-scrollbar-track,
+.facebook-modal-scroll::-webkit-scrollbar-track {
+  background: #1f2937;
+  border-radius: 3px;
+}
+
+.modal-content::-webkit-scrollbar-thumb,
+.modal-overlay::-webkit-scrollbar-thumb,
+.facebook-modal-content::-webkit-scrollbar-thumb,
+.facebook-modal-scroll::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+.modal-content::-webkit-scrollbar-thumb:hover,
+.modal-overlay::-webkit-scrollbar-thumb:hover,
+.facebook-modal-content::-webkit-scrollbar-thumb:hover,
+.facebook-modal-scroll::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Estilos para os botões dos dropdowns */
+.dropdown-trigger {
+  position: relative;
+  cursor: pointer;
+  z-index: 1;
+}
+
+/* Indicadores de status dos dropdowns */
+.dropdown-indicator {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #1f2937;
+  z-index: 2;
+}
+
+/* Estilos para modais que podem conflitar */
+.modal-overlay {
+  z-index: 999998 !important;
+}
+
+.modal-content {
+  z-index: 999999 !important;
+}
+
+/* Garantir que os dropdowns apareçam acima de outros elementos */
+.z-dropdown {
+  z-index: 999999 !important;
+}
+
+.z-dropdown-high {
+  z-index: 999999 !important;
+}
+
+/* Estilos para o backdrop dos dropdowns (se necessário) */
+.dropdown-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  z-index: 999;
+}
+
+/* Correções específicas para o header */
+.header-filters {
+  position: relative;
+  z-index: 20;
+}
+
+.header-filter-item {
+  position: relative;
+  z-index: 9999;
+}
+
+/* Garantir que os dropdowns não sejam afetados pelo overflow do header */
+header {
+  overflow: visible !important;
+}
+
+.header-container {
+  overflow: visible !important;
+}
+
+/* Garantir que todos os containers de dropdown tenham z-index alto */
+.dropdown-container {
+  position: relative !important;
+  z-index: 999999 !important;
+}
+
+/* Garantir que os dropdowns apareçam acima de qualquer outro elemento */
+.dropdown-menu,
+.dropdown-menu-large,
+.dropdown-menu-wide {
+  z-index: 999999 !important;
+  position: absolute !important;
+}
+
+/* Garantir que os modais apareçam acima dos dropdowns */
+.modal-overlay,
+.modal-content {
+  z-index: 999999 !important;
+  position: fixed !important;
+}
+
+/* Garantir que todos os elementos com z-index alto tenham prioridade máxima */
+[style*="z-index: 999999"],
+[style*="zIndex: 999999"] {
+  z-index: 999999 !important;
+}
+
+/* Garantir que o header não interfira com os dropdowns */
+header,
+.header-filters,
+.header-filter-item {
+  z-index: 1 !important;
+}
+
+/* Garantir que os dropdowns não sejam afetados por outros elementos */
+.dropdown-menu,
+.dropdown-menu-large,
+.dropdown-menu-wide {
+  isolation: isolate !important;
+  contain: layout !important;
+  transform: translateZ(0) !important;
+  will-change: transform !important;
+}
+
+/* Forçar que os dropdowns sejam renderizados em uma nova camada */
+.dropdown-menu,
+.dropdown-menu-large,
+.dropdown-menu-wide {
+  transform: translate3d(0, 0, 0) !important;
+  backface-visibility: hidden !important;
+  perspective: 1000px !important;
+}
+
+/* Estilos para garantir que os dropdowns sejam responsivos */
+@media (max-width: 768px) {
+  .dropdown-menu {
+    min-width: 280px;
+    max-width: calc(100vw - 2rem);
+  }
+  
+  .dropdown-menu-wide {
+    min-width: 300px;
+    max-width: calc(100vw - 2rem);
+  }
+}
+
+/* Correções para elementos que podem interferir com os dropdowns */
+.relative {
+  position: relative !important;
+}
+
+.absolute {
+  position: absolute !important;
+}
+
+/* Garantir que os dropdowns tenham espaço suficiente */
+.dropdown-spacer {
+  margin-top: 0.5rem;
+}
+
+/* Estilos para animações suaves dos dropdowns */
+.dropdown-enter {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: all 0.2s ease-out;
+}
+
+.dropdown-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.dropdown-exit {
+  opacity: 1;
+  transform: translateY(0);
+  transition: all 0.2s ease-in;
+}
+
+.dropdown-exit-active {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+/* ===== MELHORIAS PARA O MODAL DO FACEBOOK ===== */
+
+/* Modal do Facebook - Melhorias de Layout */
+.facebook-modal-overlay {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.facebook-modal-content {
+  animation: slideIn 0.3s ease-out;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Animações para o modal */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Melhorias de responsividade para o modal */
+@media (max-width: 640px) {
+  .facebook-modal-content {
+    margin: 1rem;
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100vh - 2rem);
+  }
+  
+  .facebook-modal-content .p-6 {
+    padding: 1rem;
+  }
+  
+  .facebook-modal-content .text-xl {
+    font-size: 1.125rem;
+  }
+  
+  .facebook-modal-content .w-20 {
+    width: 4rem;
+    height: 4rem;
+  }
+  
+  .facebook-modal-content .w-10 {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+}
+
+/* ===== ANIMAÇÕES PARA MODAIS ===== */
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ===== MELHORIAS ESPECÍFICAS PARA O MODAL DO FACEBOOK ===== */
+
+/* Modal responsivo e bem centralizado */
+.facebook-modal-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+.facebook-modal-wrapper {
+  width: 100%;
+  max-width: 28rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #1f2937;
+  border-radius: 1rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border: 1px solid #374151;
+}
+
+/* Melhorias para dispositivos móveis */
+@media (max-width: 640px) {
+  .facebook-modal-container {
+    padding: 0.5rem;
+  }
+  
+  .facebook-modal-wrapper {
+    max-width: 100%;
+    max-height: calc(100vh - 1rem);
+    margin: 0.5rem;
+  }
+}
+
+/* Melhorias para scroll interno */
+.facebook-modal-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #1f2937;
+}
+
+.facebook-modal-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.facebook-modal-scroll::-webkit-scrollbar-track {
+  background: #1f2937;
+  border-radius: 3px;
+}
+
+.facebook-modal-scroll::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 3px;
+}
+
+.facebook-modal-scroll::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Melhorias para botões */
+.facebook-modal-btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.facebook-modal-btn:hover {
+  transform: translateY(-1px);
+}
+
+.facebook-modal-btn:active {
+  transform: translateY(0);
+}
+
+/* Melhorias para foco e acessibilidade */
+.facebook-modal-focus:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Melhorias para texto */
+.facebook-modal-text {
+  line-height: 1.6;
+  letter-spacing: 0.025em;
+}
+
+/* Melhorias para espaçamento */
+.facebook-modal-space {
+  gap: 1.5rem;
+}
+
+/* Melhorias para bordas */
+.facebook-modal-border {
+  border: 1px solid rgba(75, 85, 99, 0.5);
+}
+
+/* Estados de sucesso, erro e aviso */
+.facebook-modal-success {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(22, 163, 74, 0.1) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.facebook-modal-error {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.facebook-modal-warning {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* ===== CORREÇÕES ESPECÍFICAS PARA DROPDOWNS ===== */
+
+/* Forçar que todos os dropdowns apareçam acima de qualquer elemento */
+.dropdown-menu,
+.dropdown-menu-large,
+.dropdown-menu-wide,
+.z-dropdown,
+.z-dropdown-high {
+  z-index: 999999 !important;
+  position: absolute !important;
+  isolation: isolate !important;
+  contain: layout !important;
+  transform: translate3d(0, 0, 0) !important;
+  backface-visibility: hidden !important;
+  perspective: 1000px !important;
+  will-change: transform !important;
+}
+
+/* Garantir que os containers dos dropdowns tenham z-index alto */
+.dropdown-container {
+  position: relative !important;
+  z-index: 999999 !important;
+  isolation: isolate !important;
+}
+
+/* Garantir que os filtros do header não interfiram */
+.header-filters {
+  position: relative;
+  z-index: 1 !important;
+}
+
+.header-filter-item {
+  position: relative;
+  z-index: 1 !important;
+}
+
+/* Garantir que o header principal não interfira */
+header {
+  position: relative;
+  z-index: 1 !important;
+  overflow: visible !important;
+}
+
+.header-container {
+  overflow: visible !important;
+}
+
+/* Garantir que todos os elementos com z-index alto tenham prioridade máxima */
+[style*="z-index: 999999"],
+[style*="zIndex: 999999"] {
+  z-index: 999999 !important;
+}
+
+/* Correções específicas para elementos que podem conflitar */
+.bg-slate-800\/60,
+.bg-slate-700\/50,
+.bg-gray-800\/60,
+.bg-gray-700\/50 {
+  z-index: 1 !important;
+}
+
+/* Garantir que os dropdowns não sejam afetados por outros elementos */
+.dropdown-menu,
+.dropdown-menu-large,
+.dropdown-menu-wide {
+  pointer-events: auto !important;
+  user-select: auto !important;
+}
+
+/* Estilos para garantir que os dropdowns sejam responsivos */
+@media (max-width: 768px) {
+  .dropdown-menu {
+    min-width: 280px;
+    max-width: calc(100vw - 2rem);
+    z-index: 999999 !important;
+  }
+  
+  .dropdown-menu-wide {
+    min-width: 300px;
+    max-width: calc(100vw - 2rem);
+    z-index: 999999 !important;
+  }
+}
+
+/* Correções para elementos que podem interferir com os dropdowns */
+.relative {
+  position: relative !important;
+}
+
+.absolute {
+  position: absolute !important;
+}
+
+/* Garantir que os dropdowns tenham espaço suficiente */
+.dropdown-spacer {
+  margin-top: 0.5rem;
+}
+
+/* Estilos para animações suaves dos dropdowns */
+.dropdown-enter {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: all 0.2s ease-out;
+}
+
+.dropdown-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.dropdown-exit {
+  opacity: 1;
+  transform: translateY(0);
+  transition: all 0.2s ease-in;
+}
+
+.dropdown-exit-active {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+/* ===== SOLUÇÃO ROBUSTA PARA DROPDOWNS ===== */
+
+/* Forçar que todos os dropdowns apareçam acima de qualquer elemento */
+.dropdown-menu,
+.dropdown-menu-large,
+.dropdown-menu-wide,
+.z-dropdown,
+.z-dropdown-high {
+  z-index: 2147483647 !important; /* Valor máximo de z-index */
+  position: absolute !important;
+  isolation: isolate !important;
+  contain: layout !important;
+  transform: translate3d(0, 0, 0) !important;
+  backface-visibility: hidden !important;
+  perspective: 1000px !important;
+  will-change: transform !important;
+  pointer-events: auto !important;
+  user-select: auto !important;
+  /* Forçar renderização em nova camada */
+  transform-style: preserve-3d !important;
+  /* Garantir que não seja afetado por overflow */
+  overflow: visible !important;
+}
+
+/* ===== Tooltip de ação aplicada (botões) ===== */
+.applied-tooltip {
+  position: absolute;
+  top: -44px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #e2e8f0; /* slate-200 */
+  background: rgba(30, 41, 59, 0.95); /* slate-800 */
+  border: 1px solid rgba(71, 85, 105, 0.6); /* slate-600 */
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform-origin: bottom center;
+  animation: appliedTooltipFade 800ms ease forwards;
+}
+
+.applied-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px 6px 0 6px;
+  border-style: solid;
+  border-color: rgba(71, 85, 105, 0.6) transparent transparent transparent;
+}
+
+/* ===== Animações de gradiente azul (gasto atual e barra) ===== */
+@keyframes blueGradientFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animated-blue-gradient {
+  background: linear-gradient(90deg, rgba(56,189,248,0.35), rgba(59,130,246,0.55), rgba(56,189,248,0.35));
+  background-size: 200% 200%;
+  animation: blueGradientFlow 3s ease infinite;
+}
+
+.animated-blue-text {
+  /* Tom unificado: cyan-400 (#38bdf8) → blue-500 (#3b82f6) → cyan-400 */
+  background: linear-gradient(90deg, #38bdf8, #3b82f6, #38bdf8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  background-size: 200% 200%;
+  animation: blueGradientFlow 3.2s ease infinite;
+}
+
+/* Barra de progresso com animação mais rica (tons de azul correndo) */
+.progress-animated {
+  position: relative;
+  /* Mesmo tom do texto: cyan-400 → blue-500 → cyan-400 */
+  background-image: linear-gradient(90deg, #38bdf8 0%, #3b82f6 50%, #38bdf8 100%);
+  background-size: 200% 100%;
+  animation: gradientMove 2s linear infinite;
+  box-shadow: 0 0 14px rgba(59,130,246,0.45), inset 0 0 10px rgba(56,189,248,0.35);
+}
+
+/* Variante mais discreta para barras secundárias (menos poluição visual) */
+.progress-muted {
+  position: relative;
+  background: linear-gradient(90deg, 
+    rgba(239,68,68,0.2) 0%, 
+    rgba(220,38,38,0.3) 25%, 
+    rgba(185,28,28,0.4) 50%, 
+    rgba(220,38,38,0.3) 75%, 
+    rgba(239,68,68,0.2) 100%
+  ); /* vermelho sutil animado que muda de tom */
+  background-size: 200% 100%;
+  animation: redGradientMove 4s ease-in-out infinite;
+  box-shadow: inset 0 0 6px rgba(0,0,0,0.15), 0 0 4px rgba(239,68,68,0.15);
+}
+
+.progress-animated::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.18) 20%, rgba(255,255,255,0.06) 38%, transparent 60%);
+  background-size: 200% 100%;
+  animation: shine 3.2s linear infinite;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+@keyframes gradientMove {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 200% 0%; }
+}
+
+@keyframes redGradientMove {
+  0% { background-position: 0% 0%; }
+  50% { background-position: 100% 0%; }
+  100% { background-position: 0% 0%; }
+}
+
+@keyframes shine {
+  0% { background-position: -50% 0%; opacity: 0.85; }
+  50% { opacity: 1; }
+  100% { background-position: 150% 0%; opacity: 0.85; }
+}
+
+/* Texto com a mesma animação/tons da barra */
+.progress-animated-text {
+  background-image: linear-gradient(90deg, #38bdf8 0%, #3b82f6 50%, #38bdf8 100%);
+  background-size: 200% 100%;
+  animation: gradientMove 2.6s linear infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes appliedTooltipFade {
+  0% { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.98); }
+  20% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  80% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-6px) scale(0.98); }
+}
+
+/* Garantir que o tema dark seja aplicado nos dropdowns */
+.dropdown-menu.bg-slate-900,
+.dropdown-menu-large.bg-slate-900,
+.dropdown-menu-wide.bg-slate-900 {
+  background-color: rgb(15 23 42) !important; /* slate-900 */
+}
+
+/* Garantir que os itens da lista tenham tema dark */
+.dropdown-menu .hover\:bg-slate-800:hover,
+.dropdown-menu-large .hover\:bg-slate-800:hover,
+.dropdown-menu-wide .hover\:bg-slate-800:hover {
+  background-color: rgb(30 41 59) !important; /* slate-800 */
+}
+
+/* Garantir que os textos tenham cores corretas */
+.dropdown-menu .text-slate-200,
+.dropdown-menu-large .text-slate-200,
+.dropdown-menu-wide .text-slate-200 {
+  color: rgb(226 232 240) !important; /* slate-200 */
+}
+
+.dropdown-menu .text-slate-400,
+.dropdown-menu-large .text-slate-400,
+.dropdown-menu-wide .text-slate-400 {
+  color: rgb(148 163 184) !important; /* slate-400 */
+}
+
+/* Garantir que os campos de busca tenham tema dark */
+.dropdown-menu input.bg-slate-800,
+.dropdown-menu-large input.bg-slate-800,
+.dropdown-menu-wide input.bg-slate-800 {
+  background-color: rgb(30 41 59) !important; /* slate-800 */
+  color: rgb(226 232 240) !important; /* slate-200 */
+}
+
+/* Garantir que os headers de ações tenham tema dark */
+.dropdown-menu .bg-gradient-to-r.from-slate-800.to-slate-700,
+.dropdown-menu-large .bg-gradient-to-r.from-slate-800.to-slate-700,
+.dropdown-menu-wide .bg-gradient-to-r.from-slate-800.to-slate-700 {
+  background: linear-gradient(to right, rgb(30 41 59), rgb(51 65 85)) !important;
+}
+
+/* Garantir que os containers dos dropdowns tenham z-index alto */
+.dropdown-container {
+  position: relative !important;
+  z-index: 2147483647 !important;
+  isolation: isolate !important;
+  overflow: visible !important;
+}
+
+/* Garantir que os filtros do header não interfiram */
+.header-filters {
+  position: relative;
+  z-index: 1 !important;
+  overflow: visible !important;
+}
+
+.header-filter-item {
+  position: relative;
+  z-index: 1 !important;
+  overflow: visible !important;
+}
+
+/* Garantir que o header principal não interfira */
+header {
+  position: relative;
+  z-index: 1 !important;
+  overflow: visible !important;
+}
+
+.header-container {
+  overflow: visible !important;
+}
+
+/* Garantir que todos os elementos com z-index alto tenham prioridade máxima */
+[style*="z-index: 2147483647"],
+[style*="zIndex: 2147483647"] {
+  z-index: 2147483647 !important;
+}
+
+/* Correções específicas para elementos que podem conflitar */
+.bg-slate-800\/60,
+.bg-slate-700\/50,
+.bg-gray-800\/60,
+.bg-gray-700\/50 {
+  z-index: 1 !important;
+  overflow: visible !important;
+}
+
+/* Forçar que os dropdowns sejam renderizados em uma nova camada */
+.dropdown-menu,
+.dropdown-menu-large,
+.dropdown-menu-wide {
+  /* Valor máximo de z-index */
+  z-index: 2147483647 !important;
+  /* Forçar nova camada de renderização */
+  transform: translate3d(0, 0, 0) !important;
+  /* Garantir que não seja cortado */
+  clip: auto !important;
+  clip-path: none !important;
+  /* Garantir que apareça acima de tudo */
+  position: absolute !important;
+  /* Garantir que não seja afetado por overflow */
+  overflow: visible !important;
+}
+
+/* Estilos para garantir que os dropdowns sejam responsivos */
+@media (max-width: 768px) {
+  .dropdown-menu {
+    min-width: 280px;
+    max-width: calc(100vw - 2rem);
+    z-index: 2147483647 !important;
+  }
+  
+  .dropdown-menu-wide {
+    min-width: 300px;
+    max-width: calc(100vw - 2rem);
+    z-index: 2147483647 !important;
+  }
+}
+
+/* Correções para elementos que podem interferir com os dropdowns */
+.relative {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.absolute {
+  position: absolute !important;
+  overflow: visible !important;
+}
+
+/* Garantir que os dropdowns tenham espaço suficiente */
+.dropdown-spacer {
+  margin-top: 0.5rem;
+}
+
+/* Estilos para animações suaves dos dropdowns */
+.dropdown-enter {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: all 0.2s ease-out;
+}
+
+.dropdown-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.dropdown-exit {
+  opacity: 1;
+  transform: translateY(0);
+  transition: all 0.2s ease-in;
+}
+
+.dropdown-exit-active {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+/* Forçar que todos os elementos que podem conflitar tenham z-index baixo */
+.flex,
+.grid,
+.container,
+.w-full,
+.h-full,
+.space-x-3,
+.space-y-1,
+.items-center,
+.justify-center,
+.justify-between {
+  overflow: visible !important;
+}
+
+/* EXCEÇÃO: Permitir que modais e portais tenham z-index alto */
+.modal-overlay,
+.modal-content,
+.task-manager-modal,
+.dropdown-portal,
+.force-topmost {
+  z-index: 2147483647 !important;
+  position: fixed !important;
+  isolation: isolate !important;
+  contain: layout !important;
+  transform: translate3d(0, 0, 0) !important;
+  backface-visibility: hidden !important;
+  perspective: 1000px !important;
+}
+
+/* Forçar que o task manager fique acima de TUDO */
+.task-manager-modal {
+  z-index: 2147483647 !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+}
+
+/* Garantir que os dropdowns não sejam afetados por outros elementos */
+.dropdown-menu,
+.dropdown-menu-large,
+.dropdown-menu-wide {
+  /* Forçar que apareça acima de tudo */
+  z-index: 2147483647 !important;
+  /* Garantir que não seja cortado */
+  clip: auto !important;
+  clip-path: none !important;
+  /* Garantir que não seja afetado por overflow */
+  overflow: visible !important;
+  /* Garantir que não seja afetado por transform */
+  transform: translate3d(0, 0, 0) !important;
+  /* Garantir que não seja afetado por filter */
+  filter: none !important;
+  /* Garantir que não seja afetado por backdrop-filter */
+  backdrop-filter: none !important;
+  /* Harmonização visual */
+  border-radius: 0.75rem !important;
+  box-shadow: 0 24px 48px rgba(0,0,0,0.4), 0 8px 16px rgba(0,0,0,0.3) !important;
+  margin-top: 0.25rem !important; /* pequeno espaçamento do trigger */
+}
+
+/* Container do portal para permitir cliques normalmente */
+.dropdown-portal {
+  pointer-events: auto !important;
+}
+
+/* Estilos específicos para tooltips de sugestão */
+.suggestion-tooltip {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  pointer-events: none !important;
+  transform: translate3d(0, 0, 0) !important;
+  isolation: isolate !important;
+  contain: layout !important;
+  backface-visibility: hidden !important;
+  perspective: 1000px !important;
+  will-change: transform !important;
+}
+
+/* Solução específica para garantir que os dropdowns apareçam acima de tudo */
+.dropdown-menu,
+.dropdown-menu-large,
+.dropdown-menu-wide {
+  /* Forçar que apareça acima de qualquer elemento */
+  z-index: 2147483647 !important;
+  /* Garantir que não seja cortado */
+  clip: auto !important;
+  clip-path: none !important;
+  /* Garantir que não seja afetado por overflow */
+  overflow: visible !important;
+  /* Garantir que não seja afetado por transform */
+  transform: translate3d(0, 0, 0) !important;
+  /* Garantir que não seja afetado por filter */
+  filter: none !important;
+  /* Garantir que não seja afetado por backdrop-filter */
+  backdrop-filter: none !important;
+  /* Garantir que não seja afetado por mask */
+  mask: none !important;
+  /* Garantir que não seja afetado por mask-image */
+  mask-image: none !important;
+  /* Garantir que não seja afetado por mask-clip */
+  mask-clip: border-box !important;
+  /* Garantir que não seja afetado por mask-origin */
+  mask-origin: border-box !important;
+  /* Garantir que não seja afetado por mask-size */
+  mask-size: auto !important;
+  /* Garantir que não seja afetado por mask-repeat */
+  mask-repeat: repeat !important;
+  /* Garantir que não seja afetado por mask-position */
+  mask-position: 0% 0% !important;
+  /* Garantir que não seja afetado por mask-composite */
+  mask-composite: add !important;
+  /* Garantir que não seja afetado por mask-mode */
+  mask-mode: match-source !important;
+  /* Garantir que não seja afetado por mask-type */
+  mask-type: luminance !important;
+}
+
+/* Garantir que o NotificationButton seja sempre visível */
+.notification-button-container {
+  position: relative !important;
+  z-index: 1000 !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.notification-button-container button {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Garantir que o NotificationButton seja sempre visível */
+.notification-button-wrapper {
+  position: relative !important;
+  z-index: 1000 !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.notification-button-wrapper button {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Garantir que o NotificationButton seja sempre visível */
+.notification-button-trigger {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* ===== CLASSE MODALZINDEX PARA RESOLVER PROBLEMAS DE LAYERING ===== */
+.modalzindex {
+  z-index: 9 !important;
+}

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Modal de Reconexão - Tema Dark</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1e293b;
+            color: white;
+            padding: 20px;
+        }
+        .test-button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            font-size: 16px;
+        }
+        .test-button:hover {
+            background: #2563eb;
+        }
+        .info {
+            background: #1e40af;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .success {
+            background: #059669;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste do Modal de Reconexão - Tema Dark</h1>
+    
+    <div class="success">
+        <h3>✅ Problemas Corrigidos:</h3>
+        <ul>
+            <li>✅ Modal agora usa tema dark (slate-800)</li>
+            <li>✅ Botões com altura otimizada (py-2.5)</li>
+            <li>✅ Texto "Reconectar Meta Ads" não quebra mais</li>
+            <li>✅ Cores consistentes com o projeto</li>
+            <li>✅ Duplicação do modal resolvida</li>
+        </ul>
+    </div>
+    
+    <div class="info">
+        <h3>📋 Como testar:</h3>
+        <ol>
+            <li>Clique nos botões abaixo para simular diferentes cenários</li>
+            <li>Verifique se o modal aparece com tema dark</li>
+            <li>Confirme se os botões têm altura adequada</li>
+            <li>Teste se o texto não quebra nos botões</li>
+        </ol>
+    </div>
+
+    <button class="test-button" onclick="simulateRateLimit()">
+        🚨 Simular Rate Limit
+    </button>
+    
+    <button class="test-button" onclick="simulateError400()">
+        ⚠️ Simular Erro 400
+    </button>
+
+    <button class="test-button" onclick="simulateUserRequestLimit()">
+        🔒 Simular "User request limit reached"
+    </button>
+
+    <button class="test-button" onclick="simulateCustomError()">
+        🎯 Simular Erro Personalizado
+    </button>
+
+    <script>
+        // Simular evento de rate limit
+        function simulateRateLimit() {
+            const event = new CustomEvent('metaAdsRateLimit', {
+                detail: {
+                    message: 'Rate limit exceeded. Too many requests.',
+                    timestamp: Date.now(),
+                    service: 'MetaAdsService'
+                }
+            });
+            window.dispatchEvent(event);
+            
+        }
+
+        // Simular erro 400
+        function simulateError400() {
+            const event = new CustomEvent('metaAdsRateLimit', {
+                detail: {
+                    message: 'Bad Request (400) - Invalid parameters',
+                    timestamp: Date.now(),
+                    service: 'MetaAdsService'
+                }
+            });
+            window.dispatchEvent(event);
+            
+        }
+
+        // Simular erro específico do Meta Ads
+        function simulateUserRequestLimit() {
+            const event = new CustomEvent('metaAdsRateLimit', {
+                detail: {
+                    message: 'User request limit reached',
+                    timestamp: Date.now(),
+                    service: 'MetaAdsService'
+                }
+            });
+            window.dispatchEvent(event);
+            
+        }
+
+        // Simular erro personalizado
+        function simulateCustomError() {
+            const event = new CustomEvent('metaAdsRateLimit', {
+                detail: {
+                    message: 'Erro personalizado para teste de interface',
+                    timestamp: Date.now(),
+                    service: 'MetaAdsService'
+                }
+            });
+            window.dispatchEvent(event);
+            
+        }
+
+        // Log quando a página carrega
+        
+        
+        
+    </script>
+</body>
+</html>

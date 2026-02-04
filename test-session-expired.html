@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Sessão Expirada</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1e293b;
+            color: white;
+            padding: 20px;
+        }
+        .test-button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            font-size: 16px;
+        }
+        .test-button:hover {
+            background: #2563eb;
+        }
+        .info {
+            background: #1e40af;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .success {
+            background: #059669;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .error {
+            background: #dc2626;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste - Sessão Expirada</h1>
+    
+    <div class="error">
+        <h3>🚨 Erro Detectado:</h3>
+        <p><strong>"Error validating access token: Session has expired"</strong></p>
+        <p>Este é o erro que está aparecendo no console e que deve acionar o modal.</p>
+    </div>
+    
+    <div class="success">
+        <h3>✅ Correções Implementadas:</h3>
+        <ul>
+            <li>✅ Detecção de "Session has expired"</li>
+            <li>✅ Detecção de "access token"</li>
+            <li>✅ Detecção de "token expired"</li>
+            <li>✅ Detecção de "authentication"</li>
+            <li>✅ Detecção de "permission"</li>
+            <li>✅ Modal deve aparecer automaticamente</li>
+        </ul>
+    </div>
+    
+    <div class="info">
+        <h3>📋 Como testar:</h3>
+        <ol>
+            <li>Clique no botão "Simular Sessão Expirada"</li>
+            <li>Verifique se o modal aparece com tema dark</li>
+            <li>Confirme se a mensagem de erro está correta</li>
+            <li>Teste o botão de reconexão</li>
+        </ol>
+    </div>
+
+    <button class="test-button" onclick="simulateSessionExpired()">
+        🔒 Simular Sessão Expirada
+    </button>
+    
+    <button class="test-button" onclick="simulateAccessTokenError()">
+        🔑 Simular Erro de Access Token
+    </button>
+
+    <button class="test-button" onclick="simulateAuthenticationError()">
+        🛡️ Simular Erro de Autenticação
+    </button>
+
+    <button class="test-button" onclick="simulatePermissionError()">
+        🔐 Simular Erro de Permissão
+    </button>
+
+    <script>
+        // Simular erro de sessão expirada (erro real que está ocorrendo)
+        function simulateSessionExpired() {
+            const event = new CustomEvent('metaAdsRateLimit', {
+                detail: {
+                    message: 'Error validating access token: Session has expired. The current time is Monday, 18-Aug-25 17:01:43 PDT.',
+                    timestamp: Date.now(),
+                    service: 'MetaAdsService'
+                }
+            });
+            window.dispatchEvent(event);
+            
+        }
+
+        // Simular erro de access token
+        function simulateAccessTokenError() {
+            const event = new CustomEvent('metaAdsRateLimit', {
+                detail: {
+                    message: 'Invalid access token provided',
+                    timestamp: Date.now(),
+                    service: 'MetaAdsService'
+                }
+            });
+            window.dispatchEvent(event);
+            
+        }
+
+        // Simular erro de autenticação
+        function simulateAuthenticationError() {
+            const event = new CustomEvent('metaAdsRateLimit', {
+                detail: {
+                    message: 'Authentication failed. Please reconnect your account.',
+                    timestamp: Date.now(),
+                    service: 'MetaAdsService'
+                }
+            });
+            window.dispatchEvent(event);
+            
+        }
+
+        // Simular erro de permissão
+        function simulatePermissionError() {
+            const event = new CustomEvent('metaAdsRateLimit', {
+                detail: {
+                    message: 'Permission denied. Insufficient permissions for this action.',
+                    timestamp: Date.now(),
+                    service: 'MetaAdsService'
+                }
+            });
+            window.dispatchEvent(event);
+            
+        }
+
+        // Log quando a página carrega
+        
+        
+        
+    </script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Firebase</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Teste de Conectividade Firebase</h1>
+    
+    <div class="test-section">
+        <h2>Status da Conexão</h2>
+        <div id="connection-status">Verificando...</div>
+        <button onclick="testConnection()">Testar Conexão</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Teste de Salvamento</h2>
+        <button onclick="testSave()">Testar Salvamento</button>
+        <div id="save-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Teste de Leitura</h2>
+        <button onclick="testRead()">Testar Leitura</button>
+        <div id="read-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Logs</h2>
+        <pre id="logs"></pre>
+        <button onclick="clearLogs()">Limpar Logs</button>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyAvf81ALIWW7HP7cwze9VP_YUfv3BWU7rU",
+            authDomain: "dashboard-gtrafego.firebaseapp.com",
+            projectId: "dashboard-gtrafego",
+            storageBucket: "dashboard-gtrafego.firebasestorage.app",
+            messagingSenderId: "585100264503",
+            appId: "1:585100264503:web:b9baaadf113cb1f2e02bb2"
+        };
+
+        // Inicializar Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Função para adicionar logs
+        function addLog(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            logsDiv.textContent += logEntry;
+            
+        }
+
+        // Teste de conexão
+        window.testConnection = async function() {
+            const statusDiv = document.getElementById('connection-status');
+            try {
+                addLog('Testando conexão com Firebase...');
+                statusDiv.innerHTML = '<span class="success">✅ Conectado com sucesso!</span>';
+                addLog('Conexão estabelecida com sucesso', 'success');
+            } catch (error) {
+                statusDiv.innerHTML = '<span class="error">❌ Erro na conexão: ' + error.message + '</span>';
+                addLog('Erro na conexão: ' + error.message, 'error');
+            }
+        };
+
+        // Teste de salvamento
+        window.testSave = async function() {
+            const resultDiv = document.getElementById('save-result');
+            try {
+                addLog('Testando salvamento de dados...');
+                
+                const testData = {
+                    month: 'Janeiro 2025',
+                    product: 'Produto Teste',
+                    audience: 'Público Teste',
+                    agendamentos: 5,
+                    vendas: 3,
+                    vendasAuto: false,
+                    manualVendasValue: 3,
+                    ticketMedio: 250,
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                };
+
+                const docId = `Janeiro_2025_Produto_Teste_Público_Teste`;
+                const docRef = doc(db, 'audienceDetails', docId);
+                
+                await setDoc(docRef, testData);
+                
+                resultDiv.innerHTML = '<span class="success">✅ Dados salvos com sucesso!</span>';
+                addLog('Dados salvos com sucesso: ' + JSON.stringify(testData, null, 2), 'success');
+            } catch (error) {
+                resultDiv.innerHTML = '<span class="error">❌ Erro ao salvar: ' + error.message + '</span>';
+                addLog('Erro ao salvar: ' + error.message, 'error');
+            }
+        };
+
+        // Teste de leitura
+        window.testRead = async function() {
+            const resultDiv = document.getElementById('read-result');
+            try {
+                addLog('Testando leitura de dados...');
+                
+                const docId = `Janeiro_2025_Produto_Teste_Público_Teste`;
+                const docRef = doc(db, 'audienceDetails', docId);
+                const docSnap = await getDoc(docRef);
+                
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    resultDiv.innerHTML = '<span class="success">✅ Dados lidos com sucesso!</span><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                    addLog('Dados lidos com sucesso: ' + JSON.stringify(data, null, 2), 'success');
+                } else {
+                    resultDiv.innerHTML = '<span class="error">❌ Nenhum dado encontrado</span>';
+                    addLog('Nenhum dado encontrado', 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<span class="error">❌ Erro ao ler: ' + error.message + '</span>';
+                addLog('Erro ao ler: ' + error.message, 'error');
+            }
+        };
+
+        // Limpar logs
+        window.clearLogs = function() {
+            document.getElementById('logs').textContent = '';
+        };
+
+        // Teste inicial
+        addLog('Página carregada. Clique em "Testar Conexão" para verificar o Firebase.');
+    </script>
+</body>
+</html> 

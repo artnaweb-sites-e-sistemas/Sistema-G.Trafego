@@ -1,0 +1,33 @@
+.
+├── src/
+│   ├── components/
+│   │   ├── ui/
+│   │   ├── Dashboard.tsx
+│   │   ├── LoginScreen.tsx
+│   │   ├── Header.tsx
+│   │   ├── MetricsGrid.tsx
+│   │   ├── DailyControlTable.tsx
+│   │   ├── MonthlyDetailsTable.tsx
+│   │   ├── AdStrategySection.tsx
+│   │   ├── AudiencePicker.tsx
+│   │   ├── ClientPicker.tsx
+│   │   ├── ProductPicker.tsx
+│   │   ├── MetaAdsConfig.tsx
+│   │   ├── PublicReportView.tsx
+│   │   └── ... (Outros componentes auxiliares)
+│   ├── services/
+│   │   ├── authService.ts
+│   │   ├── metaAdsService.ts
+│   │   ├── metricsService.ts
+│   │   ├── firestoreStrategyService.ts
+│   │   └── ... (Outros serviços de integração)
+│   ├── utils/
+│   ├── hooks/
+│   ├── App.tsx
+│   └── main.tsx
+├── public/
+├── .bolt/
+├── vite.config.ts
+├── tailwind.config.js
+├── package.json
+└── ... (Arquivos de documentação e scripts de raiz)
