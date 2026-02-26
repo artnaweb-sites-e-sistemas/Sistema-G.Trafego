@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
-import { Info } from 'lucide-react';
+import { Info, Target } from 'lucide-react';
 import Header from '../components/Header';
 import MetricsGrid from '../components/MetricsGrid';
 import DailyControlTable from '../components/DailyControlTable';
@@ -149,6 +149,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   // Estados para estratégias de anúncio
   const [, setAdStrategies] = useState<any[]>([]);
 
+
+
   // Estado para navegação por tabs (Modo Áurea)
   const { activeTab, setActiveTab } = useTabNavigation('hoje');
 
@@ -176,6 +178,53 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [selectedProduct, setSelectedProduct] = useState('');
   const [selectedAudience, setSelectedAudience] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState('');
+
+  // Estado para configurações do Modo Áurea
+  const [aureaSettings, setAureaSettings] = useState<{
+    cpaTarget?: number;
+    monthlyBudget?: number;
+    acqRmdSplit?: { acq: number; rmd: number };
+  }>({});
+
+  // Carregar configurações do Modo Áurea
+  useEffect(() => {
+    if (selectedClient && selectedClient !== 'Selecione um cliente' && selectedMonth) {
+      metricsService.getAureaSettings(selectedMonth, selectedClient, selectedProduct)
+        .then(settings => {
+          if (settings) {
+            setAureaSettings(settings);
+          } else {
+            setAureaSettings({});
+          }
+        })
+        .catch(err => console.error('Erro ao carregar configurações Áurea:', err));
+    } else {
+      setAureaSettings({});
+    }
+  }, [selectedClient, selectedMonth, selectedProduct]);
+
+  // Handler para salvar configurações do Modo Áurea
+  const handleAureaSettingsChange = async (newSettings: {
+    cpaTarget?: number;
+    monthlyBudget?: number;
+    acqRmdSplit?: { acq: number; rmd: number };
+  }) => {
+    setAureaSettings(newSettings);
+
+    if (selectedClient && selectedClient !== 'Selecione um cliente' && selectedMonth) {
+      try {
+        await metricsService.saveAureaSettings({
+          month: selectedMonth,
+          client: selectedClient,
+          product: selectedProduct,
+          ...newSettings
+        });
+        toast.success('Configurações do Modo Áurea salvas!');
+      } catch (error) {
+        toast.error('Erro ao salvar configurações');
+      }
+    }
+  };
 
   // 🎯 LOG PARA DEBUG: Monitorar mudanças nos filtros selecionados
   useEffect(() => {
@@ -1356,39 +1405,132 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
               </>
             ) : (
               <>
-                {/* Lógica condicional para renderização das seções */}
-                {selectedAudience && selectedAudience !== 'Todos os Públicos' ? (
-                  <>
-                    <AudienceDetailsTable
-                      metrics={metrics}
-                      selectedAudience={selectedAudience}
-                      selectedProduct={selectedProduct}
-                      selectedClient={selectedClient}
-                      selectedMonth={selectedMonth}
-                    />
+                {/* MODO ÁUREA SEMPRE VISÍVEL OMO VISÃO PRINCIPAL */}
+                <>
+                  {/* Mensagem informativa quando não há dados carregados */}
+                  {selectedClient && selectedClient !== 'Selecione um cliente' && !hasInitialLoad && !loading && (
+                    <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-xl p-6 mb-8">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center">
+                          <Info className="w-4 h-4 text-blue-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-white font-medium">Dados não carregados</h3>
+                          <p className="text-gray-300 text-sm mt-1">
+                            Clique em "Atualizar Métricas" para carregar os dados mais recentes do Meta Ads.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 🎯 MODO ÁUREA: Sistema de Navegação por Tabs */}
+                  <TabNavigation
+                    activeTab={activeTab}
+                    onTabChange={setActiveTab}
+                    disabledTabs={(!selectedProduct || selectedProduct === 'Todos os Produtos') ? ['hoje', 'dia', 'mes', 'assets', 'estrategia', 'cliente'] : []}
+                  />
+
+                  {/* Tab: Hoje - Decisão Rápida */}
+                  <TabContent activeTab={activeTab} tabId="hoje">
+                    {selectedProduct && selectedProduct !== 'Todos os Produtos' ? (
+                      <>
+                        <AureaDecisionPanel
+                          selectedClient={selectedClient}
+                          selectedMonth={selectedMonth}
+                          selectedProduct={selectedProduct}
+                          currentSpend={metrics.reduce((sum, m) => sum + (m.investment || 0), 0)}
+                          conversions={metrics.reduce((sum, m) => sum + (m.leads || 0), 0)}
+                          adSets={
+                            // Agrupar métricas pelo adSetId para não ter duplicados no seletor de RMD
+                            Array.from(
+                              metrics.reduce((acc, m) => {
+                                const id = m.adSetId || m.audience || m.product || String(Date.now());
+                                if (!acc.has(id)) {
+                                  acc.set(id, {
+                                    id,
+                                    name: m.audience || m.product || 'Sem nome',
+                                    spend: 0,
+                                    conversions: 0,
+                                    reach: 0,
+                                    impressions: 0,
+                                    clicks: 0
+                                  });
+                                }
+
+                                const current = acc.get(id)!;
+                                current.spend += (m.investment || 0);
+                                current.conversions += (m.leads || 0);
+                                current.reach += (m.reach || 0);
+                                current.impressions += (m.impressions || 0);
+                                current.clicks += (m.clicks || 0);
+
+                                return acc;
+                              }, new Map<string, any>()).values()
+                            ).map(aggr => ({
+                              id: aggr.id,
+                              name: aggr.name,
+                              spend: aggr.spend,
+                              conversions: aggr.conversions,
+                              cpa: aggr.conversions ? aggr.spend / aggr.conversions : undefined,
+                              ctr: aggr.impressions ? (aggr.clicks / aggr.impressions) * 100 : 0,
+                              reach: aggr.reach,
+                              frequency: aggr.reach ? aggr.impressions / aggr.reach : 0
+                            }))
+                          }
+                          cpaTarget={aureaSettings.cpaTarget}
+                          monthlyBudget={aureaSettings.monthlyBudget}
+                          acqRmdSplit={aureaSettings.acqRmdSplit}
+                          onSettingsChange={handleAureaSettingsChange}
+                        />
+
+                        <MetricsGrid
+                          metrics={metrics}
+                          selectedClient={selectedClient}
+                          selectedMonth={selectedMonth}
+                          onRefresh={handleRefreshMetrics}
+                          isRefreshing={isRefreshingMetrics}
+                          lastUpdate={lastMetricsUpdate}
+                        />
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-20 bg-slate-800/30 rounded-xl border border-slate-700/50">
+                        <div className="w-16 h-16 bg-slate-700/50 rounded-full flex items-center justify-center mb-4">
+                          <Target className="w-8 h-8 text-slate-400" />
+                        </div>
+                        <h3 className="text-xl font-medium text-white mb-2">Selecione um Produto</h3>
+                        <p className="text-gray-400 text-center max-w-md">
+                          Para visualizar as métricas gerais e o Modo Áurea, por favor selecione um produto no painel superior.
+                        </p>
+                      </div>
+                    )}
+                  </TabContent>
+
+                  {/* Tab: Dia - Controle Diário */}
+                  <TabContent activeTab={activeTab} tabId="dia">
+                    {selectedAudience && selectedAudience !== 'Todos os Públicos' && (
+                      <AudienceDetailsTable
+                        metrics={metrics}
+                        selectedAudience={selectedAudience}
+                        selectedProduct={selectedProduct}
+                        selectedClient={selectedClient}
+                        selectedMonth={selectedMonth}
+                      />
+                    )}
                     <DailyControlTable
                       metrics={metrics}
                       selectedCampaign={selectedCampaign}
                       selectedMonth={selectedMonth}
                       selectedAudience={selectedAudience}
                     />
-                    <PerformanceAdsSection />
-                  </>
-                ) : selectedProduct && selectedProduct !== 'Todos os Produtos' ? (
-                  <>
+                    {selectedAudience && selectedAudience !== 'Todos os Públicos' && (
+                      <PerformanceAdsSection />
+                    )}
+                  </TabContent>
 
-                    {/* Quando apenas produto estiver selecionado, mostrar status dos públicos (sem planner/sugestões) */}
-                    {(() => {
-                      const shouldShowPending = (!selectedAudience || selectedAudience === 'Todos os Públicos');
-
-                      return shouldShowPending;
-                    })() ? (
-                      <PendingAudiencesStatus
-                        selectedClient={selectedClient}
-                        selectedProduct={selectedProduct}
-                        selectedMonth={selectedMonth}
-                      />
-                    ) : (
+                  {/* Tab: Mês - Detalhes Mensais */}
+                  <TabContent activeTab={activeTab} tabId="mes">
+                    {selectedProduct && selectedProduct !== 'Todos os Produtos' && (
                       <InsightsSection
                         selectedProduct={selectedProduct}
                         selectedClient={selectedClient}
@@ -1405,126 +1547,51 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                       selectedMonth={selectedMonth}
                       onValuesChange={setMonthlyDetailsValues}
                     />
-                  </>
-                ) : (
-                  <>
-                    {/* Mensagem informativa quando não há dados carregados */}
-                    {selectedClient && selectedClient !== 'Selecione um cliente' && !hasInitialLoad && !loading && (
-                      <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-xl p-6 mb-8">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center">
-                            <Info className="w-4 h-4 text-blue-400" />
-                          </div>
-                          <div>
-                            <h3 className="text-white font-medium">Dados não carregados</h3>
-                            <p className="text-gray-300 text-sm mt-1">
-                              Clique em "Atualizar Métricas" para carregar os dados mais recentes do Meta Ads.
-                            </p>
-                          </div>
-                        </div>
+                  </TabContent>
+
+                  {/* Tab: Assets - Públicos e Criativos */}
+                  <TabContent activeTab={activeTab} tabId="assets">
+                    {selectedProduct && selectedProduct !== 'Todos os Produtos' ? (
+                      <>
+                        <PendingAudiencesStatus
+                          selectedClient={selectedClient}
+                          selectedProduct={selectedProduct}
+                          selectedMonth={selectedMonth}
+                        />
+                        <AudienceHistorySection
+                          selectedClient={selectedClient}
+                          selectedProduct={selectedProduct}
+                        />
+                      </>
+                    ) : (
+                      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-8 text-center">
+                        <p className="text-gray-400">Selecione um produto para ver os assets.</p>
                       </div>
                     )}
+                  </TabContent>
 
-                    {/* 🎯 MODO ÁUREA: Sistema de Navegação por Tabs */}
-                    <TabNavigation
-                      activeTab={activeTab}
-                      onTabChange={setActiveTab}
-                      alertCount={metrics.filter(m => (m.investment || 0) > 0 && (m.leads || 0) === 0).length}
+                  {/* Tab: Estratégia - Planejamento */}
+                  <TabContent activeTab={activeTab} tabId="estrategia">
+                    <AdStrategySection
+                      selectedClient={selectedClient}
+                      selectedMonth={selectedMonth}
+                      onStrategyCreated={handleStrategyCreated}
                     />
+                  </TabContent>
 
-                    {/* Tab: Hoje - Decisão Rápida */}
-                    <TabContent activeTab={activeTab} tabId="hoje">
-                      <AureaDecisionPanel
-                        selectedClient={selectedClient}
-                        selectedMonth={selectedMonth}
-                        selectedProduct={selectedProduct}
-                        currentSpend={metrics.reduce((sum, m) => sum + (m.investment || 0), 0)}
-                        conversions={metrics.reduce((sum, m) => sum + (m.leads || 0), 0)}
-                        adSets={metrics.map(m => ({
-                          id: m.id || String(Date.now()),
-                          name: m.audience || m.product || 'Sem nome',
-                          spend: m.investment || 0,
-                          conversions: m.leads || 0,
-                          cpa: m.leads ? (m.investment || 0) / m.leads : undefined,
-                          ctr: m.ctr || 0
-                        }))}
-                      />
-
-                      <MetricsGrid
-                        metrics={metrics}
-                        selectedClient={selectedClient}
-                        selectedMonth={selectedMonth}
-                        onRefresh={handleRefreshMetrics}
-                        isRefreshing={isRefreshingMetrics}
-                        lastUpdate={lastMetricsUpdate}
-                      />
-                    </TabContent>
-
-                    {/* Tab: Dia - Controle Diário */}
-                    <TabContent activeTab={activeTab} tabId="dia">
-                      <DailyControlTable
-                        metrics={metrics}
-                        selectedCampaign={selectedCampaign}
-                        selectedMonth={selectedMonth}
-                        selectedAudience={selectedAudience}
-                      />
-                    </TabContent>
-
-                    {/* Tab: Mês - Detalhes Mensais */}
-                    <TabContent activeTab={activeTab} tabId="mes">
-                      <MonthlyDetailsTable
-                        metrics={metrics}
-                        selectedProduct={selectedProduct}
-                        selectedClient={selectedClient}
-                        selectedMonth={selectedMonth}
-                        onValuesChange={setMonthlyDetailsValues}
-                      />
-                    </TabContent>
-
-                    {/* Tab: Assets - Públicos e Criativos */}
-                    <TabContent activeTab={activeTab} tabId="assets">
-                      {selectedProduct && selectedProduct !== 'Todos os Produtos' ? (
-                        <>
-                          <PendingAudiencesStatus
-                            selectedClient={selectedClient}
-                            selectedProduct={selectedProduct}
-                            selectedMonth={selectedMonth}
-                          />
-                          <AudienceHistorySection
-                            selectedClient={selectedClient}
-                            selectedProduct={selectedProduct}
-                          />
-                        </>
-                      ) : (
-                        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-8 text-center">
-                          <p className="text-gray-400">Selecione um produto para ver os assets.</p>
-                        </div>
-                      )}
-                    </TabContent>
-
-                    {/* Tab: Estratégia - Planejamento */}
-                    <TabContent activeTab={activeTab} tabId="estrategia">
-                      <AdStrategySection
-                        selectedClient={selectedClient}
-                        selectedMonth={selectedMonth}
-                        onStrategyCreated={handleStrategyCreated}
-                      />
-                    </TabContent>
-
-                    {/* Tab: Cliente - Relatórios */}
-                    <TabContent activeTab={activeTab} tabId="cliente">
-                      <ShareReport
-                        selectedAudience={selectedAudience}
-                        selectedProduct={selectedProduct}
-                        selectedClient={selectedClient}
-                        selectedMonth={selectedMonth}
-                        hasGeneratedLinks={false}
-                        metrics={metrics}
-                        monthlyDetailsValues={monthlyDetailsValues}
-                      />
-                    </TabContent>
-                  </>
-                )}
+                  {/* Tab: Cliente - Relatórios */}
+                  <TabContent activeTab={activeTab} tabId="cliente">
+                    <ShareReport
+                      selectedAudience={selectedAudience}
+                      selectedProduct={selectedProduct}
+                      selectedClient={selectedClient}
+                      selectedMonth={selectedMonth}
+                      hasGeneratedLinks={false}
+                      metrics={metrics}
+                      monthlyDetailsValues={monthlyDetailsValues}
+                    />
+                  </TabContent>
+                </>
               </>
             )}
           </>

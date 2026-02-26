@@ -418,6 +418,10 @@ export function runAureaAnalysis(input: AureaAnalysisInput): DecisionAlert[] {
         }
     }
 
+    const tiriricaAlerts: DecisionAlert[] = [];
+    const bonanzaAlerts: DecisionAlert[] = [];
+    const benchmarkAlerts: DecisionAlert[] = [];
+
     // 3. Analisa cada conjunto de anúncios
     for (const adSet of adSets) {
         // Tiririca (gasto sem conversão)
@@ -429,7 +433,7 @@ export function runAureaAnalysis(input: AureaAnalysisInput): DecisionAlert[] {
             adSetId: adSet.id
         });
         if (tiririca) {
-            alerts.push(tiririca);
+            tiriricaAlerts.push({ ...tiririca, metadata: { ...tiririca.metadata, adSetName: adSet.name } });
         }
 
         // Bonança (CPA abaixo da meta)
@@ -441,7 +445,7 @@ export function runAureaAnalysis(input: AureaAnalysisInput): DecisionAlert[] {
                 adSetId: adSet.id
             });
             if (bonanza) {
-                alerts.push(bonanza);
+                bonanzaAlerts.push({ ...bonanza, metadata: { ...bonanza.metadata, adSetName: adSet.name } });
             }
         }
 
@@ -453,7 +457,74 @@ export function runAureaAnalysis(input: AureaAnalysisInput): DecisionAlert[] {
             adSetName: adSet.name
         });
         if (benchmark) {
-            alerts.push(benchmark);
+            benchmarkAlerts.push({ ...benchmark, metadata: { ...benchmark.metadata, adSetName: adSet.name } });
+        }
+    }
+
+    // Agregar Tiririca
+    if (tiriricaAlerts.length > 0) {
+        if (tiriricaAlerts.length === 1) {
+            alerts.push(tiriricaAlerts[0]);
+        } else {
+            const adSetNames = tiriricaAlerts.map(a => a.metadata?.adSetName).filter(Boolean).join(', ');
+            alerts.push({
+                id: `tiririca-agg-${Date.now()}`,
+                rule: 'tiririca',
+                severity: 'critical',
+                title: '🚨 Lei da Tiririca (Múltiplos)',
+                message: `${tiriricaAlerts.length} conjuntos gastaram mais de 3x o CPA alvo sem conversões: ${adSetNames}.`,
+                action: 'pause',
+                actionLabel: 'Revisar Conjuntos',
+                timestamp: new Date()
+            });
+        }
+    }
+
+    // Agregar Bonança
+    if (bonanzaAlerts.length > 0) {
+        if (bonanzaAlerts.length === 1) {
+            alerts.push(bonanzaAlerts[0]);
+        } else {
+            const adSetNames = bonanzaAlerts.map(a => a.metadata?.adSetName).filter(Boolean).join(', ');
+            alerts.push({
+                id: `bonanza-agg-${Date.now()}`,
+                rule: 'bonanza',
+                severity: 'success',
+                title: '🎯 Lei da Bonança (Múltiplos)',
+                message: `${bonanzaAlerts.length} conjuntos com CPA abaixo da meta: ${adSetNames}. Escalar agressivamente!`,
+                action: 'scale_vertical',
+                actionLabel: 'Escalar Orçamentos',
+                timestamp: new Date()
+            });
+        }
+    }
+
+    // Agregar Benchmarks
+    if (benchmarkAlerts.length > 0) {
+        if (benchmarkAlerts.length === 1) {
+            alerts.push(benchmarkAlerts[0]);
+        } else {
+            // Conta por gargalo
+            const gargalos = benchmarkAlerts.reduce((acc, a) => {
+                const g = a.metadata?.gargalo as string;
+                if (!acc[g]) acc[g] = [];
+                acc[g].push(a.metadata?.adSetName);
+                return acc;
+            }, {} as Record<string, string[]>);
+
+            Object.entries(gargalos).forEach(([gargalo, nomes]) => {
+                const isCriativo = gargalo === 'criativo';
+                alerts.push({
+                    id: `bench-agg-${gargalo}-${Date.now()}`,
+                    rule: 'benchmark',
+                    severity: isCriativo ? 'warning' : 'info',
+                    title: `🔍 Gargalo: ${gargalo.charAt(0).toUpperCase() + gargalo.slice(1)} (Múltiplos)`,
+                    message: `${nomes.length} conjuntos com problema de ${gargalo}: ${nomes.filter(Boolean).join(', ')}.`,
+                    action: isCriativo ? 'new_creative' : 'none',
+                    actionLabel: isCriativo ? 'Trocar Criativos' : 'Analisar Funil',
+                    timestamp: new Date()
+                });
+            });
         }
     }
 

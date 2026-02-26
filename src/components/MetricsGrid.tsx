@@ -129,9 +129,6 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({
   lastUpdate,
   compactMode = true
 }) => {
-  // Estado para expandir/contrair cards extras
-  const [isExpanded, setIsExpanded] = useState(false);
-
   // CORREÇÃO: Garantir que aggregated seja calculado corretamente mesmo sem métricas
   const aggregated = metricsService.calculateAggregatedMetrics(metrics || []);
 
@@ -349,32 +346,12 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({
             ))}
           </div>
 
-          {/* KPIs Secundários - Expansíveis */}
-          {isExpanded && (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 animate-fadeIn mt-4">
-              {metricsCards.filter(m => m.priority === 'secondary').map((metric, index) => (
-                <MetricCard key={`secondary-${index}`} {...metric} compact={true} />
-              ))}
-            </div>
-          )}
-
-          {/* Botão de expandir/contrair */}
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center justify-center gap-2 w-full py-2 mt-3 text-sm text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800/50"
-          >
-            {isExpanded ? (
-              <>
-                <Minus className="w-4 h-4" />
-                <span>Mostrar menos métricas</span>
-              </>
-            ) : (
-              <>
-                <Info className="w-4 h-4" />
-                <span>Ver todas as métricas (+{metricsCards.filter(m => m.priority === 'secondary').length})</span>
-              </>
-            )}
-          </button>
+          {/* KPIs Secundários - Sempre visíveis */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
+            {metricsCards.filter(m => m.priority === 'secondary').map((metric, index) => (
+              <MetricCard key={`secondary-${index}`} {...metric} compact={true} />
+            ))}
+          </div>
         </>
       ) : (
         /* Modo Completo - Todos os cards */

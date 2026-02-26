@@ -40,6 +40,7 @@ export interface TabNavigationProps {
     // Contadores opcionais para badges
     alertCount?: number;
     hasNewData?: boolean;
+    disabledTabs?: TabId[];
 }
 
 // ============================================================================
@@ -92,28 +93,35 @@ export const TABS: Tab[] = [
 const TabNavigation: React.FC<TabNavigationProps> = ({
     activeTab,
     onTabChange,
-    alertCount = 0
+    alertCount = 0,
+    disabledTabs = []
 }) => {
     return (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-1.5 mb-6">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-1.5 mb-8">
             <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
                 {TABS.map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
+                    const isDisabled = disabledTabs.includes(tab.id);
                     const showBadge = tab.id === 'hoje' && alertCount > 0;
 
                     return (
                         <button
                             key={tab.id}
-                            onClick={() => onTabChange(tab.id)}
+                            onClick={() => {
+                                if (!isDisabled) onTabChange(tab.id);
+                            }}
+                            disabled={isDisabled}
                             className={`
-                relative flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium 
-                transition-all duration-200 whitespace-nowrap
-                ${isActive
-                                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/20'
-                                    : 'text-gray-400 hover:text-white hover:bg-slate-700/50'
+                                relative flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium 
+                                transition-all duration-200 whitespace-nowrap
+                                ${isDisabled
+                                    ? 'opacity-50 cursor-not-allowed text-gray-600'
+                                    : isActive
+                                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/20'
+                                        : 'text-gray-400 hover:text-white hover:bg-slate-700/50'
                                 }
-              `}
+                            `}
                             title={tab.description}
                         >
                             <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-gray-500'}`} />
@@ -122,14 +130,14 @@ const TabNavigation: React.FC<TabNavigationProps> = ({
                             {/* Badge de alertas */}
                             {showBadge && (
                                 <span className={`
-                  absolute -top-1 -right-1 min-w-[18px] h-[18px] 
-                  flex items-center justify-center 
-                  text-[10px] font-bold rounded-full
-                  ${isActive
+                                  absolute -top-1 -right-1 min-w-[18px] h-[18px] 
+                                  flex items-center justify-center 
+                                  text-[10px] font-bold rounded-full
+                                  ${isActive
                                         ? 'bg-amber-400 text-slate-900'
                                         : 'bg-amber-500 text-white'
                                     }
-                `}>
+                                `}>
                                     {alertCount > 9 ? '9+' : alertCount}
                                 </span>
                             )}
@@ -159,7 +167,7 @@ export const TabContent: React.FC<TabContentProps> = ({
     if (activeTab !== tabId) return null;
 
     return (
-        <div className="animate-fadeIn">
+        <div className="animate-fadeIn space-y-8">
             {children}
         </div>
     );

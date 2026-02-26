@@ -19,14 +19,12 @@ import {
     ChevronUp,
     Calendar,
     Users,
-    BarChart3,
     AlertCircle,
     Info
 } from 'lucide-react';
 import {
     decisionRulesService,
     type DecisionAlert,
-    type PacingResult,
     type CampaignIntention
 } from '../services/decisionRulesService';
 
@@ -62,6 +60,8 @@ export interface AureaDecisionPanelProps {
         connectRate?: number;
         pageConversion?: number;
         intention?: CampaignIntention;
+        reach?: number;
+        frequency?: number;
     }>;
 
     // Callbacks
@@ -98,8 +98,7 @@ const StatusBadge: React.FC<{ status: 'excellent' | 'good' | 'warning' | 'critic
 
 const AlertCard: React.FC<{
     alert: DecisionAlert;
-    onActionClick?: (action: string, alertId: string) => void;
-}> = ({ alert, onActionClick }) => {
+}> = ({ alert }) => {
     const severityConfig = {
         critical: { bg: 'bg-red-500/10', border: 'border-red-500/30', icon: AlertCircle, iconColor: 'text-red-400' },
         warning: { bg: 'bg-amber-500/10', border: 'border-amber-500/30', icon: AlertTriangle, iconColor: 'text-amber-400' },
@@ -120,12 +119,9 @@ const AlertCard: React.FC<{
                 <p className="text-gray-400 text-xs leading-relaxed">{alert.message}</p>
             </div>
             {alert.action !== 'none' && (
-                <button
-                    onClick={() => onActionClick?.(alert.action, alert.id)}
-                    className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium rounded-lg transition-colors flex-shrink-0"
-                >
+                <div className="px-3 py-1.5 bg-slate-700/50 text-slate-300 border border-slate-600/50 text-xs font-medium rounded-lg flex-shrink-0 cursor-default">
                     {alert.actionLabel}
-                </button>
+                </div>
             )}
         </div>
     );
@@ -133,9 +129,9 @@ const AlertCard: React.FC<{
 
 const PacingBar: React.FC<{
     percentSpent: number;
-    percentMonth: number;
-    status: PacingResult['status'];
-}> = ({ percentSpent, percentMonth, status }) => {
+    status: 'good' | 'warning' | 'critical' | 'excellent';
+    monthlyBudget?: number;
+}> = ({ percentSpent, status, monthlyBudget }) => {
     const statusColors = {
         excellent: 'bg-emerald-500',
         good: 'bg-blue-500',
@@ -147,23 +143,15 @@ const PacingBar: React.FC<{
         <div className="space-y-2">
             <div className="flex justify-between text-xs text-gray-400">
                 <span>Gasto: {percentSpent.toFixed(1)}%</span>
-                <span>Mês: {percentMonth.toFixed(1)}%</span>
+                {monthlyBudget !== undefined && (
+                    <span className="text-gray-400 font-medium">Orçamento: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(monthlyBudget)}</span>
+                )}
             </div>
             <div className="relative h-3 bg-slate-700 rounded-full overflow-hidden">
-                {/* Barra do mês (referência) */}
-                <div
-                    className="absolute top-0 left-0 h-full bg-slate-500/50 transition-all duration-500"
-                    style={{ width: `${Math.min(percentMonth, 100)}%` }}
-                />
                 {/* Barra do gasto (atual) */}
                 <div
                     className={`absolute top-0 left-0 h-full ${statusColors[status]} transition-all duration-500`}
                     style={{ width: `${Math.min(percentSpent, 100)}%` }}
-                />
-                {/* Marcador do dia atual */}
-                <div
-                    className="absolute top-0 w-0.5 h-full bg-white/50"
-                    style={{ left: `${Math.min(percentMonth, 100)}%` }}
                 />
             </div>
         </div>
@@ -182,12 +170,10 @@ const AureaDecisionPanel: React.FC<AureaDecisionPanelProps> = ({
     monthlyBudget: initialMonthlyBudget = 3000,
     acqRmdSplit: initialSplit = { acq: 80, rmd: 20 },
     currentSpend = 0,
-    conversions = 0,
     platformConversions,
     realConversions,
     adSets = [],
-    onSettingsChange,
-    onActionClick
+    onSettingsChange
 }) => {
     // Estados editáveis
     const [cpaTarget, setCpaTarget] = useState(initialCpaTarget);
@@ -196,12 +182,14 @@ const AureaDecisionPanel: React.FC<AureaDecisionPanelProps> = ({
     const [isEditing, setIsEditing] = useState(false);
     const [isExpanded, setIsExpanded] = useState(true);
 
-    // Atualizar estados quando props mudam
+    // Atualizar estados quando props mudam (apenas se não estiver editando)
     useEffect(() => {
-        setCpaTarget(initialCpaTarget);
-        setMonthlyBudget(initialMonthlyBudget);
-        setAcqRmdSplit(initialSplit);
-    }, [initialCpaTarget, initialMonthlyBudget, initialSplit]);
+        if (!isEditing) {
+            setCpaTarget(initialCpaTarget);
+            setMonthlyBudget(initialMonthlyBudget);
+            setAcqRmdSplit(initialSplit);
+        }
+    }, [initialCpaTarget, initialMonthlyBudget, initialSplit, isEditing]);
 
     // Calcular dados do mês
     const monthData = useMemo(() => {
@@ -253,30 +241,7 @@ const AureaDecisionPanel: React.FC<AureaDecisionPanelProps> = ({
         });
     }, [adSets, cpaTarget, monthlyBudget, currentSpend, monthData, platformConversions, realConversions, selectedProduct]);
 
-    // Calcular CPA atual
-    const currentCpa = useMemo(() => {
-        if (conversions <= 0) return null;
-        return currentSpend / conversions;
-    }, [currentSpend, conversions]);
 
-    // Separar métricas por ACQ/RMD (simplificado por enquanto)
-    const { acqMetrics, rmdMetrics } = useMemo(() => {
-        const acqSets = adSets.filter(a => a.intention !== 'RMD');
-        const rmdSets = adSets.filter(a => a.intention === 'RMD');
-
-        return {
-            acqMetrics: {
-                spend: acqSets.reduce((sum, a) => sum + a.spend, 0),
-                conversions: acqSets.reduce((sum, a) => sum + a.conversions, 0),
-                budget: monthlyBudget * (acqRmdSplit.acq / 100)
-            },
-            rmdMetrics: {
-                spend: rmdSets.reduce((sum, a) => sum + a.spend, 0),
-                impressions: 0, // TODO: adicionar quando disponível
-                budget: monthlyBudget * (acqRmdSplit.rmd / 100)
-            }
-        };
-    }, [adSets, monthlyBudget, acqRmdSplit]);
 
     // Handler para salvar configurações
     const handleSaveSettings = () => {
@@ -321,7 +286,7 @@ const AureaDecisionPanel: React.FC<AureaDecisionPanelProps> = ({
             </div>
 
             {isExpanded && (
-                <div className="p-6 space-y-6">
+                <div className="p-6 space-y-8">
                     {/* Linha 1: Contexto + Pacing */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Bloco Contexto */}
@@ -351,9 +316,16 @@ const AureaDecisionPanel: React.FC<AureaDecisionPanelProps> = ({
                         {/* Bloco Pacing */}
                         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">
                             <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 group relative">
                                     <Calendar className="w-4 h-4 text-blue-400" />
-                                    <h3 className="text-sm font-medium text-gray-300">Pacing do Mês</h3>
+                                    <h3 className="text-sm font-medium text-gray-300 flex items-center gap-1 cursor-help">
+                                        Pacing do Mês
+                                        <Info className="w-3.5 h-3.5 text-gray-500" />
+                                    </h3>
+                                    <div className="absolute left-0 top-full mt-2 w-72 p-3 bg-slate-900 border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 text-xs text-gray-400">
+                                        <p className="mb-2"><strong className="text-white">Gasto:</strong> Indica quantos % do orçamento total mensal você já gastou até agora.</p>
+                                        <p><strong className="text-white">Mês:</strong> Indica quantos % dos dias do mês já se passaram (Ritmo Ideal). Se o Gasto estiver muito acima do Mês, você está gastando rápido demais.</p>
+                                    </div>
                                 </div>
                                 <span className="text-xs text-gray-500">
                                     Dia {monthData.dayOfMonth}/{monthData.totalDaysInMonth}
@@ -362,29 +334,25 @@ const AureaDecisionPanel: React.FC<AureaDecisionPanelProps> = ({
 
                             <PacingBar
                                 percentSpent={pacing.percentSpent}
-                                percentMonth={pacing.percentMonth}
                                 status={pacing.status}
+                                monthlyBudget={monthlyBudget}
                             />
 
-                            <div className="flex justify-between mt-3 text-xs">
+                            <div className="mt-3 text-xs">
                                 <div>
-                                    <span className="text-gray-500">Gasto</span>
+                                    <span className="text-gray-500">Gasto Atual</span>
                                     <p className="text-white font-medium">{formatCurrency(currentSpend)}</p>
-                                </div>
-                                <div className="text-right">
-                                    <span className="text-gray-500">Orçamento</span>
-                                    <p className="text-white font-medium">{formatCurrency(monthlyBudget)}</p>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Linha 2: Placar ACQ vs RMD */}
+                    {/* Linha 2: Metas do Mês */}
                     <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">
-                        <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-2">
-                                <BarChart3 className="w-4 h-4 text-emerald-400" />
-                                <h3 className="text-sm font-medium text-gray-300">Placar ACQ vs RMD</h3>
+                                <Target className="w-5 h-5 text-purple-400" />
+                                <h3 className="text-sm font-medium text-gray-300">Metas do Mês</h3>
                             </div>
                             <button
                                 onClick={() => setIsEditing(!isEditing)}
@@ -395,26 +363,32 @@ const AureaDecisionPanel: React.FC<AureaDecisionPanelProps> = ({
                         </div>
 
                         {isEditing ? (
-                            <div className="grid grid-cols-3 gap-4 mb-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-xs text-gray-500 block mb-1">CPA Alvo</label>
-                                    <input
-                                        type="number"
-                                        value={cpaTarget}
-                                        onChange={(e) => setCpaTarget(Number(e.target.value))}
-                                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
-                                    />
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">R$</span>
+                                        <input
+                                            type="number"
+                                            value={cpaTarget}
+                                            onChange={(e) => setCpaTarget(Number(e.target.value))}
+                                            className="w-full bg-slate-700 border border-slate-600 rounded-lg pl-8 pr-3 py-2 text-white text-sm"
+                                        />
+                                    </div>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-500 block mb-1">Orçamento</label>
-                                    <input
-                                        type="number"
-                                        value={monthlyBudget}
-                                        onChange={(e) => setMonthlyBudget(Number(e.target.value))}
-                                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
-                                    />
+                                    <label className="text-xs text-gray-500 block mb-1">Orçamento Mensal</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">R$</span>
+                                        <input
+                                            type="number"
+                                            value={monthlyBudget}
+                                            onChange={(e) => setMonthlyBudget(Number(e.target.value))}
+                                            className="w-full bg-slate-700 border border-slate-600 rounded-lg pl-8 pr-3 py-2 text-white text-sm"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="flex items-end">
+                                <div className="col-span-full pt-2">
                                     <button
                                         onClick={handleSaveSettings}
                                         className="w-full bg-purple-600 hover:bg-purple-500 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors"
@@ -423,74 +397,22 @@ const AureaDecisionPanel: React.FC<AureaDecisionPanelProps> = ({
                                     </button>
                                 </div>
                             </div>
-                        ) : null}
-
-                        <div className="grid grid-cols-2 gap-4">
-                            {/* ACQ */}
-                            <div className="bg-slate-700/30 rounded-lg p-3">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-xs font-medium text-emerald-400">ACQ (Aquisição)</span>
-                                    <span className="text-xs text-gray-500">{acqRmdSplit.acq}%</span>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-slate-700/30 rounded-lg p-4">
+                                    <span className="text-xs text-gray-400 block mb-1 uppercase tracking-wide">CPA Alvo</span>
+                                    <span className="text-lg text-white font-semibold">{formatCurrency(cpaTarget)}</span>
                                 </div>
-                                <div className="grid grid-cols-3 gap-2 text-center">
-                                    <div>
-                                        <span className="text-xs text-gray-500 block">Gasto</span>
-                                        <span className="text-sm text-white font-medium">
-                                            {formatCurrency(acqMetrics.spend || currentSpend)}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <span className="text-xs text-gray-500 block">Conv.</span>
-                                        <span className="text-sm text-white font-medium">
-                                            {acqMetrics.conversions || conversions}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <span className="text-xs text-gray-500 block">CPA</span>
-                                        <span className={`text-sm font-medium ${currentCpa && currentCpa <= cpaTarget ? 'text-emerald-400' : 'text-white'
-                                            }`}>
-                                            {currentCpa ? formatCurrency(currentCpa) : '-'}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="mt-2 pt-2 border-t border-slate-600/50 flex justify-between text-xs">
-                                    <span className="text-gray-500">Meta CPA</span>
-                                    <span className="text-white">{formatCurrency(cpaTarget)}</span>
+                                <div className="bg-slate-700/30 rounded-lg p-4">
+                                    <span className="text-xs text-gray-400 block mb-1 uppercase tracking-wide">Orçamento Mensal</span>
+                                    <span className="text-lg text-white font-semibold">{formatCurrency(monthlyBudget)}</span>
                                 </div>
                             </div>
-
-                            {/* RMD */}
-                            <div className="bg-slate-700/30 rounded-lg p-3">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-xs font-medium text-blue-400">RMD (Remarketing)</span>
-                                    <span className="text-xs text-gray-500">{acqRmdSplit.rmd}%</span>
-                                </div>
-                                <div className="grid grid-cols-3 gap-2 text-center">
-                                    <div>
-                                        <span className="text-xs text-gray-500 block">Gasto</span>
-                                        <span className="text-sm text-white font-medium">
-                                            {formatCurrency(rmdMetrics.spend)}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <span className="text-xs text-gray-500 block">Alcance</span>
-                                        <span className="text-sm text-white font-medium">-</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-xs text-gray-500 block">Freq.</span>
-                                        <span className="text-sm text-white font-medium">-</span>
-                                    </div>
-                                </div>
-                                <div className="mt-2 pt-2 border-t border-slate-600/50 flex justify-between text-xs">
-                                    <span className="text-gray-500">Budget</span>
-                                    <span className="text-white">{formatCurrency(rmdMetrics.budget)}</span>
-                                </div>
-                            </div>
-                        </div>
+                        )}
                     </div>
 
                     {/* Linha 3: Alertas de Decisão */}
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <Zap className="w-4 h-4 text-amber-400" />
@@ -509,7 +431,6 @@ const AureaDecisionPanel: React.FC<AureaDecisionPanelProps> = ({
                                     <AlertCard
                                         key={alert.id}
                                         alert={alert}
-                                        onActionClick={onActionClick}
                                     />
                                 ))}
                             </div>

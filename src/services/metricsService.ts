@@ -1631,6 +1631,86 @@ export const metricsService = {
     return this.getBenchmarkValues('', product, client);
   },
 
+  // Salvar configurações do Modo Áurea
+  async saveAureaSettings(data: {
+    month: string;
+    client: string;
+    product?: string;
+    cpaTarget?: number;
+    monthlyBudget?: number;
+    acqRmdSplit?: { acq: number; rmd: number };
+  }) {
+    try {
+      const collectionRef = collection(db, 'aureaSettings');
+
+      // Buscar documento existente
+      const constraints = [
+        where('month', '==', data.month),
+        where('client', '==', data.client)
+      ];
+
+      if (data.product) {
+        constraints.push(where('product', '==', data.product));
+      }
+
+      const q = query(collectionRef, ...constraints);
+      const snapshot = await getDocs(q);
+
+      // Remover campos undefined para não dar erro no Firestore
+      const saveData = Object.fromEntries(
+        Object.entries(data).filter(([_, v]) => v !== undefined)
+      );
+
+      if (!snapshot.empty) {
+        const docRef = doc(db, 'aureaSettings', snapshot.docs[0].id);
+        await updateDoc(docRef, {
+          ...saveData,
+          updatedAt: new Date()
+        });
+      } else {
+        await addDoc(collectionRef, {
+          ...saveData,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao salvar configurações Áurea:', error);
+      throw error;
+    }
+  },
+
+  // Recuperar configurações do Modo Áurea
+  async getAureaSettings(month: string, client: string, product?: string) {
+    try {
+      const collectionRef = collection(db, 'aureaSettings');
+      const constraints = [
+        where('month', '==', month),
+        where('client', '==', client)
+      ];
+
+      if (product) {
+        constraints.push(where('product', '==', product));
+      }
+
+      const q = query(collectionRef, ...constraints);
+      const snapshot = await getDocs(q);
+
+      if (!snapshot.empty) {
+        const docData = snapshot.docs[0].data();
+        return {
+          cpaTarget: docData.cpaTarget,
+          monthlyBudget: docData.monthlyBudget,
+          acqRmdSplit: docData.acqRmdSplit
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Erro ao buscar configurações Áurea:', error);
+      return null;
+    }
+  },
+
   // Calcular métricas agregadas
   calculateAggregatedMetrics(metrics: MetricData[]) {
 

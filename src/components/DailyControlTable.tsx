@@ -42,7 +42,7 @@ const Tooltip: React.FC<{ children: React.ReactNode; content: string; isVisible:
         <div className={`absolute z-[9999] px-4 py-3 text-sm text-gray-100 bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl shadow-2xl border border-gray-600/50 backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-200 ${getPositionClasses()}`}>
           <div className="flex items-start space-x-2">
             <div className="w-1 h-1 bg-red-400 rounded-full animate-pulse mt-2 flex-shrink-0"></div>
-            <span className="font-medium leading-relaxed normal-case" style={{ 
+            <span className="font-medium leading-relaxed normal-case" style={{
               whiteSpace: 'nowrap'
             }}>{content}</span>
           </div>
@@ -91,8 +91,8 @@ function getCarnivalDate(year: number): Date {
   return carnival;
 }
 
-const DailyControlTable: React.FC<DailyControlTableProps> = ({ 
-  metrics, 
+const DailyControlTable: React.FC<DailyControlTableProps> = ({
+  metrics,
   selectedCampaign,
   selectedMonth = 'Julho 2023',
   customRecordCount,
@@ -334,13 +334,13 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
           color: "text-purple-400"
         });
       }
-             if (day === 25) {
-         events.push({
-           icon: <Star className="w-3 h-3" />,
-           tooltip: "Natal - Feriado nacional",
-           color: "text-green-400"
-         });
-       }
+      if (day === 25) {
+        events.push({
+          icon: <Star className="w-3 h-3" />,
+          tooltip: "Natal - Feriado nacional",
+          color: "text-green-400"
+        });
+      }
       if (day === 31) {
         events.push({
           icon: <Calendar className="w-3 h-3" />,
@@ -378,48 +378,48 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
 
   const generateDailyData = () => {
     const data: any[] = [];
-    
+
     // Determinar o mês e ano baseado no selectedMonth
     const monthMap: { [key: string]: number } = {
       'Janeiro': 0, 'Fevereiro': 1, 'Março': 2, 'Abril': 3, 'Maio': 4, 'Junho': 5,
       'Julho': 6, 'Agosto': 7, 'Setembro': 8, 'Outubro': 9, 'Novembro': 10, 'Dezembro': 11
     };
-    
+
     const [monthName, yearStr] = selectedMonth.split(' ');
     const month = monthMap[monthName] || 6; // Default para Julho
     const year = parseInt(yearStr) || 2023;
-    
+
     // Criar data de início do mês
     const startDate = new Date(year, month, 1);
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    
+
     // Data atual para comparação
     const today = new Date();
     const currentDay = today.getDate();
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
-    
+
     for (let i = 0; i < daysInMonth; i++) {
       const currentDate = new Date(startDate);
       currentDate.setDate(startDate.getDate() + i);
-      
+
       const dayStr = currentDate.getDate().toString().padStart(2, '0');
       const monthStr = (currentDate.getMonth() + 1).toString().padStart(2, '0');
       const yearStr = currentDate.getFullYear().toString();
-      
+
       // Verificar se é um dia passado, presente ou futuro
       const isPastDay = currentDate < new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const isToday = currentDate.getDate() === today.getDate() && 
-                     currentDate.getMonth() === today.getMonth() && 
-                     currentDate.getFullYear() === today.getFullYear();
+      const isToday = currentDate.getDate() === today.getDate() &&
+        currentDate.getMonth() === today.getMonth() &&
+        currentDate.getFullYear() === today.getFullYear();
       const isFutureDay = currentDate > new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      
+
       // Verificar se é domingo
       const isSunday = currentDate.getDay() === 0;
-      
+
       // Obter eventos sazonais
       const seasonalEvents = getSeasonalEvents(currentDate);
-      
+
       data.push({
         date: `${dayStr}/${monthStr}/${yearStr}`,
         dateISO: currentDate.toISOString().split('T')[0], // Para comparação
@@ -437,7 +437,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
         seasonalEvents
       });
     }
-    
+
     // -------- Nova lógica: escolher apenas a métrica mais recente por serviço em cada dia --------
     type DayKey = string; // YYYY-MM-DD
     interface Agg {
@@ -517,7 +517,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
         };
       }
     });
-    
+
     return data;
   };
 
@@ -537,14 +537,14 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
     dailyData.forEach(row => {
       if (row.status === 'Ativo') {
         totals.activeDays++;
-        
+
         // Extrair valores numéricos das strings formatadas
         const investmentValue = parseFloat(row.investment.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
         const impressionsValue = row.impressions || 0;
         const leadsValue = row.leads || 0;
         const comprasValue = row.compras || 0;
         const cprValue = parseFloat(row.cpr.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
-      
+
         // Acumular totais
         totals.investment = formatCurrency(parseFloat(totals.investment.replace(/[^\d,.-]/g, '').replace(',', '.')) + investmentValue);
         totals.impressions += impressionsValue;
@@ -556,11 +556,11 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
         const totalImpressions = totals.impressions;
         const totalLeads = totals.leads;
         const totalCompras = totals.compras;
-        
+
         if (totalImpressions > 0) {
           totals.cpm = formatCurrency((totalInvestment / totalImpressions) * 1000);
         }
-        
+
         // Calcular CPR total alinhado ao histórico: prioriza COMPRAS > LEADS
         if (totalCompras > 0) {
           totals.cpr = formatCurrency(totalInvestment / totalCompras);
@@ -613,11 +613,10 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       </td>
       <td className="p-4">
         <div className="flex items-center space-x-2">
-          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-            isHeader 
-              ? 'bg-blue-900/40 text-blue-300 border border-blue-600/30' 
-              : 'bg-green-900/40 text-green-300 border border-green-600/30'
-          }`}>
+          <span className={`px-3 py-1 rounded-full text-xs font-medium ${isHeader
+            ? 'bg-blue-900/40 text-blue-300 border border-blue-600/30'
+            : 'bg-green-900/40 text-green-300 border border-green-600/30'
+            }`}>
             {isHeader ? 'Resumo Geral' : `${totals.activeDays} dias ativos`}
           </span>
         </div>
@@ -686,13 +685,13 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
             )}
           </div>
         </div>
-        
-        {/* 🎯 NOVA SOLUÇÃO: Tabela sem scroll interno, usando sticky header */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="sticky top-0 z-30 bg-gradient-to-r from-slate-800 to-slate-750 border-b border-slate-700 shadow-lg">
-                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+
+        {/* 🎯 NOVA SOLUÇÃO: Tabela usando sticky header em relação ao viewport do navegador */}
+        <div className="w-full relative rounded-b-xl overflow-clip">
+          <table className="w-full text-sm border-separate border-spacing-0">
+            <thead className="sticky top-0 z-40 bg-slate-900 shadow-xl border-b border-slate-700/50">
+              <tr className="bg-gradient-to-r from-slate-800/90 to-slate-750/90 backdrop-blur-md">
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-b border-slate-600/30">
                   <div className="flex items-center space-x-2">
                     <span>DIA</span>
                     <Tooltip content={getColumnTooltip('Data')} isVisible={tooltipStates['Data'] || false} position="bottom">
@@ -706,7 +705,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                     </Tooltip>
                   </div>
                 </th>
-                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-b border-slate-600/30">
                   <div className="flex items-center space-x-2">
                     <span>INVESTIMENTO</span>
                     <Tooltip content={getColumnTooltip('Investimento')} isVisible={tooltipStates['Investimento'] || false} position="bottom">
@@ -720,7 +719,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                     </Tooltip>
                   </div>
                 </th>
-                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-b border-slate-600/30">
                   <div className="flex items-center space-x-2">
                     <span>CPM</span>
                     <Tooltip content={getColumnTooltip('CPM')} isVisible={tooltipStates['CPM'] || false} position="bottom">
@@ -734,7 +733,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                     </Tooltip>
                   </div>
                 </th>
-                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-b border-slate-600/30">
                   <div className="flex items-center space-x-2">
                     <span>IMPRESSÕES</span>
                     <Tooltip content={getColumnTooltip('Impressões')} isVisible={tooltipStates['Impressões'] || false} position="bottom">
@@ -748,7 +747,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                     </Tooltip>
                   </div>
                 </th>
-                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-b border-slate-600/30">
                   <div className="flex items-center space-x-2">
                     <span>CPR</span>
                     <Tooltip content={getColumnTooltip('CPR')} isVisible={tooltipStates['CPR'] || false} position="bottom">
@@ -762,7 +761,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                     </Tooltip>
                   </div>
                 </th>
-                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-b border-slate-600/30">
                   <div className="flex items-center space-x-2">
                     <span>LEADS</span>
                     <Tooltip content={getColumnTooltip('Leads')} isVisible={tooltipStates['Leads'] || false} position="bottom">
@@ -776,7 +775,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                     </Tooltip>
                   </div>
                 </th>
-                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-slate-600/30">
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-b border-slate-600/30">
                   <div className="flex items-center space-x-2">
                     <span>COMPRAS</span>
                     <Tooltip content={getColumnTooltip('Compras')} isVisible={tooltipStates['Compras'] || false} position="bottom">
@@ -790,7 +789,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                     </Tooltip>
                   </div>
                 </th>
-                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide">
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-b border-slate-600/30">
                   <div className="flex items-center space-x-2">
                     <span>STATUS</span>
                     <Tooltip content={getColumnTooltip('Status')} isVisible={tooltipStates['Status'] || false} position="bottom">
@@ -809,31 +808,30 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
             <tbody>
               <TotalsRow isHeader />
               {dailyData.map((row, index) => (
-                <tr key={index} className={`hover:bg-slate-800/40 transition-all duration-200 ${
-                  row.isToday ? 'bg-gradient-to-r from-blue-900/15 via-indigo-900/10 to-blue-900/15 border-l-4 border-l-blue-400 shadow-lg relative' : ''
-                } ${index === dailyData.length - 1 ? 'border-b-2 border-slate-600' : 'border-b border-slate-700/30'}`}>
+                <tr key={index} className={`hover:bg-slate-800/40 transition-all duration-200 ${row.isToday ? 'bg-gradient-to-r from-blue-900/15 via-indigo-900/10 to-blue-900/15 border-l-4 border-l-blue-400 shadow-lg relative' : ''
+                  } ${index === dailyData.length - 1 ? 'border-b-2 border-slate-600' : 'border-b border-slate-700/30'}`}>
                   <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">
                     <div className="flex items-center space-x-2">
                       {row.isToday && (
                         <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
                       )}
                       <span className={row.isToday ? 'text-blue-300 font-semibold' : ''}>{row.date}</span>
-                      
+
                       {/* Indicador de domingo */}
                       {row.isSunday && (
                         <span className="text-xs text-yellow-400 font-bold bg-yellow-900/30 px-1 py-0.5 rounded">
                           D
                         </span>
                       )}
-                      
+
                       {/* Ícones de épocas sazonais */}
                       {row.seasonalEvents && row.seasonalEvents.length > 0 && (
                         <div className="flex items-center space-x-1">
                           {row.seasonalEvents.map((event: SeasonalEvent, eventIndex: number) => (
-                            <Tooltip 
+                            <Tooltip
                               key={eventIndex}
-                              content={event.tooltip} 
-                              isVisible={tooltipStates[`${row.date}-${eventIndex}`] || false} 
+                              content={event.tooltip}
+                              isVisible={tooltipStates[`${row.date}-${eventIndex}`] || false}
                               position="right"
                             >
                               <div
@@ -857,15 +855,14 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                   <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.compras}</td>
                   <td className="p-4">
                     <div className="flex items-center space-x-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        row.status === 'Ativo' 
-                          ? row.isToday 
-                            ? 'bg-emerald-900/80 text-emerald-300 border-2 border-emerald-400 shadow-lg' 
-                            : 'bg-emerald-900/60 text-emerald-400 border border-emerald-600/50'
-                          : row.isToday
-                            ? 'bg-rose-900/80 text-rose-300 border-2 border-rose-400 shadow-lg'
-                            : 'bg-rose-900/60 text-rose-400 border border-rose-600/50'
-                      }`}>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${row.status === 'Ativo'
+                        ? row.isToday
+                          ? 'bg-emerald-900/80 text-emerald-300 border-2 border-emerald-400 shadow-lg'
+                          : 'bg-emerald-900/60 text-emerald-400 border border-emerald-600/50'
+                        : row.isToday
+                          ? 'bg-rose-900/80 text-rose-300 border-2 border-rose-400 shadow-lg'
+                          : 'bg-rose-900/60 text-rose-400 border border-rose-600/50'
+                        }`}>
                         {row.status}
                       </span>
                     </div>
