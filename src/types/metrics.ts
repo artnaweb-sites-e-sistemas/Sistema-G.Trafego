@@ -18,6 +18,7 @@ export interface MetricData {
     reach?: number;
     clicks: number;
     ctr: number;
+    landingPageViews?: number;
     cpm: number;
     cpl: number;
     cpr?: number; // Custo por resultado (dinâmico baseado no objetivo da campanha)

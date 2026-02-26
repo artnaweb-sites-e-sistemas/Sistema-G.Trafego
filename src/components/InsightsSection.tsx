@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Lightbulb, Pause } from 'lucide-react';
 
 import AnalysisPlanner from './AnalysisPlanner';
-import { metricsService, type MetricData } from '../services/metricsService';
 import { metaAdsService } from '../services/metaAdsService';
 
 interface InsightsSectionProps {
@@ -17,32 +16,28 @@ interface InsightsSectionProps {
 
 const InsightsSection: React.FC<InsightsSectionProps> = ({ selectedProduct, selectedClient = '', selectedMonth = '', selectedAudience = '', isFacebookConnected = false, metaAdsUserId = '' }) => {
 
-  const [autoSuggestions, setAutoSuggestions] = useState<string[]>([]);
-  const [loadingSuggestions, setLoadingSuggestions] = useState<boolean>(false);
   const [isAudiencePaused, setIsAudiencePaused] = useState<boolean>(false);
-  const [loadingAudienceStatus, setLoadingAudienceStatus] = useState<boolean>(false);
 
   // Verificar se o público selecionado está pausado
   useEffect(() => {
     let cancelled = false;
     const checkAudienceStatus = async () => {
-      if (!selectedAudience || selectedAudience === 'Todos os Públicos' || 
-          !selectedProduct || selectedProduct === 'Todos os Produtos') {
+      if (!selectedAudience || selectedAudience === 'Todos os Públicos' ||
+        !selectedProduct || selectedProduct === 'Todos os Produtos') {
         setIsAudiencePaused(false);
-        setLoadingAudienceStatus(false);
         return;
       }
-      
+
       // Se não está conectado ao Facebook, usar uma abordagem alternativa
       if (!isFacebookConnected) {
-        
-        
+
+
         // 1. Verificar se o público selecionado contém indicação de pausado no nome
-        const isPausedByName = selectedAudience.toLowerCase().includes('pausado') || 
-                              selectedAudience.toLowerCase().includes('paused') ||
-                              // Baseado na imagem enviada, o texto mostra "Conjunto de anúncios Pausado"
-                              selectedAudience.includes('Pausado');
-        
+        const isPausedByName = selectedAudience.toLowerCase().includes('pausado') ||
+          selectedAudience.toLowerCase().includes('paused') ||
+          // Baseado na imagem enviada, o texto mostra "Conjunto de anúncios Pausado"
+          selectedAudience.includes('Pausado');
+
         // 2. Verificar dados salvos no localStorage (análises passadas, etc.)
         try {
           const plannersData = localStorage.getItem('analysisPlanners');
@@ -50,63 +45,59 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({ selectedProduct, sele
             const planners = JSON.parse(plannersData);
             const planner = planners.find((p: any) => p.audience === selectedAudience);
             if (planner?.status === 'PAUSED') {
-              
+
               setIsAudiencePaused(true);
-              setLoadingAudienceStatus(false);
               return;
             }
           }
-          
+
           // 3. Para testar: Forçar como pausado se o público contém texto específico
           // (Este público específico da imagem que você enviou)
           const testPausedAudiences = [
             '[ambos os sexos] [35-45] [localização - Brasil] [aberto]',
             '[ambos os sexos] [35-45] [localização - Salvador] [aberto]'
           ];
-          
+
           if (testPausedAudiences.includes(selectedAudience)) {
             setIsAudiencePaused(true);
-            setLoadingAudienceStatus(false);
             return;
           }
-          
+
         } catch (error) {
-          
+
         }
-        
-        
+
+
         setIsAudiencePaused(isPausedByName);
-        setLoadingAudienceStatus(false);
         return;
       }
-      
-      setLoadingAudienceStatus(true);
+
       try {
         // 🎯 NOVA LÓGICA: Usar a mesma abordagem do AudiencePicker
         // Buscar todas as campanhas e Ad Sets para encontrar o público selecionado
         const campaignId = localStorage.getItem('selectedCampaignId');
-                
+
         if (campaignId) {
           const adSetsData = await metaAdsService.getAdSets(campaignId);
-          
-          
+
+
           // Encontrar o AdSet que corresponde ao público selecionado
           const matchingAdSet = adSetsData.find((adSet: any) => {
             // Comparar nome do público (pode ter variações)
             const adSetName = adSet.name || '';
             const audienceName = selectedAudience || '';
-            
-                        
+
+
             // Comparação exata ou normalizada
-            return adSetName === audienceName || 
-                   adSetName.toLowerCase().includes(audienceName.toLowerCase()) ||
-                   audienceName.toLowerCase().includes(adSetName.toLowerCase());
+            return adSetName === audienceName ||
+              adSetName.toLowerCase().includes(audienceName.toLowerCase()) ||
+              audienceName.toLowerCase().includes(adSetName.toLowerCase());
           });
-          
+
           if (matchingAdSet) {
             // 🎯 NOVA LÓGICA: Verificar status do AdSet E problemas de billing
             const adSetPaused = matchingAdSet.status === 'PAUSED';
-            
+
             // Verificar problemas de billing na conta
             let hasBillingIssues = false;
             try {
@@ -117,22 +108,22 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({ selectedProduct, sele
             } catch (error) {
               console.error('Erro ao verificar billing:', error);
             }
-            
+
             // 🎯 LÓGICA: Pausado se AdSet pausado OU problemas de billing
             const isPaused = adSetPaused || hasBillingIssues;
-                        
+
             if (!cancelled) {
               setIsAudiencePaused(isPaused);
             }
           } else {
-            
+
             // Se não encontrou o AdSet específico, considerar como ativo
             if (!cancelled) {
               setIsAudiencePaused(false);
             }
           }
         } else {
-          
+
           // Se não tem campaign ID, considerar como ativo
           if (!cancelled) {
             setIsAudiencePaused(false);
@@ -143,47 +134,14 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({ selectedProduct, sele
         if (!cancelled) {
           setIsAudiencePaused(false);
         }
-      } finally {
-        if (!cancelled) {
-          setLoadingAudienceStatus(false);
-        }
       }
     };
-    
+
     checkAudienceStatus();
     return () => { cancelled = true; };
   }, [selectedAudience, isFacebookConnected, selectedProduct]);
 
-  // Gerar sugestões simples baseadas nas métricas reais do período/escopo atual
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      if (!selectedClient || selectedClient === 'Selecione um cliente' || !selectedProduct || selectedProduct === 'Todos os Produtos') {
-        setAutoSuggestions([]);
-        return;
-      }
-      setLoadingSuggestions(true);
-      try {
-        const data = await metricsService.getMetrics(
-          selectedMonth || (localStorage.getItem('selectedMonth') || ''),
-          selectedClient,
-          selectedProduct,
-          selectedAudience || 'Todos os Públicos'
-        );
 
-        if (cancelled) return;
-
-        const suggestions = generateSuggestions(data);
-        setAutoSuggestions(suggestions);
-      } catch (e) {
-        if (!cancelled) setAutoSuggestions([]);
-      } finally {
-        if (!cancelled) setLoadingSuggestions(false);
-      }
-    };
-    load();
-    return () => { cancelled = true; };
-  }, [selectedClient, selectedProduct, selectedAudience, selectedMonth]);
 
   return (
     <div data-section="insights" className="relative overflow-hidden bg-slate-900/80 border border-slate-700/50 rounded-2xl shadow-xl">
@@ -229,7 +187,7 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({ selectedProduct, sele
             metaAdsUserId={metaAdsUserId}
           />
         )}
-        
+
         {/* Mensagem quando público pausado - Somente para AnalysisPlanner */}
         {selectedProduct && selectedProduct !== 'Todos os Produtos' && isAudiencePaused && (
           <div className="bg-slate-900/40 border border-slate-700/50 rounded-xl p-6 mb-4">
@@ -242,7 +200,7 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({ selectedProduct, sele
                   Planejamento Pausado
                 </h4>
                 <p className="text-slate-400 text-sm max-w-md">
-                  O planejamento de análise está oculto porque o público 
+                  O planejamento de análise está oculto porque o público
                   <span className="text-slate-200 font-medium"> "{selectedAudience}" </span>
                   está pausado.
                 </p>
@@ -251,27 +209,7 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({ selectedProduct, sele
           </div>
         )}
 
-        {/* Sugestões automáticas simples - Ocultar se público pausado */}
-        {!isAudiencePaused && (autoSuggestions.length > 0 || loadingSuggestions) && (
-          <div className="bg-slate-900/40 border border-slate-700/50 rounded-xl p-4 mb-4">
-            <h5 className="text-sm font-semibold text-amber-200 mb-3 flex items-center">
-              <span className="w-2 h-2 bg-amber-400 rounded-full mr-2"></span>
-              Sugestões automáticas
-            </h5>
-            {loadingSuggestions ? (
-              <p className="text-sm text-slate-400">Gerando sugestões…</p>
-            ) : (
-              <ul className="space-y-2">
-                {autoSuggestions.map((s, i) => (
-                  <li key={i} className="text-sm text-slate-300 flex items-start">
-                    <span className="text-amber-200 mr-3 mt-0.5">•</span>
-                    <span className="leading-relaxed">{s}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
+
 
         {/* Container de “Insights Gerados” removido conforme solicitado */}
       </div>
@@ -280,68 +218,3 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({ selectedProduct, sele
 };
 
 export default InsightsSection;
-
-// ------- Helpers -------
-function generateSuggestions(metrics: MetricData[]): string[] {
-  if (!metrics || metrics.length === 0) return [];
-  const ordered = [...metrics].sort((a, b) => a.date.localeCompare(b.date));
-  const last7 = ordered.slice(-7);
-  const prev7 = ordered.slice(-14, -7);
-
-  const n = (v: any) => (typeof v === 'number' ? v : Number(v || 0)) || 0;
-  const sum = (arr: number[]) => arr.reduce((s, v) => s + v, 0);
-
-  const ctr = (data: MetricData[]) => {
-    const clicks = sum(data.map(d => n(d.clicks)));
-    const impressions = sum(data.map(d => n(d.impressions)));
-    return impressions > 0 ? (clicks / impressions) * 100 : 0;
-  };
-  const spend = (data: MetricData[]) => sum(data.map(d => n(d.investment)));
-  const leads = (data: MetricData[]) => sum(data.map(d => n(d.leads)));
-  const sales = (data: MetricData[]) => sum(data.map(d => n(d.sales)));
-  const freq = (data: MetricData[]) => {
-    const vals = data.map(d => n((d as any).frequency)).filter(v => v > 0);
-    return vals.length ? sum(vals) / vals.length : 0;
-  };
-  const cprApprox = (data: MetricData[]) => {
-    const cps = data.map(d => n((d as any).cpr)).filter(v => v > 0);
-    if (cps.length) return sum(cps) / cps.length;
-    const s = spend(data);
-    const l = leads(data);
-    const sa = sales(data);
-    if (sa > 0) return s / sa;
-    if (l > 0) return s / l;
-    return 0;
-  };
-
-  const lastCtr = ctr(last7);
-  const prevCtr = prev7.length ? ctr(prev7) : lastCtr;
-  const lastCpr = cprApprox(last7);
-  const prevCpr = prev7.length ? cprApprox(prev7) : lastCpr;
-  const lastSpend = spend(last7);
-  const lastLeads = leads(last7);
-  const lastSales = sales(last7);
-  const lastFreq = freq(last7);
-
-  const ctrChange = prevCtr === 0 ? 0 : ((lastCtr - prevCtr) / prevCtr) * 100;
-  const cprChange = prevCpr === 0 ? 0 : ((lastCpr - prevCpr) / prevCpr) * 100;
-
-  const suggestions: string[] = [];
-
-  if (cprChange > 15) {
-    suggestions.push(`CPR aumentou ${cprChange.toFixed(0)}% na última semana. Priorize orçamento nos públicos/anúncios com melhor performance e reduza/pausa os de pior resultado.`);
-  }
-  if (ctrChange < -10) {
-    suggestions.push(`CTR caiu ${Math.abs(ctrChange).toFixed(0)}%. Renove criativos (ângulos, copies, criativos), teste novas variações e revise segmentações.`);
-  }
-  if (lastSpend > 0 && lastLeads === 0 && lastSales === 0) {
-    suggestions.push('Gasto sem resultados recentes. Verifique o objetivo da campanha, eventos de conversão e se o tracking está ativo.');
-  }
-  if (lastFreq >= 2.5 && ctrChange <= 0) {
-    suggestions.push('Frequência elevada com queda/estabilidade de CTR. Indício de fadiga — troque criativos e amplie o alcance do público.');
-  }
-  if (suggestions.length === 0) {
-    suggestions.push('Desempenho estável. Considere escalar gradualmente (+10–20%) nos ativos com melhor CPR e CTR.');
-  }
-  return suggestions;
-}

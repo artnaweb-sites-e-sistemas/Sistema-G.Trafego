@@ -96,7 +96,7 @@ class MetaAdsService {
   constructor() {
     // Construtor sem rate limit
   }
-  
+
   // Sistema de cache para reduzir chamadas à API
   private cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
   private readonly CACHE_TTL = {
@@ -122,24 +122,24 @@ class MetaAdsService {
     if (currentUser && currentUser.id) {
       return `user_${currentUser.id}`;
     }
-    
+
     // Fallback: usar ID da conta selecionada
     const selectedAccount = this.selectedAccount;
     if (selectedAccount && selectedAccount.id) {
       return `account_${selectedAccount.id}`;
     }
-    
+
     // Fallback: usar cliente selecionado
     const currentClient = localStorage.getItem('currentSelectedClient');
     if (currentClient) {
       return `client_${currentClient}`;
     }
-    
+
     // Fallback: usar dados do navegador (menos ideal para multi-usuário)
     const userAgent = navigator.userAgent;
     const screenRes = `${screen.width}x${screen.height}`;
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    
+
     // Criar um hash simples (em produção, usar algo mais robusto)
     let hash = 0;
     const str = `${userAgent}_${screenRes}_${timezone}`;
@@ -148,7 +148,7 @@ class MetaAdsService {
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash; // Convert to 32bit integer
     }
-    
+
     return `browser_${Math.abs(hash).toString()}`;
   }
 
@@ -174,27 +174,27 @@ class MetaAdsService {
     // 🎯 MELHORIA PARA MULTI-USUÁRIO: Incluir identificador do usuário no cache
     const userIdentifier = this.getUserIdentifier();
     params.user = userIdentifier;
-    
+
     // Incluir cliente atual e conta selecionada nos parâmetros de cache
     const currentClient = localStorage.getItem('currentSelectedClient');
     if (currentClient) {
       params.client = currentClient;
     }
-    
+
     // Incluir a conta selecionada para diferenciar cache por conta
     if (this.selectedAccount) {
       params.accountId = this.selectedAccount.id;
       params.accountName = this.selectedAccount.name;
     }
-    
+
     // Ordenar parâmetros para garantir consistência na chave
     const sortedParams = Object.keys(params).sort().reduce((result, key) => {
       result[key] = params[key];
       return result;
     }, {} as any);
-    
-    const paramStr = Object.keys(sortedParams).length > 0 
-      ? '_' + JSON.stringify(sortedParams) 
+
+    const paramStr = Object.keys(sortedParams).length > 0
+      ? '_' + JSON.stringify(sortedParams)
       : '';
     return `${type}${paramStr}`;
   }
@@ -202,13 +202,13 @@ class MetaAdsService {
   private getFromCache<T>(key: string): T | null {
     const cached = this.cache.get(key);
     if (!cached) return null;
-    
+
     const now = Date.now();
     if (now - cached.timestamp > cached.ttl) {
       this.cache.delete(key);
       return null;
     }
-    
+
     return cached.data;
   }
 
@@ -229,22 +229,22 @@ class MetaAdsService {
           this.cache.delete(key);
         }
       }
-      } else {
+    } else {
       // Limpar todo o cache
       this.cache.clear();
-  
+
     }
   }
 
   // Método para fazer requisições com cache e debounce
   private async makeCachedRequest<T>(
-    type: string, 
-    requestFn: () => Promise<T>, 
+    type: string,
+    requestFn: () => Promise<T>,
     ttl: number,
     params: any = {}
   ): Promise<T> {
     const cacheKey = this.getCacheKey(type, params);
-    
+
     // Verificar cache primeiro
     const cached = this.getFromCache<T>(cacheKey);
     if (cached) {
@@ -274,7 +274,7 @@ class MetaAdsService {
   setAccessToken(token: string) {
     this.accessToken = token;
     localStorage.setItem('facebookAccessToken', token);
-    }
+  }
 
   // Obter token de acesso
   getAccessToken(): string | null {
@@ -334,14 +334,14 @@ class MetaAdsService {
               reject(new Error(`Erro ao buscar dados do usuário: ${userInfo.error.message}`));
               return;
             }
-            
+
             const user: FacebookUser = {
               id: statusResponse.authResponse.userID,
               name: userInfo.name,
               email: userInfo.email,
               accessToken: statusResponse.authResponse.accessToken
             };
-            
+
             this.user = user;
             localStorage.setItem('facebookUser', JSON.stringify(user));
             resolve(user);
@@ -357,21 +357,21 @@ class MetaAdsService {
                   reject(new Error(`Erro ao buscar dados do usuário: ${userInfo.error.message}`));
                   return;
                 }
-                
+
                 const user: FacebookUser = {
                   id: userID,
                   name: userInfo.name,
                   email: userInfo.email,
                   accessToken: accessToken
                 };
-                
+
                 this.user = user;
                 localStorage.setItem('facebookUser', JSON.stringify(user));
                 resolve(user);
               });
             } else {
               // Rate limit do Facebook removido
-              
+
               if (response.status === 'not_authorized') {
                 reject(new Error('Login não autorizado. Verifique se você concedeu as permissões necessárias.'));
               } else if (response.status === 'unknown') {
@@ -380,7 +380,7 @@ class MetaAdsService {
                 reject(new Error('Login cancelado pelo usuário'));
               }
             }
-          }, { 
+          }, {
             scope: 'email,public_profile,ads_read,ads_management,pages_show_list,pages_read_engagement',
             return_scopes: true
           });
@@ -412,14 +412,14 @@ class MetaAdsService {
               reject(new Error(`Erro ao buscar dados do usuário: ${userInfo.error.message}`));
               return;
             }
-            
+
             const user: FacebookUser = {
               id: userID,
               name: userInfo.name,
               email: userInfo.email,
               accessToken: accessToken
             };
-            
+
             this.user = user;
             localStorage.setItem('facebookUser', JSON.stringify(user));
             resolve(user);
@@ -427,11 +427,11 @@ class MetaAdsService {
         } else {
           if (response.status === 'not_authorized') {
             reject(new Error('Login não autorizado. Verifique se você concedeu as permissões necessárias.'));
-        } else {
-          reject(new Error('Login cancelado pelo usuário'));
+          } else {
+            reject(new Error('Login cancelado pelo usuário'));
+          }
         }
-        }
-      }, { 
+      }, {
         scope: 'email,public_profile',
         return_scopes: true,
         auth_type: 'rerequest',
@@ -444,39 +444,39 @@ class MetaAdsService {
   logout() {
     // Limpar todo o cache ao fazer logout
     this.clearAllCache();
-    
+
     // Limpar dados de localStorage relacionados ao Meta Ads
     this.clearAllMetaAdsLocalStorage();
-    
+
     // Fazer logout do Facebook SDK se disponível
     if (window.FB && this.user?.accessToken) {
       try {
         window.FB.logout();
-        } catch (error) {
-        }
+      } catch (error) {
+      }
     }
-    
+
     // Limpar dados do usuário
     this.user = null;
     this.selectedAccount = null;
     this.accessToken = null;
-    
+
     // Limpar dados locais
     localStorage.removeItem('facebookUser');
     localStorage.removeItem('selectedAdAccount');
     localStorage.removeItem('facebookAccessToken');
-    
+
     // Adicionar timestamp de logout para evitar restauração automática
     localStorage.setItem('metaAdsLogoutTimestamp', Date.now().toString());
-    
+
     // Disparar evento para notificar componentes sobre logout
     window.dispatchEvent(new CustomEvent('metaAdsLoggedOut', {
       detail: { timestamp: Date.now() }
     }));
-    
+
     // Rate limit removido
-    
-    }
+
+  }
 
   // Métodos de reset de rate limit REMOVIDOS - sem limites
   resetOAuthRateLimit(): void {
@@ -532,10 +532,10 @@ class MetaAdsService {
     };
   }
 
-  async getOAuthRateLimitStatus(): Promise<{ 
-    attempts: number; 
-    maxAttempts: number; 
-    canAttempt: boolean; 
+  async getOAuthRateLimitStatus(): Promise<{
+    attempts: number;
+    maxAttempts: number;
+    canAttempt: boolean;
     nextAttemptDelay?: number;
     facebookRateLimit?: boolean;
     facebookRateLimitUntil?: number;
@@ -569,12 +569,12 @@ class MetaAdsService {
       'metaAds_adset_insights',
       'metaAds_account_insights'
     ];
-    
+
     keysToRemove.forEach(key => {
       try {
         localStorage.removeItem(key);
-        } catch (error) {
-        }
+      } catch (error) {
+      }
     });
   }
 
@@ -584,11 +584,11 @@ class MetaAdsService {
     if (this.user && this.user.accessToken) {
       return true;
     }
-    
+
     // Verificar localStorage
     const savedUser = localStorage.getItem('facebookUser');
     const savedToken = localStorage.getItem('facebookAccessToken');
-    
+
     if (savedUser && savedToken) {
       try {
         this.user = JSON.parse(savedUser);
@@ -599,7 +599,7 @@ class MetaAdsService {
         return false;
       }
     }
-    
+
     return false;
   }
 
@@ -619,7 +619,7 @@ class MetaAdsService {
       }
       return true;
     }
-    
+
     return false;
   }
 
@@ -678,13 +678,13 @@ class MetaAdsService {
           const data = response.data.data || [];
           // Salvar dados no localStorage
           this.saveDataAfterLoad('business_managers', data);
-          
+
           return data;
         } catch (error: any) {
           if (error.response?.data?.error?.code === 100) {
             throw new Error('Permissão negada. É necessário solicitar permissão ads_read no App Review.');
           }
-          
+
           throw new Error(`Erro ao buscar Business Managers: ${error.response?.data?.error?.message || error.message}`);
         }
       },
@@ -728,7 +728,7 @@ class MetaAdsService {
 
             adAccounts = response.data.data || [];
           }
-      
+
           const normalized = adAccounts.map((account: any) => ({
             ...account,
             business_id: businessId
@@ -744,7 +744,7 @@ class MetaAdsService {
             }
             const merged = Array.from(mergedMap.values());
             this.saveDataAfterLoad('ad_accounts_by_business', merged);
-          } catch {}
+          } catch { }
           return normalized;
         } catch (error: any) {
           // Fallback: tentar dados em cache local para não quebrar o fluxo da UI
@@ -759,7 +759,7 @@ class MetaAdsService {
                 return cachedForBm as AdAccount[];
               }
             }
-          } catch {}
+          } catch { }
 
           if (error.response?.data?.error?.code === 100) {
             throw new Error('Permissão negada. É necessário solicitar permissão ads_read no App Review.');
@@ -794,7 +794,7 @@ class MetaAdsService {
         throw new Error(`Erro da API do Facebook: ${response.data.error.message}`);
       }
 
-      const accounts = response.data.data.filter((account: AdAccount) => 
+      const accounts = response.data.data.filter((account: AdAccount) =>
         account.account_status === 1 // Apenas contas ativas
       );
 
@@ -808,22 +808,22 @@ class MetaAdsService {
       if (error.response?.status === 403) {
         throw new Error('Permissões de anúncios não concedidas. Para acessar contas de anúncios, você precisa das permissões ads_read e ads_management que requerem App Review.');
       }
-      
+
       // Se for erro 400 (Bad Request), pode ser problema de permissão
       if (error.response?.status === 400) {
         throw new Error('Erro na requisição. Verifique se você tem permissões adequadas para acessar contas de anúncios.');
       }
-      
+
       // Se o erro for sobre token expirado
       if (error.response?.data?.error?.code === 190) {
         throw new Error('Token de acesso expirado. Faça login novamente.');
       }
-      
+
       // Se o erro for sobre permissões
       if (error.response?.data?.error?.code === 200) {
         throw new Error('Permissões de anúncios não concedidas. Para acessar contas de anúncios, você precisa conceder permissões adicionais.');
       }
-      
+
       throw new Error(`Erro ao buscar contas: ${error.response?.data?.error?.message || error.message}`);
     }
   }
@@ -850,7 +850,7 @@ class MetaAdsService {
         'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
       ];
       const monthIndex = months.findIndex(m => m.toLowerCase() === monthName.toLowerCase());
-      
+
       if (monthIndex === -1 || isNaN(year)) {
         console.warn('Período inválido:', period);
         return false;
@@ -862,14 +862,14 @@ class MetaAdsService {
 
       // Fazer uma requisição mínima para verificar se existem campanhas
       const campaigns = await this.getCampaigns(dateStart, dateEnd);
-      
+
       // Verificar se há campanhas ativas ou que tiveram gasto no período
       const hasActiveCampaigns = campaigns.some(campaign => {
         const campaignStart = campaign.start_time ? new Date(campaign.start_time) : new Date(campaign.created_time);
         const campaignEnd = campaign.stop_time ? new Date(campaign.stop_time) : new Date();
         const periodStart = new Date(dateStart);
         const periodEnd = new Date(dateEnd);
-        
+
         // Verificar se a campanha estava ativa durante o período
         return campaignStart <= periodEnd && campaignEnd >= periodStart;
       });
@@ -886,11 +886,11 @@ class MetaAdsService {
     if (!this.isLoggedIn()) {
       throw new Error('Usuário não está logado no Meta Ads. Faça login novamente.');
     }
-    
+
     if (!this.hasSelectedAccount()) {
       throw new Error('Nenhuma conta de anúncios selecionada. Selecione um Business Manager primeiro.');
     }
-    
+
     if (!this.user?.accessToken && !this.accessToken) {
       throw new Error('Token de acesso não encontrado. Faça login novamente.');
     }
@@ -898,16 +898,16 @@ class MetaAdsService {
     if (!this.selectedAccount) {
       throw new Error('Conta de anúncios não configurada corretamente. Tente selecionar o cliente novamente.');
     }
-    
+
     const params = { dateStart, dateEnd };
-    
+
     return this.makeCachedRequest(
       'campaigns',
       async () => {
         try {
           const accessToken = this.user?.accessToken || this.getAccessToken();
           const url = `${this.baseURL}/${this.selectedAccount!.id}/campaigns`;
-          
+
           const response = await axios.get(url, {
             params: {
               access_token: accessToken,
@@ -951,15 +951,15 @@ class MetaAdsService {
       const cacheKey = `adsets_campaign_${campaignId}`;
       const cachedData = localStorage.getItem(cacheKey);
       const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
-      
+
       // Cache válido por 5 minutos para campanhas específicas
       const cacheValid = cacheTimestamp && (Date.now() - parseInt(cacheTimestamp)) < 5 * 60 * 1000;
-      
+
       if (cachedData && cacheValid) {
-        
+
         return JSON.parse(cachedData);
       } else if (cachedData) {
-        
+
       }
     } else {
       // Verificar se há dados salvos no localStorage para busca geral
@@ -972,133 +972,133 @@ class MetaAdsService {
 
     // Rate limit removido - sempre permite chamadas
 
-          const execPromise = (async () => {
+    const execPromise = (async () => {
       try {
-      const params: any = {
-        access_token: this.user!.accessToken,
-        fields: 'id,name,status,created_time,updated_time,start_time,stop_time,targeting',
-        limit: 100
-      };
+        const params: any = {
+          access_token: this.user!.accessToken,
+          fields: 'id,name,status,created_time,updated_time,start_time,stop_time,targeting',
+          limit: 100
+        };
 
-      let endpoint = `${this.baseURL}/${this.selectedAccount!.id}/adsets`;
-      
-      // Se uma campanha específica foi fornecida, buscar conjuntos dessa campanha
-      if (campaignId) {
-        endpoint = `${this.baseURL}/${campaignId}/adsets`;
-      }
-      // Importante: a API de listagem de Ad Sets não suporta time_range em nenhuma variação.
-      // Removemos qualquer envio de time_range para evitar 400 (Bad Request).
+        let endpoint = `${this.baseURL}/${this.selectedAccount!.id}/adsets`;
 
-      
-      
-      
-      
+        // Se uma campanha específica foi fornecida, buscar conjuntos dessa campanha
+        if (campaignId) {
+          endpoint = `${this.baseURL}/${campaignId}/adsets`;
+        }
+        // Importante: a API de listagem de Ad Sets não suporta time_range em nenhuma variação.
+        // Removemos qualquer envio de time_range para evitar 400 (Bad Request).
 
-      // 🎯 CORREÇÃO: Implementar paginação para buscar TODOS os Ad Sets
-      let allData: any[] = [];
-      let nextUrl: string | null = null;
-      let pageCount = 0;
-      const maxPages = 10; // Limite de segurança
-      
-      do {
-        pageCount++;
-        
-        let response;
-        try {
-          if (nextUrl) {
-            response = await axios.get(nextUrl);
-          } else {
-            response = await axios.get(endpoint, { params });
-          }
-          
-          
-        } catch (err: any) {
-          
-          // Se der 400/429, tentar sem campos extras (reduzir payload) após um pequeno atraso
-          if (err?.response?.status === 400 || err?.response?.status === 429) {
-            
-            await new Promise(res => setTimeout(res, 500));
+
+
+
+
+
+        // 🎯 CORREÇÃO: Implementar paginação para buscar TODOS os Ad Sets
+        let allData: any[] = [];
+        let nextUrl: string | null = null;
+        let pageCount = 0;
+        const maxPages = 10; // Limite de segurança
+
+        do {
+          pageCount++;
+
+          let response;
+          try {
             if (nextUrl) {
               response = await axios.get(nextUrl);
             } else {
-              response = await axios.get(endpoint, { params: { access_token: this.user!.accessToken, limit: 100 } });
+              response = await axios.get(endpoint, { params });
             }
-            
-            
-          } else {
-            throw err;
+
+
+          } catch (err: any) {
+
+            // Se der 400/429, tentar sem campos extras (reduzir payload) após um pequeno atraso
+            if (err?.response?.status === 400 || err?.response?.status === 429) {
+
+              await new Promise(res => setTimeout(res, 500));
+              if (nextUrl) {
+                response = await axios.get(nextUrl);
+              } else {
+                response = await axios.get(endpoint, { params: { access_token: this.user!.accessToken, limit: 100 } });
+              }
+
+
+            } else {
+              throw err;
+            }
           }
+
+          const pageData = response.data.data || [];
+          allData = allData.concat(pageData);
+
+          // 🎯 DEBUG: Log de cada página
+
+
+          // Verificar se há próxima página
+          nextUrl = response.data.paging?.next || null;
+
+        } while (nextUrl && pageCount < maxPages);
+
+        const data = allData;
+
+        // 🎯 DEBUG DETALHADO: Log de todos os Ad Sets retornados pela API
+
+
+        if (data.length > 0) {
+
+
         }
 
-        const pageData = response.data.data || [];
-        allData = allData.concat(pageData);
-        
-        // 🎯 DEBUG: Log de cada página
-        
-        
-        // Verificar se há próxima página
-        nextUrl = response.data.paging?.next || null;
-        
-      } while (nextUrl && pageCount < maxPages);
-
-      const data = allData;
-      
-      // 🎯 DEBUG DETALHADO: Log de todos os Ad Sets retornados pela API
-      
-      
-      if (data.length > 0) {
-        
-        
-      }
-      
-      // Salvar dados no localStorage
-      if (campaignId) {
-        // Cache específico para campanha
-        const cacheKey = `adsets_campaign_${campaignId}`;
-        localStorage.setItem(cacheKey, JSON.stringify(data));
-        localStorage.setItem(`${cacheKey}_timestamp`, Date.now().toString());
-        
-      } else {
-        // Cache geral
-        this.saveDataAfterLoad('adsets', data);
-      }
-      
-      return data;
-      } catch (error: any) {
-      const status = error?.response?.status;
-      const message: string = error?.response?.data?.error?.message || error.message || 'Unknown error';
-      console.warn('Aviso ao buscar Ad Sets:', { status, message });
-
-      // Estratégia de degradação: tentar usar cache (mesmo expirado) e, se não houver, retornar [] ao invés de lançar.
-      const useExpiredCache = () => {
+        // Salvar dados no localStorage
         if (campaignId) {
+          // Cache específico para campanha
           const cacheKey = `adsets_campaign_${campaignId}`;
-          const cachedData = localStorage.getItem(cacheKey);
-          if (cachedData) {
-            
-            return JSON.parse(cachedData);
-          }
+          localStorage.setItem(cacheKey, JSON.stringify(data));
+          localStorage.setItem(`${cacheKey}_timestamp`, Date.now().toString());
+
         } else {
-          const savedData = this.getDataFromStorage('adsets');
-          if (savedData && savedData.length > 0) {
-            
-            return savedData;
-          }
+          // Cache geral
+          this.saveDataAfterLoad('adsets', data);
         }
+
+        return data;
+      } catch (error: any) {
+        const status = error?.response?.status;
+        const message: string = error?.response?.data?.error?.message || error.message || 'Unknown error';
+        console.warn('Aviso ao buscar Ad Sets:', { status, message });
+
+        // Estratégia de degradação: tentar usar cache (mesmo expirado) e, se não houver, retornar [] ao invés de lançar.
+        const useExpiredCache = () => {
+          if (campaignId) {
+            const cacheKey = `adsets_campaign_${campaignId}`;
+            const cachedData = localStorage.getItem(cacheKey);
+            if (cachedData) {
+
+              return JSON.parse(cachedData);
+            }
+          } else {
+            const savedData = this.getDataFromStorage('adsets');
+            if (savedData && savedData.length > 0) {
+
+              return savedData;
+            }
+          }
+          return [] as any[];
+        };
+
+        // 🎯 CORREÇÃO: Propagar erro de rate limit para que o modal seja exibido
+        if (status === 429 || message.includes('User request limit reached')) {
+
+          throw new Error('User request limit reached');
+        }
+        if (status === 400) {
+          return useExpiredCache();
+        }
+
+        // Outros erros: não quebrar a UI
         return [] as any[];
-      };
-
-      // 🎯 CORREÇÃO: Propagar erro de rate limit para que o modal seja exibido
-      if (status === 429 || message.includes('User request limit reached')) {
-        
-        throw new Error('User request limit reached');
-      }
-      if (status === 400) {
-        return useExpiredCache();
-      }
-
-      // Outros erros: não quebrar a UI
-      return [] as any[];
       } finally {
         // limpar pending
         this.pendingRequests.delete(pendingKey);
@@ -1134,28 +1134,28 @@ class MetaAdsService {
       const insights = response.data.data || [];
       // Log detalhado dos primeiros insights para debug
       if (insights.length > 0) {
-        
+
         // Verificar se há actions no primeiro insight
         if (insights[0].actions && insights[0].actions.length > 0) {
-          
+
           // Verificar especificamente por messaging_conversations_started
-          const messagingAction = insights[0].actions.find((action: any) => 
-            action.action_type === 'messaging_conversations_started' || 
+          const messagingAction = insights[0].actions.find((action: any) =>
+            action.action_type === 'messaging_conversations_started' ||
             action.action_type === 'onsite_conversion.messaging_conversation_started_7d'
           );
-          
+
         } else {
-          
+
         }
-        
+
         // Verificar cost_per_action_type
         if (insights[0].cost_per_action_type && insights[0].cost_per_action_type.length > 0) {
-          
+
         } else {
-          
+
         }
       } else {
-        
+
       }
 
       return insights;
@@ -1170,7 +1170,7 @@ class MetaAdsService {
       throw new Error('Usuário não está logado. Faça login primeiro.');
     }
 
-    
+
 
     try {
       // Primeira tentativa: período específico
@@ -1190,11 +1190,11 @@ class MetaAdsService {
       );
 
       let insights = response.data.data || [];
-      
-      
+
+
       // Se não encontrou insights no período específico, só tentar período mais amplo se explicitamente habilitado
       if (insights.length === 0 && options?.fallbackToLast30Days) {
-        
+
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const today = new Date();
@@ -1213,34 +1213,34 @@ class MetaAdsService {
           }
         );
         insights = response.data.data || [];
-        
+
       }
-      
+
       // Log detalhado dos primeiros insights para debug
       if (insights.length > 0) {
-        
+
         // Verificar se há actions no primeiro insight
         if (insights[0].actions && insights[0].actions.length > 0) {
-          
-                      
-            // Verificar especificamente por messaging_conversations_started
-            const messagingAction = insights[0].actions.find((action: any) => 
-              action.action_type === 'messaging_conversations_started' || 
-              action.action_type === 'onsite_conversion.messaging_conversation_started_7d'
-            );
-            
-            
-            // Verificar cost_per_action_type
-            if (insights[0].cost_per_action_type && insights[0].cost_per_action_type.length > 0) {
-              
-            } else {
-              
-            }
+
+
+          // Verificar especificamente por messaging_conversations_started
+          const messagingAction = insights[0].actions.find((action: any) =>
+            action.action_type === 'messaging_conversations_started' ||
+            action.action_type === 'onsite_conversion.messaging_conversation_started_7d'
+          );
+
+
+          // Verificar cost_per_action_type
+          if (insights[0].cost_per_action_type && insights[0].cost_per_action_type.length > 0) {
+
+          } else {
+
+          }
         } else {
-          
+
         }
       } else {
-        
+
       }
 
       return insights;
@@ -1269,8 +1269,8 @@ class MetaAdsService {
     }
 
     try {
-      
-      
+
+
       const response = await axios.get(
         `${this.baseURL}/${adSetId}/insights`,
         {
@@ -1287,13 +1287,13 @@ class MetaAdsService {
       );
 
       const insights = response.data.data || [];
-      
-      
+
+
       // Log detalhado dos insights mensais
       insights.forEach((insight: any, index: number) => {
-        
-        
-        
+
+
+
       });
 
       return insights;
@@ -1317,7 +1317,7 @@ class MetaAdsService {
       throw new Error('Usuário não está logado. Faça login primeiro.');
     }
 
-    
+
 
     try {
       // Primeira tentativa: período específico
@@ -1337,11 +1337,11 @@ class MetaAdsService {
       );
 
       let insights = response.data.data || [];
-      
-      
+
+
       // Se não encontrou insights no período específico, só tentar período mais amplo se explicitamente habilitado
       if (insights.length === 0 && options?.fallbackToLast30Days) {
-        
+
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const today = new Date();
@@ -1360,18 +1360,18 @@ class MetaAdsService {
           }
         );
         insights = response.data.data || [];
-        
+
       }
-      
+
       if (insights.length > 0) {
-        
+
         if (insights[0].actions && insights[0].actions.length > 0) {
-          
+
         } else {
-          
+
         }
       } else {
-        
+
       }
 
       return insights;
@@ -1388,7 +1388,7 @@ class MetaAdsService {
     }
 
     const params = { dateStart, dateEnd, metric: 'messaging_conversations_started' };
-    
+
     return this.makeCachedRequest(
       'messaging_conversations_insights',
       async () => {
@@ -1416,7 +1416,7 @@ class MetaAdsService {
           const insights = response.data.data || [];
           // Log dos primeiros insights para debug
           if (insights.length > 0) {
-            }
+          }
 
           return insights;
         } catch (error: any) {
@@ -1435,7 +1435,7 @@ class MetaAdsService {
     }
 
     const params = { dateStart, dateEnd };
-    
+
     return this.makeCachedRequest(
       'account_insights',
       async () => {
@@ -1445,7 +1445,7 @@ class MetaAdsService {
         }
 
         try {
-                const response = await axios.get(
+          const response = await axios.get(
             `${this.baseURL}/${this.selectedAccount!.id}/insights`,
             {
               params: {
@@ -1463,7 +1463,7 @@ class MetaAdsService {
 
           const insights = response.data.data || [];
           if (insights.length === 0) {
-            }
+          }
 
           return insights;
         } catch (error: any) {
@@ -1478,64 +1478,71 @@ class MetaAdsService {
   // Converter dados para formato do dashboard
   convertToMetricData(insights: MetaAdsInsight[], month: string, client?: string, product?: string, audience?: string): any[] {
     const result = insights.map(insight => {
-      const messagingConversations = insight.actions?.find((action: any) => 
-        action.action_type === 'messaging_conversations_started' || 
+      const messagingConversations = insight.actions?.find((action: any) =>
+        action.action_type === 'messaging_conversations_started' ||
         action.action_type === 'onsite_conversion.messaging_conversation_started_7d'
       )?.value || '0';
-      
+
       // Manter a lógica existente para outros tipos de leads (fallback)
-      const leads = insight.actions?.find((action: any) => 
+      const leads = insight.actions?.find((action: any) =>
         action.action_type === 'lead' || action.action_type === 'complete_registration'
       )?.value || '0';
 
       // Buscar cost_per_action_type para messaging_conversations_started
-      const costPerMessagingConversation = insight.cost_per_action_type?.find((cost: any) => 
-        cost.action_type === 'messaging_conversations_started' || 
+      const costPerMessagingConversation = insight.cost_per_action_type?.find((cost: any) =>
+        cost.action_type === 'messaging_conversations_started' ||
         cost.action_type === 'onsite_conversion.messaging_conversation_started_7d'
       )?.value || '0';
 
       // Fallback para cost_per_action_type de leads tradicionais
-      const costPerLead = insight.cost_per_action_type?.find((cost: any) => 
+      const costPerLead = insight.cost_per_action_type?.find((cost: any) =>
         cost.action_type === 'lead' || cost.action_type === 'complete_registration'
       )?.value || '0';
 
       const investment = parseFloat(insight.spend || '0');
       const impressions = parseInt(insight.impressions || '0');
       const reach = parseInt(insight.reach || '0');
-      
+
       // Buscar especificamente cliques no link (link_click) em vez de todos os cliques
       // Usar cliques no link (quando houver). Caso NÃO haja link_click, usar clicks gerais
-      const linkClicksRaw = insight.actions?.find((action: any) => 
-        action.action_type === 'link_click' || 
+      const linkClicksRaw = insight.actions?.find((action: any) =>
+        action.action_type === 'link_click' ||
         action.action_type === 'onsite_conversion.link_click'
       )?.value || '0';
       const totalClicksRaw = insight.clicks || '0';
       const hasLinkClicks = parseInt(linkClicksRaw) > 0;
       const clicks = hasLinkClicks ? parseInt(linkClicksRaw) : parseInt(totalClicksRaw);
-      
+
+      // Extraindo Landing Page Views
+      const landingPageViewsRaw = insight.actions?.find((action: any) =>
+        action.action_type === 'landing_page_view' ||
+        action.action_type === 'onsite_conversion.landing_page_view'
+      )?.value || '0';
+      const landingPageViews = parseInt(landingPageViewsRaw);
+
       // Priorizar messaging_conversations_started, mas usar fallback se não disponível
       const leadsCount = parseInt(messagingConversations) > 0 ? parseInt(messagingConversations) : parseInt(leads);
-      
+
       // Buscar métricas de compras (purchase) - se não houver, será 0
-      const purchases = insight.actions?.find((action: any) => 
-        action.action_type === 'purchase' || 
+      const purchases = insight.actions?.find((action: any) =>
+        action.action_type === 'purchase' ||
         action.action_type === 'onsite_conversion.purchase' ||
         action.action_type === 'offsite_conversion.purchase' ||
         action.action_type === 'offsite_conversion.fb_pixel_purchase'
       )?.value || '0';
-      
+
       const salesCount = parseInt(purchases);
 
       // Debug: Log de compras para verificar se estão sendo detectadas
-      
+
 
       // Calcular CTR baseado em cliques no link em vez do CTR geral
       const ctr = clicks > 0 && impressions > 0 ? (clicks / impressions) * 100 : 0;
       const cpm = parseFloat(insight.cpm || '0');
-      
+
       // Calcular CPC (Cost Per Click) corretamente
       const cpc = clicks > 0 ? investment / clicks : 0;
-      
+
       // Usar cost_per_action_type de messaging_conversations_started se disponível, senão calcular CPL manualmente
       let cpl = 0;
       if (parseInt(messagingConversations) > 0 && parseFloat(costPerMessagingConversation) > 0) {
@@ -1549,21 +1556,21 @@ class MetaAdsService {
 
       // Calcular CPR dinamicamente baseado no objetivo da campanha
       let cpr = 0;
-      
+
       // Debug: Log dos dados disponíveis (apenas se houver problemas)
-      
-      
+
+
 
 
       // Debug: Log detalhado do cost_per_action_type (apenas em desenvolvimento)
-      
+
 
       // Buscar CPR diretamente do Meta Ads - método mais simples e direto
       if (insight.cost_per_action_type && insight.cost_per_action_type.length > 0) {
         // Priorizar tipos de conversão mais relevantes (excluindo video_view e outros que não são conversões)
         const priorityTypes = [
           'purchase',
-          'onsite_conversion.purchase', 
+          'onsite_conversion.purchase',
           'lead',
           'onsite_conversion.lead',
           'messaging_conversations_started',
@@ -1587,19 +1594,19 @@ class MetaAdsService {
 
         // Procurar pelo primeiro tipo de conversão com valor > 0
         for (const type of priorityTypes) {
-          const costData = insight.cost_per_action_type.find((cost: any) => 
+          const costData = insight.cost_per_action_type.find((cost: any) =>
             cost.action_type === type && parseFloat(cost.value) > 0
           );
           if (costData) {
             cpr = parseFloat(costData.value);
-            
+
             break;
           }
         }
 
         // Se não encontrou nenhum dos tipos prioritários, usar o primeiro com valor > 0 (excluindo tipos não conversão)
         if (cpr === 0) {
-          const firstValidCost = insight.cost_per_action_type.find((cost: any) => 
+          const firstValidCost = insight.cost_per_action_type.find((cost: any) =>
             parseFloat(cost.value) > 0 && !excludedTypes.includes(cost.action_type)
           );
           if (firstValidCost) {
@@ -1609,7 +1616,7 @@ class MetaAdsService {
       }
 
       // Se não há dados de cost_per_action_type, CPR será 0 (sem conversões)
-      
+
 
       const estimatedRevenue = leadsCount * 200;
       const roas = investment > 0 ? estimatedRevenue / investment : 0;
@@ -1625,7 +1632,7 @@ class MetaAdsService {
           } else {
             // Se não, tentar converter
             const date = new Date(insight.date_start);
-            
+
             if (!isNaN(date.getTime())) {
               // O problema é que o Meta Ads retorna datas em UTC
               // e quando convertemos para local, há um deslocamento de timezone
@@ -1660,9 +1667,10 @@ class MetaAdsService {
         revenue: estimatedRevenue,
         investment: investment,
         impressions: impressions,
-          reach: reach,
+        reach: reach,
         clicks: clicks,
         ctr: ctr,
+        landingPageViews: landingPageViews,
         cpm: cpm,
         cpc: cpc, // Cost Per Click
         cpl: cpl,
@@ -1674,11 +1682,11 @@ class MetaAdsService {
       };
 
       // Log final apenas em desenvolvimento
-      
+
 
       return metricData;
     });
-    
+
     return result;
   }
 
@@ -1690,23 +1698,23 @@ class MetaAdsService {
 
     try {
       let insights: MetaAdsInsight[];
-      
+
       if (campaignId) {
         insights = await this.getCampaignInsights(campaignId, startDate, endDate);
       } else {
         insights = await this.getAccountInsights(startDate, endDate);
       }
-      
+
       const metrics = this.convertToMetricData(insights, month, client, product, audience);
-      
+
       // Log do total de leads encontrados
       const totalLeads = metrics.reduce((sum, metric) => sum + metric.leads, 0);
-      
-      
+
+
       // Log do total de vendas encontradas
       const totalSales = metrics.reduce((sum, metric) => sum + metric.sales, 0);
-      
-      
+
+
       return metrics;
     } catch (error: any) {
       throw error;
@@ -1730,12 +1738,12 @@ class MetaAdsService {
 
   // Método de debug para verificar estado da conexão
   debugConnectionStatus(): void {
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
   }
 
   // Verificar status de login
@@ -1757,23 +1765,23 @@ class MetaAdsService {
     if (response.status === 'connected') {
       // O usuário está logado e autorizou o app
       const { accessToken, userID } = response.authResponse;
-      
+
       // Buscar dados do usuário
       window.FB.api('/me', { fields: 'name,email' }, (userInfo: any) => {
         if (userInfo.error) {
           return;
         }
-        
+
         const user: FacebookUser = {
           id: userID,
           name: userInfo.name,
           email: userInfo.email,
           accessToken: accessToken
         };
-        
+
         this.user = user;
         localStorage.setItem('facebookUser', JSON.stringify(user));
-        });
+      });
     } else if (response.status === 'not_authorized') {
       this.logout();
     } else {
@@ -1788,7 +1796,7 @@ class MetaAdsService {
 
   clearCacheByType(type: string): void {
     this.clearCache(type);
-    
+
     // Limpar dados específicos do localStorage
     if (type === 'adsets') {
       localStorage.removeItem('metaAds_adsets');
@@ -1801,9 +1809,9 @@ class MetaAdsService {
     for (const key of this.cache.keys()) {
       if (key.includes('metrics') || key.includes('insights') || key.includes('messaging_conversations')) {
         this.cache.delete(key);
-        }
+      }
     }
-    
+
     // Limpar também dados de métricas do localStorage
     const keysToRemove = [
       'metaAds_metrics',
@@ -1813,12 +1821,12 @@ class MetaAdsService {
       'metaAds_account_insights',
       'metaAds_messaging_conversations_insights'
     ];
-    
+
     keysToRemove.forEach(key => {
       try {
         localStorage.removeItem(key);
-        } catch (error) {
-        }
+      } catch (error) {
+      }
     });
   }
 
@@ -1828,21 +1836,21 @@ class MetaAdsService {
       this.clearCache('campaigns');
       this.clearCache('adsets'); // Limpar também ad sets pois dependem de campanhas
     }
-    
+
     if (type === 'all' || type === 'adsets') {
       this.clearCache('adsets');
     }
-    
+
     if (type === 'all' || type === 'insights') {
       this.clearMetricsCache();
     }
-    
+
     // Disparar evento para notificar componentes sobre atualização
     window.dispatchEvent(new CustomEvent('metaAdsDataRefreshed', {
       detail: { type, timestamp: Date.now() }
     }));
-    
-    }
+
+  }
 
   // Forçar refresh completo de todos os dados
   forceCompleteRefresh(): void {
@@ -1863,15 +1871,15 @@ class MetaAdsService {
     try {
       // Buscar insights com a nova métrica
       const insights = await this.getAccountInsights(dateStart, dateEnd);
-      
+
       if (insights.length > 0) {
         const firstInsight = insights[0];
         // Verificar se há messaging_conversations_started nas actions
-          const messagingConversations = firstInsight.actions?.find((action: any) => 
-            action.action_type === 'messaging_conversations_started' || 
-            action.action_type === 'onsite_conversion.messaging_conversation_started_7d'
-          );
-          // Testar conversão
+        const messagingConversations = firstInsight.actions?.find((action: any) =>
+          action.action_type === 'messaging_conversations_started' ||
+          action.action_type === 'onsite_conversion.messaging_conversation_started_7d'
+        );
+        // Testar conversão
         const testMetrics = this.convertToMetricData(insights, 'Teste', 'Teste', 'Teste', 'Teste');
         return {
           success: true,
@@ -1879,15 +1887,15 @@ class MetaAdsService {
           firstInsight,
           convertedMetrics: testMetrics,
           messagingConversationsAvailable: insights.some(i => {
-            const action = i.actions?.find((a: any) => 
-              a.action_type === 'messaging_conversations_started' || 
+            const action = i.actions?.find((a: any) =>
+              a.action_type === 'messaging_conversations_started' ||
               a.action_type === 'onsite_conversion.messaging_conversation_started_7d'
             );
             return action && parseInt(action.value) > 0;
           })
         };
       }
-      
+
       return {
         success: true,
         insightsCount: 0,
@@ -1944,11 +1952,11 @@ class MetaAdsService {
   // Método para sincronização inteligente
   async smartSync(): Promise<void> {
     const hasUpdates = await this.checkForUpdates();
-    
+
     if (hasUpdates) {
       await this.forceRefreshData('all');
     } else {
-      }
+    }
   }
 
   clearCacheByClient(clientName: string): void {
@@ -1956,9 +1964,9 @@ class MetaAdsService {
     for (const key of this.cache.keys()) {
       if (key.includes(clientName)) {
         this.cache.delete(key);
-        }
+      }
     }
-    
+
     // Limpar também dados do localStorage relacionados
     this.clearLocalStorageByClient(clientName);
   }
@@ -1971,12 +1979,12 @@ class MetaAdsService {
       'metaAds_business_managers',
       'metaAds_ad_accounts_by_business'
     ];
-    
+
     keysToRemove.forEach(key => {
       try {
         localStorage.removeItem(key);
-        } catch (error) {
-        }
+      } catch (error) {
+      }
     });
   }
 
@@ -1985,7 +1993,7 @@ class MetaAdsService {
     const cacheKey = this.getCacheKey(type, params);
     if (this.cache.has(cacheKey)) {
       this.cache.delete(cacheKey);
-      }
+    }
   }
 
   getCacheStats(): { size: number; keys: string[] } {
@@ -2003,8 +2011,8 @@ class MetaAdsService {
         data,
         timestamp: Date.now()
       }));
-      } catch (error) {
-      }
+    } catch (error) {
+    }
   }
 
   getDataFromStorage(type: string): any | null {
@@ -2095,7 +2103,7 @@ class MetaAdsService {
 
     return this.makeCachedRequest('adDetails', async () => {
       const fields = 'id,name,status,created_time,creative{id,name,thumbnail_url,image_url,image_hash,title,body,call_to_action_type,object_story_spec{page_id,link_data{link},video_data{call_to_action{value{link}}}}},adset_id,campaign_id';
-      
+
       const url = `${this.baseURL}/${adId}`;
       const params = {
         access_token: accessToken,
@@ -2103,9 +2111,9 @@ class MetaAdsService {
       };
 
       try {
-        
+
         const response = await axios.get(url, { params });
-        
+
         return response.data;
       } catch (error: any) {
         console.error(`Erro ao buscar detalhes do anúncio ${adId}:`, error.response?.data || error.message);
@@ -2126,7 +2134,7 @@ class MetaAdsService {
 
     return this.makeCachedRequest('campaignDetails', async () => {
       const fields = 'id,name,status,objective,created_time,updated_time';
-      
+
       const url = `${this.baseURL}/${campaignId}`;
       const params = {
         access_token: accessToken,
@@ -2134,9 +2142,9 @@ class MetaAdsService {
       };
 
       try {
-        
+
         const response = await axios.get(url, { params });
-        
+
         return response.data;
       } catch (error: any) {
         console.error(`Erro ao buscar detalhes da campanha ${campaignId}:`, error.response?.data || error.message);
@@ -2158,7 +2166,7 @@ class MetaAdsService {
     return this.makeCachedRequest('adSetDetails', async () => {
       // Incluir targeting para obter age_min/age_max e geo_locations
       const fields = 'id,name,status,created_time,updated_time,targeting';
-      
+
       const url = `${this.baseURL}/${adSetId}`;
       const params = {
         access_token: accessToken,
@@ -2166,9 +2174,9 @@ class MetaAdsService {
       };
 
       try {
-        
+
         const response = await axios.get(url, { params });
-        
+
         return response.data;
       } catch (error: any) {
         console.error(`Erro ao buscar detalhes do conjunto ${adSetId}:`, error.response?.data || error.message);
@@ -2179,8 +2187,8 @@ class MetaAdsService {
 
   async getPostIdsFromPage(pageId: string, pageAccessToken: string): Promise<string[]> {
     try {
-      
-      
+
+
       const url = `${this.baseURL}/${pageId}/posts`;
       const params = {
         access_token: pageAccessToken,
@@ -2189,24 +2197,24 @@ class MetaAdsService {
       };
 
       const response = await axios.get(url, { params });
-      
+
       if (response.data && response.data.data) {
         const posts = response.data.data;
-        
-        
+
+
         // Extrair apenas o postId (parte após o "_")
         const postIds = posts.map((post: any) => {
           const fullId = post.id;
           const postId = fullId.split('_')[1]; // Pega a parte após o "_"
-          
+
           return postId;
         });
-        
-        
+
+
         return postIds;
       }
-      
-      
+
+
       return [];
     } catch (error: any) {
       console.error(`Erro ao buscar posts da página ${pageId}:`, error.response?.data || error.message);
@@ -2223,7 +2231,7 @@ class MetaAdsService {
     const cacheKey = this.getCacheKey('creative', { creativeId });
     return this.makeCachedRequest('creative', async () => {
       const fields = 'id,name,thumbnail_url,image_url,image_hash,title,body,call_to_action_type,object_story_spec,effective_object_story_id';
-      
+
       const url = `${this.baseURL}/${creativeId}`;
       const params = {
         access_token: accessToken,
@@ -2252,7 +2260,7 @@ class MetaAdsService {
 
     return this.makeCachedRequest('adCreatives', async () => {
       const fields = 'id,name,effective_object_story_id,object_story_spec';
-      
+
       const url = `${this.baseURL}/act_${this.selectedAccount!.account_id}/adcreatives`;
       const params = {
         access_token: accessToken,
@@ -2261,18 +2269,18 @@ class MetaAdsService {
       };
 
       try {
-        
+
         const response = await axios.get(url, { params });
-        
-        
+
+
         const creatives = response.data.data || [];
         const creativesWithEffectiveStory = creatives.filter((creative: any) => creative.effective_object_story_id);
-        
-        
+
+
         creativesWithEffectiveStory.forEach((creative: any) => {
-          
+
         });
-        
+
         return creativesWithEffectiveStory;
       } catch (error: any) {
         console.error('Erro ao buscar adcreatives:', error.response?.data || error.message);
@@ -2292,7 +2300,7 @@ class MetaAdsService {
       throw new Error('Token de acesso não disponível');
     }
 
-    
+
 
     // Testar diferentes períodos
     const periods = [
@@ -2318,8 +2326,8 @@ class MetaAdsService {
 
         const response = await axios.get(url, { params });
         const insights = response.data.data || [];
-        
-        
+
+
         if (insights.length > 0) {
           results.push(`${period.name}: ${insights.length} insights`);
         }
@@ -2333,8 +2341,8 @@ class MetaAdsService {
     }
 
     const hasData = results.length > 0;
-    
-    
+
+
 
     return { hasData, periods: results };
   }
@@ -2348,17 +2356,17 @@ class MetaAdsService {
     try {
       // Buscar todos os adsets
       const allAdsets = await this.getAdSets();
-      
+
       // Filtrar por produto e status ativo
       const activeProductAdsets = allAdsets.filter(adset => {
         const matchesProduct = adset.name.toLowerCase().includes(product.toLowerCase());
         const isActive = adset.status === 'ACTIVE';
         return matchesProduct && isActive;
       });
-      
-      
+
+
       return activeProductAdsets;
-      
+
     } catch (error) {
       console.error('❌ Erro ao buscar adsets ativos por produto:', error);
       return [];
@@ -2369,35 +2377,35 @@ class MetaAdsService {
   async getActiveAdSetsInsightsByProduct(product: string, dateStart: string, dateEnd: string): Promise<{ adset: any; insights: MetaAdsInsight[] }[]> {
     try {
       const activeAdsets = await this.getActiveAdSetsByProduct(product);
-      
+
       if (activeAdsets.length === 0) {
         console.warn(`⚠️ Nenhum adset ativo encontrado para o produto ${product}`);
         return [];
       }
-      
+
       const results: { adset: any; insights: MetaAdsInsight[] }[] = [];
-      
+
       for (const adset of activeAdsets) {
         try {
-          
+
           const insights = await this.getAdSetInsights(adset.id, dateStart, dateEnd);
-          
+
           results.push({
             adset,
             insights
           });
-          
-          
-          
+
+
+
         } catch (adsetError) {
           console.warn(`⚠️ Erro ao buscar insights do adset ativo ${adset.name}:`, adsetError);
           // Continuar com outros adsets mesmo se um falhar
         }
       }
-      
-      
+
+
       return results;
-      
+
     } catch (error) {
       console.error('❌ Erro ao buscar insights de adsets ativos por produto:', error);
       return [];

@@ -77,19 +77,26 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const [tooltipStates, setTooltipStates] = useState<{ [key: string]: boolean }>({});
 
-  // Controle para campos benchmark editáveis (automático vs manual)
-  const [benchmarkAuto, setBenchmarkAuto] = useState({
-    investimento: true,
-    cpm: true,
-    cpc: true,
-    txMensagens: true,
-    txAgendamento: true,
-    txConversaoVendas: true
+  // 🎯 NOVO: Controle para campos de valores reais editáveis (automático vs manual)
+  const [realValueAuto, setRealValueAuto] = useState(() => {
+    const saved = localStorage.getItem('realValueAuto');
+    return saved ? JSON.parse(saved) : { Vendas: true, Agendamentos: true };
   });
 
+  const getRealValueAutoState = (metric: string) => {
+    if (metric === 'Vendas') return realValueAuto.Vendas !== false;
+    if (metric === 'Agendamentos') return false; // Agendamentos sempre manual
+    return true; // Default auto
+  };
 
-
-  // Função para salvar valores de benchmark no Firebase
+  const toggleRealValueAuto = (metric: string) => {
+    setRealValueAuto((prev: any) => {
+      const newState = { ...prev };
+      if (metric === 'Vendas') newState.Vendas = !prev.Vendas;
+      localStorage.setItem('realValueAuto', JSON.stringify(newState));
+      return newState;
+    });
+  };  // Função para salvar valores de benchmark no Firebase
   const saveBenchmarkValues = async (data: any[]) => {
     // 🎯 PROTEÇÃO: Não salvar durante carregamento
     if (!benchmarkLoadCompleted) {
@@ -349,18 +356,6 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         }
       }
 
-      // Carregar estados automáticos dos campos benchmark (mantém localStorage)
-      const autoStatesKey = `benchmark_auto_${selectedClient}_${selectedProduct}_${selectedMonth}`;
-      const savedAutoStates = localStorage.getItem(autoStatesKey);
-
-      if (savedAutoStates) {
-        try {
-          const autoStates = JSON.parse(savedAutoStates);
-          setBenchmarkAuto(autoStates);
-        } catch (error) {
-          console.error('Erro ao carregar estados automáticos de benchmark:', error);
-        }
-      }
     }
   };
 
@@ -596,7 +591,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       realValue: formatNumber(0),
       status: '',
       statusColor: 'neutral',
-      benchmarkEditable: true,
+      benchmarkEditable: false,
       realValueEditable: false
     },
     {
@@ -604,6 +599,26 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       metric: 'Leads / Msgs',
       benchmark: formatNumber(0),
       realValue: formatNumber(0),
+      status: '',
+      statusColor: 'neutral',
+      benchmarkEditable: false,
+      realValueEditable: false
+    },
+    {
+      category: 'Desempenho do Anúncio e Custo por Lead',
+      metric: '% VIS. PÁG. (LPV/Cliques)',
+      benchmark: '80,00%',
+      realValue: '0,00%',
+      status: '',
+      statusColor: 'neutral',
+      benchmarkEditable: true,
+      realValueEditable: false
+    },
+    {
+      category: 'Desempenho do Anúncio e Custo por Lead',
+      metric: 'Custo por Visita (Custo/LPV)',
+      benchmark: formatCurrency(0),
+      realValue: formatCurrency(0),
       status: '',
       statusColor: 'neutral',
       benchmarkEditable: false,
@@ -710,6 +725,12 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     // 🎯 NOVO: Carregar estado do localStorage ou usar true como padrão
     const saved = localStorage.getItem('agendamentosEnabled');
     return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  // 🎯 NOVO: Estado para controlar se o Funil de Vendas Diretas está ativo
+  const [vendasDiretasEnabled, setVendasDiretasEnabled] = useState(() => {
+    const saved = localStorage.getItem('vendasDiretasEnabled');
+    return saved !== null ? JSON.parse(saved) : false;
   });
 
   // Estado para controlar os dados editáveis
@@ -1269,6 +1290,10 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               newRow.realValue = '0.00%';
               newRow.realValueEditable = false;
               break;
+            case 'Custo por Visita (Custo/LPV)':
+              newRow.realValue = formatCurrency(0);
+              newRow.realValueEditable = false;
+              break;
             case 'Leads / Msgs':
               newRow.realValue = formatNumber(0);
               newRow.realValueEditable = false;
@@ -1400,6 +1425,15 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               }
               newRow.realValueEditable = false;
               break;
+            case 'Custo por Visita (Custo/LPV)':
+              // 🎯 CORREÇÃO: Sincronizar com Custo / LPV
+              if (hasRealData && aggregated.totalLPV > 0) {
+                newRow.realValue = formatCurrency(aggregated.totalInvestment / aggregated.totalLPV);
+              } else {
+                newRow.realValue = formatCurrency(0);
+              }
+              newRow.realValueEditable = false;
+              break;
 
             case 'Leads / Msgs':
               // CORREÇÃO: Só sincronizar se há dados reais
@@ -1462,19 +1496,29 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     })();
   }, [metrics, selectedProduct, savedDetails, audienceCalculatedValues]);
 
-  // 🎯 CORREÇÃO: useEffect separado para notificar mudanças de valores
+  // 🎯 CORREÇÃO: useEffect separado para notificar mudanças de valores e mesclar reais manuais
   useEffect(() => {
     if (onValuesChange) {
-      const agendamentos = audienceCalculatedValues.agendamentos;
-      const vendas = audienceCalculatedValues.vendas;
+      // Usa os valores do contexto/Meta Ads SOMENTE se estiver no modo Automático, senão usa os editados
+      const agendamentosFromAudience = audienceCalculatedValues.agendamentos || 0;
+      const vendasFromAudience = audienceCalculatedValues.vendas || 0;
+
+      const manualAgendamentosStr = tableData.find(r => r.metric === 'Agendamentos')?.realValue || '0';
+      const manualVendasStr = tableData.find(r => r.metric === 'Vendas')?.realValue || '0';
+
+      const manualAgendamentos = parseNumber(manualAgendamentosStr);
+      const manualVendas = parseNumber(manualVendasStr);
+
+      const agendamentos = getRealValueAutoState('Agendamentos') ? agendamentosFromAudience : manualAgendamentos;
+      const vendas = getRealValueAutoState('Vendas') ? vendasFromAudience : manualVendas;
 
       // Evitar loop infinito: só notificar se os valores mudaram
       if (agendamentos !== lastNotifiedValues.agendamentos || vendas !== lastNotifiedValues.vendas) {
         setLastNotifiedValues({ agendamentos, vendas });
-        onValuesChange({ agendamentos, vendas });
+        onValuesChange({ agendamentos, vendas }); // <-- THIS UPDATES THE TABLE BELOW (DailyControlTable)
       }
     }
-  }, [audienceCalculatedValues, onValuesChange, lastNotifiedValues]);
+  }, [audienceCalculatedValues, onValuesChange, lastNotifiedValues, realValueAuto, tableData]);
 
   // 🎯 NOVA FUNÇÃO: Verificar se um campo foi editado pelo usuário (igual ao Ticket Médio)
   const isFieldEditedByUser = (metricName: string): boolean => {
@@ -1532,12 +1576,25 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             // O valor real é definido na função de sincronização com Meta Ads
             break;
 
+          case '% VIS. PÁG. (LPV/Cliques)':
+            if (cliques > 0) {
+              newRow.realValue = formatPercentage((lpv / cliques) * 100);
+            }
+            break;
+
+          case 'Custo por Visita (Custo/LPV)':
+            // 🎯 LÓGICA: Custo/LPV = Investimento / LPV
+            if (lpv > 0) {
+              newRow.realValue = formatCurrency(investment / lpv);
+            }
+            break;
+
           case 'Tx. Mensagens (Leads/Cliques)':
             // 🎯 NOVA LÓGICA: Tx. Mensagens com prioridade para LPV quando disponível
-            const lpv = parseNumber(currentData.find(r => r.metric === 'Visitantes na página (LPV)')?.realValue || '0');
+            const lpvForTx = parseNumber(currentData.find(r => r.metric === 'Visitantes na página (LPV)')?.realValue || '0');
 
             // 🎯 PRIORIDADE: Se LPV > 0, usar LPV como base; senão, usar Cliques
-            const baseForTx = lpv > 0 ? lpv : cliques;
+            const baseForTx = lpvForTx > 0 ? lpvForTx : cliques;
 
             if (baseForTx > 0) {
               newRow.realValue = formatPercentage((leads / baseForTx) * 100);
@@ -1555,11 +1612,18 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             break;
           case 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)':
             if (vendas > 0) {
-              // 🎯 NOVA LÓGICA: Base no toggle agendamentosEnabled
+              // 🎯 NOVA LÓGICA: Base no toggle agendamentosEnabled e vendasDiretasEnabled
               if (agendamentosEnabled) {
                 // 🎯 LÓGICA ATUAL: Tx. Conversão Vendas = (Vendas ÷ Agendamentos) × 100%
                 if (agendamentos > 0) {
                   newRow.realValue = formatPercentage((vendas / agendamentos) * 100);
+                } else {
+                  newRow.realValue = formatPercentage(0);
+                }
+              } else if (vendasDiretasEnabled) {
+                // 🎯 NOVA LÓGICA: Tx. Conversão Vendas = (Vendas ÷ LPV) × 100%
+                if (lpv > 0) {
+                  newRow.realValue = formatPercentage((vendas / lpv) * 100);
                 } else {
                   newRow.realValue = formatPercentage(0);
                 }
@@ -1628,9 +1692,21 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                 updateMetric('Cliques', formatNumber(cliquesValue));
               }
 
-              // 🎯 NOVA LÓGICA: Leads/Msgs com prioridade para LPV quando disponível
-              const lpvBenchForLeads = parseNumber(currentData.find(r => r.metric === 'Visitantes na página (LPV)')?.benchmark || '0');
-              const cliquesForLeads = cpcValue > 0 ? Math.round(investmentValue / cpcValue) : 0;
+              // 🎯 NOVA LÓGICA: LPV agora é calculado e % VIS PÁG é editável
+              const lpvPercent = parsePercentage(currentData.find(r => r.metric === '% VIS. PÁG. (LPV/Cliques)')?.benchmark || '0%');
+              const cliquesForLeads = cpcValue > 0 && investmentValue > 0 ? Math.round(investmentValue / cpcValue) : 0;
+
+              // Visitantes na página (LPV) = Cliques * % VIS PÁG
+              let lpvBenchForLeads = 0;
+              if (cliquesForLeads > 0 && lpvPercent > 0) {
+                lpvBenchForLeads = Math.round(cliquesForLeads * lpvPercent / 100);
+                updateMetric('Visitantes na página (LPV)', formatNumber(lpvBenchForLeads));
+              }
+
+              if (lpvBenchForLeads > 0 && investmentValue > 0) {
+                updateMetric('Custo por Visita (Custo/LPV)', formatCurrency(investmentValue / lpvBenchForLeads));
+              }
+
               const baseForLeads = lpvBenchForLeads > 0 ? lpvBenchForLeads : cliquesForLeads;
 
               if (txMensagens > 0 && baseForLeads > 0) {
@@ -1649,59 +1725,33 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               // Vendas = Agendamentos × Tx. Conversão Vendas% (ou Leads/msgm quando desabilitado)
               const txVendasValue = parsePercentage(currentData.find(r => r.metric === 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)')?.benchmark || '0%');
 
+              let finalBaseForVendas = 0;
               if (agendamentosEnabled) {
-                // 🎯 LÓGICA ATUAL: Vendas = Agendamentos × Tx. Conversão Vendas%
-                const agendForVendas = txAgendamentoValue > 0 && leadsForAgend > 0 ? Math.floor(leadsForAgend * txAgendamentoValue / 100) : 0;
-                if (txVendasValue > 0 && agendForVendas > 0) {
-                  const vendasValue = Math.floor(agendForVendas * txVendasValue / 100);
-                  updateMetric('Vendas', formatNumber(vendasValue));
-                } else {
-                  // 🎯 CORREÇÃO: Se agendamentos = 0, vendas = 0
-                  updateMetric('Vendas', formatNumber(0));
-                }
+                finalBaseForVendas = txAgendamentoValue > 0 && leadsForAgend > 0 ? Math.floor(leadsForAgend * txAgendamentoValue / 100) : 0;
+              } else if (vendasDiretasEnabled) {
+                finalBaseForVendas = baseForLeads;
               } else {
-                // 🎯 NOVA LÓGICA: Vendas = Leads/msgm × Tx. Conversão Vendas%
-                const leadsMsgmForVendas = txMensagens > 0 && baseForLeads > 0 ? Math.round(baseForLeads * txMensagens / 100) : 0;
-                if (txVendasValue > 0 && leadsMsgmForVendas > 0) {
-                  const vendasValue = Math.floor(leadsMsgmForVendas * txVendasValue / 100);
-                  updateMetric('Vendas', formatNumber(vendasValue));
-                } else {
-                  // 🎯 CORREÇÃO: Se leads/msgm = 0, vendas = 0
-                  updateMetric('Vendas', formatNumber(0));
-                }
+                finalBaseForVendas = txMensagens > 0 && baseForLeads > 0 ? Math.round(baseForLeads * txMensagens / 100) : 0;
               }
 
+              const vendasValueFinal = txVendasValue > 0 && finalBaseForVendas > 0 ? Math.floor(finalBaseForVendas * txVendasValue / 100) : 0;
+              updateMetric('Vendas', formatNumber(vendasValueFinal));
+
               // CPV = Investimento ÷ Vendas
-              let vendasForCPV = 0;
-              if (agendamentosEnabled) {
-                const agendForVendas = txAgendamentoValue > 0 && leadsForAgend > 0 ? Math.floor(leadsForAgend * txAgendamentoValue / 100) : 0;
-                vendasForCPV = txVendasValue > 0 && agendForVendas > 0 ? Math.floor(agendForVendas * txVendasValue / 100) : 0;
-              } else {
-                const leadsMsgmForVendas = txMensagens > 0 && baseForLeads > 0 ? Math.round(baseForLeads * txMensagens / 100) : 0;
-                vendasForCPV = txVendasValue > 0 && leadsMsgmForVendas > 0 ? Math.floor(leadsMsgmForVendas * txVendasValue / 100) : 0;
-              }
-              if (vendasForCPV > 0) {
-                const cpvValue = investmentValue / vendasForCPV;
+              if (vendasValueFinal > 0 && investmentValue > 0) {
+                const cpvValue = investmentValue / vendasValueFinal;
                 updateMetric('CPV', formatCurrency(cpvValue));
               }
 
               // Lucro = (Vendas × Valor Venda) - Investimento
               const valorVenda = parseCurrency(currentData.find(r => r.metric === 'Valor Venda')?.benchmark || '0');
-              let vendasForLucro = 0;
-              if (agendamentosEnabled) {
-                const agendForVendas = txAgendamentoValue > 0 && leadsForAgend > 0 ? Math.floor(leadsForAgend * txAgendamentoValue / 100) : 0;
-                vendasForLucro = txVendasValue > 0 && agendForVendas > 0 ? Math.floor(agendForVendas * txVendasValue / 100) : 0;
-              } else {
-                const leadsMsgmForVendas = txMensagens > 0 && baseForLeads > 0 ? Math.round(baseForLeads * txMensagens / 100) : 0;
-                vendasForLucro = txVendasValue > 0 && leadsMsgmForVendas > 0 ? Math.floor(leadsMsgmForVendas * txVendasValue / 100) : 0;
-              }
-              if (valorVenda > 0 && vendasForLucro > 0) {
-                const lucroValue = (vendasForLucro * valorVenda) - investmentValue;
+              if (valorVenda > 0 && vendasValueFinal > 0) {
+                const lucroValue = (vendasValueFinal * valorVenda) - investmentValue;
                 updateMetric('Lucro', formatCurrency(lucroValue));
               }
 
               // ROI = (Lucro ÷ Investimento) × 100
-              const lucroForROI = valorVenda > 0 && vendasForLucro > 0 ? (vendasForLucro * valorVenda) - investmentValue : 0;
+              const lucroForROI = valorVenda > 0 && vendasValueFinal > 0 ? (vendasValueFinal * valorVenda) - investmentValue : 0;
               if (investmentValue > 0 && lucroForROI !== 0) {
                 const roiPercent = (lucroForROI / investmentValue) * 100;
                 const roiMultiplier = (lucroForROI / investmentValue) + 1;
@@ -1727,9 +1777,21 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                 updateMetric('Cliques', formatNumber(cliquesValue));
               }
 
-              // 🎯 NOVA LÓGICA: Leads/Msgs com prioridade para LPV quando disponível
-              const lpvBenchForLeads2 = parseNumber(currentData.find(r => r.metric === 'Visitantes na página (LPV)')?.benchmark || '0');
+              // 🎯 NOVA LÓGICA: LPV agora é calculado e % VIS PÁG é editável
+              const lpvPercent2 = parsePercentage(currentData.find(r => r.metric === '% VIS. PÁG. (LPV/Cliques)')?.benchmark || '0%');
               const cliquesForLeads2 = cpcValue2 > 0 && investmentValue2 > 0 ? Math.round(investmentValue2 / cpcValue2) : 0;
+
+              // Visitantes na página (LPV) = Cliques * % VIS PÁG
+              let lpvBenchForLeads2 = 0;
+              if (cliquesForLeads2 > 0 && lpvPercent2 > 0) {
+                lpvBenchForLeads2 = Math.round(cliquesForLeads2 * lpvPercent2 / 100);
+                updateMetric('Visitantes na página (LPV)', formatNumber(lpvBenchForLeads2));
+              }
+
+              if (lpvBenchForLeads2 > 0 && investmentValue2 > 0) {
+                updateMetric('Custo por Visita (Custo/LPV)', formatCurrency(investmentValue2 / lpvBenchForLeads2));
+              }
+
               const baseForLeads2 = lpvBenchForLeads2 > 0 ? lpvBenchForLeads2 : cliquesForLeads2;
 
               if (txMensagens > 0 && baseForLeads2 > 0) {
@@ -1754,59 +1816,33 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               // Vendas = Agendamentos × Tx. Conversão Vendas% (ou Leads/msgm quando desabilitado)
               const txVendasValue2 = parsePercentage(currentData.find(r => r.metric === 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)')?.benchmark || '0%');
 
+              let finalBaseForVendas2 = 0;
               if (agendamentosEnabled) {
-                // 🎯 LÓGICA ATUAL: Vendas = Agendamentos × Tx. Conversão Vendas%
-                const agendForVendas2 = txAgendamentoValue2 > 0 && leadsForCPL2 > 0 ? Math.floor(leadsForCPL2 * txAgendamentoValue2 / 100) : 0;
-                if (txVendasValue2 > 0 && agendForVendas2 > 0) {
-                  const vendasValue = Math.floor(agendForVendas2 * txVendasValue2 / 100);
-                  updateMetric('Vendas', formatNumber(vendasValue));
-                } else {
-                  // 🎯 CORREÇÃO: Se agendamentos = 0, vendas = 0
-                  updateMetric('Vendas', formatNumber(0));
-                }
+                finalBaseForVendas2 = txAgendamentoValue2 > 0 && leadsForCPL2 > 0 ? Math.floor(leadsForCPL2 * txAgendamentoValue2 / 100) : 0;
+              } else if (vendasDiretasEnabled) {
+                finalBaseForVendas2 = baseForLeads2;
               } else {
-                // 🎯 NOVA LÓGICA: Vendas = Leads/msgm × Tx. Conversão Vendas%
-                const leadsMsgmForVendas2 = txMensagens > 0 && baseForLeads2 > 0 ? Math.round(baseForLeads2 * txMensagens / 100) : 0;
-                if (txVendasValue2 > 0 && leadsMsgmForVendas2 > 0) {
-                  const vendasValue = Math.floor(leadsMsgmForVendas2 * txVendasValue2 / 100);
-                  updateMetric('Vendas', formatNumber(vendasValue));
-                } else {
-                  // 🎯 CORREÇÃO: Se leads/msgm = 0, vendas = 0
-                  updateMetric('Vendas', formatNumber(0));
-                }
+                finalBaseForVendas2 = txMensagens > 0 && baseForLeads2 > 0 ? Math.round(baseForLeads2 * txMensagens / 100) : 0;
               }
 
+              const vendasValueFinal2 = txVendasValue2 > 0 && finalBaseForVendas2 > 0 ? Math.floor(finalBaseForVendas2 * txVendasValue2 / 100) : 0;
+              updateMetric('Vendas', formatNumber(vendasValueFinal2));
+
               // CPV = Investimento ÷ Vendas
-              let vendasForCPV2 = 0;
-              if (agendamentosEnabled) {
-                const agendForVendas2 = txAgendamentoValue2 > 0 && leadsForCPL2 > 0 ? Math.floor(leadsForCPL2 * txAgendamentoValue2 / 100) : 0;
-                vendasForCPV2 = txVendasValue2 > 0 && agendForVendas2 > 0 ? Math.floor(agendForVendas2 * txVendasValue2 / 100) : 0;
-              } else {
-                const leadsMsgmForVendas2 = txMensagens > 0 && baseForLeads2 > 0 ? Math.round(baseForLeads2 * txMensagens / 100) : 0;
-                vendasForCPV2 = txVendasValue2 > 0 && leadsMsgmForVendas2 > 0 ? Math.floor(leadsMsgmForVendas2 * txVendasValue2 / 100) : 0;
-              }
-              if (vendasForCPV2 > 0 && investmentValue2 > 0) {
-                const cpvValue = investmentValue2 / vendasForCPV2;
+              if (vendasValueFinal2 > 0 && investmentValue2 > 0) {
+                const cpvValue = investmentValue2 / vendasValueFinal2;
                 updateMetric('CPV', formatCurrency(cpvValue));
               }
 
               // Lucro = (Vendas × Valor Venda) - Investimento
               const valorVenda2 = parseCurrency(currentData.find(r => r.metric === 'Valor Venda')?.benchmark || '0');
-              let vendasForLucro2 = 0;
-              if (agendamentosEnabled) {
-                const agendForVendas2 = txAgendamentoValue2 > 0 && leadsForCPL2 > 0 ? Math.floor(leadsForCPL2 * txAgendamentoValue2 / 100) : 0;
-                vendasForLucro2 = txVendasValue2 > 0 && agendForVendas2 > 0 ? Math.floor(agendForVendas2 * txVendasValue2 / 100) : 0;
-              } else {
-                const leadsMsgmForVendas2 = txMensagens > 0 && baseForLeads2 > 0 ? Math.round(baseForLeads2 * txMensagens / 100) : 0;
-                vendasForLucro2 = txVendasValue2 > 0 && leadsMsgmForVendas2 > 0 ? Math.floor(leadsMsgmForVendas2 * txVendasValue2 / 100) : 0;
-              }
-              if (valorVenda2 > 0 && vendasForLucro2 > 0) {
-                const lucroValue = (vendasForLucro2 * valorVenda2) - investmentValue2;
+              if (valorVenda2 > 0 && vendasValueFinal2 > 0) {
+                const lucroValue = (vendasValueFinal2 * valorVenda2) - investmentValue2;
                 updateMetric('Lucro', formatCurrency(lucroValue));
               }
 
               // ROI = (Lucro ÷ Investimento) × 100
-              const lucroForROI2 = valorVenda2 > 0 && vendasForLucro2 > 0 ? (vendasForLucro2 * valorVenda2) - investmentValue2 : 0;
+              const lucroForROI2 = valorVenda2 > 0 && vendasValueFinal2 > 0 ? (vendasValueFinal2 * valorVenda2) - investmentValue2 : 0;
               if (investmentValue2 > 0 && lucroForROI2 !== 0) {
                 const roiPercent = (lucroForROI2 / investmentValue2) * 100;
                 const roiMultiplier = (lucroForROI2 / investmentValue2) + 1;
@@ -1825,9 +1861,21 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                 updateMetric('Cliques', formatNumber(cliquesValue));
               }
 
-              // 🎯 NOVA LÓGICA: Leads/Msgs com prioridade para LPV quando disponível
-              const lpvBenchForLeads3 = parseNumber(currentData.find(r => r.metric === 'Visitantes na página (LPV)')?.benchmark || '0');
+              // 🎯 NOVA LÓGICA: LPV agora é calculado e % VIS PÁG é editável
+              const lpvPercent3 = parsePercentage(currentData.find(r => r.metric === '% VIS. PÁG. (LPV/Cliques)')?.benchmark || '0%');
               const cliquesForLeads3 = cpcValue3 > 0 && investmentValue3 > 0 ? Math.round(investmentValue3 / cpcValue3) : 0;
+
+              // Visitantes na página (LPV) = Cliques * % VIS PÁG
+              let lpvBenchForLeads3 = 0;
+              if (cliquesForLeads3 > 0 && lpvPercent3 > 0) {
+                lpvBenchForLeads3 = Math.round(cliquesForLeads3 * lpvPercent3 / 100);
+                updateMetric('Visitantes na página (LPV)', formatNumber(lpvBenchForLeads3));
+              }
+
+              if (lpvBenchForLeads3 > 0 && investmentValue3 > 0) {
+                updateMetric('Custo por Visita (Custo/LPV)', formatCurrency(investmentValue3 / lpvBenchForLeads3));
+              }
+
               const baseForLeads3 = lpvBenchForLeads3 > 0 ? lpvBenchForLeads3 : cliquesForLeads3;
 
               if (txMensagens > 0 && baseForLeads3 > 0) {
@@ -1852,59 +1900,33 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               // Vendas = Agendamentos × Tx. Conversão Vendas% (ou Leads/msgm quando desabilitado)
               const txVendasValue3 = parsePercentage(currentData.find(r => r.metric === 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)')?.benchmark || '0%');
 
+              let finalBaseForVendas3 = 0;
               if (agendamentosEnabled) {
-                // 🎯 LÓGICA ATUAL: Vendas = Agendamentos × Tx. Conversão Vendas%
-                const agendForVendas3 = txAgendamentoValue3 > 0 && leadsForCPL3 > 0 ? Math.floor(leadsForCPL3 * txAgendamentoValue3 / 100) : 0;
-                if (txVendasValue3 > 0 && agendForVendas3 > 0) {
-                  const vendasValue = Math.floor(agendForVendas3 * txVendasValue3 / 100);
-                  updateMetric('Vendas', formatNumber(vendasValue));
-                } else {
-                  // 🎯 CORREÇÃO: Se agendamentos = 0, vendas = 0
-                  updateMetric('Vendas', formatNumber(0));
-                }
+                finalBaseForVendas3 = txAgendamentoValue3 > 0 && leadsForCPL3 > 0 ? Math.floor(leadsForCPL3 * txAgendamentoValue3 / 100) : 0;
+              } else if (vendasDiretasEnabled) {
+                finalBaseForVendas3 = baseForLeads3;
               } else {
-                // 🎯 NOVA LÓGICA: Vendas = Leads/msgm × Tx. Conversão Vendas%
-                const leadsMsgmForVendas3 = txMensagens > 0 && baseForLeads3 > 0 ? Math.round(baseForLeads3 * txMensagens / 100) : 0;
-                if (txVendasValue3 > 0 && leadsMsgmForVendas3 > 0) {
-                  const vendasValue = Math.floor(leadsMsgmForVendas3 * txVendasValue3 / 100);
-                  updateMetric('Vendas', formatNumber(vendasValue));
-                } else {
-                  // 🎯 CORREÇÃO: Se leads/msgm = 0, vendas = 0
-                  updateMetric('Vendas', formatNumber(0));
-                }
+                finalBaseForVendas3 = txMensagens > 0 && baseForLeads3 > 0 ? Math.round(baseForLeads3 * txMensagens / 100) : 0;
               }
 
+              const vendasValueFinal3 = txVendasValue3 > 0 && finalBaseForVendas3 > 0 ? Math.floor(finalBaseForVendas3 * txVendasValue3 / 100) : 0;
+              updateMetric('Vendas', formatNumber(vendasValueFinal3));
+
               // CPV = Investimento ÷ Vendas
-              let vendasForCPV3 = 0;
-              if (agendamentosEnabled) {
-                const agendForVendas3 = txAgendamentoValue3 > 0 && leadsForCPL3 > 0 ? Math.floor(leadsForCPL3 * txAgendamentoValue3 / 100) : 0;
-                vendasForCPV3 = txVendasValue3 > 0 && agendForVendas3 > 0 ? Math.floor(agendForVendas3 * txVendasValue3 / 100) : 0;
-              } else {
-                const leadsMsgmForVendas3 = txMensagens > 0 && baseForLeads3 > 0 ? Math.round(baseForLeads3 * txMensagens / 100) : 0;
-                vendasForCPV3 = txVendasValue3 > 0 && leadsMsgmForVendas3 > 0 ? Math.floor(leadsMsgmForVendas3 * txVendasValue3 / 100) : 0;
-              }
-              if (vendasForCPV3 > 0 && investmentValue3 > 0) {
-                const cpvValue = investmentValue3 / vendasForCPV3;
+              if (vendasValueFinal3 > 0 && investmentValue3 > 0) {
+                const cpvValue = investmentValue3 / vendasValueFinal3;
                 updateMetric('CPV', formatCurrency(cpvValue));
               }
 
               // Lucro = (Vendas × Valor Venda) - Investimento
               const valorVenda3 = parseCurrency(currentData.find(r => r.metric === 'Valor Venda')?.benchmark || '0');
-              let vendasForLucro3 = 0;
-              if (agendamentosEnabled) {
-                const agendForVendas3 = txAgendamentoValue3 > 0 && leadsForCPL3 > 0 ? Math.floor(leadsForCPL3 * txAgendamentoValue3 / 100) : 0;
-                vendasForLucro3 = txVendasValue3 > 0 && agendForVendas3 > 0 ? Math.floor(agendForVendas3 * txVendasValue3 / 100) : 0;
-              } else {
-                const leadsMsgmForVendas3 = txMensagens > 0 && baseForLeads3 > 0 ? Math.round(baseForLeads3 * txMensagens / 100) : 0;
-                vendasForLucro3 = txVendasValue3 > 0 && leadsMsgmForVendas3 > 0 ? Math.floor(leadsMsgmForVendas3 * txVendasValue3 / 100) : 0;
-              }
-              if (valorVenda3 > 0 && vendasForLucro3 > 0) {
-                const lucroValue = (vendasForLucro3 * valorVenda3) - investmentValue3;
+              if (valorVenda3 > 0 && vendasValueFinal3 > 0) {
+                const lucroValue = (vendasValueFinal3 * valorVenda3) - investmentValue3;
                 updateMetric('Lucro', formatCurrency(lucroValue));
               }
 
               // ROI = (Lucro ÷ Investimento) × 100
-              const lucroForROI3 = valorVenda3 > 0 && vendasForLucro3 > 0 ? (vendasForLucro3 * valorVenda3) - investmentValue3 : 0;
+              const lucroForROI3 = valorVenda3 > 0 && vendasValueFinal3 > 0 ? (vendasValueFinal3 * valorVenda3) - investmentValue3 : 0;
               if (investmentValue3 > 0 && lucroForROI3 !== 0) {
                 const roiPercent = (lucroForROI3 / investmentValue3) * 100;
                 const roiMultiplier = (lucroForROI3 / investmentValue3) + 1;
@@ -1912,10 +1934,80 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               }
               break;
 
-            case 'Visitantes na página (LPV)':
-              // 🎯 CORREÇÃO: LPV da coluna valores reais NÃO deve ser afetado pelo benchmark
-              // O campo valores reais deve sempre puxar dados do Meta Ads
-              // Nenhuma ação necessária aqui
+            case '% VIS. PÁG. (LPV/Cliques)':
+              // 🎯 % VIS PÁG AFETA: Visitantes na página (LPV), Leads/Msgs, CPL, Agendamentos, Vendas, CPV, Lucro, ROI
+              const lpvPercent4 = parsePercentage(currentData.find(r => r.metric === '% VIS. PÁG. (LPV/Cliques)')?.benchmark || '0%');
+              const investmentValue4 = parseCurrency(currentData.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
+              const cpcValue4 = parseCurrency(currentData.find(r => r.metric === 'CPC')?.benchmark || '0');
+
+              const cliquesForLeads4 = cpcValue4 > 0 && investmentValue4 > 0 ? Math.round(investmentValue4 / cpcValue4) : 0;
+
+              // Visitantes na página (LPV) = Cliques * % VIS PÁG
+              let lpvBenchForLeads4 = 0;
+              if (cliquesForLeads4 > 0 && lpvPercent4 > 0) {
+                lpvBenchForLeads4 = Math.round(cliquesForLeads4 * lpvPercent4 / 100);
+                updateMetric('Visitantes na página (LPV)', formatNumber(lpvBenchForLeads4));
+              }
+
+              if (lpvBenchForLeads4 > 0 && investmentValue4 > 0) {
+                updateMetric('Custo por Visita (Custo/LPV)', formatCurrency(investmentValue4 / lpvBenchForLeads4));
+              }
+
+              // O restante recai sobre txMensagens, leads, vendas (basicamente o funil a partir do LPV)
+              const txMensagens4 = parsePercentage(currentData.find(r => r.metric === 'Tx. Mensagens (Leads/Cliques)')?.benchmark || '0%');
+              const baseForLeads4 = lpvBenchForLeads4 > 0 ? lpvBenchForLeads4 : cliquesForLeads4;
+
+              if (txMensagens4 > 0 && baseForLeads4 > 0) {
+                const leadsValue = Math.round(baseForLeads4 * txMensagens4 / 100);
+                updateMetric('Leads / Msgs', formatNumber(leadsValue));
+              }
+
+              // CPL = Investimento ÷ Leads
+              const leadsForCPL4 = txMensagens4 > 0 && baseForLeads4 > 0 ? Math.round(baseForLeads4 * txMensagens4 / 100) : 0;
+              if (leadsForCPL4 > 0 && investmentValue4 > 0) {
+                const cplValue = investmentValue4 / leadsForCPL4;
+                updateMetric('CPL', formatCurrency(cplValue));
+              }
+
+              // Agendamentos = Leads × Tx. Agendamento%
+              const txAgendamentoValue4 = parsePercentage(currentData.find(r => r.metric === 'Tx. Agendamento (Agend./Leads)')?.benchmark || '0%');
+              if (txAgendamentoValue4 > 0 && leadsForCPL4 > 0) {
+                const agendamentosValue = Math.floor(leadsForCPL4 * txAgendamentoValue4 / 100);
+                updateMetric('Agendamentos', formatNumber(agendamentosValue));
+              }
+
+              // Vendas
+              const txVendasValue4 = parsePercentage(currentData.find(r => r.metric === 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)')?.benchmark || '0%');
+              let finalBaseForVendas4 = 0;
+              if (agendamentosEnabled) {
+                finalBaseForVendas4 = txAgendamentoValue4 > 0 && leadsForCPL4 > 0 ? Math.floor(leadsForCPL4 * txAgendamentoValue4 / 100) : 0;
+              } else if (vendasDiretasEnabled) {
+                finalBaseForVendas4 = baseForLeads4;
+              } else {
+                finalBaseForVendas4 = txMensagens4 > 0 && baseForLeads4 > 0 ? Math.round(baseForLeads4 * txMensagens4 / 100) : 0;
+              }
+
+              const vendasValueFinal4 = txVendasValue4 > 0 && finalBaseForVendas4 > 0 ? Math.floor(finalBaseForVendas4 * txVendasValue4 / 100) : 0;
+              updateMetric('Vendas', formatNumber(vendasValueFinal4));
+
+              // CPV
+              if (vendasValueFinal4 > 0 && investmentValue4 > 0) {
+                const cpvValue = investmentValue4 / vendasValueFinal4;
+                updateMetric('CPV', formatCurrency(cpvValue));
+              }
+
+              // Lucro / ROI
+              const valorVenda4 = parseCurrency(currentData.find(r => r.metric === 'Valor Venda')?.benchmark || '0');
+              if (valorVenda4 > 0 && vendasValueFinal4 > 0) {
+                const lucroValue = (vendasValueFinal4 * valorVenda4) - investmentValue4;
+                updateMetric('Lucro', formatCurrency(lucroValue));
+
+                if (investmentValue4 > 0) {
+                  const roiPercent = (lucroValue / investmentValue4) * 100;
+                  const roiMultiplier = (lucroValue / investmentValue4) + 1;
+                  updateMetric('ROI', `${roiPercent.toFixed(0).replace('.', ',')}% (${roiMultiplier.toFixed(1).replace('.', ',')}x)`);
+                }
+              }
               break;
 
             case 'Tx. Mensagens (Leads/Cliques)':
@@ -1930,9 +2022,21 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               const cpcValue5 = parseCurrency(currentData.find(r => r.metric === 'CPC')?.benchmark || '0');
               const txMensagensValue5 = parsePercentage(currentData.find(r => r.metric === 'Tx. Mensagens (Leads/Cliques)')?.benchmark || '0%');
 
-              // 🎯 NOVA LÓGICA: Leads com prioridade para LPV quando disponível
-              const lpvBenchForLeads5 = parseNumber(currentData.find(r => r.metric === 'Visitantes na página (LPV)')?.benchmark || '0');
+              // 🎯 NOVA LÓGICA: LPV agora é calculado e % VIS PÁG é editável
+              const lpvPercent5 = parsePercentage(currentData.find(r => r.metric === '% VIS. PÁG. (LPV/Cliques)')?.benchmark || '0%');
               const cliquesForLeads5 = cpcValue5 > 0 && investmentValue5 > 0 ? Math.round(investmentValue5 / cpcValue5) : 0;
+
+              // Visitantes na página (LPV) = Cliques * % VIS PÁG
+              let lpvBenchForLeads5 = 0;
+              if (cliquesForLeads5 > 0 && lpvPercent5 > 0) {
+                lpvBenchForLeads5 = Math.round(cliquesForLeads5 * lpvPercent5 / 100);
+                updateMetric('Visitantes na página (LPV)', formatNumber(lpvBenchForLeads5));
+              }
+
+              if (lpvBenchForLeads5 > 0 && investmentValue5 > 0) {
+                updateMetric('Custo por Visita (Custo/LPV)', formatCurrency(investmentValue5 / lpvBenchForLeads5));
+              }
+
               const baseForLeads5 = lpvBenchForLeads5 > 0 ? lpvBenchForLeads5 : cliquesForLeads5;
 
               // Leads = Base (LPV ou Cliques) × Tx. Mensagens%
@@ -1947,59 +2051,33 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               // Vendas = Agendamentos × Tx. Conversão Vendas% (ou Leads/msgm quando desabilitado)
               const txVendasValue5 = parsePercentage(currentData.find(r => r.metric === 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)')?.benchmark || '0%');
 
+              let finalBaseForVendas5 = 0;
               if (agendamentosEnabled) {
-                // 🎯 LÓGICA ATUAL: Vendas = Agendamentos × Tx. Conversão Vendas%
-                const agendForVendas5 = txAgendamentoValue5 > 0 && leadsForAgend5 > 0 ? Math.floor(leadsForAgend5 * txAgendamentoValue5 / 100) : 0;
-                if (txVendasValue5 > 0 && agendForVendas5 > 0) {
-                  const vendasValue = Math.floor(agendForVendas5 * txVendasValue5 / 100);
-                  updateMetric('Vendas', formatNumber(vendasValue));
-                } else {
-                  // 🎯 CORREÇÃO: Se agendamentos = 0, vendas = 0
-                  updateMetric('Vendas', formatNumber(0));
-                }
+                finalBaseForVendas5 = txAgendamentoValue5 > 0 && leadsForAgend5 > 0 ? Math.floor(leadsForAgend5 * txAgendamentoValue5 / 100) : 0;
+              } else if (vendasDiretasEnabled) {
+                finalBaseForVendas5 = baseForLeads5;
               } else {
-                // 🎯 NOVA LÓGICA: Vendas = Leads/msgm × Tx. Conversão Vendas%
-                const leadsMsgmForVendas5 = txMensagensValue5 > 0 && baseForLeads5 > 0 ? Math.round(baseForLeads5 * txMensagensValue5 / 100) : 0;
-                if (txVendasValue5 > 0 && leadsMsgmForVendas5 > 0) {
-                  const vendasValue = Math.floor(leadsMsgmForVendas5 * txVendasValue5 / 100);
-                  updateMetric('Vendas', formatNumber(vendasValue));
-                } else {
-                  // 🎯 CORREÇÃO: Se leads/msgm = 0, vendas = 0
-                  updateMetric('Vendas', formatNumber(0));
-                }
+                finalBaseForVendas5 = txMensagensValue5 > 0 && baseForLeads5 > 0 ? Math.round(baseForLeads5 * txMensagensValue5 / 100) : 0;
               }
 
+              const vendasValueFinal5 = txVendasValue5 > 0 && finalBaseForVendas5 > 0 ? Math.floor(finalBaseForVendas5 * txVendasValue5 / 100) : 0;
+              updateMetric('Vendas', formatNumber(vendasValueFinal5));
+
               // CPV = Investimento ÷ Vendas
-              let vendasForCPV5 = 0;
-              if (agendamentosEnabled) {
-                const agendForVendas5 = txAgendamentoValue5 > 0 && leadsForAgend5 > 0 ? Math.floor(leadsForAgend5 * txAgendamentoValue5 / 100) : 0;
-                vendasForCPV5 = txVendasValue5 > 0 && agendForVendas5 > 0 ? Math.floor(agendForVendas5 * txVendasValue5 / 100) : 0;
-              } else {
-                const leadsMsgmForVendas5 = txMensagensValue5 > 0 && baseForLeads5 > 0 ? Math.round(baseForLeads5 * txMensagensValue5 / 100) : 0;
-                vendasForCPV5 = txVendasValue5 > 0 && leadsMsgmForVendas5 > 0 ? Math.floor(leadsMsgmForVendas5 * txVendasValue5 / 100) : 0;
-              }
-              if (vendasForCPV5 > 0 && investmentValue5 > 0) {
-                const cpvValue = investmentValue5 / vendasForCPV5;
+              if (vendasValueFinal5 > 0 && investmentValue5 > 0) {
+                const cpvValue = investmentValue5 / vendasValueFinal5;
                 updateMetric('CPV', formatCurrency(cpvValue));
               }
 
               // Lucro = (Vendas × Valor Venda) - Investimento
               const valorVenda5 = parseCurrency(currentData.find(r => r.metric === 'Valor Venda')?.benchmark || '0');
-              let vendasForLucro5 = 0;
-              if (agendamentosEnabled) {
-                const agendForVendas5 = txAgendamentoValue5 > 0 && leadsForAgend5 > 0 ? Math.floor(leadsForAgend5 * txAgendamentoValue5 / 100) : 0;
-                vendasForLucro5 = txVendasValue5 > 0 && agendForVendas5 > 0 ? Math.floor(agendForVendas5 * txVendasValue5 / 100) : 0;
-              } else {
-                const leadsMsgmForVendas5 = txMensagensValue5 > 0 && baseForLeads5 > 0 ? Math.round(baseForLeads5 * txMensagensValue5 / 100) : 0;
-                vendasForLucro5 = txVendasValue5 > 0 && leadsMsgmForVendas5 > 0 ? Math.floor(leadsMsgmForVendas5 * txVendasValue5 / 100) : 0;
-              }
-              if (valorVenda5 > 0 && vendasForLucro5 > 0) {
-                const lucroValue = (vendasForLucro5 * valorVenda5) - investmentValue5;
+              if (valorVenda5 > 0 && vendasValueFinal5 > 0) {
+                const lucroValue = (vendasValueFinal5 * valorVenda5) - investmentValue5;
                 updateMetric('Lucro', formatCurrency(lucroValue));
               }
 
               // ROI = (Lucro ÷ Investimento) × 100
-              const lucroForROI5 = valorVenda5 > 0 && vendasForLucro5 > 0 ? (vendasForLucro5 * valorVenda5) - investmentValue5 : 0;
+              const lucroForROI5 = valorVenda5 > 0 && vendasValueFinal5 > 0 ? (vendasValueFinal5 * valorVenda5) - investmentValue5 : 0;
               if (investmentValue5 > 0 && lucroForROI5 !== 0) {
                 const roiPercent = (lucroForROI5 / investmentValue5) * 100;
                 const roiMultiplier = (lucroForROI5 / investmentValue5) + 1;
@@ -2015,9 +2093,21 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               const txMensagensValue6 = parsePercentage(currentData.find(r => r.metric === 'Tx. Mensagens (Leads/Cliques)')?.benchmark || '0%');
               const txAgendamentoValue6 = parsePercentage(currentData.find(r => r.metric === 'Tx. Agendamento (Agend./Leads)')?.benchmark || '0%');
 
-              // 🎯 NOVA LÓGICA: Leads com prioridade para LPV quando disponível
-              const lpvBenchForLeads6 = parseNumber(currentData.find(r => r.metric === 'Visitantes na página (LPV)')?.benchmark || '0');
+              // 🎯 NOVA LÓGICA: LPV agora é calculado e % VIS PÁG é editável
+              const lpvPercent6 = parsePercentage(currentData.find(r => r.metric === '% VIS. PÁG. (LPV/Cliques)')?.benchmark || '0%');
               const cliquesForLeads6 = cpcValue6 > 0 && investmentValue6 > 0 ? Math.round(investmentValue6 / cpcValue6) : 0;
+
+              // Visitantes na página (LPV) = Cliques * % VIS PÁG
+              let lpvBenchForLeads6 = 0;
+              if (cliquesForLeads6 > 0 && lpvPercent6 > 0) {
+                lpvBenchForLeads6 = Math.round(cliquesForLeads6 * lpvPercent6 / 100);
+                updateMetric('Visitantes na página (LPV)', formatNumber(lpvBenchForLeads6));
+              }
+
+              if (lpvBenchForLeads6 > 0 && investmentValue6 > 0) {
+                updateMetric('Custo por Visita (Custo/LPV)', formatCurrency(investmentValue6 / lpvBenchForLeads6));
+              }
+
               const baseForLeads6 = lpvBenchForLeads6 > 0 ? lpvBenchForLeads6 : cliquesForLeads6;
 
               // Leads = Base (LPV ou Cliques) × Tx. Mensagens%
@@ -2026,45 +2116,37 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               // Agendamentos = Leads × Tx. Agendamento%
               const agendForVendas6 = txAgendamentoValue6 > 0 && leadsForAgend6 > 0 ? Math.floor(leadsForAgend6 * txAgendamentoValue6 / 100) : 0;
 
-              // Vendas = Agendamentos × Tx. Conversão Vendas% (ou Leads/msgm quando desabilitado)
+              // 🎯 BASE PARA VENDAS (agendamentos, LPV ou Leads)
+              let finalBaseForVendas6 = 0;
               if (agendamentosEnabled) {
-                // 🎯 LÓGICA ATUAL: Vendas = Agendamentos × Tx. Conversão Vendas%
-                if (txVendasValue6 > 0 && agendForVendas6 > 0) {
-                  const vendasValue = Math.floor(agendForVendas6 * txVendasValue6 / 100);
-                  updateMetric('Vendas', formatNumber(vendasValue));
-                } else {
-                  // 🎯 CORREÇÃO: Se agendamentos = 0, vendas = 0
-                  updateMetric('Vendas', formatNumber(0));
-                }
+                finalBaseForVendas6 = agendForVendas6;
+              } else if (vendasDiretasEnabled) {
+                // 🎯 Se LPV não tiver benchmark, usa a projeção de cliques
+                finalBaseForVendas6 = baseForLeads6;
               } else {
-                // 🎯 NOVA LÓGICA: Vendas = Leads/msgm × Tx. Conversão Vendas%
                 const leadsMsgmForVendas6 = txMensagensValue6 > 0 && baseForLeads6 > 0 ? Math.round(baseForLeads6 * txMensagensValue6 / 100) : 0;
-                if (txVendasValue6 > 0 && leadsMsgmForVendas6 > 0) {
-                  const vendasValue = Math.floor(leadsMsgmForVendas6 * txVendasValue6 / 100);
-                  updateMetric('Vendas', formatNumber(vendasValue));
-                } else {
-                  // 🎯 CORREÇÃO: Se leads/msgm = 0, vendas = 0
-                  updateMetric('Vendas', formatNumber(0));
-                }
+                finalBaseForVendas6 = leadsMsgmForVendas6;
               }
 
-              // CPV = Investimento ÷ Vendas
-              const vendasForCPV6 = txVendasValue6 > 0 && agendForVendas6 > 0 ? Math.floor(agendForVendas6 * txVendasValue6 / 100) : 0;
-              if (vendasForCPV6 > 0 && investmentValue6 > 0) {
-                const cpvValue = investmentValue6 / vendasForCPV6;
+              // Vendas
+              const vendasValueFinal6 = txVendasValue6 > 0 && finalBaseForVendas6 > 0 ? Math.floor(finalBaseForVendas6 * txVendasValue6 / 100) : 0;
+              updateMetric('Vendas', formatNumber(vendasValueFinal6));
+
+              // CPV
+              if (vendasValueFinal6 > 0 && investmentValue6 > 0) {
+                const cpvValue = investmentValue6 / vendasValueFinal6;
                 updateMetric('CPV', formatCurrency(cpvValue));
               }
 
-              // Lucro = (Vendas × Valor Venda) - Investimento
+              // Lucro
               const valorVenda6 = parseCurrency(currentData.find(r => r.metric === 'Valor Venda')?.benchmark || '0');
-              const vendasForLucro6 = txVendasValue6 > 0 && agendForVendas6 > 0 ? Math.floor(agendForVendas6 * txVendasValue6 / 100) : 0;
-              if (valorVenda6 > 0 && vendasForLucro6 > 0) {
-                const lucroValue = (vendasForLucro6 * valorVenda6) - investmentValue6;
+              if (valorVenda6 > 0 && vendasValueFinal6 > 0) {
+                const lucroValue = (vendasValueFinal6 * valorVenda6) - investmentValue6;
                 updateMetric('Lucro', formatCurrency(lucroValue));
               }
 
-              // ROI = (Lucro ÷ Investimento) × 100
-              const lucroForROI6 = valorVenda6 > 0 && vendasForLucro6 > 0 ? (vendasForLucro6 * valorVenda6) - investmentValue6 : 0;
+              // ROI
+              const lucroForROI6 = valorVenda6 > 0 && vendasValueFinal6 > 0 ? (vendasValueFinal6 * valorVenda6) - investmentValue6 : 0;
               if (investmentValue6 > 0 && lucroForROI6 !== 0) {
                 const roiPercent = (lucroForROI6 / investmentValue6) * 100;
                 const roiMultiplier = (lucroForROI6 / investmentValue6) + 1;
@@ -2078,9 +2160,25 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               const investmentValue7 = parseCurrency(currentData.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
               const cpcValue7 = parseCurrency(currentData.find(r => r.metric === 'CPC')?.benchmark || '0');
 
-              // 🎯 NOVA LÓGICA: Leads com prioridade para LPV quando disponível
-              const lpvBenchForLeads7 = parseNumber(currentData.find(r => r.metric === 'Visitantes na página (LPV)')?.benchmark || '0');
+              // 🎯 NOVA LÓGICA: LPV agora é calculado e % VIS PÁG é editável
+              const lpvPercent7 = parsePercentage(currentData.find(r => r.metric === '% VIS. PÁG. (LPV/Cliques)')?.benchmark || '0%');
               const cliquesForLeads7 = cpcValue7 > 0 && investmentValue7 > 0 ? Math.round(investmentValue7 / cpcValue7) : 0;
+
+              // Visitantes na página (LPV) = Cliques * % VIS PÁG
+              let lpvBenchForLeads7 = 0;
+              if (cliquesForLeads7 > 0 && lpvPercent7 > 0) {
+                lpvBenchForLeads7 = Math.round(cliquesForLeads7 * lpvPercent7 / 100);
+                updateMetric('Visitantes na página (LPV)', formatNumber(lpvBenchForLeads7));
+              } else {
+                updateMetric('Visitantes na página (LPV)', formatNumber(0));
+              }
+
+              if (lpvBenchForLeads7 > 0 && investmentValue7 > 0) {
+                updateMetric('Custo por Visita (Custo/LPV)', formatCurrency(investmentValue7 / lpvBenchForLeads7));
+              } else {
+                updateMetric('Custo por Visita (Custo/LPV)', formatCurrency(0));
+              }
+
               const baseForLeads7 = lpvBenchForLeads7 > 0 ? lpvBenchForLeads7 : cliquesForLeads7;
 
               // Leads/Msgs = Base (LPV ou Cliques) × Tx. Mensagens%
@@ -2187,7 +2285,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             }
             break;
           case 'Vendas':
-            // 🎯 NOVA LÓGICA: Vendas com base em Agendamentos ou Leads/msgm
+            // 🎯 NOVA LÓGICA: Vendas com base em Agendamentos, LPV ou Leads/msgm
             const txConversaoVendasBench = parsePercentage(currentData.find(r => r.metric === 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)')?.benchmark || '0%');
 
             if (agendamentosEnabled) {
@@ -2197,7 +2295,15 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                 const vendasValue = Math.floor(agendamentosBench * txConversaoVendasBench / 100);
                 newRow.benchmark = formatNumber(vendasValue);
               } else {
-                // 🎯 CORREÇÃO: Se agendamentos = 0, vendas = 0
+                newRow.benchmark = formatNumber(0);
+              }
+            } else if (vendasDiretasEnabled) {
+              // 🎯 NOVA LÓGICA: Vendas = LPV × Tx. Conversão Vendas%
+              const lpvBench = parseNumber(currentData.find(r => r.metric === 'Visitantes na página (LPV)')?.benchmark || '0');
+              if (txConversaoVendasBench > 0 && lpvBench > 0) {
+                const vendasValue = Math.floor(lpvBench * txConversaoVendasBench / 100);
+                newRow.benchmark = formatNumber(vendasValue);
+              } else {
                 newRow.benchmark = formatNumber(0);
               }
             } else {
@@ -2494,14 +2600,14 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     const isEditable = field === 'benchmark' ? row.benchmarkEditable : row.realValueEditable;
     if (isEditable) {
       setEditingCell({ rowIndex, field });
-      if (row.metric.includes('CPM') || row.metric.includes('CPC') || row.metric.includes('CPL') ||
-        row.metric.includes('CPV') || row.metric.includes('Investimento') || row.metric.includes('Lucro')) {
-        // Extrair apenas dígitos do valor atual (moeda)
+      if (row && (row.metric.includes('CPM') || row.metric.includes('CPC') || row.metric.includes('CPL') ||
+        row.metric.includes('CPV') || row.metric.includes('Investimento') || row.metric.includes('Lucro') || row.metric.includes('Custo por Visita'))) {
+        // Formatar como moeda ao editarígitos do valor atual (moeda)
         const digits = value.replace(/\D/g, '');
         setEditRawValue(digits);
         setEditValue(formatBRLFromDigits(digits));
         setEditRawPercent('');
-      } else if (row.metric.includes('CTR') || row.metric.includes('Tx.')) {
+      } else if (row.metric.includes('CTR') || row.metric.includes('Tx.') || row.metric.includes('% VIS. PÁG.')) {
         // Extrair apenas dígitos do valor atual (percentual)
         const digits = value.replace(/\D/g, '');
         setEditRawPercent(digits);
@@ -2519,12 +2625,12 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const row = editingCell ? tableData[editingCell.rowIndex] : null;
     if (row && (row.metric.includes('CPM') || row.metric.includes('CPC') || row.metric.includes('CPL') ||
-      row.metric.includes('CPV') || row.metric.includes('Investimento') || row.metric.includes('Lucro'))) {
+      row.metric.includes('CPV') || row.metric.includes('Investimento') || row.metric.includes('Lucro') || row.metric.includes('Custo por Visita'))) {
       // Moeda
       const digits = e.target.value.replace(/\D/g, '');
       setEditRawValue(digits);
       setEditValue(formatBRLFromDigits(digits));
-    } else if (row && (row.metric.includes('CTR') || row.metric.includes('Tx.'))) {
+    } else if (row && (row.metric.includes('CTR') || row.metric.includes('Tx.') || row.metric.includes('% VIS. PÁG.'))) {
       // Percentual
       const digits = e.target.value.replace(/\D/g, '');
       setEditRawPercent(digits);
@@ -2550,10 +2656,10 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
       // Formatar valor temporário para cálculo
       if (row.metric.includes('CPM') || row.metric.includes('CPC') || row.metric.includes('CPL') ||
-        row.metric.includes('CPV') || row.metric.includes('Investimento') || row.metric.includes('Lucro')) {
+        row.metric.includes('CPV') || row.metric.includes('Investimento') || row.metric.includes('Lucro') || row.metric.includes('Custo por Visita')) {
         const digits = e.target.value.replace(/\D/g, '');
         tempValue = formatBRLFromDigits(digits);
-      } else if (row.metric.includes('CTR') || row.metric.includes('Tx.')) {
+      } else if (row.metric.includes('CTR') || row.metric.includes('Tx.') || row.metric.includes('% VIS. PÁG.')) {
         const digits = e.target.value.replace(/\D/g, '');
         tempValue = formatPercentFromDigits(digits);
       }
@@ -2577,17 +2683,17 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       // 🎯 CORREÇÃO: Garantir que campos vazios sejam convertidos para '0'
       if (!editValue || editValue.trim() === '') {
         if (row.metric.includes('CPM') || row.metric.includes('CPC') || row.metric.includes('CPL') ||
-          row.metric.includes('CPV') || row.metric.includes('Investimento') || row.metric.includes('Lucro')) {
+          row.metric.includes('CPV') || row.metric.includes('Investimento') || row.metric.includes('Lucro') || row.metric.includes('Custo por Visita')) {
           finalValue = 'R$ 0,00';
-        } else if (row.metric.includes('CTR') || row.metric.includes('Tx.')) {
+        } else if (row.metric.includes('CTR') || row.metric.includes('Tx.') || row.metric.includes('% VIS. PÁG.')) {
           finalValue = '0,00%';
         } else {
           finalValue = '0';
         }
       } else if (row.metric.includes('CPM') || row.metric.includes('CPC') || row.metric.includes('CPL') ||
-        row.metric.includes('CPV') || row.metric.includes('Investimento') || row.metric.includes('Lucro')) {
+        row.metric.includes('CPV') || row.metric.includes('Investimento') || row.metric.includes('Lucro') || row.metric.includes('Custo por Visita')) {
         finalValue = formatBRLFromDigits(editRawValue);
-      } else if (row.metric.includes('CTR') || row.metric.includes('Tx.')) {
+      } else if (row.metric.includes('CTR') || row.metric.includes('Tx.') || row.metric.includes('% VIS. PÁG.')) {
         finalValue = formatPercentFromDigits(editRawPercent);
       }
 
@@ -2673,7 +2779,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleSave();
+      inputRef.current?.blur();
     } else if (e.key === 'Escape') {
       handleCancel();
     }
@@ -2699,67 +2805,6 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     }
   };
 
-  // Função para obter o estado automático de um campo benchmark
-  const getBenchmarkAutoState = (metric: string): boolean => {
-    switch (metric) {
-      case 'Investimento pretendido (Mês)':
-        return benchmarkAuto.investimento;
-      case 'CPM':
-        return benchmarkAuto.cpm;
-      case 'CPC':
-        return benchmarkAuto.cpc;
-
-      case 'Tx. Mensagens (Leads/Cliques)':
-        return benchmarkAuto.txMensagens;
-      case 'Tx. Agendamento (Agend./Leads)':
-        return benchmarkAuto.txAgendamento;
-      case 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)':
-        return benchmarkAuto.txConversaoVendas;
-      default:
-        return true;
-    }
-  };
-
-  // Função para alternar o estado automático de um campo benchmark
-  const toggleBenchmarkAuto = (metric: string) => {
-    setBenchmarkAuto(prev => {
-      const newState = { ...prev };
-      switch (metric) {
-        case 'Investimento pretendido (Mês)':
-          newState.investimento = !prev.investimento;
-          break;
-        case 'CPM':
-          newState.cpm = !prev.cpm;
-          break;
-        case 'CPC':
-          newState.cpc = !prev.cpc;
-          break;
-
-        case 'Tx. Mensagens (Leads/Cliques)':
-          newState.txMensagens = !prev.txMensagens;
-          break;
-        case 'Tx. Agendamento (Agend./Leads)':
-          newState.txAgendamento = !prev.txAgendamento;
-          break;
-        case 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)':
-          newState.txConversaoVendas = !prev.txConversaoVendas;
-          break;
-      }
-      return newState;
-    });
-  };
-
-  // Salvar estados automáticos dos campos benchmark quando mudarem
-  useEffect(() => {
-    if (selectedProduct && selectedMonth) {
-      // CORREÇÃO: Incluir cliente na chave para vincular ao período específico
-      const clientForToggle = localStorage.getItem('selectedClient') || 'Cliente Padrão';
-      const autoStatesKey = `benchmark_auto_${clientForToggle}_${selectedProduct}_${selectedMonth}`;
-      localStorage.setItem(autoStatesKey, JSON.stringify(benchmarkAuto));
-
-    }
-  }, [benchmarkAuto, selectedProduct, selectedMonth]);
-
   // Função para obter tooltip de cada métrica
   const getMetricTooltip = (metric: string): string => {
     const tooltips: { [key: string]: string } = {
@@ -2775,9 +2820,13 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       'Agendamentos': 'Número de consultas ou reuniões agendadas com clientes',
       'Tx. Agendamento (Agend./Leads)': 'Porcentagem de leads que viraram agendamentos',
       'Vendas': 'Número total de vendas realizadas através dos anúncios',
+      '% VIS. PÁG. (LPV/Cliques)': 'Porcentagem de cliques que resultaram em acesso completo à página',
+      'Custo por Visita (Custo/LPV)': 'Quanto você gasta para conseguir cada visita completa na página de destino',
       'Tx. Conversão Vendas (Vendas/Leads ou Agend.)': agendamentosEnabled
         ? 'Porcentagem de agendamentos que viraram vendas'
-        : 'Porcentagem de leads/mensagens que viraram vendas',
+        : vendasDiretasEnabled
+          ? 'Porcentagem de visitantes na página que viraram vendas'
+          : 'Porcentagem de leads/mensagens que viraram vendas',
       'CPV (Custo por Venda)': 'Quanto você gasta para conseguir cada venda',
       'Lucro': 'Receita total menos o investimento em anúncios',
       'ROI / ROAS': 'Retorno sobre investimento / Return on Ad Spend. Quanto você ganha de volta para cada real investido'
@@ -2837,8 +2886,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     let realNum = 0;
     let benchmarkNum = 0;
 
-    // Para valores monetários (CPM, CPC, CPL, CPV)
-    if (metric.includes('CPM') || metric.includes('CPC') || metric.includes('CPL') || metric.includes('CPV')) {
+    // Para valores monetários (CPM, CPC, CPL, CPV, Custo por Visita)
+    if (metric.includes('CPM') || metric.includes('CPC') || metric.includes('CPL') || metric.includes('CPV') || metric.includes('Custo por Visita')) {
       realNum = parseCurrency(realValue);
       benchmarkNum = parseCurrency(benchmark);
     }
@@ -2872,8 +2921,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     // Calcular diferença percentual
     const difference = ((realNum - benchmarkNum) / benchmarkNum) * 100;
 
-    // CORREÇÃO: Para custos (CPM, CPC, CPL, CPV), quanto mais baixo, melhor
-    const isCostMetric = metric.includes('CPM') || metric.includes('CPC') || metric.includes('CPL') || metric.includes('CPV');
+    // CORREÇÃO: Para custos (CPM, CPC, CPL, CPV, Custo por Visita), quanto mais baixo, melhor
+    const isCostMetric = metric.includes('CPM') || metric.includes('CPC') || metric.includes('CPL') || metric.includes('CPV') || metric.includes('Custo por Visita');
 
     // Se é métrica de custo, inverter a lógica (diferença negativa = bom)
     const effectiveDifference = isCostMetric ? -difference : difference;
@@ -3027,17 +3076,47 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                           </button>
                         </div>
                       )}
+
+                      {category === 'Resultados Finais da Venda' && (
+                        <div className="flex items-center space-x-2 ml-3">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const newValue = !vendasDiretasEnabled;
+                              setVendasDiretasEnabled(newValue);
+                              localStorage.setItem('vendasDiretasEnabled', JSON.stringify(newValue));
+                            }}
+                            className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium transition-all duration-200 ${vendasDiretasEnabled
+                              ? 'bg-blue-900/40 text-blue-400 border border-blue-500/30 hover:bg-blue-800/50'
+                              : 'bg-slate-800/60 text-slate-400 border border-slate-600/30 hover:bg-slate-700/50'
+                              }`}
+                            title={vendasDiretasEnabled ? 'Desabilitar Funil de Vendas Diretas (usará Leads)' : 'Habilitar Funil de Vendas Diretas (usará Visitas na Página)'}
+                          >
+                            {vendasDiretasEnabled ? 'VISITAS (LPV)' : 'LEADS / MSGS'}
+                          </button>
+                        </div>
+                      )}
                       <div className="ml-3 flex-1 h-px bg-slate-600/30"></div>
                     </div>
                   </td>
                 </tr>
                 {/* Itens da categoria */}
-                {items.map((row, index) => {
+                {items.filter(row => {
+                  if (category === 'Desempenho do Anúncio e Custo por Lead') {
+                    if (vendasDiretasEnabled) {
+                      return !['Leads / Msgs', 'Tx. Mensagens (Leads/Cliques)', 'CPL (Custo por Lead)'].includes(row.metric);
+                    } else {
+                      return !['% VIS. PÁG. (LPV/Cliques)', 'Custo por Visita (Custo/LPV)'].includes(row.metric);
+                    }
+                  }
+                  return true;
+                }).map((row, index, filteredItems) => {
                   const globalIndex = tableData.findIndex(item =>
                     item.category === category && item.metric === row.metric
                   );
 
-                  const isLastItem = index === items.length - 1;
+                  const isLastItem = index === filteredItems.length - 1;
                   const isLastCategory = Object.keys(groupedData).indexOf(category) === Object.keys(groupedData).length - 1;
 
                   return (
@@ -3065,9 +3144,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                           : row.benchmarkEditable
                             ? editingCell?.rowIndex === globalIndex && editingCell?.field === 'benchmark'
                               ? 'bg-indigo-900/40 cursor-pointer transition-all duration-200 shadow-sm'
-                              : getBenchmarkAutoState(row.metric)
-                                ? 'bg-slate-800/40 cursor-pointer hover:bg-slate-800/60 transition-all duration-200'
-                                : 'bg-slate-700/60 cursor-pointer hover:bg-slate-700/80 transition-all duration-200'
+                              : 'bg-slate-800/40 cursor-pointer hover:bg-slate-800/60 transition-all duration-200'
                             : 'bg-slate-800/40'
                           }`}
                         onClick={(row.metric === 'Agendamentos' || row.metric === 'Tx. Agendamento (Agend./Leads)') && !agendamentosEnabled ? undefined : () => handleCellClick(globalIndex, 'benchmark', row.benchmark)}
@@ -3105,13 +3182,10 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                                       e.stopPropagation();
                                       handleCellClick(globalIndex, 'benchmark', row.benchmark);
                                     }}
-                                    className={`inline-flex items-center justify-center rounded-full p-1.5 transition-all duration-200 ${getBenchmarkAutoState(row.metric)
-                                      ? 'bg-purple-900/40 hover:bg-purple-800/50 border border-purple-500/30'
-                                      : 'bg-indigo-900/40 hover:bg-indigo-800/50 border border-indigo-500/30'
-                                      }`}
-                                    title={getBenchmarkAutoState(row.metric) ? 'Usando valores da IA (clique para editar manualmente)' : 'Editando manualmente (clique para usar valores da IA)'}
+                                    className="inline-flex items-center justify-center p-1.5 rounded-full bg-purple-900/40 hover:bg-purple-800/50 border border-purple-500/30 transition-all duration-200"
+                                    title="Editar projeção"
                                   >
-                                    {getBenchmarkAutoState(row.metric) ? <Edit3 className="w-4 h-4 text-purple-400" /> : <TrendingUp className="w-4 h-4 text-indigo-400" />}
+                                    <Edit3 className="w-4 h-4" style={{ color: '#c084fc' }} />
                                   </button>
                                 </div>
                               )}
@@ -3128,12 +3202,14 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                           : row.realValueEditable
                             ? editingCell?.rowIndex === globalIndex && editingCell?.field === 'realValue'
                               ? 'bg-emerald-900/40 cursor-pointer transition-all duration-200 border-l-4 border-emerald-400 shadow-sm'
-                              : 'bg-slate-700/60 cursor-pointer hover:bg-emerald-900/30 transition-all duration-200 border-l-4 border-transparent hover:border-emerald-400/60'
+                              : (getRealValueAutoState(row.metric)
+                                ? 'bg-slate-800/40 border-l-4 border-blue-500/30'
+                                : 'bg-slate-700/60 cursor-pointer hover:bg-emerald-900/30 transition-all duration-200 border-l-4 border-transparent hover:border-emerald-400/60')
                             : 'bg-slate-800/40 border-l-4 border-blue-500/30'
                           }`}
-                        onClick={(row.metric === 'Agendamentos' || row.metric === 'Tx. Agendamento (Agend./Leads)') && !agendamentosEnabled ? undefined : (row.realValueEditable ? () => handleCellClick(globalIndex, 'realValue', row.realValue) : undefined)}
-                        onMouseEnter={(row.metric === 'Agendamentos' || row.metric === 'Tx. Agendamento (Agend./Leads)') && !agendamentosEnabled ? undefined : (row.realValueEditable ? () => setIsHovered({ rowIndex: globalIndex, field: 'realValue' }) : undefined)}
-                        onMouseLeave={row.realValueEditable ? () => setIsHovered(null) : undefined}
+                        onClick={(row.metric === 'Agendamentos' || row.metric === 'Tx. Agendamento (Agend./Leads)') && !agendamentosEnabled ? undefined : (row.realValueEditable && !getRealValueAutoState(row.metric) ? () => handleCellClick(globalIndex, 'realValue', row.realValue) : undefined)}
+                        onMouseEnter={(row.metric === 'Agendamentos' || row.metric === 'Tx. Agendamento (Agend./Leads)') && !agendamentosEnabled ? undefined : (row.realValueEditable && !getRealValueAutoState(row.metric) ? () => setIsHovered({ rowIndex: globalIndex, field: 'realValue' }) : undefined)}
+                        onMouseLeave={row.realValueEditable && !getRealValueAutoState(row.metric) ? () => setIsHovered(null) : undefined}
                       >
                         {editingCell?.rowIndex === globalIndex && editingCell?.field === 'realValue' ? (
                           <input
@@ -3157,6 +3233,34 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                                 <div className="flex items-center space-x-1">
                                   <span className="text-xs text-blue-400 font-medium">Sincronizado</span>
                                   <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                                </div>
+                              )}
+                              {row.realValueEditable && row.metric !== 'Agendamentos' && (
+                                <div className="flex items-center space-x-2">
+                                  {getRealValueAutoState(row.metric) && (
+                                    <div className="flex items-center space-x-1 mr-1">
+                                      <span className="text-xs text-blue-400 font-medium">Sincronizado</span>
+                                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                                    </div>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleRealValueAuto(row.metric);
+                                    }}
+                                    className={`inline-flex items-center justify-center rounded-full transition-all duration-200 ${getRealValueAutoState(row.metric)
+                                      ? 'bg-emerald-900/40 hover:bg-emerald-800/50 border border-emerald-500/30 p-1.5'
+                                      : 'bg-blue-900/40 hover:bg-blue-800/50 border border-blue-500/30 p-1.5'
+                                      }`}
+                                    title={getRealValueAutoState(row.metric) ? 'Sincronizado (clique para ir a edição manual)' : 'Manual (clique para voltar ao Sincronizado)'}
+                                  >
+                                    {getRealValueAutoState(row.metric) ? (
+                                      <Edit3 className="w-4 h-4 text-emerald-400" />
+                                    ) : (
+                                      <RefreshCw className="w-4 h-4 text-blue-400" />
+                                    )}
+                                  </button>
                                 </div>
                               )}
                             </div>

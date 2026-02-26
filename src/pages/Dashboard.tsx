@@ -179,6 +179,14 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [selectedAudience, setSelectedAudience] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState('');
 
+  // 🎯 CORREÇÃO: Forçar aba 'hoje' se não houver produto selecionado (evita que o cache carregue
+  // abas inválidas como 'dia' na primeira conexão sem produto).
+  useEffect(() => {
+    if (!selectedProduct || selectedProduct === 'Todos os Produtos') {
+      setActiveTab('hoje');
+    }
+  }, [selectedProduct, setActiveTab]);
+
   // Estado para configurações do Modo Áurea
   const [aureaSettings, setAureaSettings] = useState<{
     cpaTarget?: number;

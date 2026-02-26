@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Info, Calendar, Gift, Heart, Star, Sun, Moon, ShoppingBag, GraduationCap, Flag } from 'lucide-react';
+import { Info, Calendar, Heart, Star, Moon, ShoppingBag, Flag } from 'lucide-react';
 import { MetricData } from '../services/metricsService';
-import { metaAdsService } from '../services/metaAdsService';
 
 interface DailyControlTableProps {
   metrics: MetricData[];
@@ -123,7 +122,40 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
     const year = date.getFullYear();
     const dayOfWeek = date.getDay(); // 0 = Domingo
 
-    // Janeiro
+    // === DATAS MÓVEIS (Religiosas e dependentes da Páscoa) ===
+    const easter = getEasterDate(year);
+    const carnival = getCarnivalDate(year);
+    const goodFriday = new Date(easter);
+    goodFriday.setDate(easter.getDate() - 2);
+    const carnivalMonday = new Date(carnival);
+    carnivalMonday.setDate(carnival.getDate() - 1);
+
+    if (month === easter.getMonth() + 1 && day === easter.getDate()) {
+      events.push({
+        icon: <Calendar className="w-3 h-3" />,
+        tooltip: "Páscoa - Feriado nacional (data móvel)",
+        color: "text-yellow-400"
+      });
+    }
+
+    if (month === goodFriday.getMonth() + 1 && day === goodFriday.getDate()) {
+      events.push({
+        icon: <Calendar className="w-3 h-3" />,
+        tooltip: "Sexta-feira Santa - Feriado nacional",
+        color: "text-slate-400"
+      });
+    }
+
+    if ((month === carnival.getMonth() + 1 && day === carnival.getDate()) ||
+      (month === carnivalMonday.getMonth() + 1 && day === carnivalMonday.getDate())) {
+      events.push({
+        icon: <Calendar className="w-3 h-3" />,
+        tooltip: "Carnaval - Feriado nacional (data móvel)",
+        color: "text-purple-400"
+      });
+    }
+
+    // === JANEIRO ===
     if (month === 1) {
       if (day === 1) {
         events.push({
@@ -141,25 +173,10 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       }
     }
 
-    // Fevereiro
-    if (month === 2) {
-      if (day === 14) {
-        events.push({
-          icon: <Heart className="w-3 h-3" />,
-          tooltip: "Dia dos Namorados - Data comercial importante",
-          color: "text-pink-400"
-        });
-      }
-      if (day >= 20 && day <= 26) {
-        events.push({
-          icon: <Calendar className="w-3 h-3" />,
-          tooltip: "Carnaval - Feriado nacional (data móvel)",
-          color: "text-purple-400"
-        });
-      }
-    }
+    // === FEVEREIRO ===
+    // Fevereiro geralmente tem as datas móveis tratadas acima
 
-    // Março
+    // === MARÇO ===
     if (month === 3) {
       if (day === 8) {
         events.push({
@@ -168,16 +185,16 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
           color: "text-pink-400"
         });
       }
-      if (day === 15) {
+      if (day >= 14 && day <= 16) {
         events.push({
           icon: <ShoppingBag className="w-3 h-3" />,
-          tooltip: "Dia do Consumidor - Campanhas promocionais",
+          tooltip: "Semana do Consumidor - Data comercial importante",
           color: "text-green-400"
         });
       }
     }
 
-    // Abril
+    // === ABRIL ===
     if (month === 4) {
       if (day === 21) {
         events.push({
@@ -186,18 +203,9 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
           color: "text-green-400"
         });
       }
-      // Páscoa
-      const easter = getEasterDate(year);
-      if (month === (easter.getMonth() + 1) && day === easter.getDate()) {
-        events.push({
-          icon: <Calendar className="w-3 h-3" />,
-          tooltip: "Páscoa - Feriado nacional (data móvel)",
-          color: "text-yellow-400"
-        });
-      }
     }
 
-    // Maio
+    // === MAIO ===
     if (month === 5) {
       if (day === 1) {
         events.push({
@@ -216,7 +224,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       }
     }
 
-    // Junho
+    // === JUNHO ===
     if (month === 6) {
       if (day === 12) {
         events.push({
@@ -234,18 +242,18 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       }
     }
 
-    // Julho
+    // === JULHO ===
     if (month === 7) {
       if (day === 9) {
         events.push({
           icon: <Flag className="w-3 h-3" />,
-          tooltip: "Independência da Bahia - Feriado estadual",
-          color: "text-green-400"
+          tooltip: "Revolução Constitucionalista - Feriado SP",
+          color: "text-slate-400"
         });
       }
     }
 
-    // Agosto
+    // === AGOSTO ===
     if (month === 8) {
       // Dia dos Pais: segundo domingo de agosto
       if (day === getSecondSunday(year, 7)) {
@@ -255,16 +263,9 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
           color: "text-blue-400"
         });
       }
-      if (day === 15) {
-        events.push({
-          icon: <Flag className="w-3 h-3" />,
-          tooltip: "Dia da Assunção de Nossa Senhora",
-          color: "text-purple-400"
-        });
-      }
     }
 
-    // Setembro
+    // === SETEMBRO ===
     if (month === 9) {
       if (day === 7) {
         events.push({
@@ -273,22 +274,23 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
           color: "text-green-400"
         });
       }
+      // Semana do Brasil nas proximidades da Independência
+      if (day >= 4 && day <= 10) {
+        events.push({
+          icon: <ShoppingBag className="w-3 h-3" />,
+          tooltip: "Semana do Brasil - Data comercial",
+          color: "text-yellow-400"
+        });
+      }
     }
 
-    // Outubro
+    // === OUTUBRO ===
     if (month === 10) {
       if (day === 12) {
         events.push({
           icon: <Heart className="w-3 h-3" />,
-          tooltip: "Nossa Senhora Aparecida - Feriado nacional",
+          tooltip: "Dia das Crianças / N. Sra. Aparecida",
           color: "text-purple-400"
-        });
-      }
-      if (day === 15) {
-        events.push({
-          icon: <GraduationCap className="w-3 h-3" />,
-          tooltip: "Dia do Professor",
-          color: "text-blue-400"
         });
       }
       if (day === 31) {
@@ -300,13 +302,13 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       }
     }
 
-    // Novembro
+    // === NOVEMBRO ===
     if (month === 11) {
       if (day === 2) {
         events.push({
           icon: <Calendar className="w-3 h-3" />,
           tooltip: "Finados - Feriado nacional",
-          color: "text-gray-400"
+          color: "text-slate-400"
         });
       }
       if (day === 15) {
@@ -319,41 +321,50 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       if (day === 20) {
         events.push({
           icon: <Flag className="w-3 h-3" />,
-          tooltip: "Dia da Consciência Negra",
+          tooltip: "Dia da Consciência Negra - Feriado nacional",
           color: "text-yellow-400"
+        });
+      }
+      // Black Friday (Última sexta-feira ou sexta entre 23 e 29)
+      if (dayOfWeek === 5 && day >= 23 && day <= 29) {
+        events.push({
+          icon: <ShoppingBag className="w-3 h-3" />,
+          tooltip: "Black Friday - Maior data comercial",
+          color: "text-red-400"
+        });
+      }
+      // Cyber Monday (Segunda-feira pós Black Friday)
+      if (dayOfWeek === 1 && day >= 26 && day <= 30) {
+        events.push({
+          icon: <ShoppingBag className="w-3 h-3" />,
+          tooltip: "Cyber Monday",
+          color: "text-blue-400"
         });
       }
     }
 
-    // Dezembro
+    // === DEZEMBRO ===
     if (month === 12) {
-      if (day === 8) {
+      // Cyber Monday se a Black Friday tiver caído bem no fim de novembro
+      if (dayOfWeek === 1 && day <= 2) {
         events.push({
-          icon: <Heart className="w-3 h-3" />,
-          tooltip: "Nossa Senhora da Conceição",
-          color: "text-purple-400"
+          icon: <ShoppingBag className="w-3 h-3" />,
+          tooltip: "Cyber Monday",
+          color: "text-blue-400"
         });
       }
       if (day === 25) {
         events.push({
           icon: <Star className="w-3 h-3" />,
-          tooltip: "Natal - Feriado nacional",
+          tooltip: "Natal - Feriado nacional / Data comercial",
           color: "text-green-400"
         });
       }
       if (day === 31) {
         events.push({
           icon: <Calendar className="w-3 h-3" />,
-          tooltip: "Réveillon - Feriado nacional",
+          tooltip: "Réveillon - Véspera de Ano Novo",
           color: "text-blue-400"
-        });
-      }
-      // Black Friday (última sexta-feira de novembro)
-      if (day >= 25 && day <= 30) {
-        events.push({
-          icon: <ShoppingBag className="w-3 h-3" />,
-          tooltip: "Black Friday - Campanhas promocionais",
-          color: "text-red-400"
         });
       }
     }
@@ -368,6 +379,8 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       'Investimento': 'Valor investido em anúncios neste dia',
       'CPM': 'Custo por mil impressões neste dia',
       'Impressões': 'Número de vezes que o anúncio foi exibido neste dia',
+      'CTR': 'Taxa de cliques no link (Cliques / Impressões)',
+      '% Vis. Pág': 'Taxa de visualização da página (Visualizações de Página / Cliques)',
       'CPR': 'Custo por resultado dinâmico: prioriza custo por compra; se não houver, custo por lead; caso contrário, custo por clique (tráfego). Mostra “-” quando não houver resultado no dia.',
       'Leads': 'Número de leads gerados neste dia',
       'Compras': 'Número de vendas/conversões realizadas neste dia',
@@ -395,9 +408,6 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
 
     // Data atual para comparação
     const today = new Date();
-    const currentDay = today.getDate();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
 
     for (let i = 0; i < daysInMonth; i++) {
       const currentDate = new Date(startDate);
@@ -426,6 +436,10 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
         investment: formatCurrency(0),
         cpm: formatCurrency(0),
         impressions: 0,
+        clicks: 0,
+        landingPageViews: 0,
+        ctr: '0,00%',
+        lpViewsPct: '0,00%',
         cpr: '-',
         leads: 0,
         compras: 0,
@@ -444,6 +458,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       investment: number;
       impressions: number;
       clicks?: number;
+      landingPageViews?: number;
       leads: number;
       compras: number;
       cpr?: number; // Custo por resultado dinâmico
@@ -471,11 +486,12 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
     // Agregar por dia somando serviços
     const dayAggMap = new Map<DayKey, Agg>();
     dayServiceMap.forEach((serviceMap, dateKey) => {
-      let agg: Agg = { investment: 0, impressions: 0, clicks: 0, leads: 0, compras: 0, cpr: 0 };
+      let agg: Agg = { investment: 0, impressions: 0, clicks: 0, landingPageViews: 0, leads: 0, compras: 0, cpr: 0 };
       serviceMap.forEach(metric => {
         agg.investment += metric.investment || 0;
         agg.impressions += metric.impressions || 0;
         agg.clicks = (agg.clicks || 0) + (metric.clicks || 0);
+        agg.landingPageViews = (agg.landingPageViews || 0) + (metric.landingPageViews || 0);
         agg.leads += metric.leads || 0;
         agg.compras += metric.compras || 0;
         // CPR será calculado ao aplicar por dia com base em investimento/resultado do próprio dia
@@ -507,9 +523,13 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
 
         data[dayIndex] = {
           ...data[dayIndex],
-          investment: formatCurrency(agg.investment),
+          investissement: formatCurrency(agg.investment),
           cpm: agg.impressions > 0 ? formatCurrency((agg.investment / agg.impressions) * 1000) : formatCurrency(0),
           impressions: agg.impressions,
+          clicks: agg.clicks || 0,
+          landingPageViews: agg.landingPageViews || 0,
+          ctr: agg.impressions > 0 && (agg.clicks || 0) > 0 ? `${(((agg.clicks || 0) / agg.impressions) * 100).toFixed(2).replace('.', ',')}%` : '0,00%',
+          lpViewsPct: (agg.clicks || 0) > 0 && (agg.landingPageViews || 0) > 0 ? `${(((agg.landingPageViews || 0) / (agg.clicks || 0)) * 100).toFixed(2).replace('.', ',')}%` : '0,00%',
           cpr: resultsCount > 0 ? formatCurrency(agg.investment / resultsCount) : '-',
           leads: agg.leads,
           compras: agg.compras,
@@ -528,6 +548,10 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       investment: formatCurrency(0),
       cpm: formatCurrency(0),
       impressions: 0,
+      clicks: 0,
+      landingPageViews: 0,
+      ctr: '0,00%',
+      lpViewsPct: '0,00%',
       cpr: formatCurrency(0),
       leads: 0,
       compras: 0,
@@ -541,24 +565,37 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
         // Extrair valores numéricos das strings formatadas
         const investmentValue = parseFloat(row.investment.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
         const impressionsValue = row.impressions || 0;
+        const clicksValue = row.clicks || 0;
+        const lpViewsValue = row.landingPageViews || 0;
         const leadsValue = row.leads || 0;
         const comprasValue = row.compras || 0;
-        const cprValue = parseFloat(row.cpr.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
 
         // Acumular totais
         totals.investment = formatCurrency(parseFloat(totals.investment.replace(/[^\d,.-]/g, '').replace(',', '.')) + investmentValue);
         totals.impressions += impressionsValue;
+        totals.clicks += clicksValue;
+        totals.landingPageViews += lpViewsValue;
         totals.leads += leadsValue;
         totals.compras += comprasValue;
 
         // Calcular médias
         const totalInvestment = parseFloat(totals.investment.replace(/[^\d,.-]/g, '').replace(',', '.'));
         const totalImpressions = totals.impressions;
+        const totalClicks = totals.clicks;
+        const totalLpViews = totals.landingPageViews;
         const totalLeads = totals.leads;
         const totalCompras = totals.compras;
 
         if (totalImpressions > 0) {
           totals.cpm = formatCurrency((totalInvestment / totalImpressions) * 1000);
+        }
+
+        if (totalImpressions > 0 && totalClicks > 0) {
+          totals.ctr = `${((totalClicks / totalImpressions) * 100).toFixed(2).replace('.', ',')}%`;
+        }
+
+        if (totalClicks > 0 && totalLpViews > 0) {
+          totals.lpViewsPct = `${((totalLpViews / totalClicks) * 100).toFixed(2).replace('.', ',')}%`;
         }
 
         // Calcular CPR total alinhado ao histórico: prioriza COMPRAS > LEADS
@@ -601,6 +638,12 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
       </td>
       <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
         {totals.impressions}
+      </td>
+      <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
+        {totals.ctr}
+      </td>
+      <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
+        {totals.lpViewsPct}
       </td>
       <td className="p-4 font-bold text-slate-100 border-r border-slate-600/30">
         {totals.cpr}
@@ -749,6 +792,34 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                 </th>
                 <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-b border-slate-600/30">
                   <div className="flex items-center space-x-2">
+                    <span>CTR</span>
+                    <Tooltip content={getColumnTooltip('CTR')} isVisible={tooltipStates['CTR'] || false} position="bottom">
+                      <div
+                        className="cursor-default group/tooltip"
+                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, 'CTR': true }))}
+                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, 'CTR': false }))}
+                      >
+                        <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                      </div>
+                    </Tooltip>
+                  </div>
+                </th>
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-b border-slate-600/30">
+                  <div className="flex items-center space-x-2">
+                    <span className="whitespace-nowrap">% VIS. PÁG</span>
+                    <Tooltip content={getColumnTooltip('% Vis. Pág')} isVisible={tooltipStates['% Vis. Pág'] || false} position="bottom">
+                      <div
+                        className="cursor-default group/tooltip"
+                        onMouseEnter={() => setTooltipStates(prev => ({ ...prev, '% Vis. Pág': true }))}
+                        onMouseLeave={() => setTooltipStates(prev => ({ ...prev, '% Vis. Pág': false }))}
+                      >
+                        <Info className="w-3 h-3 text-slate-400 group-hover/tooltip:text-red-400 transition-all duration-200 group-hover/tooltip:scale-110" />
+                      </div>
+                    </Tooltip>
+                  </div>
+                </th>
+                <th className="text-left p-4 text-slate-200 font-semibold text-sm uppercase tracking-wide border-r border-b border-slate-600/30">
+                  <div className="flex items-center space-x-2">
                     <span>CPR</span>
                     <Tooltip content={getColumnTooltip('CPR')} isVisible={tooltipStates['CPR'] || false} position="bottom">
                       <div
@@ -850,6 +921,8 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
                   <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.investment}</td>
                   <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.cpm}</td>
                   <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.impressions}</td>
+                  <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.ctr}</td>
+                  <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.lpViewsPct}</td>
                   <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.cpr}</td>
                   <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.leads}</td>
                   <td className="p-4 text-slate-200 font-medium border-r border-slate-600/30">{row.compras}</td>
