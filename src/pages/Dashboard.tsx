@@ -1493,6 +1493,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                           // Fator para ajustar as conversões da plataforma (Meta) para bater com os valores reais digitados
                           const scalingFactor = platformConversionsTotal > 0 ? realConversionsTotal / platformConversionsTotal : 1;
 
+                          const totalSpend = metrics.reduce((sum, m) => sum + (m.investment || 0), 0);
+
                           return (
                             <AureaDecisionPanel
                               selectedClient={selectedClient}
@@ -1526,8 +1528,21 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
                                     return acc;
                                   }, new Map<string, any>()).values()
-                                ).map(aggr => {
-                                  const adjustedConversions = aggr.conversions * scalingFactor;
+                                ).map((aggr, _, array) => {
+                                  let adjustedConversions = 0;
+                                  if (platformConversionsTotal > 0) {
+                                    adjustedConversions = aggr.conversions * scalingFactor;
+                                  } else if (realConversionsTotal > 0) {
+                                    // Se a plataforma reportou 0 conversões, mas o usuário digitou um Valor Real
+                                    // Distribuímos as conversões reais proporcionalmente ao gasto
+                                    if (totalSpend > 0) {
+                                      adjustedConversions = realConversionsTotal * (aggr.spend / totalSpend);
+                                    } else {
+                                      // Se não houver gasto (fallback), divide igualmente entre os conjuntos
+                                      adjustedConversions = realConversionsTotal / (array.length || 1);
+                                    }
+                                  }
+
                                   return {
                                     id: aggr.id,
                                     name: aggr.name,
