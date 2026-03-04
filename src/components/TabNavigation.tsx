@@ -13,11 +13,9 @@
 import React from 'react';
 import {
     LayoutDashboard,
-    Sparkles,
     Calendar,
     Layers,
     Target,
-    Users,
     LucideIcon
 } from 'lucide-react';
 
@@ -25,7 +23,7 @@ import {
 // TIPOS
 // ============================================================================
 
-export type TabId = 'visaoGeral' | 'hoje' | 'dia' | 'assets' | 'estrategia' | 'cliente';
+export type TabId = 'visaoGeral' | 'dia' | 'assets' | 'estrategia';
 
 export interface Tab {
     id: TabId;
@@ -52,13 +50,7 @@ export const TABS: Tab[] = [
         id: 'visaoGeral',
         label: 'Visão Geral',
         icon: LayoutDashboard,
-        description: 'Visão principal'
-    },
-    {
-        id: 'hoje',
-        label: 'Áurea',
-        icon: Sparkles,
-        description: 'Análise inteligente'
+        description: 'Visão principal e análise Áurea'
     },
     {
         id: 'dia',
@@ -77,12 +69,6 @@ export const TABS: Tab[] = [
         label: 'Estratégia',
         icon: Target,
         description: 'Planejamento'
-    },
-    {
-        id: 'cliente',
-        label: 'Cliente',
-        icon: Users,
-        description: 'Relatórios'
     }
 ];
 
@@ -103,7 +89,7 @@ const TabNavigation: React.FC<TabNavigationProps> = ({
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
                     const isDisabled = disabledTabs.includes(tab.id);
-                    const showBadge = tab.id === 'hoje' && alertCount > 0;
+                    const showBadge = tab.id === 'visaoGeral' && alertCount > 0;
 
                     return (
                         <button
@@ -177,7 +163,7 @@ export const TabContent: React.FC<TabContentProps> = ({
 // HOOK PARA GERENCIAR ESTADO DA TAB
 // ============================================================================
 
-export const useTabNavigation = (initialTab: TabId = 'hoje') => {
+export const useTabNavigation = (initialTab: TabId = 'visaoGeral') => {
     const [activeTab, setActiveTab] = React.useState<TabId>(initialTab);
 
     // Persistir tab ativa no localStorage

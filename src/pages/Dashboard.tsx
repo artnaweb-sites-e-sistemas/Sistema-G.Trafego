@@ -9,7 +9,6 @@ import AudienceDetailsTable from '../components/AudienceDetailsTable';
 import InsightsSection from '../components/InsightsSection';
 // import HistorySection from '../components/HistorySection'; // Removido conforme solicitação
 import AudienceHistorySection from '../components/AudienceHistorySection';
-import ShareReport from '../components/ShareReport';
 import PerformanceAdsSection from '../components/PerformanceAdsSection';
 import PendingAudiencesStatus from '../components/PendingAudiencesStatus';
 import { analysisPlannerService } from '../services/analysisPlannerService';
@@ -1429,7 +1428,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                   <TabNavigation
                     activeTab={activeTab}
                     onTabChange={setActiveTab}
-                    disabledTabs={(!selectedProduct || selectedProduct === 'Todas as Campanhas') ? ['hoje', 'dia', 'assets', 'estrategia', 'cliente'] : []}
+                    disabledTabs={(!selectedProduct || selectedProduct === 'Todas as Campanhas') ? ['dia', 'assets', 'estrategia'] : []}
                   />
 
                   {/* Tab: Visão Geral - Entrada Principal */}
@@ -1457,6 +1456,99 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                               onValuesChange={setMonthlyDetailsValues}
                             />
                           </section>
+
+                          <section className="w-full">
+                            {(() => {
+                              const getDynamicConversions = (m: any, funnel?: string) => {
+                                if (funnel === 'DIRETA') {
+                                  return m.sales || 0;
+                                }
+                                if (funnel === 'AUDIENCIA') {
+                                  return m.followers || 0;
+                                }
+                                return m.leads || 0;
+                              };
+
+                              const platformConversionsTotal = metrics.reduce((sum, m) => sum + getDynamicConversions(m, monthlyDetailsValues.funnelType), 0);
+                              const realConversionsTotal =
+                                monthlyDetailsValues.funnelType === 'DIRETA' ? (monthlyDetailsValues.vendas || 0) :
+                                  monthlyDetailsValues.funnelType === 'AUDIENCIA' ? (monthlyDetailsValues.seguidoresNovos || 0) :
+                                    (monthlyDetailsValues.agendamentos || 0);
+
+                              // Fator para ajustar as conversões da plataforma (Meta) para bater com os valores reais digitados
+                              const scalingFactor = platformConversionsTotal > 0 ? realConversionsTotal / platformConversionsTotal : 1;
+
+                              const totalSpend = metrics.reduce((sum, m) => sum + (m.investment || 0), 0);
+
+                              return (
+                                <AureaDecisionPanel
+                                  selectedClient={selectedClient}
+                                  selectedMonth={selectedMonth}
+                                  selectedProduct={selectedProduct}
+                                  currentSpend={metrics.reduce((sum, m) => sum + (m.investment || 0), 0)}
+                                  conversions={realConversionsTotal}
+                                  adSets={
+                                    // Agrupar métricas pelo adSetId para não ter duplicados no seletor de RMD
+                                    Array.from(
+                                      metrics.reduce((acc, m) => {
+                                        const id = m.adSetId || m.audience || m.product || String(Date.now());
+                                        if (!acc.has(id)) {
+                                          acc.set(id, {
+                                            id,
+                                            name: m.audience || m.product || 'Sem nome',
+                                            spend: 0,
+                                            conversions: 0,
+                                            reach: 0,
+                                            impressions: 0,
+                                            clicks: 0
+                                          });
+                                        }
+
+                                        const current = acc.get(id)!;
+                                        current.spend += (m.investment || 0);
+                                        current.conversions += getDynamicConversions(m, monthlyDetailsValues.funnelType);
+                                        current.reach += (m.reach || 0);
+                                        current.impressions += (m.impressions || 0);
+                                        current.clicks += (m.clicks || 0);
+
+                                        return acc;
+                                      }, new Map<string, any>()).values()
+                                    ).map((aggr, _, array) => {
+                                      let adjustedConversions = 0;
+                                      if (platformConversionsTotal > 0) {
+                                        adjustedConversions = aggr.conversions * scalingFactor;
+                                      } else if (realConversionsTotal > 0) {
+                                        // Se a plataforma reportou 0 conversões, mas o usuário digitou um Valor Real
+                                        // Distribuímos as conversões reais proporcionalmente ao gasto
+                                        if (totalSpend > 0) {
+                                          adjustedConversions = realConversionsTotal * (aggr.spend / totalSpend);
+                                        } else {
+                                          // Se não houver gasto (fallback), divide igualmente entre os conjuntos
+                                          adjustedConversions = realConversionsTotal / (array.length || 1);
+                                        }
+                                      }
+
+                                      return {
+                                        id: aggr.id,
+                                        name: aggr.name,
+                                        spend: aggr.spend,
+                                        conversions: adjustedConversions,
+                                        cpa: adjustedConversions ? aggr.spend / adjustedConversions : undefined,
+                                        ctr: aggr.impressions ? (aggr.clicks / aggr.impressions) * 100 : 0,
+                                        reach: aggr.reach,
+                                        frequency: aggr.reach ? aggr.impressions / aggr.reach : 0
+                                      };
+                                    })
+                                  }
+                                  cpaTarget={monthlyDetailsValues.cpaTarget || 50}
+                                  alertCpaTarget={monthlyDetailsValues.cpaTarget || 50}
+                                  monthlyBudget={monthlyDetailsValues.monthlyBudget || 3000}
+                                  acqRmdSplit={aureaSettings.acqRmdSplit}
+                                  onSettingsChange={handleAureaSettingsChange}
+                                />
+                              );
+                            })()}
+                          </section>
                         </>
                       ) : (
                         <div className="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-6">
@@ -1467,114 +1559,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                         </div>
                       )}
                     </div>
-                  </TabContent>
-
-                  {/* Tab: Hoje - Decisão Rápida */}
-                  <TabContent activeTab={activeTab} tabId="hoje">
-                    {selectedProduct && selectedProduct !== 'Todas as Campanhas' ? (
-                      <>
-                        {(() => {
-                          const getDynamicConversions = (m: any, funnel?: string) => {
-                            if (funnel === 'DIRETA') {
-                              return m.sales || 0;
-                            }
-                            if (funnel === 'AUDIENCIA') {
-                              return m.followers || 0;
-                            }
-                            return m.leads || 0;
-                          };
-
-                          const platformConversionsTotal = metrics.reduce((sum, m) => sum + getDynamicConversions(m, monthlyDetailsValues.funnelType), 0);
-                          const realConversionsTotal =
-                            monthlyDetailsValues.funnelType === 'DIRETA' ? (monthlyDetailsValues.vendas || 0) :
-                              monthlyDetailsValues.funnelType === 'AUDIENCIA' ? (monthlyDetailsValues.seguidoresNovos || 0) :
-                                (monthlyDetailsValues.agendamentos || 0);
-
-                          // Fator para ajustar as conversões da plataforma (Meta) para bater com os valores reais digitados
-                          const scalingFactor = platformConversionsTotal > 0 ? realConversionsTotal / platformConversionsTotal : 1;
-
-                          const totalSpend = metrics.reduce((sum, m) => sum + (m.investment || 0), 0);
-
-                          return (
-                            <AureaDecisionPanel
-                              selectedClient={selectedClient}
-                              selectedMonth={selectedMonth}
-                              selectedProduct={selectedProduct}
-                              currentSpend={metrics.reduce((sum, m) => sum + (m.investment || 0), 0)}
-                              conversions={realConversionsTotal}
-                              adSets={
-                                // Agrupar métricas pelo adSetId para não ter duplicados no seletor de RMD
-                                Array.from(
-                                  metrics.reduce((acc, m) => {
-                                    const id = m.adSetId || m.audience || m.product || String(Date.now());
-                                    if (!acc.has(id)) {
-                                      acc.set(id, {
-                                        id,
-                                        name: m.audience || m.product || 'Sem nome',
-                                        spend: 0,
-                                        conversions: 0,
-                                        reach: 0,
-                                        impressions: 0,
-                                        clicks: 0
-                                      });
-                                    }
-
-                                    const current = acc.get(id)!;
-                                    current.spend += (m.investment || 0);
-                                    current.conversions += getDynamicConversions(m, monthlyDetailsValues.funnelType);
-                                    current.reach += (m.reach || 0);
-                                    current.impressions += (m.impressions || 0);
-                                    current.clicks += (m.clicks || 0);
-
-                                    return acc;
-                                  }, new Map<string, any>()).values()
-                                ).map((aggr, _, array) => {
-                                  let adjustedConversions = 0;
-                                  if (platformConversionsTotal > 0) {
-                                    adjustedConversions = aggr.conversions * scalingFactor;
-                                  } else if (realConversionsTotal > 0) {
-                                    // Se a plataforma reportou 0 conversões, mas o usuário digitou um Valor Real
-                                    // Distribuímos as conversões reais proporcionalmente ao gasto
-                                    if (totalSpend > 0) {
-                                      adjustedConversions = realConversionsTotal * (aggr.spend / totalSpend);
-                                    } else {
-                                      // Se não houver gasto (fallback), divide igualmente entre os conjuntos
-                                      adjustedConversions = realConversionsTotal / (array.length || 1);
-                                    }
-                                  }
-
-                                  return {
-                                    id: aggr.id,
-                                    name: aggr.name,
-                                    spend: aggr.spend,
-                                    conversions: adjustedConversions,
-                                    cpa: adjustedConversions ? aggr.spend / adjustedConversions : undefined,
-                                    ctr: aggr.impressions ? (aggr.clicks / aggr.impressions) * 100 : 0,
-                                    reach: aggr.reach,
-                                    frequency: aggr.reach ? aggr.impressions / aggr.reach : 0
-                                  };
-                                })
-                              }
-                              cpaTarget={monthlyDetailsValues.cpaTarget || 50}
-                              alertCpaTarget={monthlyDetailsValues.cpaTarget || 50}
-                              monthlyBudget={monthlyDetailsValues.monthlyBudget || 3000}
-                              acqRmdSplit={aureaSettings.acqRmdSplit}
-                              onSettingsChange={handleAureaSettingsChange}
-                            />
-                          );
-                        })()}
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-20 bg-slate-800/30 rounded-xl border border-slate-700/50">
-                        <div className="w-16 h-16 bg-slate-700/50 rounded-full flex items-center justify-center mb-4">
-                          <Target className="w-8 h-8 text-slate-400" />
-                        </div>
-                        <h3 className="text-xl font-medium text-white mb-2">Selecione uma Campanha</h3>
-                        <p className="text-gray-400 text-center max-w-md">
-                          Para visualizar as métricas do Modo Áurea, por favor selecione uma campanha no painel superior.
-                        </p>
-                      </div>
-                    )}
                   </TabContent>
 
                   {/* Tab: Dia - Controle Diário */}
@@ -1628,19 +1612,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                       selectedClient={selectedClient}
                       selectedMonth={selectedMonth}
                       onStrategyCreated={handleStrategyCreated}
-                    />
-                  </TabContent>
-
-                  {/* Tab: Cliente - Relatórios */}
-                  <TabContent activeTab={activeTab} tabId="cliente">
-                    <ShareReport
-                      selectedAudience={selectedAudience}
-                      selectedProduct={selectedProduct}
-                      selectedClient={selectedClient}
-                      selectedMonth={selectedMonth}
-                      hasGeneratedLinks={false}
-                      metrics={metrics}
-                      monthlyDetailsValues={monthlyDetailsValues}
                     />
                   </TabContent>
                 </>
