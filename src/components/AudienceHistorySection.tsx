@@ -212,7 +212,7 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
 
   // 🎯 NOVA FUNÇÃO: Carregar dados com controle manual
   const loadAdSetData = async (forceRefresh: boolean = false) => {
-      if (!selectedProduct || selectedProduct === 'Todos os Produtos') return;
+      if (!selectedProduct || selectedProduct === 'Todas as Campanhas') return;
       
       setLoading(true);
     if (forceRefresh) {
@@ -385,7 +385,7 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
 
   // 🎯 NOVA FUNÇÃO: Carregar 12 meses de histórico
   const load12MonthsHistory = async () => {
-    if (!selectedProduct || selectedProduct === 'Todos os Produtos') return;
+    if (!selectedProduct || selectedProduct === 'Todas as Campanhas') return;
 
     setIsLoadingFullHistory(true);
 
@@ -482,7 +482,7 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
 
   // 🎯 NOVA FUNÇÃO: Carregar mais 12 meses (24 meses total)
   const loadMore12Months = async () => {
-    if (!selectedProduct || selectedProduct === 'Todos os Produtos') return;
+    if (!selectedProduct || selectedProduct === 'Todas as Campanhas') return;
 
     setIsLoadingFullHistory(true);
 
@@ -583,9 +583,9 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
     }
   };
 
-  // 🎯 MODIFICADO: Carregar dados automaticamente quando produto mudar
+  // 🎯 MODIFICADO: Carregar dados automaticamente quanda campanha mudar
   useEffect(() => {
-    if (selectedProduct && selectedProduct !== 'Todos os Produtos') {
+    if (selectedProduct && selectedProduct !== 'Todas as Campanhas') {
       // 🎯 NOVO: Carregar dados automaticamente (com cache)
       loadAdSetData(false);
       // Resetar estados de histórico completo

@@ -115,7 +115,7 @@ const HistorySection: React.FC<HistorySectionProps> = ({ selectedProduct }) => {
   };
 
   useEffect(() => {
-    if (selectedProduct && selectedProduct !== '' && selectedProduct !== 'Todos os Produtos') {
+    if (selectedProduct && selectedProduct !== '' && selectedProduct !== 'Todas as Campanhas') {
       // Filtrar relatórios por produto selecionado
       const filtered = reports.filter(report => {
         const urlParams = new URLSearchParams(report.shareLink.originalUrl.split('?')[1] || '');
@@ -124,7 +124,7 @@ const HistorySection: React.FC<HistorySectionProps> = ({ selectedProduct }) => {
       });
       setFilteredReports(filtered);
     } else {
-      // Se nenhum produto selecionado ou "Todos os Produtos", mostrar todos
+      // Se nenhuma campanha selecionado ou "Todas as Campanhas", mostrar todos
       setFilteredReports(reports);
     }
   }, [selectedProduct, reports]);
@@ -356,7 +356,7 @@ const HistorySection: React.FC<HistorySectionProps> = ({ selectedProduct }) => {
           <FileText className="w-12 h-12 text-slate-500 mx-auto mb-3" />
           <p className="text-slate-400">
             {selectedProduct 
-              ? `Nenhum relatório encontrado para o produto "${selectedProduct}"`
+              ? `Nenhum relatório encontrado para a campanha "${selectedProduct}"`
               : 'Nenhum relatório compartilhado encontrado'
             }
           </p>

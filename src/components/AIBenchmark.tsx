@@ -111,12 +111,12 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
 
   const handleGenerateBenchmark = async () => {
     if (!formData.productNiche.trim()) {
-      toast.error('Por favor, informe o nicho do produto');
+      toast.error('Por favor, informe o nicho da campanha');
       return;
     }
     
     if (formData.productValue <= 0) {
-      toast.error('Por favor, informe um valor válido para o produto');
+      toast.error('Por favor, informe um valor válido para a campanha');
       return;
     }
 
@@ -188,7 +188,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
             </div>
             <div className="flex flex-col justify-center h-11">
               <h3 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent leading-tight">Benchmark com IA</h3>
-              <p className="text-slate-400 text-sm mt-1 leading-tight">Produto: <span className="text-slate-200 font-semibold">{selectedProduct}</span></p>
+              <p className="text-slate-400 text-sm mt-1 leading-tight">Campanha: <span className="text-slate-200 font-semibold">{selectedProduct}</span></p>
             </div>
           </div>
           
@@ -479,7 +479,7 @@ const AIBenchmark: React.FC<AIBenchmarkProps> = ({ selectedProduct, onBenchmarkG
                         {[
                           { value: 'direct', label: 'Venda Direta', desc: 'Cliente compra na hora' },
                           { value: 'consultation', label: 'Consultoria', desc: 'Precisa conversar antes' },
-                          { value: 'demo', label: 'Demonstração', desc: 'Mostra o produto funcionando' },
+                          { value: 'demo', label: 'Demonstração', desc: 'Mostra a campanha funcionando' },
                           { value: 'trial', label: 'Teste Grátis', desc: 'Cliente testa antes de comprar' }
                         ].map((method) => (
                           <button

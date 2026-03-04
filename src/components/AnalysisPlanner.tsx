@@ -29,7 +29,7 @@ function formatDateBR(date: Date) {
 // 🎯 CORREÇÃO: Usar dayjs para consistência com PendingAudiencesStatus
 function addDays(base: Date, days: number) {
   const result = dayjs(base).add(days, 'day').toDate();
-  
+
   return result;
 }
 
@@ -40,14 +40,14 @@ function getStorageKey(client: string, product: string, audience?: string) {
 
 function safeParseDate(iso?: string): Date | null {
   if (!iso) return null;
-  
+
   // 🎯 CORREÇÃO: Usar dayjs para evitar problemas de fuso horário
   // ao interpretar strings YYYY-MM-DD como local ao invés de UTC
   const d = dayjs(iso).toDate();
   const isValid = !isNaN(d.getTime());
-  
-  
-  
+
+
+
   return isValid ? d : null;
 }
 
@@ -123,7 +123,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
 
   // Debug das props recebidas e estados
   useEffect(() => {
-//     
+    //     
   }, [selectedClient, selectedMonth, selectedProduct, selectedAudience]);
 
   const storageKey = useMemo(() => getStorageKey(selectedClient, selectedProduct, selectedAudience), [selectedClient, selectedProduct, selectedAudience]);
@@ -132,7 +132,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
   useEffect(() => {
     // Reset hydrated state when dependencies change
     setHydrated(false);
-    
+
     try {
       const raw = localStorage.getItem(storageKey);
       if (raw) {
@@ -140,19 +140,19 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
         if (saved.lastAnalysisDate) setLastAnalysisDate(saved.lastAnalysisDate);
         if (typeof saved.intervalDays === 'number') setIntervalDays(saved.intervalDays);
       }
-      
+
       // Carregar do Firestore (sobrepõe localStorage se existir)
       (async () => {
         try {
-          
-          
+
+
           // 1ª tentativa: registro específico do público
           let record = await analysisPlannerService.getPlanner(selectedClient, selectedProduct, selectedAudience, metaAdsUserId);
-          // Fallback 1: nível do produto
+          // Fallback 1: nível da campanha
           if (!record && selectedAudience) {
             record = await analysisPlannerService.getPlanner(selectedClient, selectedProduct, undefined, metaAdsUserId);
           }
-          // Fallback 2: procurar por adSetId atual entre todos os planners do produto
+          // Fallback 2: procurar por adSetId atual entre todos os planners da campanha
           if (!record) {
             try {
               const adSetId = localStorage.getItem('selectedAdSetId') || undefined;
@@ -161,7 +161,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
                 const byAdSet = all.find(p => p.adSetId === adSetId);
                 if (byAdSet) record = byAdSet;
               }
-            } catch {}
+            } catch { }
           }
           // Fallback 3: comparar por nome normalizado do público
           if (!record && selectedAudience) {
@@ -170,17 +170,17 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
               const all = await analysisPlannerService.listPlannersForProduct(selectedClient, selectedProduct);
               const byName = all.find(p => norm(p.audience || '') === norm(selectedAudience));
               if (byName) record = byName;
-            } catch {}
+            } catch { }
           }
-          
+
           if (record) {
-            
+
             if (record.lastAnalysisDate) setLastAnalysisDate(record.lastAnalysisDate);
             if (typeof record.intervalDays === 'number') setIntervalDays(record.intervalDays);
             // Se tinha adSetId no registro mas não está no localStorage, propaga
-            try { if (record.adSetId && !localStorage.getItem('selectedAdSetId')) localStorage.setItem('selectedAdSetId', record.adSetId); } catch {}
+            try { if (record.adSetId && !localStorage.getItem('selectedAdSetId')) localStorage.setItem('selectedAdSetId', record.adSetId); } catch { }
           } else {
-            
+
           }
         } catch (error) {
           console.error('❌ Erro ao carregar dados do Firestore:', error);
@@ -201,8 +201,8 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
       const payload: PlannerStorage = { lastAnalysisDate, intervalDays };
       localStorage.setItem(storageKey, JSON.stringify(payload));
       const adSetId = localStorage.getItem('selectedAdSetId') || undefined;
-      analysisPlannerService.savePlanner(selectedClient, selectedProduct, selectedAudience, { ...payload, adSetId }).catch(() => {});
-    } catch {}
+      analysisPlannerService.savePlanner(selectedClient, selectedProduct, selectedAudience, { ...payload, adSetId }).catch(() => { });
+    } catch { }
   }, [storageKey, lastAnalysisDate, intervalDays, hydrated]);
 
   // Buscar métricas para sugerir intervalo
@@ -213,7 +213,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
       try {
         const month = selectedMonth || localStorage.getItem('selectedMonth') || '';
         const client = selectedClient || localStorage.getItem('currentSelectedClient') || 'Todos os Clientes';
-        const product = selectedProduct || localStorage.getItem('currentSelectedProduct') || 'Todos os Produtos';
+        const product = selectedProduct || localStorage.getItem('currentSelectedProduct') || 'Todas as Campanhas';
         const audience = selectedAudience || localStorage.getItem('currentSelectedAudience') || 'Todos os Públicos';
         const data = await metricsService.getMetrics(month, client, product, audience);
         if (!cancelled) {
@@ -226,7 +226,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
       }
     };
     // Só sugerir quando houver cliente e produto definidos
-    if (selectedClient && selectedClient !== 'Selecione um cliente' && selectedProduct && selectedProduct !== 'Todos os Produtos') {
+    if (selectedClient && selectedClient !== 'Selecione um cliente' && selectedProduct && selectedProduct !== 'Todas as Campanhas') {
       load();
     } else {
       setSuggested({ days: DEFAULT_INTERVAL, reason: 'Defina cliente e produto para recomendações mais precisas.' });
@@ -237,7 +237,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
   // Aplicar automaticamente a sugestão quando ela for calculada
   useEffect(() => {
     if (suggested?.days && hydrated) {
-      
+
       setIntervalDays(suggested.days);
     }
   }, [suggested, hydrated]);
@@ -246,10 +246,10 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
   const nextDate = useMemo(() => {
     if (!lastDateObj) return null;
     const calculatedNextDate = addDays(lastDateObj, Math.max(1, intervalDays || DEFAULT_INTERVAL));
-    
+
     // 🎯 DEBUG: Log para sincronização de datas
-    
-    
+
+
     return calculatedNextDate;
   }, [lastDateObj, intervalDays, forceUpdate]);
 
@@ -258,37 +258,37 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
 
   // Debug dos estados de data - APÓS definição dos valores computados
   useEffect(() => {
-//     
+    //     
   }, [lastAnalysisDate, intervalDays, forceUpdate, lastDateObj, nextDate]);
 
   const handleMarkAnalyzedToday = useCallback(async () => {
     setIsUpdating(true);
-    
+
     // 🎯 CORREÇÃO: Usar dayjs com fuso horário local para garantir data correta
     const todayIso = dayjs().format('YYYY-MM-DD');
     const newIntervalDays = suggested?.days ?? intervalDays;
-    
-    
-    
+
+
+
     // Verificar se as props são válidas
-    if (!selectedClient || selectedClient === 'Selecione um cliente' || selectedClient === '' || !selectedProduct || selectedProduct === 'Todos os Produtos') {
+    if (!selectedClient || selectedClient === 'Selecione um cliente' || selectedClient === '' || !selectedProduct || selectedProduct === 'Todas as Campanhas') {
       console.warn('⚠️ Props inválidas - não é possível salvar análise:', { selectedClient, selectedProduct });
       alert('Por favor, selecione um cliente válido antes de marcar a análise.');
       setIsUpdating(false);
       return;
     }
-    
+
     // Persistir imediatamente ANTES de atualizar estados
     try {
       const adSetId = localStorage.getItem('selectedAdSetId') || undefined;
-      
+
       // Persistir também no localStorage de forma síncrona PRIMEIRO
       const payload: PlannerStorage = { lastAnalysisDate: todayIso, intervalDays: newIntervalDays };
-      
+
       localStorage.setItem(storageKey, JSON.stringify(payload));
-      
+
       // Depois salvar no Firestore
-      
+
       await analysisPlannerService.savePlanner(
         selectedClient,
         selectedProduct,
@@ -296,98 +296,98 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
         { lastAnalysisDate: todayIso, intervalDays: newIntervalDays, adSetId },
         metaAdsUserId
       );
-      
-      
-      
+
+
+
     } catch (error) {
       console.error('❌ Erro ao salvar dados de análise:', error);
       // Em caso de erro, tentar salvar apenas no localStorage
       try {
         const payload: PlannerStorage = { lastAnalysisDate: todayIso, intervalDays: newIntervalDays };
         localStorage.setItem(storageKey, JSON.stringify(payload));
-        
+
       } catch (localStorageError) {
         console.error('❌ Erro crítico - não foi possível salvar nem no localStorage:', localStorageError);
       }
     }
 
     // Atualiza estados locais DEPOIS do salvamento usando flushSync
-    
-    
+
+
     flushSync(() => {
       setLastAnalysisDate(() => {
-        
+
         return todayIso;
       });
-      
+
       setIntervalDays(() => {
-        
+
         return newIntervalDays;
       });
-      
+
       setForceUpdate(prev => {
         const newValue = prev + 1;
-        
+
         return newValue;
       });
     });
-    
+
     // Atualização direta do DOM como fallback
     const updateDOMDirectly = () => {
       try {
         const lastDateSpan = document.querySelector(`[key*="last-date-"]`);
         const nextDateSpan = document.querySelector(`[key*="next-date-"]`);
         const intervalSpan = document.querySelector(`[key*="interval-"]`);
-        
+
         if (lastDateSpan) {
           lastDateSpan.textContent = formatDateBR(dayjs(todayIso).toDate());
-          
+
         }
-        
+
         if (intervalSpan) {
           intervalSpan.textContent = newIntervalDays.toString();
-          
+
         }
-        
+
         if (nextDateSpan) {
           const nextDate = addDays(dayjs(todayIso).toDate(), newIntervalDays);
           nextDateSpan.textContent = formatDateBR(nextDate);
-          
+
         }
       } catch (domError) {
         console.warn('⚠️ Erro ao atualizar DOM diretamente:', domError);
       }
     };
-    
+
     // Atualização imediata do DOM
     updateDOMDirectly();
-    
+
     // Garantir atualização múltipla para casos de React Strict Mode
     setTimeout(() => {
-      
+
       setLastAnalysisDate(() => todayIso);
       setIntervalDays(() => newIntervalDays);
       setForceUpdate(prev => prev + 1);
       updateDOMDirectly();
     }, 50);
-    
+
     setTimeout(() => {
-      
+
       setLastAnalysisDate(() => todayIso);
       setIntervalDays(() => newIntervalDays);
       setForceUpdate(prev => prev + 1);
       updateDOMDirectly();
-      
+
       // 🎯 FORÇAR ATUALIZAÇÃO DA SEÇÃO "PÚBLICOS DESTE PRODUTO"
-      
-      
+
+
       // 1. Limpar cache de métricas para forçar recálculo
       try {
         if (typeof (window as any).metricsService?.clearCache === 'function') {
           (window as any).metricsService.clearCache();
         }
-      } catch (e) {}
-      
+      } catch (e) { }
+
       // 2. Disparar evento customizado para notificar outros componentes
       window.dispatchEvent(new CustomEvent('analysisUpdated', {
         detail: {
@@ -398,12 +398,12 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
           intervalDays: newIntervalDays
         }
       }));
-      
+
       // 3. Forçar re-render através do localStorage
       const currentRefreshTrigger = localStorage.getItem('refreshTrigger') || '0';
       localStorage.setItem('refreshTrigger', (parseInt(currentRefreshTrigger) + 1).toString());
-      
-      
+
+
       setIsUpdating(false);
     }, 200);
   }, [selectedClient, selectedProduct, selectedAudience, suggested, intervalDays, storageKey]);
@@ -427,11 +427,11 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
         btn.appendChild(tip);
         setTimeout(() => tip.remove(), 900);
       }
-    } catch {}
+    } catch { }
   }
 
   return (
-    <div key={`analysis-planner-${lastAnalysisDate}-${intervalDays}-${forceUpdate}`} className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 md:p-5 mb-6">
+    <div key={`analysis-planner-${lastAnalysisDate}-${intervalDays}-${forceUpdate}`} className="bg-slate-900/70 border border-slate-700/50 rounded-2xl shadow-lg p-6">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <CalendarDays className="w-5 h-5 text-amber-300" />
@@ -494,16 +494,15 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={(e) => { 
+            onClick={(e) => {
               playButtonClickEffect(e.currentTarget);
-              handleMarkAnalyzedToday(); 
+              handleMarkAnalyzedToday();
             }}
             disabled={isUpdating}
-            className={`relative overflow-hidden px-3 py-2 text-sm rounded-lg border transition transform text-white ${
-              isUpdating 
-                ? 'bg-amber-600/80 border-amber-500/40 cursor-wait' 
+            className={`relative overflow-hidden px-3 py-2 text-sm rounded-lg border transition transform text-white ${isUpdating
+                ? 'bg-amber-600/80 border-amber-500/40 cursor-wait'
                 : 'bg-emerald-600/80 hover:bg-emerald-600 active:scale-[0.98] border-emerald-500/40'
-            }`}
+              }`}
           >
             {isUpdating ? 'Atualizando...' : 'Marcar como analisado hoje'}
           </button>

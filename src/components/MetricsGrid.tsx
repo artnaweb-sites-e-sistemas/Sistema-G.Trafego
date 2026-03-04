@@ -72,19 +72,19 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, subtitle, trend, 
 
   // Estilos baseados no modo compacto e prioridade
   const cardClasses = compact
-    ? `bg-gradient-to-br rounded-xl border transition-all duration-300 shadow-md hover:shadow-lg group ${priority === 'primary'
-      ? 'from-purple-900/40 to-indigo-900/40 border-purple-500/30 hover:border-purple-400/50 p-4'
-      : 'from-gray-800/60 to-gray-900/60 border-gray-700/40 hover:border-gray-600/50 p-3'
+    ? `bg-slate-800/30 rounded-xl border transition-all duration-300 group ${priority === 'primary'
+      ? 'border-purple-500/30 hover:border-purple-500/50 p-4'
+      : 'border-slate-700/50 hover:border-slate-600/60 p-3'
     }`
-    : 'bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm rounded-2xl p-8 border border-gray-700/50 hover:border-gray-600/70 transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-black/20 group';
+    : 'bg-slate-800/40 backdrop-blur-sm rounded-2xl p-8 border border-slate-700/50 hover:border-slate-600/70 transition-all duration-300 group';
 
   const valueClasses = compact
-    ? priority === 'primary' ? 'text-2xl font-bold text-white' : 'text-xl font-bold text-white'
+    ? priority === 'primary' ? 'text-2xl font-bold text-white' : 'text-xl font-semibold text-white'
     : 'text-4xl font-bold text-white group-hover:text-gray-100 transition-colors';
 
   const titleClasses = compact
-    ? 'text-gray-400 text-xs font-medium uppercase tracking-wide'
-    : 'text-gray-300 text-sm font-semibold uppercase tracking-wide';
+    ? 'text-gray-400 text-[11px] font-medium uppercase tracking-wider'
+    : 'text-gray-400 text-sm font-medium uppercase tracking-wide';
 
   return (
     <div className={cardClasses}>

@@ -523,7 +523,7 @@ const DailyControlTable: React.FC<DailyControlTableProps> = ({
 
         data[dayIndex] = {
           ...data[dayIndex],
-          investissement: formatCurrency(agg.investment),
+          investment: formatCurrency(agg.investment),
           cpm: agg.impressions > 0 ? formatCurrency((agg.investment / agg.impressions) * 1000) : formatCurrency(0),
           impressions: agg.impressions,
           clicks: agg.clicks || 0,

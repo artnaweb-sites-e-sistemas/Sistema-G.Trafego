@@ -111,7 +111,7 @@ class MetaAdsMcpService {
         });
       }
       
-      // 🎯 ESTRATÉGIA 1: Tentar filtrar por nome do produto nos adsets (como antes)
+      // 🎯 ESTRATÉGIA 1: Tentar filtrar por nome da campanha nos adsets (como antes)
       
       let productAdsets = adsets.filter(adset => 
         adset.name.toLowerCase().includes(product.toLowerCase())
@@ -119,7 +119,7 @@ class MetaAdsMcpService {
       
       
       
-      // 🎯 ESTRATÉGIA 2: Se não encontrou, buscar por campanhas que contenham o produto
+      // 🎯 ESTRATÉGIA 2: Se não encontrou, buscar por campanhas que contenham a campanha
       if (productAdsets.length === 0) {
         
         const productCampaigns = campaigns.filter(campaign => 
@@ -147,7 +147,7 @@ class MetaAdsMcpService {
       if (productAdsets.length === 0) {
         
         
-        // Extrair palavras-chave do produto (remover colchetes e palavras comuns)
+        // Extrair palavras-chave da campanha (remover colchetes e palavras comuns)
         const productWords = product.toLowerCase()
           .replace(/\[/g, ' ')
           .replace(/\]/g, ' ')
@@ -187,7 +187,7 @@ class MetaAdsMcpService {
       }
       
       if (productAdsets.length === 0) {
-        console.warn(`⚠️ Nenhum adset encontrado mesmo com todas as estratégias para o produto "${product}"`);
+        console.warn(`⚠️ Nenhum adset encontrado mesmo com todas as estratégias para a campanha "${product}"`);
         return [];
       }
       
@@ -818,7 +818,7 @@ class MetaAdsMcpService {
    * Método de compatibilidade (usar getAudienceHistoryByProduct)
    */
   async getAudienceHistory(client: string, datePreset: string = 'last_30d'): Promise<ProcessedMetricData[]> {
-    return this.getAudienceHistoryByProduct(client, 'Todos os Produtos', datePreset);
+    return this.getAudienceHistoryByProduct(client, 'Todas as Campanhas', datePreset);
   }
 
   /**

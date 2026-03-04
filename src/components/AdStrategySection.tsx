@@ -1048,7 +1048,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
             </div>
             
                          <div style="background: linear-gradient(135deg, #10b981, #059669); color: white; border-radius: 8px; padding: 16px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); text-align: center;">
-               <div style="font-size: 12px; font-weight: 500; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">Produto</div>
+               <div style="font-size: 12px; font-weight: 500; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">Campanha</div>
                <div style="font-size: 16px; font-weight: bold;">${(strategy.product?.type || 'N/A').replace(/\b\w/g, l => l.toUpperCase())}</div>
              </div>
             
@@ -1058,7 +1058,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
             </div>
             
             <div style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; border-radius: 8px; padding: 16px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); text-align: center;">
-              <div style="font-size: 12px; font-weight: 500; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">Ticket do Produto</div>
+              <div style="font-size: 12px; font-weight: 500; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">Ticket da Campanha</div>
               <div style="font-size: 16px; font-weight: bold;">R$ ${strategy.product?.ticket || '0'}</div>
             </div>
           </div>
@@ -2494,7 +2494,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
             className="group relative inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] h-11"
           >
             <Plus className="h-4 w-4 mr-2" />
-            <span>Novo Produto</span>
+            <span>Nova Campanha</span>
           </button>
         </div>
 
@@ -2533,7 +2533,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                   animate={{ opacity: 1, y: 0 }}
                   className="bg-slate-800/60 border border-slate-700/50 rounded-2xl shadow-md overflow-hidden"
                 >
-                  {/* Header do produto */}
+                  {/* Header da campanha */}
                   <div
                     className="flex items-center justify-between p-6 cursor-pointer"
                     onClick={() => {
@@ -2562,7 +2562,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                     </motion.div>
                   </div>
 
-                  {/* Estratégias do produto */}
+                  {/* Estratégias da campanha */}
                   <AnimatePresence>
                     {!collapsedProducts.has(productKey) && (
                       <motion.div
@@ -2616,7 +2616,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                     {/* Nomenclaturas */}
                                     <div className="space-y-3 mb-4">
                                       <div>
-                                        <span className="text-xs text-slate-300 font-semibold uppercase tracking-wide block mb-2">Produto</span>
+                                        <span className="text-xs text-slate-300 font-semibold uppercase tracking-wide block mb-2">Campanha</span>
                                         <div className="relative">
                                           <div
                                             onClick={() => copyToClipboard(strategy.generatedNames.product, `product-${strategy.id}`)}
@@ -2994,7 +2994,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                               </motion.div>
                             ))}
 
-                          {/* Botão para adicionar estratégia ao produto */}
+                          {/* Botão para adicionar estratégia aa campanha */}
                           <motion.button
                             onClick={() => handleOpenModal(undefined, productData.name, productData.campaignType)}
                             className="group relative inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-indigo-500/20 hover:from-blue-500/30 hover:via-purple-500/30 hover:to-indigo-500/30 border border-blue-500/40 hover:border-blue-400/60 px-6 py-3 text-blue-200 hover:text-blue-100 transition-all duration-300 shadow-lg hover:shadow-xl w-full"
@@ -3055,7 +3055,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 overflow-visible relative">
                           <div className="relative z-10">
-                            <label className="block text-sm font-medium text-blue-300 mb-2">Nome do Produto</label>
+                            <label className="block text-sm font-medium text-blue-300 mb-2">Nome da Campanha</label>
                             <input
                               type="text"
                               value={currentStrategy.product?.name || ''}
@@ -3419,7 +3419,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                             </div>
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-emerald-300 mb-2">Ticket do Produto</label>
+                            <label className="block text-sm font-medium text-emerald-300 mb-2">Ticket da Campanha</label>
                             <div className="relative">
                               <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-400 font-semibold text-sm">R$</span>
                               <input
@@ -3449,7 +3449,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                             <label className="block text-sm font-medium text-slate-300 mb-2">Nomenclatura do Produto</label>
                             <div className="bg-slate-700/60 border border-slate-600/50 rounded-lg px-4 py-3">
                               <div className="flex items-center justify-between">
-                                <p className="text-blue-400 font-medium">{currentStrategy.generatedNames?.product || 'Preencha os dados do produto'}</p>
+                                <p className="text-blue-400 font-medium">{currentStrategy.generatedNames?.product || 'Preencha os dados da campanha'}</p>
                                 <button
                                   onClick={() => copyToClipboard(currentStrategy.generatedNames?.product || '', 'modal-product')}
                                   className="text-blue-400 hover:text-blue-300 transition-colors"
@@ -3552,7 +3552,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                       {/* Estratégia Atual */}
                       <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
                         <h3 className="text-sm font-semibold text-slate-300 mb-2">Estratégia Atual</h3>
-                        <p className="text-sm text-slate-400 mb-1">Produto: <span className="text-blue-300">{selectedStrategyForRemarketing?.product?.name}</span></p>
+                        <p className="text-sm text-slate-400 mb-1">Campanha: <span className="text-blue-300">{selectedStrategyForRemarketing?.product?.name}</span></p>
                         <p className="text-sm text-slate-400 mb-1">Público: <span className="text-yellow-300">{selectedStrategyForRemarketing?.generatedNames?.audience}</span></p>
                         <p className="text-sm text-slate-400">Orçamento: <span className="text-emerald-300">{selectedStrategyForRemarketing?.budget?.planned.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></p>
                       </div>

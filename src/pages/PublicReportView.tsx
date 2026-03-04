@@ -778,14 +778,14 @@ const PublicReportView: React.FC = () => {
         let searchProduct = product;
         let searchAudience = audience;
 
-        if (product && product !== 'Todos os Produtos' && product !== '') {
+        if (product && product !== 'Todas as Campanhas' && product !== '') {
           searchProduct = product;
           searchAudience = 'Todos os Públicos';
         } else if (audience && audience !== 'Todos os Públicos' && audience !== '') {
-          searchProduct = 'Todos os Produtos';
+          searchProduct = 'Todas as Campanhas';
           searchAudience = audience;
         } else {
-          searchProduct = 'Todos os Produtos';
+          searchProduct = 'Todas as Campanhas';
           searchAudience = 'Todos os Públicos';
         }
 

@@ -23,9 +23,9 @@ interface ProductPickerProps {
   isFacebookConnected?: boolean;
 }
 
-const ProductPicker: React.FC<ProductPickerProps> = ({ 
-  selectedProduct, 
-  setSelectedProduct, 
+const ProductPicker: React.FC<ProductPickerProps> = ({
+  selectedProduct,
+  setSelectedProduct,
   selectedClient,
   dataSource,
   selectedMonth,
@@ -58,30 +58,30 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
     if (dataSource === 'facebook' && selectedClient && selectedClient !== 'Todos os Clientes') {
       try {
         setIsLoading(true);
-        
+
         const selectedAccount = metaAdsService.getSelectedAccount();
-        
+
         if (!selectedAccount) {
           setIsLoading(false);
           return;
         }
-        
+
         if (!metaAdsService.isLoggedIn()) {
           setIsLoading(false);
           return;
         }
-        
+
         // Obter datas do mês selecionado
         const getPeriodDates = (monthString: string) => {
           const months = [
             'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
             'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
           ];
-          
+
           const [monthName, yearStr] = monthString.split(' ');
           const year = parseInt(yearStr);
           const monthIndex = months.findIndex(m => m.toLowerCase() === monthName.toLowerCase());
-          
+
           if (monthIndex === -1) {
             const now = new Date();
             return {
@@ -89,44 +89,44 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
               endDate: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
             };
           }
-          
+
           const startDate = new Date(year, monthIndex, 1).toISOString().split('T')[0];
           const endDate = new Date(year, monthIndex + 1, 0).toISOString().split('T')[0];
-          
+
           return { startDate, endDate };
         };
 
         // const { startDate, endDate } = getPeriodDates(selectedMonth || '');
-        
+
         // 🎯 CORREÇÃO: Para análise histórica, buscar TODAS as campanhas sem filtro de data
         // O usuário quer ver produtos que têm dados no período, independente de quando foram criados
-        
+
         const campaignsData = await metaAdsService.getCampaigns();
-        
-//         
-        
+
+        //         
+
         // 🎯 CORREÇÃO: Para análise histórica, incluir campanhas PAUSED e ARCHIVED também
         // Campanhas pausadas ou arquivadas podem ter dados históricos importantes
-        const activeCampaigns = campaignsData.filter(campaign => 
+        const activeCampaigns = campaignsData.filter(campaign =>
           campaign.status === 'ACTIVE' || campaign.status === 'PAUSED' || campaign.status === 'ARCHIVED'
         );
-        
-//         
-        
+
+        //         
+
         const facebookProducts: Product[] = [];
-        
+
         // Para cada campanha, verificar se tem conjuntos de anúncio ativos
         for (const campaign of activeCampaigns) {
           try {
             // Buscar conjuntos de anúncio da campanha
             const adSets = await metaAdsService.getAdSets(campaign.id);
-            
+
             // Verificar se pelo menos um conjunto de anúncio está ativo
             const hasActiveAdSets = adSets.some(adSet => adSet.status === 'ACTIVE');
-            
+
             // Determinar status da campanha baseado nos conjuntos de anúncio
             const campaignStatus = hasActiveAdSets ? 'ACTIVE' : 'PAUSED';
-            
+
             facebookProducts.push({
               id: `fb-campaign-${campaign.id}`,
               name: campaign.name,
@@ -152,7 +152,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
             });
           }
         }
-        
+
         // Se não há campanhas, mostrar lista vazia
         if (facebookProducts.length === 0) {
           setProducts([]);
@@ -163,7 +163,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
         } else {
           setProducts(facebookProducts);
         }
-        
+
       } catch (error: any) {
         setProducts([]);
       } finally {
@@ -182,16 +182,16 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
     const handleClientChanged = async (event: Event) => {
       const customEvent = event as CustomEvent;
       const { clientName, source, adAccount } = customEvent.detail;
-      
+
       // Limpar seleção atual
       setSelectedProduct('');
-      
+
       // Carregar produtos baseado no novo cliente
       if (source === 'facebook') {
         await loadMetaAdsCampaignsForClient(clientName, source, adAccount);
-        
+
         // 🎯 MUDANÇA: Não carregar métricas automaticamente - apenas log para debug
-        
+
       } else if (source === 'manual') {
         await loadMetaAdsCampaignsForClient(clientName, source, null);
       }
@@ -234,48 +234,48 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
     setSelectedProduct(product.name);
     setIsOpen(false);
     setSearchTerm('');
-    
+
     // Se for uma campanha do Facebook, salvar no Firestore
     if (product.source === 'facebook' && product.campaign) {
       try {
         const { firestoreCampaignSyncService } = await import('../services/firestoreCampaignSyncService');
-        
+
         // Salvar seleção no Firestore
         await firestoreCampaignSyncService.saveUserSelection({
           selectedCampaignId: product.campaign.id,
           selectedProductName: product.name,
           selectedClient: selectedClient !== 'Selecione um cliente' ? selectedClient : undefined
         });
-        
-//         
+
+        //         
       } catch (error) {
         console.error('Erro ao salvar seleção no Firestore:', error);
       }
     }
-    
+
     // Manter localStorage como fallback/cache local
-//     
-    
+    //     
+
     localStorage.setItem('currentSelectedProduct', product.name);
     if (product.source === 'facebook' && product.campaign) {
       localStorage.setItem('selectedCampaignId', product.campaign.id);
-      
-      
+
+
       // Verificar se foi salvo corretamente
       const savedId = localStorage.getItem('selectedCampaignId');
-      
+
     }
-    
+
     // Emitir evento para notificar outros componentes
     window.dispatchEvent(new CustomEvent('productSelected', {
-      detail: { 
+      detail: {
         productName: product.name,
         productId: product.id,
         source: product.source,
         campaign: product.campaign
       }
     }));
-    
+
     // Se for uma campanha do Facebook, disparar evento específico para carregar métricas
     if (product.source === 'facebook' && product.campaign) {
       window.dispatchEvent(new CustomEvent('campaignSelected', {
@@ -285,24 +285,24 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
           campaignId: product.campaign.id
         }
       }));
-      
+
       // 🎯 CARREGAMENTO IMEDIATO E DUPLO para garantir que funcione
-      
-      
+
+
       // Primeiro disparo imediato
       window.dispatchEvent(new CustomEvent('loadAudiencesForProduct', {
-        detail: { 
+        detail: {
           productName: product.name,
           campaignId: product.campaign.id,
           immediate: true
         }
       }));
-      
+
       // Segundo disparo com delay para garantir que capture
       setTimeout(() => {
-        
+
         window.dispatchEvent(new CustomEvent('loadAudiencesForProduct', {
-          detail: { 
+          detail: {
             productName: product.name,
             campaignId: product.campaign.id,
             immediate: true
@@ -316,7 +316,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
     setSelectedProduct('');
     setSearchTerm('');
     localStorage.removeItem('currentSelectedProduct');
-    
+
     // Emitir evento para notificar outros componentes
     window.dispatchEvent(new CustomEvent('productCleared'));
   };
@@ -325,18 +325,18 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
     if (source === 'facebook' && adAccount) {
       try {
         setIsLoading(true);
-        
+
         // Obter datas do mês selecionado
         const getPeriodDates = (monthString: string) => {
           const months = [
             'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
             'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
           ];
-          
+
           const [monthName, yearStr] = monthString.split(' ');
           const year = parseInt(yearStr);
           const monthIndex = months.findIndex(m => m.toLowerCase() === monthName.toLowerCase());
-          
+
           if (monthIndex === -1) {
             const now = new Date();
             return {
@@ -344,33 +344,33 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
               endDate: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
             };
           }
-          
+
           const startDate = new Date(year, monthIndex, 1).toISOString().split('T')[0];
           const endDate = new Date(year, monthIndex + 1, 0).toISOString().split('T')[0];
-          
+
           return { startDate, endDate };
         };
 
         // const { startDate, endDate } = getPeriodDates(selectedMonth || '');
-        
+
         // 🎯 CORREÇÃO: Para análise histórica, buscar TODAS as campanhas sem filtro de data
-        
+
         const campaignsData = await metaAdsService.getCampaigns();
-        
-//         
-        
+
+        //         
+
         // 🎯 CORREÇÃO: Incluir campanhas ARCHIVED também para análise histórica
-        const activeCampaigns = campaignsData.filter(campaign => 
+        const activeCampaigns = campaignsData.filter(campaign =>
           campaign.status === 'ACTIVE' || campaign.status === 'PAUSED' || campaign.status === 'ARCHIVED'
         );
-        
-//         
-        
+
+        //         
+
         // Sincronizar campanhas com Firestore
         try {
           const { firestoreCampaignSyncService } = await import('../services/firestoreCampaignSyncService');
           const selectedAccount = metaAdsService.getSelectedAccount();
-          
+
           if (selectedAccount && activeCampaigns.length > 0) {
             // Sincronizar campanhas no Firestore
             await firestoreCampaignSyncService.syncCampaignsFromMetaAds(
@@ -379,7 +379,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
               selectedAccount.business_id || 'unknown',
               selectedAccount.id
             );
-            
+
           }
         } catch (error) {
           console.error('Erro ao sincronizar campanhas com Firestore:', error);
@@ -394,19 +394,19 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
           source: 'facebook' as const,
           campaign: campaign
         }));
-        
+
         setProducts(facebookProducts);
-        
+
         // Se não há produtos encontrados, disparar evento
         if (facebookProducts.length === 0) {
           window.dispatchEvent(new CustomEvent('noProductsFound', {
             detail: { clientName }
           }));
         }
-        
+
       } catch (error: any) {
-        if (error.message.includes('Nenhuma conta de anúncios selecionada') || 
-            error.message.includes('Conta de anúncios não configurada')) {
+        if (error.message.includes('Nenhuma conta de anúncios selecionada') ||
+          error.message.includes('Conta de anúncios não configurada')) {
           setTimeout(async () => {
             try {
               await loadMetaAdsCampaignsForClient(clientName, source, adAccount);
@@ -446,31 +446,31 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
 
   const handleDeleteProduct = (productId: string, productName: string, event: React.MouseEvent) => {
     event.stopPropagation();
-    
+
     // Não permitir deletar produtos do Facebook
     const product = products.find(p => p.id === productId);
     if (product?.source === 'facebook') {
       alert('Não é possível excluir campanhas do Meta Ads. Use o Facebook Ads Manager para gerenciar suas campanhas.');
       return;
     }
-    
-    if (window.confirm(`Tem certeza que deseja excluir o produto "${productName}"?`)) {
+
+    if (window.confirm(`Tem certeza que deseja excluir a campanha "${productName}"?`)) {
       setProducts(prevProducts => prevProducts.filter(product => product.id !== productId));
-      
+
       if (productName === selectedProduct) {
         setSelectedProduct('');
       }
-      
+
       setSearchTerm('');
     }
   };
 
   const getDisplayText = () => {
     if (!selectedProduct) {
-      return 'Selecionar Produto';
+      return 'Selecionar Campanha';
     }
     const product = products.find(p => p.name === selectedProduct);
-    return product ? product.name : 'Selecionar Produto';
+    return product ? product.name : 'Selecionar Campanha';
   };
 
   const formatPrice = (price?: number) => {
@@ -491,7 +491,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
   // Função para traduzir objetivos das campanhas
   const getCampaignObjective = (objective: string | undefined): string => {
     if (!objective) return 'Sem objetivo definido';
-    
+
     const objectives: { [key: string]: string } = {
       'OUTCOME_ENGAGEMENT': 'Engajamento',
       'OUTCOME_AWARENESS': 'Reconhecimento',
@@ -510,7 +510,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
       'OUTCOME_STORE_VISITS': 'Visitas à Loja',
       'OUTCOME_WEBSITE_CONVERSIONS': 'Conversões do Site'
     };
-    
+
     return objectives[objective] || objective;
   };
 
@@ -540,35 +540,33 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
   return (
     <div className="relative dropdown-container" ref={pickerRef}>
       {/* Input field */}
-      <div 
+      <div
         className={`relative ${isPickerActive ? 'cursor-pointer dropdown-trigger' : 'cursor-not-allowed'}`}
         onClick={() => isPickerActive && setIsOpen(!isOpen)}
       >
         <Package className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isPickerActive ? 'text-gray-400' : 'text-gray-600'}`} />
-        <div ref={triggerRef} className={`pl-10 pr-8 py-2 rounded-lg border w-full ${
-          isPickerActive 
-            ? 'bg-gray-700 text-white border-gray-600 focus:border-purple-500 focus:outline-none' 
-            : 'bg-gray-800 text-gray-500 border-gray-700'
-        }`}>
-                  <span className="truncate block">
-          {isPickerActive ? getDisplayText() : 
-            !isFacebookConnected ? 'Conecte-se ao Meta primeiro' : 
-            'Selecione um cliente primeiro'}
-        </span>
+        <div ref={triggerRef} className={`pl-10 pr-8 py-2 rounded-lg border w-full ${isPickerActive
+          ? 'bg-gray-700 text-white border-gray-600 focus:border-purple-500 focus:outline-none'
+          : 'bg-gray-800 text-gray-500 border-gray-700'
+          }`}>
+          <span className="truncate block">
+            {isPickerActive ? getDisplayText() :
+              !isFacebookConnected ? 'Conecte-se ao Meta primeiro' :
+                'Selecione um cliente primeiro'}
+          </span>
         </div>
         <ChevronDown className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isPickerActive ? 'text-gray-400' : 'text-gray-600'}`} />
-        
+
         {/* Indicador de Status */}
-        <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 dropdown-indicator ${
-          isPickerActive && selectedProduct && selectedProduct !== '' && selectedProduct !== undefined && selectedProduct !== null && selectedProduct !== 'Todos os Produtos'
-            ? 'bg-green-500 shadow-lg shadow-green-500/50'
-            : 'bg-gray-500'
-        }`}></div>
+        <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 dropdown-indicator ${isPickerActive && selectedProduct && selectedProduct !== '' && selectedProduct !== undefined && selectedProduct !== null && selectedProduct !== 'Todas as Campanhas'
+          ? 'bg-green-500 shadow-lg shadow-green-500/50'
+          : 'bg-gray-500'
+          }`}></div>
       </div>
 
       {/* Dropdown */}
       {(isOpen && isPickerActive) && renderDropdown(
-          <div className="dropdown-menu dropdown-menu-wide z-dropdown-high bg-slate-900 border border-slate-700 rounded-xl shadow-2xl" style={{ zIndex: 2147483647 }}>
+        <div className="dropdown-menu dropdown-menu-wide z-dropdown-high bg-slate-900 border border-slate-700 rounded-xl shadow-2xl" style={{ zIndex: 2147483647 }}>
           {/* Action buttons - Fixed at top */}
           <div className="border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-700">
             <div className="flex items-center justify-between p-3">
@@ -580,12 +578,12 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
                 Limpar
               </button>
 
-              {/* Remover botão de adicionar produto - só deve ser feito via Meta */}
+              {/* Remover botão de adicionar campanha - só deve ser feito via Meta */}
               {/* <button
                 className="flex items-center px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-md transition-all duration-200 ease-in-out shadow-sm hover:shadow-md"
               >
                 <Plus className="w-4 h-4 mr-1" />
-                Novo Produto
+                Nova Campanha
               </button> */}
             </div>
           </div>
@@ -596,7 +594,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Buscar produto..."
+                placeholder="Buscar campanha..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500 text-slate-200 bg-slate-800 placeholder-slate-400"
@@ -617,9 +615,8 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
                 <div
                   key={product.id}
                   onClick={() => handleProductSelect(product)}
-                  className={`p-3 hover:bg-slate-800 cursor-pointer transition-colors group ${
-                    product.name === selectedProduct ? 'bg-slate-800/80 border-l-4 border-purple-500' : ''
-                  }`}
+                  className={`p-3 hover:bg-slate-800 cursor-pointer transition-colors group ${product.name === selectedProduct ? 'bg-slate-800/80 border-l-4 border-purple-500' : ''
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -641,11 +638,10 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
                           </span>
                         )}
                         {product.source === 'facebook' && product.campaign && (
-                          <span className={`text-xs px-2 py-1 rounded-full border ${
-                            product.campaign.status === 'ACTIVE' 
-                              ? 'bg-green-900/30 text-green-400 border-green-500/30' 
-                              : 'bg-yellow-900/30 text-yellow-400 border-yellow-500/30'
-                          }`}>
+                          <span className={`text-xs px-2 py-1 rounded-full border ${product.campaign.status === 'ACTIVE'
+                            ? 'bg-green-900/30 text-green-400 border-green-500/30'
+                            : 'bg-yellow-900/30 text-yellow-400 border-yellow-500/30'
+                            }`}>
                             {product.campaign.status === 'ACTIVE' ? 'Ativa' : 'Pausada'}
                           </span>
                         )}
@@ -659,7 +655,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
                         <button
                           onClick={(e) => handleDeleteProduct(product.id, product.name, e)}
                           className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded transition-all duration-200 ease-in-out"
-                          title="Excluir produto"
+                          title="Excluir campanha"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -672,15 +668,15 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
               <div className="p-4 text-center text-slate-400">
                 {dataSource === 'facebook' && metaAdsService.isLoggedIn()
                   ? 'Nenhuma campanha ativa encontrada para este período'
-                  : selectedClient === 'Todos os Clientes' 
-                    ? 'Selecione um cliente para ver os produtos'
-                    : 'Nenhum produto encontrado'
+                  : selectedClient === 'Todos os Clientes'
+                    ? 'Selecione um cliente para ver as campanhas'
+                    : 'Nenhuma campanha encontrada'
                 }
               </div>
             )}
           </div>
-          </div>
-        )}
+        </div>
+      )}
     </div>
   );
 };

@@ -1533,6 +1533,16 @@ class MetaAdsService {
 
       const salesCount = parseInt(purchases);
 
+      // Buscar métricas de engajamento/seguidores para campanhas de audiência
+      const pageEngagement = insight.actions?.find((action: any) =>
+        action.action_type === 'page_engagement' ||
+        action.action_type === 'post_engagement' ||
+        action.action_type === 'like' ||
+        action.action_type === 'page_like' ||
+        action.action_type === 'onsite_conversion.account_follows'
+      )?.value || '0';
+      const engagementCount = parseInt(pageEngagement);
+
       // Debug: Log de compras para verificar se estão sendo detectadas
 
 
@@ -1678,7 +1688,8 @@ class MetaAdsService {
         roas: roas,
         roi: roi,
         appointments: leadsCount,
-        sales: salesCount
+        sales: salesCount,
+        followers: engagementCount
       };
 
       // Log final apenas em desenvolvimento
@@ -2379,7 +2390,7 @@ class MetaAdsService {
       const activeAdsets = await this.getActiveAdSetsByProduct(product);
 
       if (activeAdsets.length === 0) {
-        console.warn(`⚠️ Nenhum adset ativo encontrado para o produto ${product}`);
+        console.warn(`⚠️ Nenhum adset ativo encontrado para a campanha ${product}`);
         return [];
       }
 

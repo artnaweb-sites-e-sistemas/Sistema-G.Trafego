@@ -40,7 +40,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
   // Verificar se já existe um link para a seleção atual
   useEffect(() => {
     const checkExistingLink = () => {
-      if (!selectedProduct || selectedProduct === 'Todos os Produtos') {
+      if (!selectedProduct || selectedProduct === 'Todas as Campanhas') {
         setHasLinkForCurrentSelection(false);
         setGeneratedLink(null);
         return;
@@ -106,7 +106,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
       }
       
       // Salvar detalhes mensais atuais no Firebase (vinculado ao cliente, produto e mês)
-      if (monthlyDetailsValues && selectedProduct && selectedProduct !== 'Todos os Produtos' && selectedClient && selectedClient !== 'Todos os Clientes') {
+      if (monthlyDetailsValues && selectedProduct && selectedProduct !== 'Todas as Campanhas' && selectedClient && selectedClient !== 'Todos os Clientes') {
         await metricsService.saveMonthlyDetails({
           month: selectedMonth,
           product: selectedProduct,
@@ -186,7 +186,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
       }
     
       // Atualizar detalhes mensais no Firebase (vinculado ao cliente, produto e mês)
-      if (monthlyDetailsValues && selectedProduct && selectedProduct !== 'Todos os Produtos' && selectedClient && selectedClient !== 'Todos os Clientes') {
+      if (monthlyDetailsValues && selectedProduct && selectedProduct !== 'Todas as Campanhas' && selectedClient && selectedClient !== 'Todos os Clientes') {
         await metricsService.saveMonthlyDetails({
           month: selectedMonth,
           product: selectedProduct,
@@ -271,7 +271,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
     }
   };
 
-  const isDisabled = selectedProduct === 'Todos os Produtos' || 
+  const isDisabled = selectedProduct === 'Todas as Campanhas' || 
                     selectedProduct === '' ||
                     selectedClient === 'Todos os Clientes' ||
                     selectedClient === '';
@@ -466,7 +466,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
             ? 'bg-green-600 hover:bg-green-700 text-white'
             : 'bg-gray-600 hover:bg-gray-700 text-gray-300 hover:text-white'
         }`}
-        title={isDisabled ? 'Selecione um produto específico para compartilhar' : 'Compartilhar Relatório'}
+        title={isDisabled ? 'Selecione uma campanha específico para compartilhar' : 'Compartilhar Relatório'}
       >
         <Share2 className="w-5 h-5" />
         

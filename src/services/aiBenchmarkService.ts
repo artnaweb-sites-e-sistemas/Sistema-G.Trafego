@@ -12,7 +12,7 @@ export interface BenchmarkData {
   productType: string;
   campaignObjective: string;
   salesProcess: {
-    requiresScheduling: boolean; // Se o produto requer agendamento
+    requiresScheduling: boolean; // Se a campanha requer agendamento
     salesMethod: 'direct' | 'consultation' | 'demo' | 'trial'; // Método de venda
     avgSalesTime: string; // Tempo médio para fechar venda
   };
@@ -155,7 +155,7 @@ export class AIBenchmarkService {
       };
     }
 
-    // Algoritmo básico para simular valores baseados nos dados do produto
+    // Algoritmo básico para simular valores baseados nos dados da campanha
     const baseMultiplier = this.getBaseMultiplierByNiche(data.productNiche);
     const valueMultiplier = this.getValueMultiplier(data.productValue);
     const audienceMultiplier = this.getAudienceMultiplier(data.targetAudience);
@@ -338,7 +338,7 @@ export class AIBenchmarkService {
         confidence: 50,
         insights: [
           'Não foi possível gerar insights específicos',
-          'Considere refinar as informações do produto',
+          'Considere refinar as informações da campanha',
           'Tente novamente para obter dados mais precisos',
           'Valores padrão aplicados para demonstração'
         ]
@@ -358,7 +358,7 @@ export class AIBenchmarkService {
         return null;
       }
 
-      // Buscar métricas dos últimos 3 meses para o produto
+      // Buscar métricas dos últimos 3 meses para a campanha
       const now = new Date();
       const months = [];
       for (let i = 0; i < 3; i++) {

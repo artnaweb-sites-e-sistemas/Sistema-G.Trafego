@@ -119,7 +119,7 @@ export const metricsServiceSimple = {
   async getMetrics(
     month: string,
     client: string = 'Todos os Clientes',
-    product: string = 'Todos os Produtos',
+    product: string = 'Todas as Campanhas',
     audience: string = 'Todos os Públicos'
   ): Promise<MetricData[]> {
     // Calcular datas do mês selecionado
@@ -144,7 +144,7 @@ export const metricsServiceSimple = {
         if (audience !== 'Todos os Públicos' && adSetId) {
           // Buscar métricas do ad set
           insights = await metaAdsService.getAdSetInsights(adSetId, startDate, endDate, { fallbackToLast30Days: false });
-        } else if (product !== 'Todos os Produtos' && campaignId) {
+        } else if (product !== 'Todas as Campanhas' && campaignId) {
           // Buscar métricas da campanha
           insights = await metaAdsService.getCampaignInsights(campaignId, startDate, endDate);
         } else {
@@ -164,7 +164,7 @@ export const metricsServiceSimple = {
     if (client !== 'Todos os Clientes') {
       filteredData = filteredData.map(item => ({ ...item, client }));
     }
-    if (product !== 'Todos os Produtos') {
+    if (product !== 'Todas as Campanhas') {
       filteredData = filteredData.map(item => ({ ...item, product }));
     }
     if (audience !== 'Todos os Públicos') {

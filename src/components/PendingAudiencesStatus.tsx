@@ -289,12 +289,12 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
 
         if (!cancelled) setAudiences(withSpend);
       } catch (e: any) {
-        if (!cancelled) setError('Não foi possível carregar os públicos deste produto.');
+        if (!cancelled) setError('Não foi possível carregar os públicos desta campanha.');
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
-    if (selectedProduct && selectedProduct !== 'Todos os Produtos') {
+    if (selectedProduct && selectedProduct !== 'Todas as Campanhas') {
       load();
     }
     return () => { cancelled = true; };
@@ -303,7 +303,7 @@ const PendingAudiencesStatus: React.FC<PendingAudiencesStatusProps> = ({ selecte
   return (
     <div className="relative overflow-visible bg-slate-900/80 border border-slate-700/50 rounded-2xl shadow-xl">
       <div className="relative p-6 md:p-8">
-        <SectionHeader title="Públicos deste produto" subtitle="Status de análise por conjunto de anúncios" />
+        <SectionHeader title="Públicos desta campanha" subtitle="Status de análise por conjunto de anúncios" />
 
         {/* Barra de progresso agregada (todos os públicos) */}
         {audiences.length > 0 && (

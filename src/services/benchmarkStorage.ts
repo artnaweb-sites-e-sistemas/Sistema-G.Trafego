@@ -19,7 +19,7 @@ class BenchmarkStorageService {
     return !!user?.uid;
   }
 
-  // Salvar benchmark para um produto específico (localStorage + Firestore)
+  // Salvar benchmark para uma campanha específico (localStorage + Firestore)
   async saveBenchmark(
     productName: string, 
     results: BenchmarkResults, 
@@ -55,7 +55,7 @@ class BenchmarkStorageService {
     }
   }
 
-  // Carregar benchmark para um produto específico (Firestore primeiro, localStorage como fallback)
+  // Carregar benchmark para uma campanha específico (Firestore primeiro, localStorage como fallback)
   async loadBenchmark(
     productName: string, 
     clientName?: string, 
@@ -90,7 +90,7 @@ class BenchmarkStorageService {
     }
   }
 
-  // Verificar se existe benchmark para um produto
+  // Verificar se existe benchmark para uma campanha
   async hasBenchmark(
     productName: string, 
     clientName?: string, 

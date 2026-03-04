@@ -12,9 +12,9 @@
 
 import React from 'react';
 import {
-    Zap,
+    LayoutDashboard,
+    Sparkles,
     Calendar,
-    BarChart3,
     Layers,
     Target,
     Users,
@@ -25,7 +25,7 @@ import {
 // TIPOS
 // ============================================================================
 
-export type TabId = 'hoje' | 'dia' | 'mes' | 'assets' | 'estrategia' | 'cliente';
+export type TabId = 'visaoGeral' | 'hoje' | 'dia' | 'assets' | 'estrategia' | 'cliente';
 
 export interface Tab {
     id: TabId;
@@ -49,22 +49,22 @@ export interface TabNavigationProps {
 
 export const TABS: Tab[] = [
     {
+        id: 'visaoGeral',
+        label: 'Visão Geral',
+        icon: LayoutDashboard,
+        description: 'Visão principal'
+    },
+    {
         id: 'hoje',
-        label: 'Hoje',
-        icon: Zap,
-        description: 'Decisões do dia'
+        label: 'Áurea',
+        icon: Sparkles,
+        description: 'Análise inteligente'
     },
     {
         id: 'dia',
-        label: 'Dia',
-        icon: Calendar,
-        description: 'Controle diário'
-    },
-    {
-        id: 'mes',
         label: 'Mês',
-        icon: BarChart3,
-        description: 'Detalhes mensais'
+        icon: Calendar,
+        description: 'Controle mensal'
     },
     {
         id: 'assets',

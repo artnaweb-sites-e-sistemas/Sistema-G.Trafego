@@ -11,7 +11,7 @@ interface Audience {
   interests?: string[];
   location?: string;
   size?: number;
-  productId: string; // Vinculado ao produto
+  productId: string; // Vinculado aa campanha
   clientId: string; // Vinculado ao cliente
   source?: 'manual' | 'facebook';
   adSet?: any; // Dados do Ad Set do Meta Ads
@@ -62,7 +62,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
     return clientMap[clientName] || 'all';
   };
 
-  // Função para obter o ID do produto baseado no nome
+  // Função para obter o ID da campanha baseado no nome
   const getProductIdFromName = (productName: string): string => {
     const productMap: { [key: string]: string } = {
       'Pacote Básico': '2',
@@ -200,7 +200,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
       return;
     }
     
-    if (!selectedProduct || selectedProduct === 'Todos os Produtos' || selectedProduct === '') {
+    if (!selectedProduct || selectedProduct === 'Todas as Campanhas' || selectedProduct === '') {
       
       return;
     }
@@ -217,7 +217,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
     
     
     
-    if (dataSource === 'facebook' && selectedProduct && selectedProduct !== 'Todos os Produtos') {
+    if (dataSource === 'facebook' && selectedProduct && selectedProduct !== 'Todas as Campanhas') {
       try {
         // Verificar se está logado no Meta Ads
         if (!metaAdsService.isLoggedIn()) {
@@ -252,7 +252,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
         if (!campaignId) {
           
           
-          // 🎯 MELHORIA: Tentar obter campaign ID do produto selecionado no localStorage
+          // 🎯 MELHORIA: Tentar obter campaign ID da campanha selecionado no localStorage
           const currentSelectedProduct = localStorage.getItem('currentSelectedProduct');
           if (currentSelectedProduct) {
             
@@ -474,7 +474,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
                     
     // Só carregar se há produto selecionado e Meta Ads conectado
     if (selectedProduct && 
-        selectedProduct !== 'Todos os Produtos' && 
+        selectedProduct !== 'Todas as Campanhas' && 
         selectedProduct !== '' && 
         selectedClient && 
         selectedClient !== 'Selecione um cliente' && 
@@ -740,7 +740,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
       
       // Se há produto selecionado e condições atendidas, recarregar públicos também
       if (selectedProduct && 
-          selectedProduct !== 'Todos os Produtos' && 
+          selectedProduct !== 'Todas as Campanhas' && 
           selectedProduct !== '' &&
           dataSource === 'facebook' && 
           isFacebookConnected && 
@@ -788,7 +788,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
     if (dataSource === 'facebook' && audience.source === 'facebook') {
       const matchesClient = selectedClient === 'Todos os Clientes' || 
                            audience.clientId === selectedClient;
-      const matchesProduct = selectedProduct === 'Todos os Produtos' || 
+      const matchesProduct = selectedProduct === 'Todas as Campanhas' || 
                             audience.productId === selectedProduct;
       return matchesSearch && matchesClient && matchesProduct;
     }
@@ -798,7 +798,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
                          audience.clientId === 'all' || 
                          audience.clientId === getClientIdFromName(selectedClient);
     
-    const matchesProduct = selectedProduct === 'Todos os Produtos' || 
+    const matchesProduct = selectedProduct === 'Todas as Campanhas' || 
                           audience.productId === 'all' || 
                           audience.productId === getProductIdFromName(selectedProduct);
     
@@ -941,7 +941,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
   };
 
   // Verificar se o picker deve estar ativo - só ativo se Meta estiver conectado e produto/cliente selecionados
-  const isPickerActive = dataSource === 'facebook' && isFacebookConnected && selectedProduct && selectedProduct !== 'Todos os Produtos' && selectedClient && selectedClient !== 'Selecione um cliente' && selectedClient !== 'Todos os Clientes';
+  const isPickerActive = dataSource === 'facebook' && isFacebookConnected && selectedProduct && selectedProduct !== 'Todas as Campanhas' && selectedClient && selectedClient !== 'Selecione um cliente' && selectedClient !== 'Todos os Clientes';
   
 //   
 
@@ -962,7 +962,7 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
             {isPickerActive ? getDisplayText() : 
               !isFacebookConnected ? 'Conecte-se ao Meta primeiro' :
               selectedClient === 'Selecione um cliente' ? 'Selecione um cliente primeiro' : 
-              'Selecione um produto primeiro'}
+              'Selecione uma campanha primeiro'}
           </span>
         </div>
         <ChevronDown className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isPickerActive ? 'text-gray-400' : 'text-gray-600'}`} />
@@ -1182,8 +1182,8 @@ const AudiencePicker: React.FC<AudiencePickerProps> = ({
                    )
                    : selectedClient === 'Selecione um cliente' 
                      ? 'Selecione um cliente para ver os públicos'
-                     : selectedProduct === 'Selecione um produto'
-                     ? 'Selecione um produto para ver os públicos'
+                     : selectedProduct === 'Selecione uma campanha'
+                     ? 'Selecione uma campanha para ver os públicos'
                      : 'Nenhum público encontrado'
                  }
                </div>

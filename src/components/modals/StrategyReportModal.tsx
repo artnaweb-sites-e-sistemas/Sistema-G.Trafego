@@ -87,7 +87,7 @@ const StrategyReportModal: React.FC<StrategyReportModalProps> = ({
                                         <div className="text-white font-medium capitalize">{selectedReport.strategyReport.inputs.campaignType}</div>
                                     </div>
                                     <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
-                                        <div className="text-sm text-slate-400 mb-1">Produto</div>
+                                        <div className="text-sm text-slate-400 mb-1">Campanha</div>
                                         <div className="text-white font-medium">{selectedReport.strategyReport.inputs.productType}</div>
                                     </div>
                                     <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
@@ -95,7 +95,7 @@ const StrategyReportModal: React.FC<StrategyReportModalProps> = ({
                                         <div className="text-white font-medium">{selectedReport.strategyReport.inputs.investmentBRL.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
                                     </div>
                                     <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
-                                        <div className="text-sm text-slate-400 mb-1">Ticket do Produto</div>
+                                        <div className="text-sm text-slate-400 mb-1">Ticket da Campanha</div>
                                         <div className="text-white font-medium">{selectedReport.strategyReport.inputs.ticketBRL.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
                                     </div>
                                 </div>

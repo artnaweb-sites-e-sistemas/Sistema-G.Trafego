@@ -174,9 +174,9 @@ export const metricsService = {
   },
 
   // Buscar métricas por mês e serviço
-  async getMetrics(month: string, client: string = 'Todos os Clientes', product: string = 'Todos os Produtos', audience: string = 'Todos os Públicos', campaignId?: string) {
+  async getMetrics(month: string, client: string = 'Todos os Clientes', product: string = 'Todas as Campanhas', audience: string = 'Todos os Públicos', campaignId?: string) {
     // Se não foi passado campaignId, tentar pegar do localStorage
-    if (!campaignId && product !== 'Todos os Produtos') {
+    if (!campaignId && product !== 'Todas as Campanhas') {
       const storedCampaignId = localStorage.getItem('selectedCampaignId');
       if (storedCampaignId) {
         campaignId = storedCampaignId;
@@ -335,7 +335,7 @@ export const metricsService = {
           return mockData.filter(data => {
             const monthMatch = data.month === month;
             const clientMatch = client === 'Todos os Clientes' || data.client === client;
-            const productMatch = product === 'Todos os Produtos' || data.product === product;
+            const productMatch = product === 'Todas as Campanhas' || data.product === product;
             const audienceMatch = audience === 'Todos os Públicos' || data.audience === audience;
 
             return monthMatch && clientMatch && productMatch && audienceMatch;
@@ -372,7 +372,7 @@ export const metricsService = {
             filteredData = filteredData.filter(item => item.client === client);
           }
 
-          if (product !== 'Todos os Produtos') {
+          if (product !== 'Todas as Campanhas') {
             filteredData = filteredData.filter(item => item.product === product);
           }
 
@@ -401,7 +401,7 @@ export const metricsService = {
         filteredData = filteredData.filter(item => item.client === client);
       }
 
-      if (product !== 'Todos os Produtos') {
+      if (product !== 'Todas as Campanhas') {
         filteredData = filteredData.filter(item => item.product === product);
       }
 
@@ -646,7 +646,7 @@ export const metricsService = {
         }
       }
 
-      // Fallback final: se ainda muito limitado, usar todos os dados do produto
+      // Fallback final: se ainda muito limitado, usar todos os dados da campanha
       if (scoped.length === 0) {
         scoped = metaAdsOnly;
 
@@ -1225,7 +1225,7 @@ export const metricsService = {
 
       return result;
     } catch (error) {
-      console.error('Erro ao buscar histórico do produto:', error);
+      console.error('Erro ao buscar histórico da campanha:', error);
       return [];
     }
   },
@@ -1246,7 +1246,7 @@ export const metricsService = {
           constraints.push(where('client', '==', client));
         }
 
-        if (product && product !== '' && product !== 'Todos os Produtos') {
+        if (product && product !== '' && product !== 'Todas as Campanhas') {
           constraints.push(where('product', '==', product));
         }
 
@@ -1288,7 +1288,7 @@ export const metricsService = {
         filteredData = filteredData.filter(item => item.client === client);
       }
 
-      if (product && product !== '' && product !== 'Todos os Produtos') {
+      if (product && product !== '' && product !== 'Todas as Campanhas') {
         filteredData = filteredData.filter(item => item.product === product);
       }
 
@@ -1398,13 +1398,14 @@ export const metricsService = {
     }
   },
 
-  // Salvar detalhes mensais editáveis (Agendamentos, Vendas e Ticket Médio) - vinculado apenas ao produto
+  // Salvar detalhes mensais editáveis (Agendamentos, Vendas e Ticket Médio) - vinculado apenas aa campanha
   async saveMonthlyDetails(data: {
     month: string;
     product: string;
     client?: string; // Adicionar campo client opcional
     agendamentos: number;
     vendas: number;
+    seguidoresNovos?: number;
     ticketMedio?: number;
     cpv?: number;
     roi?: string; // Changed to string to save full ROI value
@@ -1412,11 +1413,12 @@ export const metricsService = {
     try {
       const detailsRef = collection(db, 'monthlyDetails');
 
-      // Buscar documento existente baseado apenas em mês e produto
+      // Buscar documento existente baseado em mês, produto e cliente
       const q = query(
         detailsRef,
         where('month', '==', data.month),
-        where('product', '==', data.product)
+        where('product', '==', data.product),
+        where('client', '==', data.client || 'Cliente Padrão')
       );
 
       const snapshot = await getDocs(q);
@@ -1438,6 +1440,11 @@ export const metricsService = {
           client: data.client || 'Cliente Padrão', // Atualizar o client também
           updatedAt: new Date()
         };
+
+        // Incluir seguidoresNovos apenas se fornecido (evitar zerar valor manual salvo)
+        if (data.seguidoresNovos !== undefined) {
+          updateData.seguidoresNovos = data.seguidoresNovos;
+        }
 
         // Incluir ticketMedio apenas se foi fornecido
         if (data.ticketMedio !== undefined) {
@@ -1465,6 +1472,7 @@ export const metricsService = {
           client: data.client,
           agendamentos: data.agendamentos,
           vendas: data.vendas,
+          seguidoresNovos: data.seguidoresNovos,
           ticketMedio: data.ticketMedio
         }
       }));
@@ -1477,6 +1485,7 @@ export const metricsService = {
           client: data.client,
           agendamentos: data.agendamentos,
           vendas: data.vendas,
+          seguidoresNovos: data.seguidoresNovos,
           ticketMedio: data.ticketMedio
         }
       }));
@@ -1487,7 +1496,7 @@ export const metricsService = {
     }
   },
 
-  // Buscar detalhes mensais editáveis - vinculado apenas ao produto
+  // Buscar detalhes mensais editáveis - vinculado apenas aa campanha
   async getMonthlyDetails(month: string, product: string, client?: string) {
     try {
       const detailsRef = collection(db, 'monthlyDetails');
@@ -1518,14 +1527,15 @@ export const metricsService = {
           vendas: data.vendas || 0,
           ticketMedio: data.ticketMedio || 0,
           cpv: data.cpv || 0,
-          roi: data.roi
+          roi: data.roi,
+          seguidoresNovos: data.seguidoresNovos || 0
         };
       }
 
-      return { agendamentos: 0, vendas: 0, ticketMedio: 250, cpv: 0, roi: '0% (0.0x)' };
+      return { agendamentos: 0, vendas: 0, seguidoresNovos: 0, ticketMedio: 250, cpv: 0, roi: '0% (0.0x)' };
     } catch (error) {
       console.error('Erro ao buscar detalhes mensais:', error);
-      return { agendamentos: 0, vendas: 0, ticketMedio: 250, cpv: 0, roi: '0% (0.0x)' };
+      return { agendamentos: 0, vendas: 0, seguidoresNovos: 0, ticketMedio: 250, cpv: 0, roi: '0% (0.0x)' };
     }
   },
 
@@ -1736,6 +1746,8 @@ export const metricsService = {
     // CORREÇÃO: Filtrar métricas por cliente para evitar dados incorretos
     const currentClient = localStorage.getItem('currentSelectedClient');
     const currentMonth = localStorage.getItem('currentSelectedMonth');
+    const currentProduct = localStorage.getItem('currentSelectedProduct');
+    const currentCampaignId = localStorage.getItem('selectedCampaignId');
 
 
 
@@ -1752,6 +1764,13 @@ export const metricsService = {
 
     }
 
+    // 🎯 CORREÇÃO: Filtrar por CAMPANHA/PRODUTO para não embolar dados de outras campanhas na Planilha
+    if (currentCampaignId && currentCampaignId !== '') {
+      filteredMetrics = filteredMetrics.filter(metric => metric.campaignId === currentCampaignId);
+    } else if (currentProduct && currentProduct !== 'Selecione um produto' && currentProduct !== 'Todos os Produtos' && currentProduct !== '') {
+      filteredMetrics = filteredMetrics.filter(metric => metric.product === currentProduct);
+    }
+
 
 
     if (filteredMetrics.length === 0) {
@@ -1764,11 +1783,12 @@ export const metricsService = {
         totalClicks: 0,
         avgCTR: 0,
         avgCPM: 0,
-        avgCPL: 0,
         totalROAS: 0,
         totalROI: 0,
         totalAppointments: 0,
-        totalSales: 0
+        totalSales: 0,
+        totalLPV: 0,
+        totalFollowers: 0
       };
     }
 
@@ -1798,6 +1818,8 @@ export const metricsService = {
       acc.totalClicks += chosenClicks;
       acc.totalAppointments += metric.appointments;
       acc.totalSales += metric.sales;
+      acc.totalLPV += (metric.landingPageViews || 0);
+      acc.totalFollowers += (metric.followers || metric.resultCount || 0);
       return acc;
     }, {
       totalLeads: 0,
@@ -1806,6 +1828,7 @@ export const metricsService = {
       totalImpressions: 0,
       totalClicks: 0,
       totalLPV: 0,
+      totalFollowers: 0,
       totalAppointments: 0,
       totalSales: 0
     });
@@ -1849,7 +1872,6 @@ export const metricsService = {
 
     return {
       ...totals,
-      totalLPV: 0, // 🎯 NOVA: Adicionar totalLPV
       avgCTR: Number(avgCTR.toFixed(2)),
       avgCPM: Number(avgCPM.toFixed(2)),
       avgCPL: Number(avgCPL.toFixed(2)),
@@ -1933,6 +1955,9 @@ export const metricsService = {
       let sumClicksAll = 0;
       let sumLinkClicks = 0;
       let sumLPV = 0;
+      let sumFollowers = 0;
+      let sumLeads = 0;
+      let sumSales = 0;
 
       for (const ins of insights as any[]) {
         sumSpend += Number(ins?.spend || 0) || 0;
@@ -1940,6 +1965,9 @@ export const metricsService = {
         sumClicksAll += Number(ins?.clicks || 0) || 0;
         const actions = Array.isArray(ins?.actions) ? ins.actions : [];
         if (actions && actions.length > 0) {
+          // DEBUG
+          console.log(`[MetaAds DEBUG] Available actions for item:`, actions.map((a: any) => `${a.action_type}=${a.value}`));
+
           const linkClick = actions.find((a: any) => a?.action_type === 'link_click' || a?.action_type === 'link_clicks');
           if (linkClick) {
             const v = Number(linkClick?.value || 0) || 0;
@@ -1951,6 +1979,36 @@ export const metricsService = {
             const v = Number(lpv?.value || 0) || 0;
             sumLPV += v;
           }
+          // 🎯 NOVA: Buscar Seguidores (Followers / Engagement)
+          const followerAction = actions.find((a: any) =>
+            a?.action_type === 'onsite_conversion.account_follows' ||
+            a?.action_type === 'like' ||
+            a?.action_type === 'page_like'
+          );
+          if (followerAction) {
+            const v = Number(followerAction?.value || 0) || 0;
+            sumFollowers += v;
+          }
+
+          // 🎯 NOVA: Buscar Leads e Vendas
+          const messagingConversations = actions.find((a: any) =>
+            a.action_type === 'messaging_conversations_started' ||
+            a.action_type === 'onsite_conversion.messaging_conversation_started_7d'
+          );
+          const standardLeads = actions.find((a: any) =>
+            a.action_type === 'lead' || a.action_type === 'complete_registration'
+          );
+          const msgValue = parseInt(messagingConversations?.value || '0');
+          const leadValue = parseInt(standardLeads?.value || '0');
+          sumLeads += msgValue > 0 ? msgValue : leadValue;
+
+          const purchases = actions.find((a: any) =>
+            a.action_type === 'purchase' ||
+            a.action_type === 'onsite_conversion.purchase' ||
+            a.action_type === 'offsite_conversion.purchase' ||
+            a.action_type === 'offsite_conversion.fb_pixel_purchase'
+          );
+          sumSales += parseInt(purchases?.value || '0');
         }
       }
 
@@ -1963,10 +2021,13 @@ export const metricsService = {
       const totalClicks = metaHasSignificantData ? chosenTotalClicks : base.totalClicks;
       const totalImpressions = metaHasSignificantData ? sumImpr : base.totalImpressions;
       const totalInvestment = metaHasSignificantData ? sumSpend : base.totalInvestment;
+      const totalLeads = metaHasSignificantData ? sumLeads : base.totalLeads;
+      const totalSales = metaHasSignificantData ? sumSales : base.totalSales;
 
       const avgCTR = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
       const avgCPM = totalImpressions > 0 ? (totalInvestment / totalImpressions) * 1000 : 0;
       const avgCPC = totalClicks > 0 ? (totalInvestment / totalClicks) : 0;
+      const avgCPL = totalLeads > 0 ? (totalInvestment / totalLeads) : 0;
 
       const result = {
         ...base,
@@ -1974,9 +2035,13 @@ export const metricsService = {
         totalImpressions,
         totalClicks,
         totalLPV: sumLPV,
+        totalFollowers: sumFollowers,
+        totalLeads,
+        totalSales,
         avgCTR: Number(avgCTR.toFixed(2)),
         avgCPM: Number(avgCPM.toFixed(2)),
-        avgCPC: Number(avgCPC.toFixed(2))
+        avgCPC: Number(avgCPC.toFixed(2)),
+        avgCPL: Number(avgCPL.toFixed(2))
       };
 
       // 🎯 CACHE: Salvar resultado no cache
@@ -2129,7 +2194,7 @@ export const metricsService = {
   clearAudienceCacheByPeriod(month: string, product?: string): void {
     for (const key of this.audienceDetailsCache.keys()) {
       if (product) {
-        // Limpar cache específico do produto/período
+        // Limpar cache específico da campanha/período
         if (key.includes(`audience_${month}_${product}`)) {
           this.audienceDetailsCache.delete(key);
         }
@@ -2142,7 +2207,7 @@ export const metricsService = {
     }
   },
 
-  // Buscar todos os dados de públicos de um produto específico (COM CACHE)
+  // Buscar todos os dados de públicos de uma campanha específico (COM CACHE)
   async getAllAudienceDetailsForProduct(month: string, product: string, forceRefresh: boolean = false) {
     try {
       // 🎯 NOVO: Verificar cache primeiro (se não for force refresh)
@@ -2205,7 +2270,7 @@ export const metricsService = {
     }
   },
 
-  // 🎯 FUNÇÃO DE DEBUG: Verificar todos os dados de um produto/período específico
+  // 🎯 FUNÇÃO DE DEBUG: Verificar todos os dados de uma campanha/período específico
   async debugAudienceData(month: string, product: string) {
     try {
 
@@ -2274,12 +2339,12 @@ export const metricsService = {
     }
   },
 
-  // 🎯 FUNÇÃO DEFINITIVA: Limpar TODOS os dados de um produto/período e forçar recálculo
+  // 🎯 FUNÇÃO DEFINITIVA: Limpar TODOS os dados de uma campanha/período e forçar recálculo
   async resetProductData(month: string, product: string) {
     try {
 
 
-      // 1. Buscar TODOS os documentos para o produto/período
+      // 1. Buscar TODOS os documentos para a campanha/período
       const q = query(
         collection(db, 'audienceDetails'),
         where('month', '==', month),
@@ -2334,7 +2399,7 @@ export const metricsService = {
     }
   },
 
-  // 🎯 NOVA FUNÇÃO: Limpar registros com valores zero para um produto/período específico
+  // 🎯 NOVA FUNÇÃO: Limpar registros com valores zero para uma campanha/período específico
   async cleanupZeroValueRecords(month: string, product: string) {
     try {
 
@@ -2683,7 +2748,7 @@ export const metricsService = {
               //               
 
               if (monthlyDetailsSnapshot.size > 0) {
-                // Usar o ticket médio do primeiro produto encontrado
+                // Usar o ticket médio do primeira campanha encontrado
                 const firstDoc = monthlyDetailsSnapshot.docs[0];
                 const firstData = firstDoc.data();
 

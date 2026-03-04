@@ -26,6 +26,7 @@ export interface MetricData {
     roi: number;
     appointments: number;
     sales: number;
+    followers?: number;
     createdAt?: Date;
     updatedAt?: Date;
 }

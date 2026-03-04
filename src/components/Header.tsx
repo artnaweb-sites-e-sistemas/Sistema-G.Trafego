@@ -530,7 +530,7 @@ const Header: React.FC<HeaderProps> = ({
             </div>
 
             <div className="flex flex-col items-center space-y-1 w-1/4 header-filter-item">
-              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Produto</label>
+              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Campanha</label>
               <div className="relative bg-slate-800/60 rounded-lg border border-slate-600/40 p-2 shadow-sm hover:shadow-md transition-all duration-200 w-full backdrop-blur-sm dropdown-container">
                 <div className="absolute top-1 right-1">
                   <button
