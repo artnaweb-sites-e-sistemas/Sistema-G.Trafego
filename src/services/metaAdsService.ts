@@ -1533,15 +1533,12 @@ class MetaAdsService {
 
       const salesCount = parseInt(purchases);
 
-      // Buscar métricas de engajamento/seguidores para campanhas de audiência
-      const pageEngagement = insight.actions?.find((action: any) =>
-        action.action_type === 'page_engagement' ||
-        action.action_type === 'post_engagement' ||
-        action.action_type === 'like' ||
+      // Buscar métricas de seguidores para campanhas de audiência
+      const followerActions = insight.actions?.filter((action: any) =>
         action.action_type === 'page_like' ||
         action.action_type === 'onsite_conversion.account_follows'
-      )?.value || '0';
-      const engagementCount = parseInt(pageEngagement);
+      ) || [];
+      const engagementCount = followerActions.reduce((sum, action) => sum + parseInt(action.value || '0'), 0);
 
       // Debug: Log de compras para verificar se estão sendo detectadas
 

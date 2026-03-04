@@ -1629,7 +1629,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       if (funnelType === 'AUDIENCIA') {
         currentCpaTargetStr = safeFind('Custo por Seguidor');
       } else if (funnelType === 'DIRETA') {
-        currentCpaTargetStr = safeFind('Custo por Visita');
+        currentCpaTargetStr = safeFind('CPV');
       } else {
         currentCpaTargetStr = safeFind('CPL'); // Matches CPL (Custo por Lead)
       }
@@ -1756,18 +1756,18 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             break;
           case 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)':
             if (vendas > 0) {
-              // 🎯 NOVA LÓGICA: Base no toggle agendamentosEnabled e vendasDiretasEnabled
-              if (agendamentosEnabled) {
-                // 🎯 LÓGICA ATUAL: Tx. Conversão Vendas = (Vendas ÷ Agendamentos) × 100%
-                if (agendamentos > 0) {
-                  newRow.realValue = formatPercentage((vendas / agendamentos) * 100);
-                } else {
-                  newRow.realValue = formatPercentage(0);
-                }
-              } else if (funnelType === 'DIRETA') {
+              // 🎯 NOVA LÓGICA: Priorizar DIRETA para usar LPV, senão usar agendamentos/leads conforme toggle
+              if (funnelType === 'DIRETA') {
                 // 🎯 NOVA LÓGICA: Tx. Conversão Vendas = (Vendas ÷ LPV) × 100%
                 if (lpv > 0) {
                   newRow.realValue = formatPercentage((vendas / lpv) * 100);
+                } else {
+                  newRow.realValue = formatPercentage(0);
+                }
+              } else if (agendamentosEnabled) {
+                // 🎯 LÓGICA ATUAL: Tx. Conversão Vendas = (Vendas ÷ Agendamentos) × 100%
+                if (agendamentos > 0) {
+                  newRow.realValue = formatPercentage((vendas / agendamentos) * 100);
                 } else {
                   newRow.realValue = formatPercentage(0);
                 }
@@ -1892,10 +1892,10 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           case 'Vendas':
             const txConversaoVendasBench = parsePercentage(currentData.find(r => r.metric === 'Tx. Conversão Vendas (Vendas/Leads ou Agend.)')?.benchmark || '0%');
             let baseVendas = 0;
-            if (agendamentosEnabled) {
-              baseVendas = parseNumber(currentData.find(r => r.metric === 'Agendamentos')?.benchmark || '0');
-            } else if (funnelType === 'DIRETA') {
+            if (funnelType === 'DIRETA') {
               baseVendas = parseNumber(currentData.find(r => r.metric === 'Visitantes na página (LPV)')?.benchmark || '0');
+            } else if (agendamentosEnabled) {
+              baseVendas = parseNumber(currentData.find(r => r.metric === 'Agendamentos')?.benchmark || '0');
             } else {
               baseVendas = parseNumber(currentData.find(r => r.metric === 'Leads / Msgs')?.benchmark || '0');
             }

@@ -1476,7 +1476,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                         {(() => {
                           const getDynamicConversions = (m: any, funnel?: string) => {
                             if (funnel === 'DIRETA') {
-                              return m.landingPageViews || 0;
+                              return m.sales || 0;
                             }
                             if (funnel === 'AUDIENCIA') {
                               return m.followers || 0;
@@ -1484,13 +1484,22 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                             return m.leads || 0;
                           };
 
+                          const platformConversionsTotal = metrics.reduce((sum, m) => sum + getDynamicConversions(m, monthlyDetailsValues.funnelType), 0);
+                          const realConversionsTotal =
+                            monthlyDetailsValues.funnelType === 'DIRETA' ? (monthlyDetailsValues.vendas || 0) :
+                              monthlyDetailsValues.funnelType === 'AUDIENCIA' ? (monthlyDetailsValues.seguidoresNovos || 0) :
+                                (monthlyDetailsValues.agendamentos || 0);
+
+                          // Fator para ajustar as conversões da plataforma (Meta) para bater com os valores reais digitados
+                          const scalingFactor = platformConversionsTotal > 0 ? realConversionsTotal / platformConversionsTotal : 1;
+
                           return (
                             <AureaDecisionPanel
                               selectedClient={selectedClient}
                               selectedMonth={selectedMonth}
                               selectedProduct={selectedProduct}
                               currentSpend={metrics.reduce((sum, m) => sum + (m.investment || 0), 0)}
-                              conversions={metrics.reduce((sum, m) => sum + getDynamicConversions(m, monthlyDetailsValues.funnelType), 0)}
+                              conversions={realConversionsTotal}
                               adSets={
                                 // Agrupar métricas pelo adSetId para não ter duplicados no seletor de RMD
                                 Array.from(
@@ -1517,16 +1526,19 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
                                     return acc;
                                   }, new Map<string, any>()).values()
-                                ).map(aggr => ({
-                                  id: aggr.id,
-                                  name: aggr.name,
-                                  spend: aggr.spend,
-                                  conversions: aggr.conversions,
-                                  cpa: aggr.conversions ? aggr.spend / aggr.conversions : undefined,
-                                  ctr: aggr.impressions ? (aggr.clicks / aggr.impressions) * 100 : 0,
-                                  reach: aggr.reach,
-                                  frequency: aggr.reach ? aggr.impressions / aggr.reach : 0
-                                }))
+                                ).map(aggr => {
+                                  const adjustedConversions = aggr.conversions * scalingFactor;
+                                  return {
+                                    id: aggr.id,
+                                    name: aggr.name,
+                                    spend: aggr.spend,
+                                    conversions: adjustedConversions,
+                                    cpa: adjustedConversions ? aggr.spend / adjustedConversions : undefined,
+                                    ctr: aggr.impressions ? (aggr.clicks / aggr.impressions) * 100 : 0,
+                                    reach: aggr.reach,
+                                    frequency: aggr.reach ? aggr.impressions / aggr.reach : 0
+                                  };
+                                })
                               }
                               cpaTarget={monthlyDetailsValues.cpaTarget || 50}
                               alertCpaTarget={monthlyDetailsValues.cpaTarget || 50}
