@@ -609,18 +609,15 @@ export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
   let proximosPassos =
     `## Próximos Passos
 - Configurar a campanha no Gerenciador.
-- **Verba diária (já descontado remarketing):**
-  - **Prospecção:** ${brl(round(dailyProspection))} / dia
-- **Reservar ${(rmShare * 100).toFixed(0)}% para remarketing:**
-  - **Remarketing:** ${brl(round(dailyRemarketing))} / dia
+- Verba diária para prospecção: **${brl(round(dailyProspection))}** / dia
+- Reservar ${(rmShare * 100).toFixed(0)}% para remarketing: **${brl(round(dailyRemarketing))}** / dia
 - Alocar em **1 conjunto** (mais força) ou **2+ conjuntos** (testes).
 - Garantir atendimento rápido e consultivo no WhatsApp.`;
 
   if (finalStrategyType === "impulsionar_post") {
     proximosPassos = `## Próximos Passos
 - Configurar a campanha no Gerenciador selecionando objetivo de Engajamento ou Tráfego para o Perfil.
-- **Verba diária (100% Prospecção):**
-  - **Prospecção:** ${brl(round(dailyProspection))} / dia
+- Verba diária para prospecção: **${brl(round(dailyProspection))}** / dia
 - Não há remarketing para esta estratégia.
 - Alocar em **2+ anúncios** de topo de funil para testar o melhor custo por seguidor.`;
   }

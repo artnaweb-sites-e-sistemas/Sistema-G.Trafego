@@ -2580,10 +2580,10 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                       <button
                                         onClick={() => handleNewYellowIcon(strategy)}
                                         disabled={!canCreateMoreRemarketing(strategy)}
-                                        className={`p - 1.5 rounded - lg transition - all duration - 200 ${canCreateMoreRemarketing(strategy)
+                                        className={`p-1.5 rounded-lg transition-all duration-200 ${canCreateMoreRemarketing(strategy)
                                           ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-500/30 hover:scale-110'
                                           : 'text-slate-500 cursor-not-allowed opacity-50'
-                                          } `}
+                                          }`}
                                       >
                                         🎯
                                       </button>
@@ -2601,7 +2601,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                         <span className="text-xs text-slate-300 font-semibold uppercase tracking-wide block mb-2">Campanha</span>
                                         <div className="relative">
                                           <div
-                                            onClick={() => copyToClipboard(strategy.generatedNames.product, `product - ${strategy.id} `)}
+                                            onClick={() => copyToClipboard(strategy.generatedNames.product, `product-${strategy.id}`)}
                                             className="bg-gradient-to-r from-slate-700/50 to-slate-800/50 rounded-lg px-4 py-3 border border-slate-600/30 cursor-pointer hover:border-slate-500/50 hover:bg-gradient-to-r hover:from-slate-700/60 hover:to-slate-800/60 transition-all duration-200 group"
                                           >
                                             <div className="flex items-center justify-between">
@@ -2610,7 +2610,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                             </div>
                                           </div>
                                           <AnimatePresence>
-                                            {copiedStates.has(`product - ${strategy.id} `) && (
+                                            {copiedStates.has(`product-${strategy.id}`) && (
                                               <motion.div
                                                 initial={{ opacity: 0, y: -10, scale: 0.8 }}
                                                 animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -2632,7 +2632,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                         <span className="text-xs text-slate-300 font-semibold uppercase tracking-wide block mb-2">Público</span>
                                         <div className="relative">
                                           <div
-                                            onClick={() => copyToClipboard(strategy.generatedNames.audience, `audience - ${strategy.id} `)}
+                                            onClick={() => copyToClipboard(strategy.generatedNames.audience, `audience-${strategy.id}`)}
                                             className="bg-gradient-to-r from-slate-700/50 to-slate-800/50 rounded-lg px-4 py-3 border border-slate-600/30 cursor-pointer hover:border-slate-500/50 hover:bg-gradient-to-r hover:from-slate-700/60 hover:to-slate-800/60 transition-all duration-200 group"
                                           >
                                             <div className="flex items-center justify-between">
@@ -2643,7 +2643,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                             </div>
                                           </div>
                                           <AnimatePresence>
-                                            {copiedStates.has(`audience - ${strategy.id} `) && (
+                                            {copiedStates.has(`audience-${strategy.id}`) && (
                                               <motion.div
                                                 initial={{ opacity: 0, y: -10, scale: 0.8 }}
                                                 animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -2691,13 +2691,13 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                           })()}
                                           <div className="flex items-center gap-1 relative group/sync">
                                             <div
-                                              className={`w - 2 h - 2 rounded - full ${getCurrentPeriodSyncStatus(strategy) ? 'bg-blue-500 animate-pulse' : 'bg-red-500 animate-pulse'} cursor - help`}
+                                              className={`w-2 h-2 rounded-full ${getCurrentPeriodSyncStatus(strategy) ? 'bg-blue-500 animate-pulse' : 'bg-red-500 animate-pulse'} cursor-help`}
                                               onMouseEnter={(e) => {
                                                 const rect = e.currentTarget.getBoundingClientRect();
                                                 const tooltip = e.currentTarget.parentElement?.querySelector('.tooltip-sync') as HTMLElement;
                                                 if (tooltip) {
-                                                  tooltip.style.left = `${rect.left - 260} px`;
-                                                  tooltip.style.top = `${rect.top - 30} px`;
+                                                  tooltip.style.left = `${rect.left - 260}px`;
+                                                  tooltip.style.top = `${rect.top - 30}px`;
                                                   tooltip.style.display = 'block';
                                                 }
                                               }}
@@ -2746,11 +2746,11 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
 
                                           return (
                                             <div
-                                              className={`h - 2.5 rounded - full transition - all duration - 500 shadow - sm ${isPaused
+                                              className={`h-2.5 rounded-full transition-all duration-500 shadow-sm ${isPaused
                                                 ? 'bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 animate-pulse'
                                                 : 'bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500'
-                                                } `}
-                                              style={{ width: `${progressPercentage}% ` }}
+                                                }`}
+                                              style={{ width: `${progressPercentage}%` }}
                                             />
                                           );
                                         })()}
@@ -2882,7 +2882,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                                         </div>
                                                         <div className="flex items-center gap-1 relative group/sync">
                                                           <div
-                                                            className={`w - 2 h - 2 rounded - full ${getCurrentPeriodRemarketingSyncStatus(strategy, remarketingKey) ? 'bg-blue-500 animate-pulse' : 'bg-red-500 animate-pulse'} cursor - help`}
+                                                            className={`w-2 h-2 rounded-full ${getCurrentPeriodRemarketingSyncStatus(strategy, remarketingKey) ? 'bg-blue-500 animate-pulse' : 'bg-red-500 animate-pulse'} cursor-help`}
                                                           />
                                                         </div>
                                                       </div>
@@ -2897,11 +2897,11 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
 
                                                       return (
                                                         <div
-                                                          className={`h - 2.5 rounded - full transition - all duration - 500 shadow - sm ${isPaused
+                                                          className={`h-2.5 rounded-full transition-all duration-500 shadow-sm ${isPaused
                                                             ? 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 animate-pulse'
                                                             : 'bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600'
-                                                            } `}
-                                                          style={{ width: `${progressPercentage}% ` }}
+                                                            }`}
+                                                          style={{ width: `${progressPercentage}%` }}
                                                         />
                                                       );
                                                     })()}

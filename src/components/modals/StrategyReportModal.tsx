@@ -125,14 +125,14 @@ const StrategyReportModal: React.FC<StrategyReportModalProps> = ({
                                                 Recomendado
                                             </div>
                                         </div>
-                                        <div className="p-8 space-y-5">
+                                        <div className={`p-8 grid gap-4 ${dynamicReport.metrics.strategyType === 'impulsionar_post' ? 'grid-cols-1' : 'grid-cols-2'}`}>
                                             <div className="flex items-center gap-5 bg-slate-800/20 p-5 rounded-[1.25rem] border border-slate-800/40">
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-1">
                                                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Prospecção</span>
                                                         <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 text-[9px] font-black rounded tracking-normal">{dynamicReport.metrics.strategyType === 'impulsionar_post' ? '100' : Math.round((1 - getRemarketingShare(selectedReport.strategyReport.inputs.investmentBRL)) * 100)}%</span>
                                                     </div>
-                                                    <div className="text-2xl font-black text-white tracking-tight">{(dynamicReport.metrics.dailyProspectionBRLMin || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                                                    <div className="text-xl font-black text-white tracking-tight">{(dynamicReport.metrics.dailyProspectionBRLMin || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
                                                 </div>
                                             </div>
                                             {dynamicReport.metrics.strategyType !== 'impulsionar_post' && (
@@ -142,7 +142,7 @@ const StrategyReportModal: React.FC<StrategyReportModalProps> = ({
                                                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Remarketing</span>
                                                             <span className="px-1.5 py-0.5 bg-purple-500/10 text-purple-400 text-[9px] font-black rounded tracking-normal">{Math.round(getRemarketingShare(selectedReport.strategyReport.inputs.investmentBRL) * 100)}%</span>
                                                         </div>
-                                                        <div className="text-2xl font-black text-white tracking-tight">{(dynamicReport.metrics.dailyRemarketingBRLMin || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                                                        <div className="text-xl font-black text-white tracking-tight">{(dynamicReport.metrics.dailyRemarketingBRLMin || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
                                                     </div>
                                                 </div>
                                             )}
@@ -200,7 +200,7 @@ const StrategyReportModal: React.FC<StrategyReportModalProps> = ({
                                                         return (
                                                             <div className="mb-10 p-8 bg-slate-900/30 rounded-3xl border border-slate-800/50">
                                                                 <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.25em] mb-6">Modelo de Funil Selecionado</h4>
-                                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                                                <div className={`grid grid-cols-1 ${selectedReport?.product?.objective === 'mensagens' ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-5`}>
                                                                     {isCapturaLeads ? (
                                                                         <div className="p-5 rounded-2xl border border-indigo-500/30 bg-indigo-500/5 col-span-full">
                                                                             <div className="font-bold text-indigo-300 text-base">LP → Formulário</div>

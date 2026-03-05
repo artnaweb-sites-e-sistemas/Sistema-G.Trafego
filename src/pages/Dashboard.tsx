@@ -787,6 +787,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
       try {
         // Forçar recarregamento das métricas com a nova campanha
         setRefreshTrigger(prev => prev + 1);
+
+        // 🎯 MUDANÇA: Ao selecionar campanha, redirecionar para Visão Geral
+        setActiveTab('visaoGeral');
       } catch (error) {
         console.error('Erro ao carregar métricas da campanha:', error);
       }
