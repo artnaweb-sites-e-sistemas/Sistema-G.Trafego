@@ -1314,9 +1314,18 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
 
   // Função para gerar nomes
   const generateNames = () => {
-    if (!currentStrategy.product?.name || !currentStrategy.product?.campaignType || !currentStrategy.product?.objective) return;
+    // Nome da campanha (Produto)
+    const productType = currentStrategy.product.type;
+    const campaignName = productType === 'sem_produto' ? currentStrategy.product.name : `${currentStrategy.product.name} - ${productType}`;
+    const campaignType = currentStrategy.product.campaignType === 'sazonal' ? 'sazonal' : 'recorrente';
 
-    const productName = `[${currentStrategy.product.name} ${currentStrategy.product.type}][${currentStrategy.product.campaignType === 'sazonal' ? 'sazonal' : 'recorrente'}][${currentStrategy.product.objective === 'trafico' ? 'tráfego' : currentStrategy.product.objective === 'mensagens' ? 'mensagens' : currentStrategy.product.objective === 'captura_leads' ? 'captura de leads' : 'compras'}]`;
+    let objectiveLabel = 'compras';
+    if (currentStrategy.product.objective === 'trafico') objectiveLabel = 'tráfego';
+    else if (currentStrategy.product.objective === 'mensagens') objectiveLabel = 'mensagens';
+    else if (currentStrategy.product.objective === 'captura_leads') objectiveLabel = 'captura de leads';
+    else if (currentStrategy.product.objective === 'crescimento_audiencia') objectiveLabel = 'audiência';
+
+    const productName = `[${campaignName}] [${campaignType}] [${objectiveLabel}]`;
 
     // Construir a nomenclatura do público
     const gender = currentStrategy.audience?.gender === 'homem' ? 'homens' : currentStrategy.audience?.gender === 'mulher' ? 'mulheres' : 'ambos os sexos';
@@ -1326,8 +1335,13 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     const remarketing = currentStrategy.audience?.remarketing || [];
     const scaleType = currentStrategy.audience?.scaleType;
 
+    // Ad Set prefix logic for "Sem Produto"
+    const adSetPrefix = productType === 'sem_produto'
+      ? `[${currentStrategy.product.name} sem_produto] [${campaignType}] [${objectiveLabel}] `
+      : '';
+
     // Construir a nomenclatura do público
-    let audienceName = `[${gender}][${ageRange}]`;
+    let audienceName = `${adSetPrefix}[${gender}] [${ageRange}]`;
 
     // Adicionar localização se houver
     if (locations.length > 0) {
@@ -3244,7 +3258,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                 }))}
                                 className="sr-only"
                               />
-                              <div className={`w - 4 h - 4 rounded - full border - 2 mr - 3 flex items - center justify - center ${!currentStrategy.audience?.scaleType
+                              <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${!currentStrategy.audience?.scaleType
                                 ? 'border-yellow-400 bg-yellow-400'
                                 : 'border-yellow-500/40'
                                 } `}>
@@ -3270,7 +3284,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                 }))}
                                 className="sr-only"
                               />
-                              <div className={`w - 4 h - 4 rounded - full border - 2 mr - 3 flex items - center justify - center ${currentStrategy.audience?.scaleType === 'vertical'
+                              <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${currentStrategy.audience?.scaleType === 'vertical'
                                 ? 'border-yellow-400 bg-yellow-400'
                                 : 'border-yellow-500/40'
                                 } `}>
@@ -3296,7 +3310,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                 }))}
                                 className="sr-only"
                               />
-                              <div className={`w - 4 h - 4 rounded - full border - 2 mr - 3 flex items - center justify - center ${currentStrategy.audience?.scaleType === 'horizontal'
+                              <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${currentStrategy.audience?.scaleType === 'horizontal'
                                 ? 'border-yellow-400 bg-yellow-400'
                                 : 'border-yellow-500/40'
                                 } `}>
@@ -3321,7 +3335,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                           </div>
                           <h3 className="text-lg font-semibold text-emerald-200">Orçamento</h3>
                         </div>
-                        <div className={`grid grid - cols - 1 ${currentStrategy.product?.type !== 'sem_produto' ? 'md:grid-cols-2' : ''} gap - 4`}>
+                        <div className={`grid grid-cols-1 ${currentStrategy.product?.type !== 'sem_produto' ? 'md:grid-cols-2' : ''} gap-4`}>
                           <div>
                             <label className="block text-sm font-medium text-emerald-300 mb-2">Investimento disponível (mês)</label>
                             <div className="relative">
