@@ -32,6 +32,7 @@ interface Inputs {
   ticketBRL: number;     // ex: 3550
   objective?: string;    // ex: "crescimento_audiencia"
   strategyType?: StrategyType; // Nova: tipo de estratégia selecionada
+  forceStrategy?: boolean; // Se true, não substitui a estratégia automaticamente
   remarketingPercent?: number; // 0.2 a 0.3 (default 0.2)
   cpcOverride?: { min: number; max: number }; // em R$
   convOverrides?: Partial<{
@@ -268,33 +269,28 @@ export function pickRecommendedOption(ticketBand: TicketBand, productType: Produ
   return "lp_whatsapp";
 }
 
-function renderOpcoesEstrategia(strategyType: StrategyType) {
+function renderOpcoesEstrategia(strategyType: StrategyType, objective?: string) {
   if (strategyType === "impulsionar_post") {
     return `## Opções de Estratégia
-- **Crescimento de Audiência (Impulsionar Post):** Foco em atrair novos seguidores pelo menor custo possível. Ideal para volume e branding.
-
-**Estratégia selecionada:** **Impulsionamento de Post** focado no crescimento direto de audiência.`;
+- **Crescimento de Audiência (Impulsionar Post):** Foco em atrair novos seguidores pelo menor custo possível. Ideal para volume e branding.`;
   }
-  const opt1 = "**LP → WhatsApp:** Quem chega no WhatsApp já vem educado pela LP, com maior chance de fechamento.";
-  const opt2 = "**WhatsApp direto:** gera mais conversas rapidamente, porém com mais curiosos e esforço de atendimento.";
-  const opt3 = "**LP direto (checkout):** elimina contato humano; exige LP muito forte (preço, prova social, urgência). Funciona melhor em tickets baixos/compra por impulso.";
 
-  // Explicação baseada na estratégia selecionada
-  let why = "";
+  // Captura de Lead: LP → Formulário (sem WhatsApp)
+  if (objective === 'captura_leads') {
+    return `## Opções de Estratégia
+- **LP → Formulário:** O tráfego é direcionado a uma Landing Page com formulário de captação. Ideal para gerar leads qualificados sem necessidade de atendimento humano imediato. Funciona bem com ofertas de conteúdo, materiais ricos e inscrições.`;
+  }
+
   if (strategyType === "lp_whatsapp") {
-    why = "**LP → WhatsApp** oferece qualificação sem perder escala, principalmente para tickets médios/altos e vendas consultivas.";
+    return `## Opções de Estratégia
+- **LP → WhatsApp:** Quem chega no WhatsApp já vem educado pela LP, com maior chance de fechamento. Oferece qualificação sem perder escala, principalmente para tickets médios/altos e vendas consultivas.`;
   } else if (strategyType === "whatsapp_direto") {
-    why = "**WhatsApp direto** prioriza volume de conversas em ofertas simples/rápidas, aceitando maior esforço do atendimento.";
+    return `## Opções de Estratégia
+- **WhatsApp direto:** Gera mais conversas rapidamente, porém com mais curiosos e esforço de atendimento. Prioriza volume de conversas em ofertas simples/rápidas.`;
   } else {
-    why = "**LP direto (checkout)** funciona melhor quando o ticket é baixo e a oferta é clara, permitindo conversões rápidas em escala.";
+    return `## Opções de Estratégia
+- **LP direto (checkout):** Elimina contato humano; exige LP muito forte (preço, prova social, urgência). Funciona melhor quando o ticket é baixo e a oferta é clara, permitindo conversões rápidas em escala.`;
   }
-
-  return `## Opções de Estratégia
-- ${opt1}
-- ${opt2}
-- ${opt3}
-
-**Estratégia selecionada:** ${why}`;
 }
 
 function renderEstrategiaRecomendada(campaignType: CampaignType, productType: ProductType, ticketBand: TicketBand, strategyType: StrategyType) {
@@ -393,11 +389,11 @@ Fundo → ${fundo}
 export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
   console.log('🔍 [BUILD_REPORT] Inputs recebidos:', inputs);
 
-  const { campaignType, productType, investmentBRL, ticketBRL, strategyType = "lp_whatsapp", objective } = inputs;
+  const { campaignType, productType, investmentBRL, ticketBRL, strategyType = "lp_whatsapp", objective, forceStrategy = false } = inputs;
   const ticketBand = getTicketBand(ticketBRL);
 
   const isGrowth = objective === 'crescimento_audiencia';
-  const finalStrategyType = isGrowth ? 'impulsionar_post' : (strategyType === 'lp_whatsapp' ? pickRecommendedOption(ticketBand, productType, campaignType) : strategyType);
+  const finalStrategyType = isGrowth ? 'impulsionar_post' : ((strategyType === 'lp_whatsapp' && !forceStrategy) ? pickRecommendedOption(ticketBand, productType, campaignType) : strategyType);
 
   console.log('🔍 [BUILD_REPORT] Dados processados:', {
     campaignType,
@@ -450,7 +446,7 @@ export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
     leadsMax = Math.floor(accessesMax * conv.lpToLeadMax);
     salesMin = Math.max(0, Math.floor(leadsMin * conv.leadToSaleMin));
     salesMax = Math.max(0, Math.floor(leadsMax * conv.leadToSaleMax));
-  } else if (strategyType === "whatsapp_direto") {
+  } else if (finalStrategyType === "whatsapp_direto") {
     // WhatsApp Direto: Clique → Chat → Venda (sem LP)
     // Não há acessos à LP, apenas cliques diretos
     whatsappChatsMin = Math.floor(clicksMin * conv.whatsappChatMin);
@@ -492,33 +488,60 @@ export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
     finalStrategyType
   });
 
-  const opcoesEstrategia = renderOpcoesEstrategia(finalStrategyType);
+  const opcoesEstrategia = renderOpcoesEstrategia(finalStrategyType, objective);
   const estrategiaRecomendada = renderEstrategiaRecomendada(campaignType, productType, ticketBand, finalStrategyType);
 
+  // Calculate correct geometric averages for the markdown text
+  const avgCpc = (cpc.max + cpc.min) / 2;
+  const expClicks = Math.floor(investmentBRL / avgCpc);
+
+  const avgLpToLead = (conv.lpToLeadMin + conv.lpToLeadMax) / 2;
+  const expLeads = Math.floor(expClicks * avgLpToLead);
+
+  const avgLeadToSale = (conv.leadToSaleMin + conv.leadToSaleMax) / 2;
+  const expSalesLp = Math.floor(expLeads * avgLeadToSale);
+
+  const avgWppChat = (conv.whatsappChatMin + conv.whatsappChatMax) / 2;
+  const expWppChats = Math.floor(expClicks * avgWppChat);
+
+  const avgWppSale = (conv.whatsappSaleMin + conv.whatsappSaleMax) / 2;
+  const expSalesWpp = Math.floor(expWppChats * avgWppSale);
+
+  const avgDirectSale = (conv.directSaleMin + conv.directSaleMax) / 2;
+  const expSalesDirect = Math.floor(expClicks * avgDirectSale);
+
   // Gerar resultados esperados baseados na estratégia
-  let resultadosEsperados = `## Resultados Esperados
-- **CPC médio:** ${brl((cpc.max + cpc.min) / 2)}`;
+  let resultadosEsperados = finalStrategyType === "whatsapp_direto"
+    ? `## Resultados Esperados\n- **CPC médio:** ${brl(avgCpc)}`
+    : `## Resultados Esperados\n- **CPLPV médio:** ${brl(avgCpc)}`;
 
   if (finalStrategyType === "impulsionar_post") {
     resultadosEsperados = `## Resultados Esperados
-- **Custo por seguidor:** ${brl((cpc.max + cpc.min) / 2)}
-- **Seguidores estimados:** ${Math.round((clicksMin + clicksMax) / 2).toLocaleString("pt-BR")} novos seguidores`;
+- **Custo por seguidor:** ${brl(avgCpc)}
+- **Seguidores estimados:** ${expClicks.toLocaleString("pt-BR")} novos seguidores`;
   } else if (finalStrategyType === "lp_whatsapp") {
-    resultadosEsperados += `
-- **Cliques estimados:** ${Math.round((clicksMin + clicksMax) / 2).toLocaleString("pt-BR")}
-- **Acessos à LP:** ${Math.round((accessesMin + accessesMax) / 2).toLocaleString("pt-BR")}
-- **Conversão LP → Lead:** ${pct((conv.lpToLeadMin + conv.lpToLeadMax) / 2)} → **${Math.round((leadsMin + leadsMax) / 2).toLocaleString("pt-BR")} leads**
-- **Conversão Lead → Venda:** ${pct((conv.leadToSaleMin + conv.leadToSaleMax) / 2)} → **${Math.round((salesMin + salesMax) / 2).toLocaleString("pt-BR")} vendas**`;
+    if (objective === 'captura_leads') {
+      resultadosEsperados += `
+- **Visitas estimadas:** ${expClicks.toLocaleString("pt-BR")}
+- **Acessos à LP:** ${expClicks.toLocaleString("pt-BR")}
+- **Conversão LP → Lead (Formulário):** ${pct(avgLpToLead)} → **${expLeads.toLocaleString("pt-BR")} leads**`;
+    } else {
+      resultadosEsperados += `
+- **Visitas estimadas:** ${expClicks.toLocaleString("pt-BR")}
+- **Acessos à LP:** ${expClicks.toLocaleString("pt-BR")}
+- **Conversão LP → Lead:** ${pct(avgLpToLead)} → **${expLeads.toLocaleString("pt-BR")} leads**
+- **Conversão Lead → Venda:** ${pct(avgLeadToSale)} → **${expSalesLp.toLocaleString("pt-BR")} vendas**`;
+    }
   } else if (finalStrategyType === "whatsapp_direto") {
     resultadosEsperados += `
-- **Cliques estimados:** ${Math.round((clicksMin + clicksMax) / 2).toLocaleString("pt-BR")}
-- **Conversão Clique → Chat:** ${pct((conv.whatsappChatMin + conv.whatsappChatMax) / 2)} → **${Math.round((whatsappChatsMin + whatsappChatsMax) / 2).toLocaleString("pt-BR")} chats**
-- **Conversão Chat → Venda:** ${pct((conv.whatsappSaleMin + conv.whatsappSaleMax) / 2)} → **${Math.round((salesMin + salesMax) / 2).toLocaleString("pt-BR")} vendas**`;
+- **Cliques estimados:** ${expClicks.toLocaleString("pt-BR")}
+- **Conversão Clique → Chat:** ${pct(avgWppChat)} → **${expWppChats.toLocaleString("pt-BR")} chats**
+- **Conversão Chat → Venda:** ${pct(avgWppSale)} → **${expSalesWpp.toLocaleString("pt-BR")} vendas**`;
   } else { // lp_direto
     resultadosEsperados += `
-- **Cliques estimados:** ${Math.round((clicksMin + clicksMax) / 2).toLocaleString("pt-BR")}
-- **Acessos à LP:** ${Math.round((accessesMin + accessesMax) / 2).toLocaleString("pt-BR")}
-- **Conversão LP → Venda direta:** ${pct((conv.directSaleMin + conv.directSaleMax) / 2)} → **${Math.round((salesMin + salesMax) / 2).toLocaleString("pt-BR")} vendas**`;
+- **Visitas estimadas:** ${expClicks.toLocaleString("pt-BR")}
+- **Acessos à LP:** ${expClicks.toLocaleString("pt-BR")}
+- **Conversão LP → Venda direta:** ${pct(avgDirectSale)} → **${expSalesDirect.toLocaleString("pt-BR")} vendas**`;
   }
 
   const retornoEstimado = isGrowth ? '' :
@@ -528,6 +551,10 @@ export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
 
   // Margem de Risco personalizada por múltiplos fatores
   const getPersonalizedRiskLevel = () => {
+    if (finalStrategyType === "impulsionar_post") {
+      return "Médio a Alto - Experiência ruim pode perder clientes. Falta de retenção pode perder investimento.";
+    }
+
     // Base por ticket
     let baseRisk = '';
     if (ticketBand === "alto") {
@@ -551,7 +578,7 @@ export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
     } else { // curso, mentoria, retiro, etc
       productContext = ticketBand === "alto" ? " - Experiência premium reduz risco de abandono" :
         ticketBand === "medio" ? " - Conteúdo ruim pode causar desistência" :
-          " - Experiência ruim pode perder alunos";
+          " - Experiência ruim pode perder clientes";
     }
 
     // Personalização por tipo de campanha
@@ -576,6 +603,10 @@ export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
   };
 
   const getPersonalizedCriticalFactors = () => {
+    if (finalStrategyType === "impulsionar_post") {
+      return "Criativos ruins, Público mal direcionado, Experiência ruim do usuário, Falta de retenção de clientes, Falta de fidelização.";
+    }
+
     let factors = [];
 
     // Fatores base por tipo de produto

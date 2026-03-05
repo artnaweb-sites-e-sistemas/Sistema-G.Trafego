@@ -166,7 +166,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       // Regenerar relatório com nova estratégia
       const newReport = buildStrategyReport({
         ...selectedReport.strategyReport.inputs,
-        strategyType: strategyType
+        strategyType: strategyType,
+        forceStrategy: true
       });
 
       const updatedStrategy = {
@@ -1084,16 +1085,16 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           ` : `
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
             <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6;">
-              <h4 style="color: #1f2937; margin: 0 0 10px 0;">CPC Médio</h4>
+              <h4 style="color: #1f2937; margin: 0 0 10px 0;">${metrics.strategyType === 'whatsapp_direto' ? 'CPC Médio' : 'CPLPV Médio'}</h4>
               <p style="color: #059669; font-size: 24px; font-weight: bold; margin: 0;">R$ ${((metrics.cpcMin + metrics.cpcMax) / 2).toFixed(2)}</p>
             </div>
             <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #10b981;">
-              <h4 style="color: #1f2937; margin: 0 0 10px 0;">Acessos Estimados</h4>
-              <p style="color: #059669; font-size: 24px; font-weight: bold; margin: 0;">${((metrics.accessesMin + metrics.accessesMax) / 2).toLocaleString()}</p>
+              <h4 style="color: #1f2937; margin: 0 0 10px 0;">${metrics.strategyType === 'whatsapp_direto' ? 'Cliques Estimados' : 'Acessos Estimados'}</h4>
+              <p style="color: #059669; font-size: 24px; font-weight: bold; margin: 0;">${(metrics.strategyType === 'whatsapp_direto' ? (metrics.clicksMin + metrics.clicksMax) / 2 : (metrics.accessesMin + metrics.accessesMax) / 2).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
             </div>
             <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b;">
-              <h4 style="color: #1f2937; margin: 0 0 10px 0;">Leads Estimados</h4>
-              <p style="color: #059669; font-size: 24px; font-weight: bold; margin: 0;">${((metrics.leadsMin + metrics.leadsMax) / 2).toFixed(0)}</p>
+              <h4 style="color: #1f2937; margin: 0 0 10px 0;">${metrics.strategyType === 'whatsapp_direto' ? 'Chats Estimados' : 'Leads Estimados'}</h4>
+              <p style="color: #059669; font-size: 24px; font-weight: bold; margin: 0;">${(metrics.strategyType === 'whatsapp_direto' ? (metrics.whatsappChatsMin + metrics.whatsappChatsMax) / 2 : (metrics.leadsMin + metrics.leadsMax) / 2).toFixed(0)}</p>
             </div>
             <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444;">
               <h4 style="color: #1f2937; margin: 0 0 10px 0;">Vendas Estimadas</h4>
@@ -2812,83 +2813,107 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                           </div>
 
                                           {/* Métricas em Cards - Primeira Linha */}
-                                          {strategy.strategyReport.metrics.strategyType === 'impulsionar_post' ? (
-                                            <div className="grid grid-cols-2 gap-2">
-                                              <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
-                                                <div className="text-xs text-slate-400 mb-1.5 font-medium">Custo p/ Seguidor</div>
-                                                <div className="text-sm font-semibold text-slate-200">
-                                                  {((strategy.strategyReport.metrics.cpcMin + strategy.strategyReport.metrics.cpcMax) / 2).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 })}
+                                          {(() => {
+                                            const metrics = strategy.strategyReport.metrics;
+                                            const avgCpc = (metrics.cpcMin + metrics.cpcMax) / 2;
+                                            const expClicks = Math.floor(strategy.budget.planned / avgCpc);
+
+                                            const avgLpToLead = (metrics.conv.lpToLeadMin + metrics.conv.lpToLeadMax) / 2;
+                                            const expLeads = Math.floor(expClicks * avgLpToLead);
+
+                                            const avgLeadToSale = (metrics.conv.leadToSaleMin + metrics.conv.leadToSaleMax) / 2;
+                                            const expSalesLp = Math.floor(expLeads * avgLeadToSale);
+
+                                            const avgWppChat = (metrics.conv.whatsappChatMin + metrics.conv.whatsappChatMax) / 2;
+                                            const expWppChats = Math.floor(expClicks * avgWppChat);
+
+                                            const avgWppSale = (metrics.conv.whatsappSaleMin + metrics.conv.whatsappSaleMax) / 2;
+                                            const expSalesWpp = Math.floor(expWppChats * avgWppSale);
+
+                                            const avgDirectSale = (metrics.conv.directSaleMin + metrics.conv.directSaleMax) / 2;
+                                            const expSalesDirect = Math.floor(expClicks * avgDirectSale);
+
+                                            return metrics.strategyType === 'impulsionar_post' ? (
+                                              <div className="grid grid-cols-2 gap-2">
+                                                <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
+                                                  <div className="text-xs text-slate-400 mb-1.5 font-medium">Custo p/ Seguidor</div>
+                                                  <div className="text-sm font-semibold text-slate-200">
+                                                    {avgCpc.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 })}
+                                                  </div>
+                                                  <div className="text-xs text-slate-500 mt-1">Estimativa de Custo</div>
                                                 </div>
-                                                <div className="text-xs text-slate-500 mt-1">Estimativa de Custo</div>
-                                              </div>
-                                              <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
-                                                <div className="text-xs text-slate-400 mb-1.5 font-medium">Seguidores Est.</div>
-                                                <div className="text-sm font-semibold text-slate-200">
-                                                  {Math.round(((strategy.strategyReport.metrics.clicksMin || 0) + (strategy.strategyReport.metrics.clicksMax || 0)) / 2).toLocaleString('pt-BR')}
-                                                </div>
-                                                <div className="text-xs text-slate-500 mt-1">Novos Seguidores</div>
-                                              </div>
-                                            </div>
-                                          ) : (
-                                            <div className="grid grid-cols-4 gap-2">
-                                              <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
-                                                <div className="text-xs text-slate-400 mb-1.5 font-medium">CPC Médio</div>
-                                                <div className="text-sm font-semibold text-slate-200">
-                                                  {((strategy.strategyReport.metrics.cpcMin + strategy.strategyReport.metrics.cpcMax) / 2).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 })}
-                                                </div>
-                                                <div className="text-xs text-slate-500 mt-1">Custo por Clique</div>
-                                              </div>
-                                              <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
-                                                <div className="text-xs text-slate-400 mb-1.5 font-medium">
-                                                  {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto' ? 'Cliques Est.' : 'Acessos Est.'}
-                                                </div>
-                                                <div className="text-sm font-semibold text-slate-200">
-                                                  {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto'
-                                                    ? Math.round(((strategy.strategyReport.metrics.clicksMin || 0) + (strategy.strategyReport.metrics.clicksMax || 0)) / 2).toLocaleString('pt-BR')
-                                                    : Math.round(((strategy.strategyReport.metrics.accessesMin || 0) + (strategy.strategyReport.metrics.accessesMax || 0)) / 2).toLocaleString('pt-BR')
-                                                  }
-                                                </div>
-                                                <div className="text-xs text-slate-500 mt-1">
-                                                  {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto' ? 'Cliques → Chats' : 'Acessos → Leads'}
+                                                <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
+                                                  <div className="text-xs text-slate-400 mb-1.5 font-medium">Seguidores Est.</div>
+                                                  <div className="text-sm font-semibold text-slate-200">
+                                                    {expClicks.toLocaleString('pt-BR')}
+                                                  </div>
+                                                  <div className="text-xs text-slate-500 mt-1">Novos Seguidores</div>
                                                 </div>
                                               </div>
-                                              <div className={`bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md ${strategy.strategyReport.metrics.strategyType === 'lp_direto' ? 'opacity-40' : ''}`}>
-                                                <div className="text-xs text-slate-400 mb-1.5 font-medium">
-                                                  {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto' ? 'Chats Est.' :
-                                                    strategy.strategyReport.metrics.strategyType === 'lp_direto' ? 'Leads Est.' : 'Leads Est.'}
+                                            ) : (
+                                              <div className="grid grid-cols-4 gap-2">
+                                                <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
+                                                  <div className="text-xs text-slate-400 mb-1.5 font-medium">
+                                                    {metrics.strategyType === 'whatsapp_direto' ? 'CPC Médio' : 'CPLPV Médio'}
+                                                  </div>
+                                                  <div className="text-sm font-semibold text-slate-200">
+                                                    {avgCpc.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 })}
+                                                  </div>
+                                                  <div className="text-xs text-slate-500 mt-1">
+                                                    {metrics.strategyType === 'whatsapp_direto' ? 'Custo por Clique' : 'Custo p/ Visita à pág'}
+                                                  </div>
                                                 </div>
-                                                <div className="text-sm font-semibold text-slate-200">
-                                                  {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto'
-                                                    ? Math.round(((strategy.strategyReport.metrics.whatsappChatsMin || 0) + (strategy.strategyReport.metrics.whatsappChatsMax || 0)) / 2).toLocaleString('pt-BR')
-                                                    : strategy.strategyReport.metrics.strategyType === 'lp_direto'
-                                                      ? `0`
-                                                      : Math.round(((strategy.strategyReport.metrics.leadsMin || 0) + (strategy.strategyReport.metrics.leadsMax || 0)) / 2).toLocaleString('pt-BR')
-                                                  }
+                                                <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
+                                                  <div className="text-xs text-slate-400 mb-1.5 font-medium">
+                                                    {metrics.strategyType === 'whatsapp_direto' ? 'Cliques Est.' : 'Acessos Est.'}
+                                                  </div>
+                                                  <div className="text-sm font-semibold text-slate-200">
+                                                    {expClicks.toLocaleString('pt-BR')}
+                                                  </div>
+                                                  <div className="text-xs text-slate-500 mt-1">
+                                                    {metrics.strategyType === 'whatsapp_direto' ? 'Cliques → Chats' : 'Acessos → Leads'}
+                                                  </div>
                                                 </div>
-                                                <div className="text-xs text-slate-500 mt-1">
-                                                  {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto' ?
-                                                    `${(((strategy.strategyReport.metrics.conv.whatsappChatMin + strategy.strategyReport.metrics.conv.whatsappChatMax) / 2) * 100).toFixed(1)}%` :
-                                                    strategy.strategyReport.metrics.strategyType === 'lp_direto' ? '0%' :
-                                                      `${(((strategy.strategyReport.metrics.conv.lpToLeadMin + strategy.strategyReport.metrics.conv.lpToLeadMax) / 2) * 100).toFixed(1)}%`}
+                                                <div className={`bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md ${metrics.strategyType === 'lp_direto' ? 'opacity-40' : ''}`}>
+                                                  <div className="text-xs text-slate-400 mb-1.5 font-medium">
+                                                    {metrics.strategyType === 'whatsapp_direto' ? 'Chats Est.' :
+                                                      metrics.strategyType === 'lp_direto' ? 'Leads Est.' : 'Leads Est.'}
+                                                  </div>
+                                                  <div className="text-sm font-semibold text-slate-200">
+                                                    {metrics.strategyType === 'whatsapp_direto'
+                                                      ? expWppChats.toLocaleString('pt-BR')
+                                                      : metrics.strategyType === 'lp_direto'
+                                                        ? `0`
+                                                        : expLeads.toLocaleString('pt-BR')
+                                                    }
+                                                  </div>
+                                                  <div className="text-xs text-slate-500 mt-1">
+                                                    {metrics.strategyType === 'whatsapp_direto' ?
+                                                      `${(avgWppChat * 100).toFixed(1)}%` :
+                                                      metrics.strategyType === 'lp_direto' ? '0%' :
+                                                        `${(avgLpToLead * 100).toFixed(1)}%`}
+                                                  </div>
+                                                </div>
+                                                <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
+                                                  <div className="text-xs text-slate-400 mb-1.5 font-medium">
+                                                    {metrics.strategyType === 'lp_direto' ? 'Vendas Est.' : 'Vendas Est.'}
+                                                  </div>
+                                                  <div className="text-sm font-semibold text-slate-200">
+                                                    {metrics.strategyType === 'whatsapp_direto' ? expSalesWpp.toLocaleString('pt-BR') :
+                                                      metrics.strategyType === 'lp_direto' ? expSalesDirect.toLocaleString('pt-BR') :
+                                                        expSalesLp.toLocaleString('pt-BR')}
+                                                  </div>
+                                                  <div className="text-xs text-slate-500 mt-1">
+                                                    {metrics.strategyType === 'whatsapp_direto' ?
+                                                      `${(avgWppSale * 100).toFixed(1)}%` :
+                                                      metrics.strategyType === 'lp_direto' ?
+                                                        `${(avgDirectSale * 100).toFixed(1)}%` :
+                                                        `${(avgLeadToSale * 100).toFixed(1)}%`}
+                                                  </div>
                                                 </div>
                                               </div>
-                                              <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
-                                                <div className="text-xs text-slate-400 mb-1.5 font-medium">
-                                                  {strategy.strategyReport.metrics.strategyType === 'lp_direto' ? 'Vendas Est.' : 'Vendas Est.'}
-                                                </div>
-                                                <div className="text-sm font-semibold text-slate-200">
-                                                  {Math.round(((strategy.strategyReport.metrics.salesMin || 0) + (strategy.strategyReport.metrics.salesMax || 0)) / 2).toLocaleString('pt-BR')}
-                                                </div>
-                                                <div className="text-xs text-slate-500 mt-1">
-                                                  {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto' ?
-                                                    `${(((strategy.strategyReport.metrics.conv.whatsappSaleMin + strategy.strategyReport.metrics.conv.whatsappSaleMax) / 2) * 100).toFixed(1)}%` :
-                                                    strategy.strategyReport.metrics.strategyType === 'lp_direto' ?
-                                                      `${(((strategy.strategyReport.metrics.conv.directSaleMin + strategy.strategyReport.metrics.conv.directSaleMax) / 2) * 100).toFixed(1)}%` :
-                                                      `${(((strategy.strategyReport.metrics.conv.leadToSaleMin + strategy.strategyReport.metrics.conv.leadToSaleMax) / 2) * 100).toFixed(1)}%`}
-                                                </div>
-                                              </div>
-                                            </div>
-                                          )}
+                                            );
+                                          })()}
 
 
 
