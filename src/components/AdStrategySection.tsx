@@ -998,7 +998,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     // CONTROLE INTELIGENTE DE QUEBRA DE PÁGINA - Evita cortes de texto
     // Força quebra de página antes de seções importantes para evitar cortes
     formatted = formatted.replace(/^## Opções de Estratégia$/gm,
-      '<div style="page-break-before: always; page-break-after: avoid; page-break-inside: avoid; color: #1e40af; font-size: 16px; font-weight: 600; margin: 12px 0 12px 0; padding: 8px 16px; background: #eff6ff; border-radius: 6px; border-left: 4px solid #3b82f6; box-shadow: 0 1px 3px rgba(0,0,0,0.1); min-height: 32px; text-align: left; vertical-align: middle; line-height: 32px; padding-bottom:20px">Opções de Estratégia</div>'
+      '<div style="page-break-after: avoid; page-break-inside: avoid; color: #1e40af; font-size: 16px; font-weight: 600; margin: 12px 0 12px 0; padding: 8px 16px; background: #eff6ff; border-radius: 6px; border-left: 4px solid #3b82f6; box-shadow: 0 1px 3px rgba(0,0,0,0.1); min-height: 32px; text-align: left; vertical-align: middle; line-height: 32px; padding-bottom:20px">Opções de Estratégia</div>'
     );
 
     // CORREÇÃO DAS QUEBRAS DE LINHA - Aplicar em todas as seções
@@ -1074,7 +1074,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           </div>
         </div>
 
-  <div style="page-break-inside: avoid; margin-bottom: 20px; padding: 16px 0; border-top: 1px solid #e2e8f0;">
+  <div style="margin-bottom: 20px; padding: 16px 0; border-top: 1px solid #e2e8f0;">
     <h3 style="color: #1e293b; font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #374151;">Análise Completa</h3>
     <div style="color: #475569; line-height: 1.6; font-size: 13px;">
       ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não disponível'}
@@ -2578,8 +2578,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                         onClick={() => handleNewYellowIcon(strategy)}
                                         disabled={!canCreateMoreRemarketing(strategy)}
                                         className={`p - 1.5 rounded - lg transition - all duration - 200 ${canCreateMoreRemarketing(strategy)
-                                            ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-500/30 hover:scale-110'
-                                            : 'text-slate-500 cursor-not-allowed opacity-50'
+                                          ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-500/30 hover:scale-110'
+                                          : 'text-slate-500 cursor-not-allowed opacity-50'
                                           } `}
                                       >
                                         🎯
@@ -2744,8 +2744,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                           return (
                                             <div
                                               className={`h - 2.5 rounded - full transition - all duration - 500 shadow - sm ${isPaused
-                                                  ? 'bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 animate-pulse'
-                                                  : 'bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500'
+                                                ? 'bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 animate-pulse'
+                                                : 'bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500'
                                                 } `}
                                               style={{ width: `${progressPercentage}% ` }}
                                             />
@@ -2895,8 +2895,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                                       return (
                                                         <div
                                                           className={`h - 2.5 rounded - full transition - all duration - 500 shadow - sm ${isPaused
-                                                              ? 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 animate-pulse'
-                                                              : 'bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600'
+                                                            ? 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 animate-pulse'
+                                                            : 'bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600'
                                                             } `}
                                                           style={{ width: `${progressPercentage}% ` }}
                                                         />
@@ -3245,8 +3245,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                 className="sr-only"
                               />
                               <div className={`w - 4 h - 4 rounded - full border - 2 mr - 3 flex items - center justify - center ${!currentStrategy.audience?.scaleType
-                                  ? 'border-yellow-400 bg-yellow-400'
-                                  : 'border-yellow-500/40'
+                                ? 'border-yellow-400 bg-yellow-400'
+                                : 'border-yellow-500/40'
                                 } `}>
                                 {!currentStrategy.audience?.scaleType && (
                                   <div className="w-2 h-2 rounded-full bg-slate-800"></div>
@@ -3271,8 +3271,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                 className="sr-only"
                               />
                               <div className={`w - 4 h - 4 rounded - full border - 2 mr - 3 flex items - center justify - center ${currentStrategy.audience?.scaleType === 'vertical'
-                                  ? 'border-yellow-400 bg-yellow-400'
-                                  : 'border-yellow-500/40'
+                                ? 'border-yellow-400 bg-yellow-400'
+                                : 'border-yellow-500/40'
                                 } `}>
                                 {currentStrategy.audience?.scaleType === 'vertical' && (
                                   <div className="w-2 h-2 rounded-full bg-slate-800"></div>
@@ -3297,8 +3297,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
                                 className="sr-only"
                               />
                               <div className={`w - 4 h - 4 rounded - full border - 2 mr - 3 flex items - center justify - center ${currentStrategy.audience?.scaleType === 'horizontal'
-                                  ? 'border-yellow-400 bg-yellow-400'
-                                  : 'border-yellow-500/40'
+                                ? 'border-yellow-400 bg-yellow-400'
+                                : 'border-yellow-500/40'
                                 } `}>
                                 {currentStrategy.audience?.scaleType === 'horizontal' && (
                                   <div className="w-2 h-2 rounded-full bg-slate-800"></div>

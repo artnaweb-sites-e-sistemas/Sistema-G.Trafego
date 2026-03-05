@@ -307,10 +307,10 @@ function renderEstrategiaRecomendada(campaignType: CampaignType, productType: Pr
   if (strategyType === "impulsionar_post") {
     objetivo = "Crescimento de audiência e atração de novos seguidores.";
     publico = "Base aberta, lookalike de engajamento ou interesses amplos sem remarketing.";
-    topo = "Impulsionamento de Reels e Carrossel com alto engajamento.";
-    meio = "Não se aplica - foco em volume de seguidores.";
-    fundo = "Não se aplica - sem remarketing nesta estratégia.";
-    comunicacao = "Conteúdo de topo de funil, viral, gatilhos de curiosidade, 'Siga para mais'.";
+    topo = "Atração (Inconsciente): Reels e Carrossel de alto impacto focados na dor ou desejo central.";
+    meio = "Educação (Consciente do Problema): Conteúdo que gera conexão e mostra autoridade sobre o tema.";
+    fundo = "Conversão em Seguidor (Consciente da Solução): CTA clara para seguir e acompanhar novos conteúdos.";
+    comunicacao = "Tom inspirador e educativo com gatilhos de curiosidade e autoridade.";
   } else if (strategyType === "lp_whatsapp") {
     // LP → WhatsApp
     if (ticketBand === "alto") {
