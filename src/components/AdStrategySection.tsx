@@ -2464,12 +2464,6 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
       <div className="p-6 md:p-8">
         <div className="flex items-center justify-between mb-8 pt-6">
           <div className="flex items-center gap-4">
-            <div className="relative flex-shrink-0">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-md">
-                <Target className="h-5 w-5 text-white" />
-              </div>
-              <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-900 animate-pulse" />
-            </div>
             <div className="flex flex-col justify-center h-11">
               <h3 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent leading-tight">Estratégias de Anúncio</h3>
               <p className="text-slate-400 text-sm mt-1 leading-tight">Cliente: <span className="text-slate-200 font-semibold">{selectedClient}</span></p>

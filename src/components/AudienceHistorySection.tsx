@@ -725,12 +725,12 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
       key={key || label}
       onClick={key ? () => handleSort(key) : undefined}
       className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-300 ${key ? 'cursor-pointer select-none' : ''} whitespace-nowrap ${key === 'month' ? 'w-[120px]' :
-          key === 'adSet' ? 'w-[150px]' :
-            key === 'cpm' || key === 'cpc' || key === 'cpr' ? 'w-[80px]' :
-              key === 'txMensagens' ? 'w-[100px]' :
-                key === 'txAgendamento' ? 'w-[110px]' :
-                  key === 'txConversaoVendas' ? (agendamentosEnabled ? 'w-[90px]' : 'w-[0px]') :
-                    key === 'roiCombined' ? 'w-[120px]' : ''
+        key === 'adSet' ? 'w-[150px]' :
+          key === 'cpm' || key === 'cpc' || key === 'cpr' ? 'w-[80px]' :
+            key === 'txMensagens' ? 'w-[100px]' :
+              key === 'txAgendamento' ? 'w-[110px]' :
+                key === 'txConversaoVendas' ? (agendamentosEnabled ? 'w-[90px]' : 'w-[0px]') :
+                  key === 'roiCombined' ? 'w-[120px]' : ''
         }`}
     >
       <div className="inline-flex items-center gap-1">
@@ -819,7 +819,7 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
     <div className="bg-slate-900 rounded-2xl border border-slate-700/50 shadow-xl overflow-hidden">
       <div className="p-6 border-b border-slate-700/60 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900">
         <div className="flex items-center justify-between">
-          <SectionHeader title="Histórico de Público" subtitle={selectedProduct} />
+          <SectionHeader title="Histórico de Público" subtitle={selectedProduct} hideIcon={true} />
 
           <div className="flex flex-col items-end gap-2">
             {/* Data da Última Atualização (apenas texto) */}
@@ -844,8 +844,8 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
                   onClick={load12MonthsHistory}
                   disabled={loading || isLoadingFullHistory}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${isLoadingFullHistory
-                      ? 'bg-gray-700/50 text-gray-400 cursor-not-allowed'
-                      : 'bg-slate-700/80 text-slate-200 border border-slate-600/50 hover:bg-slate-600/80 hover:border-slate-500/50 shadow-md hover:shadow-lg'
+                    ? 'bg-gray-700/50 text-gray-400 cursor-not-allowed'
+                    : 'bg-slate-700/80 text-slate-200 border border-slate-600/50 hover:bg-slate-600/80 hover:border-slate-500/50 shadow-md hover:shadow-lg'
                     }`}
                   title="Carregar histórico de 12 meses"
                 >
@@ -876,8 +876,8 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
                 onClick={handleRefresh}
                 disabled={loading || isRefreshing}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${isRefreshing
-                    ? 'bg-gray-700/50 text-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl'
+                  ? 'bg-gray-700/50 text-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl'
                   }`}
                 title="Atualizar dados do histórico de público"
               >
@@ -1030,8 +1030,8 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
               <button
                 onClick={() => setShowOnlySelected(!showOnlySelected)}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${showOnlySelected
-                    ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/50'
-                    : 'bg-slate-700/50 text-slate-300 border border-slate-600/50 hover:bg-slate-600/50 hover:border-slate-500/50'
+                  ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/50'
+                  : 'bg-slate-700/50 text-slate-300 border border-slate-600/50 hover:bg-slate-600/50 hover:border-slate-500/50'
                   }`}
                 title="Mostrar apenas os selecionados"
               >
@@ -1057,8 +1057,8 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
               onClick={loadMore12Months}
               disabled={isLoadingFullHistory}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${isLoadingFullHistory
-                  ? 'bg-gray-700/50 text-gray-400 cursor-not-allowed'
-                  : 'bg-slate-700/50 text-slate-300 border border-slate-600/50 hover:bg-slate-600/50 hover:border-slate-500/50'
+                ? 'bg-gray-700/50 text-gray-400 cursor-not-allowed'
+                : 'bg-slate-700/50 text-slate-300 border border-slate-600/50 hover:bg-slate-600/50 hover:border-slate-500/50'
                 }`}
               title="Carregar mais 12 meses de histórico"
             >

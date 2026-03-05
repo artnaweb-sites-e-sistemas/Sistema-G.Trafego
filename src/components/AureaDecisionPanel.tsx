@@ -363,7 +363,6 @@ const AureaDecisionPanel: React.FC<AureaDecisionPanelProps> = ({
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-amber-400" />
                         <h3 className="text-sm font-medium text-gray-300">Alertas de Decisão</h3>
                         {alerts.length > 0 && (
                             <span className="bg-amber-500/20 text-amber-400 text-xs px-2 py-0.5 rounded-full">

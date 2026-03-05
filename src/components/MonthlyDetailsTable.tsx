@@ -97,10 +97,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       return newState;
     });
   };  // Função para salvar valores de benchmark no Firebase
-  const saveBenchmarkValues = async (data: any[]) => {
+  const saveBenchmarkValues = async (data: any[], overrideTicketMedio?: number) => {
     // 🎯 PROTEÇÃO: Não salvar durante carregamento
     if (!benchmarkLoadCompleted) {
-
       return;
     }
 
@@ -113,12 +112,10 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       // Rate limit removido - salvar imediatamente
       (async () => {
         if (isSaving) {
-
           return;
         }
 
         setIsSaving(true);
-
 
         const benchmarkValues: { [key: string]: string } = {};
 
@@ -130,14 +127,13 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             !row.benchmark.toString().includes('NaN') &&
             row.benchmark.toString().trim() !== '') {
             benchmarkValues[row.metric] = row.benchmark;
-
           }
         });
 
         // 🎯 INCLUIR TICKET MÉDIO nos benchmarks salvos
-        if (ticketMedio && ticketMedio !== 250) {
-          benchmarkValues['Ticket Médio (Bench)'] = formatCurrency(ticketMedio);
-
+        const ticketToSave = overrideTicketMedio !== undefined ? overrideTicketMedio : ticketMedio;
+        if (ticketToSave && ticketToSave !== 250) {
+          benchmarkValues['Ticket Médio (Bench)'] = formatCurrency(ticketToSave);
         }
 
         // 🎯 PROTEÇÃO: Não salvar se não há dados válidos
@@ -2071,7 +2067,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         roi: roiValue
       }).then(() => {
         // 🎯 NOVO: Salvar também nos benchmarks para persistir ao trocar período
-        saveBenchmarkValues(tableData);
+        saveBenchmarkValues(tableData, ticketMedio);
 
         // 🎯 NOVO: Disparar evento para atualizar histórico em tempo real
         window.dispatchEvent(new CustomEvent('ticketMedioChanged', {
@@ -2132,7 +2128,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           roi: roiValue
         }).then(() => {
           // 🎯 NOVO: Salvar também nos benchmarks para persistir ao trocar período
-          saveBenchmarkValues(tableData);
+          saveBenchmarkValues(tableData, newValue);
 
           // 🎯 NOVO: Disparar evento para atualizar histórico em tempo real
           window.dispatchEvent(new CustomEvent('ticketMedioChanged', {
@@ -2531,23 +2527,21 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
   // Função para calcular o status baseado na comparação entre valores reais e benchmarks
   const calculateStatus = (metric: string, realValue: string, benchmark: string): { status: string; statusColor: string } => {
-    // CORREÇÃO: Tratamento especial para CPV quando valor real é zero ou R$ 0,00
-    if (metric === 'CPV (Custo por Venda)' && (realValue === 'R$ 0,00' || realValue === '0' || parseCurrency(realValue) === 0)) {
-      return { status: '', statusColor: 'neutral' };
-    }
-
-    // Campos que não devem ter status (mantêm "-")
-    const noStatusFields = [
-      'Investimento pretendido (Mês)',
-      'Impressões',
-      'Cliques',
-      'Visitantes na página (LPV)',
-      'Leads / Msgs',
-      'Agendamentos',
-      'Vendas'
+    // 🎯 NOVA LÓGICA: Whitelist restrita de campos que devem ter status (conforme pedido do usuário)
+    const allowedStatusFields = [
+      'CPL',
+      'Tx. Agendamento',
+      'Tx. Conversão Vendas',
+      'Custo por Visita',
+      'Custo por Seguidor'
     ];
 
-    if (noStatusFields.includes(metric)) {
+    // Verifica se a métrica atual está na whitelist (usando includes para ser robusto)
+    const matchedField = allowedStatusFields.find(field =>
+      metric.toLowerCase().includes(field.toLowerCase())
+    );
+
+    if (!matchedField) {
       return { status: '', statusColor: 'neutral' };
     }
 
@@ -2571,16 +2565,16 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       benchmarkNum = parseNumber(benchmark);
     }
 
-    // Se não conseguiu extrair valores válidos
+    // Se não conseguiu extrair valores válidos (benchmark deve ser > 0 para comparação)
     if (isNaN(realNum) || isNaN(benchmarkNum) || benchmarkNum === 0) {
       return { status: '', statusColor: 'neutral' };
     }
 
-    // CORREÇÃO: Se o valor real é zero, não deve ter status (exceto para alguns campos específicos)
+    // CORREÇÃO: Se o valor real é zero, não deve ter status (exceto para os campos permitidos)
     if (realNum === 0) {
-      // Campos que podem ter status mesmo com valor zero
-      const canHaveStatusWhenZero = ['CTR', 'Tx. Mensagens', 'Tx. Agendamento', 'Tx. Conversão Vendas'];
-      const canHaveStatus = canHaveStatusWhenZero.some(field => metric.includes(field));
+      // Permitir status zero para métricas de conversão e opcionalmente para custos whitelisted
+      const canHaveStatusWhenZero = ['CTR', 'Tx.', 'CPL', 'Custo por Visita', 'Custo por Seguidor'];
+      const canHaveStatus = canHaveStatusWhenZero.some(field => metric.toLowerCase().includes(field.toLowerCase()));
 
       if (!canHaveStatus) {
         return { status: '', statusColor: 'neutral' };
@@ -2691,13 +2685,73 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         </div>
       </div>
 
+      <div className="px-6 py-4 bg-slate-800/20 border-b border-slate-800/60">
+        <div className="flex items-center">
+          <div className="flex items-center space-x-1 bg-slate-800/80 p-1 rounded-lg border border-slate-700/50">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setFunnelType('WHATSAPP');
+              }}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all duration-200 ${funnelType === 'WHATSAPP'
+                ? 'bg-green-600 text-white shadow-lg shadow-green-900/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                }`}
+            >
+              WHATSAPP
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setFunnelType('LEADS');
+              }}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all duration-200 ${funnelType === 'LEADS'
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                }`}
+            >
+              CAPTURA LEADS
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setFunnelType('DIRETA');
+              }}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all duration-200 ${funnelType === 'DIRETA'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                }`}
+            >
+              VENDA DIRETA
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setFunnelType('AUDIENCIA');
+              }}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all duration-200 ${funnelType === 'AUDIENCIA'
+                ? 'bg-pink-600 text-white shadow-lg shadow-pink-900/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                }`}
+            >
+              AUDIÊNCIA
+            </button>
+          </div>
+          <div className="ml-4 flex-1 h-px bg-slate-700/40"></div>
+        </div>
+      </div>
+
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
+        <table className="w-full border-separate border-spacing-0">
           <thead>
-            <tr className="border-b border-slate-800/60 bg-slate-800/40">
-              <th className="text-left p-5 text-slate-200 font-semibold text-sm uppercase tracking-wide w-2/5 border-r border-slate-600/50">Métrica</th>
-              <th className="text-left p-5 text-slate-200 font-semibold text-sm uppercase tracking-wide w-1/5 border-r border-slate-600/50">Benchmark/Projeção</th>
-              <th className="text-left p-5 text-slate-200 font-semibold text-sm uppercase tracking-wide w-1/5 border-r border-slate-600/50">
+            <tr className="bg-slate-800/40">
+              <th className="text-left p-4 text-slate-400 font-bold text-[11px] uppercase tracking-[0.1em] w-2/5 border-b border-r border-slate-700/50">Métrica</th>
+              <th className="text-left p-4 text-slate-400 font-bold text-[11px] uppercase tracking-[0.1em] w-1/5 border-b border-r border-slate-700/50">Benchmark/Projeção</th>
+              <th className="text-left p-4 text-slate-400 font-bold text-[11px] uppercase tracking-[0.1em] w-1/5 border-b border-r border-slate-700/50">
                 <div className="flex items-center justify-between">
                   <span>Valores Reais</span>
                   <button
@@ -2713,7 +2767,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                   </button>
                 </div>
               </th>
-              <th className="text-left p-5 text-slate-200 font-semibold text-sm uppercase tracking-wide w-1/5">Status vs Benchmark</th>
+              <th className="text-left p-4 text-slate-400 font-bold text-[11px] uppercase tracking-[0.1em] w-1/5 border-b border-slate-700/50">Status vs Benchmark</th>
             </tr>
           </thead>
           <tbody>
@@ -2732,93 +2786,38 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               }
               return (
                 <React.Fragment key={category}>
-                  {/* Linha de categoria */}
-                  <tr className="border-b border-slate-700 bg-gradient-to-r from-slate-800/40 via-slate-700/30 to-slate-800/40">
-                    <td className="p-3 text-slate-400 font-medium text-sm" colSpan={4}>
-                      <div className="flex items-center">
-                        <div className="w-2 h-2 bg-slate-500 rounded-full mr-3"></div>
-                        <span className="text-slate-400 font-medium tracking-wide uppercase text-xs">
-                          {category}
-                        </span>
-                        {category === 'Funil de Agendamento' && (
-                          <div className="flex items-center space-x-2 ml-3">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setAgendamentosEnabled(!agendamentosEnabled);
-                              }}
-                              className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium transition-all duration-200 ${agendamentosEnabled
-                                ? 'bg-green-900/40 text-green-400 border border-green-500/30 hover:bg-green-800/50'
-                                : 'bg-red-900/40 text-red-400 border border-red-500/30 hover:bg-red-800/50'
-                                }`}
-                              title={agendamentosEnabled ? 'Desabilitar Funil de Agendamento' : 'Habilitar Funil de Agendamento'}
-                            >
-                              {agendamentosEnabled ? 'USANDO' : 'SEM USO'}
-                            </button>
-                          </div>
-                        )}
+                  {category !== 'Geral e Drivers Primários' && (
+                    <tr className="border-b border-slate-700 bg-gradient-to-r from-slate-800/40 via-slate-700/30 to-slate-800/40">
+                      <td className="p-3 text-slate-400 font-medium text-sm" colSpan={4}>
+                        <div className="flex items-center">
+                          <div className="w-2 h-2 bg-slate-500 rounded-full mr-3"></div>
+                          <span className="text-slate-400 font-medium tracking-wide uppercase text-xs">
+                            {category}
+                          </span>
+                          {category === 'Funil de Agendamento' && (
+                            <div className="flex items-center space-x-2 ml-3">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAgendamentosEnabled(!agendamentosEnabled);
+                                }}
+                                className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium transition-all duration-200 ${agendamentosEnabled
+                                  ? 'bg-green-900/40 text-green-400 border border-green-500/30 hover:bg-green-800/50'
+                                  : 'bg-red-900/40 text-red-400 border border-red-500/30 hover:bg-red-800/50'
+                                  }`}
+                                title={agendamentosEnabled ? 'Desabilitar Funil de Agendamento' : 'Habilitar Funil de Agendamento'}
+                              >
+                                {agendamentosEnabled ? 'USANDO' : 'SEM USO'}
+                              </button>
+                            </div>
+                          )}
 
-                        {category === 'Geral e Drivers Primários' && (
-                          <div className="flex items-center space-x-1 ml-3 bg-slate-800/80 p-1 rounded-md border border-slate-700/50">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setFunnelType('WHATSAPP');
-                              }}
-                              className={`px-3 py-1 rounded text-xs font-semibold transition-all duration-200 ${funnelType === 'WHATSAPP'
-                                ? 'bg-green-600 text-white shadow-sm'
-                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                                }`}
-                            >
-                              WHATSAPP
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setFunnelType('LEADS');
-                              }}
-                              className={`px-3 py-1 rounded text-xs font-semibold transition-all duration-200 ${funnelType === 'LEADS'
-                                ? 'bg-indigo-600 text-white shadow-sm'
-                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                                }`}
-                            >
-                              CAPTURA LEADS
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setFunnelType('DIRETA');
-                              }}
-                              className={`px-3 py-1 rounded text-xs font-semibold transition-all duration-200 ${funnelType === 'DIRETA'
-                                ? 'bg-blue-600 text-white shadow-sm'
-                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                                }`}
-                            >
-                              VENDA DIRETA
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setFunnelType('AUDIENCIA');
-                              }}
-                              className={`px-3 py-1 rounded text-xs font-semibold transition-all duration-200 ${funnelType === 'AUDIENCIA'
-                                ? 'bg-pink-600 text-white shadow-sm'
-                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                                }`}
-                            >
-                              AUDIÊNCIA
-                            </button>
-                          </div>
-                        )}
-                        <div className="ml-3 flex-1 h-px bg-slate-600/30"></div>
-                      </div>
-                    </td>
-                  </tr>
+                          <div className="ml-3 flex-1 h-px bg-slate-600/30"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                   {/* Itens da categoria */}
                   {items.filter(row => {
                     const hiddenMetrics = ['CPM', 'Impressões', 'CPC', 'Cliques', '% VIS. PÁG. (LPV/Cliques)', 'Tx. Mensagens (Leads/Cliques)', 'Tx. Conversão Audiência (Seg./Alcance)', 'Custo por Alcance (CPM)', 'Alcance'];
@@ -2877,7 +2876,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
                         {/* Célula Benchmark editável */}
                         <td
-                          className={`p-5 relative group w-1/5 text-left border-r border-slate-600/50 border-l-4 border-purple-400 ${(row.metric === 'Agendamentos' || row.metric === 'Tx. Agendamento (Agend./Leads)') && !agendamentosEnabled
+                          className={`p-5 relative group w-1/5 text-left border-r border-slate-600/50 border-l-4 border-slate-800/60 ${(row.metric === 'Agendamentos' || row.metric === 'Tx. Agendamento (Agend./Leads)') && !agendamentosEnabled
                             ? 'bg-slate-900/60 opacity-50 cursor-not-allowed'
                             : row.benchmarkEditable
                               ? editingCell?.rowIndex === globalIndex && editingCell?.field === 'benchmark'
@@ -2936,14 +2935,14 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                         {/* Célula Valores Reais editável */}
                         <td
                           className={`p-5 relative group w-1/5 text-left border-r border-slate-600/50 ${(row.metric === 'Agendamentos' || row.metric === 'Tx. Agendamento (Agend./Leads)') && !agendamentosEnabled
-                            ? 'bg-slate-900/60 opacity-50 cursor-not-allowed border-l-4 border-gray-500/30'
+                            ? 'bg-slate-900/60 opacity-50 cursor-not-allowed border-l-4 border-slate-800/60'
                             : row.realValueEditable
                               ? editingCell?.rowIndex === globalIndex && editingCell?.field === 'realValue'
-                                ? 'bg-emerald-900/40 cursor-pointer transition-all duration-200 border-l-4 border-emerald-400 shadow-sm'
+                                ? 'bg-emerald-900/40 cursor-pointer transition-all duration-200 border-l-4 border-slate-800/60 shadow-sm'
                                 : (getRealValueAutoState(row.metric)
-                                  ? 'bg-slate-800/40 border-l-4 border-blue-500/30'
-                                  : 'bg-slate-700/60 cursor-pointer hover:bg-emerald-900/30 transition-all duration-200 border-l-4 border-transparent hover:border-emerald-400/60')
-                              : 'bg-slate-800/40 border-l-4 border-blue-500/30'
+                                  ? 'bg-slate-800/40 border-l-4 border-slate-800/60'
+                                  : 'bg-slate-700/60 cursor-pointer hover:bg-emerald-900/30 transition-all duration-200 border-l-4 border-slate-800/60 hover:border-emerald-400/60')
+                              : 'bg-slate-800/40 border-l-4 border-slate-800/60'
                             }`}
                           onClick={(row.metric === 'Agendamentos' || row.metric === 'Tx. Agendamento (Agend./Leads)') && !agendamentosEnabled ? undefined : (row.realValueEditable && !getRealValueAutoState(row.metric) ? () => handleCellClick(globalIndex, 'realValue', row.realValue) : undefined)}
                           onMouseEnter={(row.metric === 'Agendamentos' || row.metric === 'Tx. Agendamento (Agend./Leads)') && !agendamentosEnabled ? undefined : (row.realValueEditable && !getRealValueAutoState(row.metric) ? () => setIsHovered({ rowIndex: globalIndex, field: 'realValue' }) : undefined)}

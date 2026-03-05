@@ -6,15 +6,18 @@ interface SectionHeaderProps {
   subtitle?: string;
   icon?: React.ReactNode;
   className?: string;
+  hideIcon?: boolean;
 }
 
-const SectionHeader: React.FC<SectionHeaderProps> = ({ title, subtitle, icon, className = '' }) => {
+const SectionHeader: React.FC<SectionHeaderProps> = ({ title, subtitle, icon, className = '', hideIcon = false }) => {
   return (
     <div className={`flex items-start justify-between mb-6 ${className}`.trim()}>
       <div className="flex items-center gap-3">
-        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shadow-md">
-          {icon || <Users className="h-5 w-5 text-slate-900" />}
-        </div>
+        {!hideIcon && (
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shadow-md shrink-0">
+            {icon || <Users className="h-5 w-5 text-slate-900" />}
+          </div>
+        )}
         <div>
           <h3 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent leading-tight">
             {title}
