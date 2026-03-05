@@ -115,17 +115,26 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
 
         const facebookProducts: Product[] = [];
 
-        // Para cada campanha, verificar se tem conjuntos de anúncio ativos
+        // 🎯 Limpar cache de adsets e ads para garantir dados frescos
+        metaAdsService.clearCacheByType('adsets');
+        metaAdsService.clearCacheByType('ads');
+
+        // Para cada campanha, buscar seus conjuntos e criativos DIRETAMENTE
         for (const campaign of activeCampaigns) {
           try {
-            // Buscar conjuntos de anúncio da campanha
+            // Buscar conjuntos de anúncio desta campanha específica
             const adSets = await metaAdsService.getAdSets(campaign.id);
+            // Buscar anúncios desta campanha específica
+            const ads = await metaAdsService.getAds(undefined, campaign.id);
 
             // Verificar se pelo menos um conjunto de anúncio está ativo
             const hasActiveAdSets = adSets.some(adSet => adSet.status === 'ACTIVE');
+            // Verificar se pelo menos um anúncio está ativo
+            const hasActiveAds = ads.some(ad => ad.status === 'ACTIVE');
 
-            // Determinar status da campanha baseado nos conjuntos de anúncio
-            const campaignStatus = hasActiveAdSets ? 'ACTIVE' : 'PAUSED';
+            // A campanha é considerada ATIVA apenas se tiver PELO MENOS 1 conjunto E 1 anúncio ativos
+            const isEffectivelyActive = campaign.status === 'ACTIVE' && hasActiveAdSets && hasActiveAds;
+            const campaignStatus = isEffectivelyActive ? 'ACTIVE' : 'PAUSED';
 
             facebookProducts.push({
               id: `fb-campaign-${campaign.id}`,
@@ -136,11 +145,11 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
               source: 'facebook' as const,
               campaign: {
                 ...campaign,
-                status: campaignStatus // Sobrescrever status com base nos conjuntos de anúncio
+                status: campaignStatus
               }
             });
           } catch (error) {
-            // Se não conseguir buscar conjuntos de anúncio, usar status original da campanha
+            // Fallback: se não conseguir buscar, usar status original
             facebookProducts.push({
               id: `fb-campaign-${campaign.id}`,
               name: campaign.name,
@@ -385,15 +394,50 @@ const ProductPicker: React.FC<ProductPickerProps> = ({
           console.error('Erro ao sincronizar campanhas com Firestore:', error);
         }
 
-        const facebookProducts: Product[] = activeCampaigns.map((campaign, index) => ({
-          id: `fb-campaign-${campaign.id}`,
-          name: campaign.name,
-          description: `Campanha ${campaign.status === 'ACTIVE' ? 'Ativa' : 'Pausada'} - ${getCampaignObjective(campaign.objective)}`,
-          category: 'Meta Ads',
-          clientId: clientName,
-          source: 'facebook' as const,
-          campaign: campaign
-        }));
+        // 🎯 Limpar cache de adsets e ads para garantir dados frescos
+        metaAdsService.clearCacheByType('adsets');
+        metaAdsService.clearCacheByType('ads');
+
+        const facebookProducts: Product[] = [];
+
+        for (const campaign of activeCampaigns) {
+          try {
+            // Buscar conjuntos de anúncio desta campanha específica
+            const adSets = await metaAdsService.getAdSets(campaign.id);
+            // Buscar anúncios desta campanha específica
+            const ads = await metaAdsService.getAds(undefined, campaign.id);
+
+            // Verificar condições de atividade real
+            const hasActiveAdSets = adSets.some(adSet => adSet.status === 'ACTIVE');
+            const hasActiveAds = ads.some(ad => ad.status === 'ACTIVE');
+            const isEffectivelyActive = campaign.status === 'ACTIVE' && hasActiveAdSets && hasActiveAds;
+            const campaignStatus = isEffectivelyActive ? 'ACTIVE' : 'PAUSED';
+
+            facebookProducts.push({
+              id: `fb-campaign-${campaign.id}`,
+              name: campaign.name,
+              description: `Campanha ${campaignStatus === 'ACTIVE' ? 'Ativa' : 'Pausada'} - ${getCampaignObjective(campaign.objective)}`,
+              category: 'Meta Ads',
+              clientId: clientName,
+              source: 'facebook' as const,
+              campaign: {
+                ...campaign,
+                status: campaignStatus
+              }
+            });
+          } catch (error) {
+            // Fallback: usar status original
+            facebookProducts.push({
+              id: `fb-campaign-${campaign.id}`,
+              name: campaign.name,
+              description: `Campanha ${campaign.status === 'ACTIVE' ? 'Ativa' : 'Pausada'} - ${getCampaignObjective(campaign.objective)}`,
+              category: 'Meta Ads',
+              clientId: clientName,
+              source: 'facebook' as const,
+              campaign: campaign
+            });
+          }
+        }
 
         setProducts(facebookProducts);
 

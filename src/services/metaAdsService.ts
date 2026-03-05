@@ -976,7 +976,7 @@ class MetaAdsService {
       try {
         const params: any = {
           access_token: this.user!.accessToken,
-          fields: 'id,name,status,created_time,updated_time,start_time,stop_time,targeting',
+          fields: 'id,name,status,created_time,updated_time,start_time,stop_time,targeting,campaign_id',
           limit: 100
         };
 
@@ -1808,6 +1808,29 @@ class MetaAdsService {
     // Limpar dados específicos do localStorage
     if (type === 'adsets') {
       localStorage.removeItem('metaAds_adsets');
+      // Limpar também caches de adsets por campanha específica
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('adsets_campaign_') || key.startsWith('metaAds_adsets'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+    }
+
+
+    if (type === 'ads') {
+      localStorage.removeItem('metaAds_ads');
+      // Limpar caches de ads por campanha/adset
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('metaAds_ads')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
     }
   }
 
