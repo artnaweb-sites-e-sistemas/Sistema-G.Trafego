@@ -1069,58 +1069,17 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
           </div>
         </div>
 
-        <div style="margin-bottom: 30px;">
-          <h3 style="color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 10px;">Análise Estratégica - Projeção de Resultados</h3>
-          ${metrics.strategyType === 'impulsionar_post' ? `
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
-            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6;">
-              <h4 style="color: #1f2937; margin: 0 0 10px 0;">Custo por Seguidor</h4>
-              <p style="color: #059669; font-size: 24px; font-weight: bold; margin: 0;">R$ ${((metrics.cpcMin + metrics.cpcMax) / 2).toFixed(2)}</p>
-            </div>
-            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #10b981;">
-              <h4 style="color: #1f2937; margin: 0 0 10px 0;">Seguidores Estimados</h4>
-              <p style="color: #059669; font-size: 24px; font-weight: bold; margin: 0;">${((metrics.clicksMin + metrics.clicksMax) / 2).toLocaleString()}</p>
-            </div>
-          </div>
-          ` : `
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
-            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6;">
-              <h4 style="color: #1f2937; margin: 0 0 10px 0;">${metrics.strategyType === 'whatsapp_direto' ? 'CPC Médio' : 'CPLPV Médio'}</h4>
-              <p style="color: #059669; font-size: 24px; font-weight: bold; margin: 0;">R$ ${((metrics.cpcMin + metrics.cpcMax) / 2).toFixed(2)}</p>
-            </div>
-            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #10b981;">
-              <h4 style="color: #1f2937; margin: 0 0 10px 0;">${metrics.strategyType === 'whatsapp_direto' ? 'Cliques Estimados' : 'Acessos Estimados'}</h4>
-              <p style="color: #059669; font-size: 24px; font-weight: bold; margin: 0;">${(metrics.strategyType === 'whatsapp_direto' ? (metrics.clicksMin + metrics.clicksMax) / 2 : (metrics.accessesMin + metrics.accessesMax) / 2).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
-            </div>
-            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b;">
-              <h4 style="color: #1f2937; margin: 0 0 10px 0;">${metrics.strategyType === 'whatsapp_direto' ? 'Chats Estimados' : 'Leads Estimados'}</h4>
-              <p style="color: #059669; font-size: 24px; font-weight: bold; margin: 0;">${(metrics.strategyType === 'whatsapp_direto' ? (metrics.whatsappChatsMin + metrics.whatsappChatsMax) / 2 : (metrics.leadsMin + metrics.leadsMax) / 2).toFixed(0)}</p>
-            </div>
-            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444;">
-              <h4 style="color: #1f2937; margin: 0 0 10px 0;">Vendas Estimadas</h4>
-              <p style="color: #059669; font-size: 24px; font-weight: bold; margin: 0;">${((metrics.salesMin + metrics.salesMax) / 2).toFixed(0)}</p>
-            </div>
-          </div>
-          
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
-            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #8b5cf6;">
-              <h4 style="color: #1f2937; margin: 0 0 10px 0;">ROI Estimado</h4>
-              <p style="color: #059669; font-size: 24px; font-weight: bold; margin: 0;">${((metrics.roiMin + metrics.roiMax) / 2).toFixed(1)}x</p>
-            </div>
-            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #06b6d4;">
-              <h4 style="color: #1f2937; margin: 0 0 10px 0;">Receita Potencial</h4>
-              <p style="color: #059669; font-size: 24px; font-weight: bold; margin: 0;">R$ ${((metrics.revenueMin + metrics.revenueMax) / 2).toLocaleString()}</p>
-            </div>
-          </div>
-          `}
-        </div>
-        
-        <div style="page-break-inside: avoid; margin-bottom: 20px; padding: 16px 0; border-top: 1px solid #e2e8f0;">
-          <h3 style="color: #1e293b; font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #374151;">Análise Completa</h3>
-          <div style="color: #475569; line-height: 1.6; font-size: 13px;">
-${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não disponível'}
+          <div style="margin-top: 20px;">
+            <!-- Eliminar métricas estimadas conforme pedido pelo usuário -->
           </div>
         </div>
+
+  <div style="page-break-inside: avoid; margin-bottom: 20px; padding: 16px 0; border-top: 1px solid #e2e8f0;">
+    <h3 style="color: #1e293b; font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #374151;">Análise Completa</h3>
+    <div style="color: #475569; line-height: 1.6; font-size: 13px;">
+      ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não disponível'}
+    </div>
+  </div>
         
         ${strategy.budgetItems && strategy.budgetItems.length > 0 && strategy.budgetItems.some(item => item.service.trim() !== '') ? `
         <div style="page-break-inside: avoid; margin-bottom: 30px;">
@@ -1153,13 +1112,14 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
             </table>
           </div>
         </div>
-        ` : ''}
-        
-        <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px;">
-          Relatório gerado automaticamente com base nos dados da estratégia
-        </div>
-      </div>
-    `;
+        ` : ''
+      }
+
+<div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px;">
+  Relatório gerado automaticamente com base nos dados da estratégia
+</div>
+      </div >
+  `;
 
     // Configurações do PDF
     const opt = {
@@ -1356,7 +1316,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
   const generateNames = () => {
     if (!currentStrategy.product?.name || !currentStrategy.product?.campaignType || !currentStrategy.product?.objective) return;
 
-    const productName = `[${currentStrategy.product.name} ${currentStrategy.product.type}] [${currentStrategy.product.campaignType === 'sazonal' ? 'sazonal' : 'recorrente'}] [${currentStrategy.product.objective === 'trafico' ? 'tráfego' : currentStrategy.product.objective === 'mensagens' ? 'mensagens' : currentStrategy.product.objective === 'captura_leads' ? 'captura de leads' : 'compras'}]`;
+    const productName = `[${currentStrategy.product.name} ${currentStrategy.product.type}][${currentStrategy.product.campaignType === 'sazonal' ? 'sazonal' : 'recorrente'}][${currentStrategy.product.objective === 'trafico' ? 'tráfego' : currentStrategy.product.objective === 'mensagens' ? 'mensagens' : currentStrategy.product.objective === 'captura_leads' ? 'captura de leads' : 'compras'}]`;
 
     // Construir a nomenclatura do público
     const gender = currentStrategy.audience?.gender === 'homem' ? 'homens' : currentStrategy.audience?.gender === 'mulher' ? 'mulheres' : 'ambos os sexos';
@@ -1367,7 +1327,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
     const scaleType = currentStrategy.audience?.scaleType;
 
     // Construir a nomenclatura do público
-    let audienceName = `[${gender}] [${ageRange}]`;
+    let audienceName = `[${gender}][${ageRange}]`;
 
     // Adicionar localização se houver
     if (locations.length > 0) {
@@ -1606,7 +1566,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
 
               return insights;
             } catch (error) {
-              console.error(`❌ DEBUG - Erro ao buscar insights para "${ad.name}":`, error);
+              console.error(`❌ DEBUG - Erro ao buscar insights para "${ad.name}": `, error);
               return [];
             }
           })
@@ -1709,7 +1669,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                 const insights = await metaAdsService.getAdSetInsights(ad.id, startDate, endDate, { fallbackToLast30Days: false });
                 return insights;
               } catch (error) {
-                console.error(`❌ DEBUG - Erro ao buscar insights para remarketing "${ad.name}":`, error);
+                console.error(`❌ DEBUG - Erro ao buscar insights para remarketing "${ad.name}": `, error);
                 return [];
               }
             })
@@ -1934,7 +1894,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
 
               return insights;
             } catch (error) {
-              console.error(`❌ DEBUG - Erro ao buscar insights para "${ad.name}":`, error);
+              console.error(`❌ DEBUG - Erro ao buscar insights para "${ad.name}": `, error);
               return [];
             }
           })
@@ -2065,7 +2025,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
       if (!hasMinimumData) {
         rec = {
           type: 'wait',
-          tooltip: `Dados insuficientes: ${totals.impressions} impressões, ${totals.clicks} cliques. Mínimo: 3.000 impressões e 100 cliques ou gasto ≥ 2× CPA/CPL alvo.`
+          tooltip: `Dados insuficientes: ${totals.impressions} impressões, ${totals.clicks} cliques.Mínimo: 3.000 impressões e 100 cliques ou gasto ≥ 2× CPA / CPL alvo.`
         };
       } else {
         // REGRA 2: Validar estabilidade (média móvel de 3-7 dias)
@@ -2091,7 +2051,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
             } else if (okCPL && ctr >= 1.0 && frequency <= 2.5) {
               rec = {
                 type: 'horizontal',
-                tooltip: `Bom desempenho: CTR ${ctr.toFixed(2)}%, CPL ${formatCurrencyNumber(perfValue)}, freq ${frequency.toFixed(1)}. Teste novos criativos/públicos (escala horizontal).`
+                tooltip: `Bom desempenho: CTR ${ctr.toFixed(2)}%, CPL ${formatCurrencyNumber(perfValue)}, freq ${frequency.toFixed(1)}. Teste novos criativos / públicos(escala horizontal).`
               };
             } else {
               rec = {
@@ -2112,7 +2072,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
             } else if (okCPL && ctr >= 1.0 && frequency <= 3.0) {
               rec = {
                 type: 'horizontal',
-                tooltip: `Bom desempenho: CTR ${ctr.toFixed(2)}%, CPC ${formatCurrencyNumber(perfValue)}, freq ${frequency.toFixed(1)}. Teste novos criativos/públicos (escala horizontal).`
+                tooltip: `Bom desempenho: CTR ${ctr.toFixed(2)}%, CPC ${formatCurrencyNumber(perfValue)}, freq ${frequency.toFixed(1)}. Teste novos criativos / públicos(escala horizontal).`
               };
             } else {
               rec = {
@@ -2130,17 +2090,17 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
           if (salesEnough && cpr > 0 && cpr <= targetCPA && roas >= targetROAS && frequencyOk && hasStableData) {
             rec = {
               type: 'vertical',
-              tooltip: `Compras consistentes: CPR ${formatCurrencyNumber(cpr)}, ROAS ${roas.toFixed(2)}x, ${totals.sales} vendas, freq ${frequency.toFixed(1)}. Escale orçamento (vertical).`
+              tooltip: `Compras consistentes: CPR ${formatCurrencyNumber(cpr)}, ROAS ${roas.toFixed(2)} x, ${totals.sales} vendas, freq ${frequency.toFixed(1)}. Escale orçamento(vertical).`
             };
           } else if (cpr > 0 && cpr <= targetCPA * 1.3 && roas >= targetROAS * 0.8 && frequency <= 3.0) {
             rec = {
               type: 'horizontal',
-              tooltip: `Algumas compras: CPR ${formatCurrencyNumber(cpr)}, ROAS ${roas.toFixed(2)}x. Expandir públicos/criativos (horizontal).`
+              tooltip: `Algumas compras: CPR ${formatCurrencyNumber(cpr)}, ROAS ${roas.toFixed(2)} x.Expandir públicos / criativos(horizontal).`
             };
           } else {
             rec = {
               type: 'wait',
-              tooltip: `Pouca sinalização de compras ou métricas fora do alvo: CPR ${formatCurrencyNumber(cpr)}, ROAS ${roas.toFixed(2)}x, ${totals.sales} vendas, freq ${frequency.toFixed(1)}.`
+              tooltip: `Pouca sinalização de compras ou métricas fora do alvo: CPR ${formatCurrencyNumber(cpr)}, ROAS ${roas.toFixed(2)} x, ${totals.sales} vendas, freq ${frequency.toFixed(1)}.`
             };
           }
         } else if (objective === 'captura_leads') {
@@ -2151,12 +2111,12 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
           if (leadsEnough && cplStrict > 0 && cplStrict <= targetCPL && ctr >= 1.5 && frequencyOk && hasStableData) {
             rec = {
               type: 'vertical',
-              tooltip: `Captura de leads eficiente: CPL ${formatCurrencyNumber(cplStrict)}, ${totals.leads} leads, CTR ${ctr.toFixed(2)}%, freq ${frequency.toFixed(1)}. Escale orçamento (vertical).`
+              tooltip: `Captura de leads eficiente: CPL ${formatCurrencyNumber(cplStrict)}, ${totals.leads} leads, CTR ${ctr.toFixed(2)}%, freq ${frequency.toFixed(1)}. Escale orçamento(vertical).`
             };
           } else if (cplStrict > 0 && cplStrict <= targetCPL * 1.3 && ctr >= 1.0 && frequency <= 3.0) {
             rec = {
               type: 'horizontal',
-              tooltip: `Boa captura de leads: CPL ${formatCurrencyNumber(cplStrict)}, ${totals.leads} leads, CTR ${ctr.toFixed(2)}%. Teste novos criativos/públicos (horizontal).`
+              tooltip: `Boa captura de leads: CPL ${formatCurrencyNumber(cplStrict)}, ${totals.leads} leads, CTR ${ctr.toFixed(2)}%.Teste novos criativos / públicos(horizontal).`
             };
           } else {
             rec = {
@@ -2253,7 +2213,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
 
 
     const result = filtered.reduce((acc, strategy) => {
-      const productKey = `${strategy.product.name}-${strategy.product.campaignType}`;
+      const productKey = `${strategy.product.name} -${strategy.product.campaignType} `;
       if (!acc[productKey]) {
         acc[productKey] = {
           name: strategy.product.name,
@@ -2617,10 +2577,10 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                       <button
                                         onClick={() => handleNewYellowIcon(strategy)}
                                         disabled={!canCreateMoreRemarketing(strategy)}
-                                        className={`p-1.5 rounded-lg transition-all duration-200 ${canCreateMoreRemarketing(strategy)
-                                          ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-500/30 hover:scale-110'
-                                          : 'text-slate-500 cursor-not-allowed opacity-50'
-                                          }`}
+                                        className={`p - 1.5 rounded - lg transition - all duration - 200 ${canCreateMoreRemarketing(strategy)
+                                            ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-500/30 hover:scale-110'
+                                            : 'text-slate-500 cursor-not-allowed opacity-50'
+                                          } `}
                                       >
                                         🎯
                                       </button>
@@ -2638,7 +2598,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                         <span className="text-xs text-slate-300 font-semibold uppercase tracking-wide block mb-2">Campanha</span>
                                         <div className="relative">
                                           <div
-                                            onClick={() => copyToClipboard(strategy.generatedNames.product, `product-${strategy.id}`)}
+                                            onClick={() => copyToClipboard(strategy.generatedNames.product, `product - ${strategy.id} `)}
                                             className="bg-gradient-to-r from-slate-700/50 to-slate-800/50 rounded-lg px-4 py-3 border border-slate-600/30 cursor-pointer hover:border-slate-500/50 hover:bg-gradient-to-r hover:from-slate-700/60 hover:to-slate-800/60 transition-all duration-200 group"
                                           >
                                             <div className="flex items-center justify-between">
@@ -2647,7 +2607,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                             </div>
                                           </div>
                                           <AnimatePresence>
-                                            {copiedStates.has(`product-${strategy.id}`) && (
+                                            {copiedStates.has(`product - ${strategy.id} `) && (
                                               <motion.div
                                                 initial={{ opacity: 0, y: -10, scale: 0.8 }}
                                                 animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -2669,7 +2629,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                         <span className="text-xs text-slate-300 font-semibold uppercase tracking-wide block mb-2">Público</span>
                                         <div className="relative">
                                           <div
-                                            onClick={() => copyToClipboard(strategy.generatedNames.audience, `audience-${strategy.id}`)}
+                                            onClick={() => copyToClipboard(strategy.generatedNames.audience, `audience - ${strategy.id} `)}
                                             className="bg-gradient-to-r from-slate-700/50 to-slate-800/50 rounded-lg px-4 py-3 border border-slate-600/30 cursor-pointer hover:border-slate-500/50 hover:bg-gradient-to-r hover:from-slate-700/60 hover:to-slate-800/60 transition-all duration-200 group"
                                           >
                                             <div className="flex items-center justify-between">
@@ -2680,7 +2640,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                             </div>
                                           </div>
                                           <AnimatePresence>
-                                            {copiedStates.has(`audience-${strategy.id}`) && (
+                                            {copiedStates.has(`audience - ${strategy.id} `) && (
                                               <motion.div
                                                 initial={{ opacity: 0, y: -10, scale: 0.8 }}
                                                 animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -2728,13 +2688,13 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                           })()}
                                           <div className="flex items-center gap-1 relative group/sync">
                                             <div
-                                              className={`w-2 h-2 rounded-full ${getCurrentPeriodSyncStatus(strategy) ? 'bg-blue-500 animate-pulse' : 'bg-red-500 animate-pulse'} cursor-help`}
+                                              className={`w - 2 h - 2 rounded - full ${getCurrentPeriodSyncStatus(strategy) ? 'bg-blue-500 animate-pulse' : 'bg-red-500 animate-pulse'} cursor - help`}
                                               onMouseEnter={(e) => {
                                                 const rect = e.currentTarget.getBoundingClientRect();
                                                 const tooltip = e.currentTarget.parentElement?.querySelector('.tooltip-sync') as HTMLElement;
                                                 if (tooltip) {
-                                                  tooltip.style.left = `${rect.left - 260}px`;
-                                                  tooltip.style.top = `${rect.top - 30}px`;
+                                                  tooltip.style.left = `${rect.left - 260} px`;
+                                                  tooltip.style.top = `${rect.top - 30} px`;
                                                   tooltip.style.display = 'block';
                                                 }
                                               }}
@@ -2783,11 +2743,11 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
 
                                           return (
                                             <div
-                                              className={`h-2.5 rounded-full transition-all duration-500 shadow-sm ${isPaused
-                                                ? 'bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 animate-pulse'
-                                                : 'bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500'
-                                                }`}
-                                              style={{ width: `${progressPercentage}%` }}
+                                              className={`h - 2.5 rounded - full transition - all duration - 500 shadow - sm ${isPaused
+                                                  ? 'bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 animate-pulse'
+                                                  : 'bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500'
+                                                } `}
+                                              style={{ width: `${progressPercentage}% ` }}
                                             />
                                           );
                                         })()}
@@ -2812,108 +2772,8 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                             </div>
                                           </div>
 
-                                          {/* Métricas em Cards - Primeira Linha */}
-                                          {(() => {
-                                            const metrics = strategy.strategyReport.metrics;
-                                            const avgCpc = (metrics.cpcMin + metrics.cpcMax) / 2;
-                                            const expClicks = Math.floor(strategy.budget.planned / avgCpc);
+                                          {/* Eliminar métricas estimadas conforme pedido pelo usuário */}
 
-                                            const avgLpToLead = (metrics.conv.lpToLeadMin + metrics.conv.lpToLeadMax) / 2;
-                                            const expLeads = Math.floor(expClicks * avgLpToLead);
-
-                                            const avgLeadToSale = (metrics.conv.leadToSaleMin + metrics.conv.leadToSaleMax) / 2;
-                                            const expSalesLp = Math.floor(expLeads * avgLeadToSale);
-
-                                            const avgWppChat = (metrics.conv.whatsappChatMin + metrics.conv.whatsappChatMax) / 2;
-                                            const expWppChats = Math.floor(expClicks * avgWppChat);
-
-                                            const avgWppSale = (metrics.conv.whatsappSaleMin + metrics.conv.whatsappSaleMax) / 2;
-                                            const expSalesWpp = Math.floor(expWppChats * avgWppSale);
-
-                                            const avgDirectSale = (metrics.conv.directSaleMin + metrics.conv.directSaleMax) / 2;
-                                            const expSalesDirect = Math.floor(expClicks * avgDirectSale);
-
-                                            return metrics.strategyType === 'impulsionar_post' ? (
-                                              <div className="grid grid-cols-2 gap-2">
-                                                <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
-                                                  <div className="text-xs text-slate-400 mb-1.5 font-medium">Custo p/ Seguidor</div>
-                                                  <div className="text-sm font-semibold text-slate-200">
-                                                    {avgCpc.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 })}
-                                                  </div>
-                                                  <div className="text-xs text-slate-500 mt-1">Estimativa de Custo</div>
-                                                </div>
-                                                <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
-                                                  <div className="text-xs text-slate-400 mb-1.5 font-medium">Seguidores Est.</div>
-                                                  <div className="text-sm font-semibold text-slate-200">
-                                                    {expClicks.toLocaleString('pt-BR')}
-                                                  </div>
-                                                  <div className="text-xs text-slate-500 mt-1">Novos Seguidores</div>
-                                                </div>
-                                              </div>
-                                            ) : (
-                                              <div className="grid grid-cols-4 gap-2">
-                                                <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
-                                                  <div className="text-xs text-slate-400 mb-1.5 font-medium">
-                                                    {metrics.strategyType === 'whatsapp_direto' ? 'CPC Médio' : 'CPLPV Médio'}
-                                                  </div>
-                                                  <div className="text-sm font-semibold text-slate-200">
-                                                    {avgCpc.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 })}
-                                                  </div>
-                                                  <div className="text-xs text-slate-500 mt-1">
-                                                    {metrics.strategyType === 'whatsapp_direto' ? 'Custo por Clique' : 'Custo p/ Visita à pág'}
-                                                  </div>
-                                                </div>
-                                                <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
-                                                  <div className="text-xs text-slate-400 mb-1.5 font-medium">
-                                                    {metrics.strategyType === 'whatsapp_direto' ? 'Cliques Est.' : 'Acessos Est.'}
-                                                  </div>
-                                                  <div className="text-sm font-semibold text-slate-200">
-                                                    {expClicks.toLocaleString('pt-BR')}
-                                                  </div>
-                                                  <div className="text-xs text-slate-500 mt-1">
-                                                    {metrics.strategyType === 'whatsapp_direto' ? 'Cliques → Chats' : 'Acessos → Leads'}
-                                                  </div>
-                                                </div>
-                                                <div className={`bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md ${metrics.strategyType === 'lp_direto' ? 'opacity-40' : ''}`}>
-                                                  <div className="text-xs text-slate-400 mb-1.5 font-medium">
-                                                    {metrics.strategyType === 'whatsapp_direto' ? 'Chats Est.' :
-                                                      metrics.strategyType === 'lp_direto' ? 'Leads Est.' : 'Leads Est.'}
-                                                  </div>
-                                                  <div className="text-sm font-semibold text-slate-200">
-                                                    {metrics.strategyType === 'whatsapp_direto'
-                                                      ? expWppChats.toLocaleString('pt-BR')
-                                                      : metrics.strategyType === 'lp_direto'
-                                                        ? `0`
-                                                        : expLeads.toLocaleString('pt-BR')
-                                                    }
-                                                  </div>
-                                                  <div className="text-xs text-slate-500 mt-1">
-                                                    {metrics.strategyType === 'whatsapp_direto' ?
-                                                      `${(avgWppChat * 100).toFixed(1)}%` :
-                                                      metrics.strategyType === 'lp_direto' ? '0%' :
-                                                        `${(avgLpToLead * 100).toFixed(1)}%`}
-                                                  </div>
-                                                </div>
-                                                <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
-                                                  <div className="text-xs text-slate-400 mb-1.5 font-medium">
-                                                    {metrics.strategyType === 'lp_direto' ? 'Vendas Est.' : 'Vendas Est.'}
-                                                  </div>
-                                                  <div className="text-sm font-semibold text-slate-200">
-                                                    {metrics.strategyType === 'whatsapp_direto' ? expSalesWpp.toLocaleString('pt-BR') :
-                                                      metrics.strategyType === 'lp_direto' ? expSalesDirect.toLocaleString('pt-BR') :
-                                                        expSalesLp.toLocaleString('pt-BR')}
-                                                  </div>
-                                                  <div className="text-xs text-slate-500 mt-1">
-                                                    {metrics.strategyType === 'whatsapp_direto' ?
-                                                      `${(avgWppSale * 100).toFixed(1)}%` :
-                                                      metrics.strategyType === 'lp_direto' ?
-                                                        `${(avgDirectSale * 100).toFixed(1)}%` :
-                                                        `${(avgLeadToSale * 100).toFixed(1)}%`}
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            );
-                                          })()}
 
 
 
@@ -2952,7 +2812,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                           {[strategy.remarketing1, strategy.remarketing2, strategy.remarketing3].map((remarketing, index) => {
                                             if (!remarketing) return null;
                                             const remarketingNumber = index + 1; // remarketing1, remarketing2, remarketing3
-                                            const remarketingKey = `remarketing${remarketingNumber}` as 'remarketing1' | 'remarketing2' | 'remarketing3';
+                                            const remarketingKey = `remarketing${remarketingNumber} ` as 'remarketing1' | 'remarketing2' | 'remarketing3';
 
                                             return (
                                               <div key={remarketingKey} className="space-y-3">
@@ -2972,7 +2832,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                                   </div>
                                                   <div className="relative">
                                                     <div
-                                                      onClick={() => copyToClipboard(remarketing.audienceName, `${remarketingKey}-${strategy.id}`)}
+                                                      onClick={() => copyToClipboard(remarketing.audienceName, `${remarketingKey} -${strategy.id} `)}
                                                       className="bg-gradient-to-r from-amber-700/50 to-yellow-800/50 rounded-lg px-4 py-3 border border-amber-600/30 cursor-pointer hover:border-amber-500/50 hover:bg-gradient-to-r hover:from-amber-700/60 hover:to-yellow-800/60 transition-all duration-200 group"
                                                     >
                                                       <div className="flex items-center justify-between">
@@ -2981,7 +2841,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                                       </div>
                                                     </div>
                                                     <AnimatePresence>
-                                                      {copiedStates.has(`${remarketingKey}-${strategy.id}`) && (
+                                                      {copiedStates.has(`${remarketingKey} -${strategy.id} `) && (
                                                         <motion.div
                                                           initial={{ opacity: 0, y: -10, scale: 0.8 }}
                                                           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -3019,7 +2879,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                                         </div>
                                                         <div className="flex items-center gap-1 relative group/sync">
                                                           <div
-                                                            className={`w-2 h-2 rounded-full ${getCurrentPeriodRemarketingSyncStatus(strategy, remarketingKey) ? 'bg-blue-500 animate-pulse' : 'bg-red-500 animate-pulse'} cursor-help`}
+                                                            className={`w - 2 h - 2 rounded - full ${getCurrentPeriodRemarketingSyncStatus(strategy, remarketingKey) ? 'bg-blue-500 animate-pulse' : 'bg-red-500 animate-pulse'} cursor - help`}
                                                           />
                                                         </div>
                                                       </div>
@@ -3034,11 +2894,11 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
 
                                                       return (
                                                         <div
-                                                          className={`h-2.5 rounded-full transition-all duration-500 shadow-sm ${isPaused
-                                                            ? 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 animate-pulse'
-                                                            : 'bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600'
-                                                            }`}
-                                                          style={{ width: `${progressPercentage}%` }}
+                                                          className={`h - 2.5 rounded - full transition - all duration - 500 shadow - sm ${isPaused
+                                                              ? 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 animate-pulse'
+                                                              : 'bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600'
+                                                            } `}
+                                                          style={{ width: `${progressPercentage}% ` }}
                                                         />
                                                       );
                                                     })()}
@@ -3384,10 +3244,10 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                 }))}
                                 className="sr-only"
                               />
-                              <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${!currentStrategy.audience?.scaleType
-                                ? 'border-yellow-400 bg-yellow-400'
-                                : 'border-yellow-500/40'
-                                }`}>
+                              <div className={`w - 4 h - 4 rounded - full border - 2 mr - 3 flex items - center justify - center ${!currentStrategy.audience?.scaleType
+                                  ? 'border-yellow-400 bg-yellow-400'
+                                  : 'border-yellow-500/40'
+                                } `}>
                                 {!currentStrategy.audience?.scaleType && (
                                   <div className="w-2 h-2 rounded-full bg-slate-800"></div>
                                 )}
@@ -3410,10 +3270,10 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                 }))}
                                 className="sr-only"
                               />
-                              <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${currentStrategy.audience?.scaleType === 'vertical'
-                                ? 'border-yellow-400 bg-yellow-400'
-                                : 'border-yellow-500/40'
-                                }`}>
+                              <div className={`w - 4 h - 4 rounded - full border - 2 mr - 3 flex items - center justify - center ${currentStrategy.audience?.scaleType === 'vertical'
+                                  ? 'border-yellow-400 bg-yellow-400'
+                                  : 'border-yellow-500/40'
+                                } `}>
                                 {currentStrategy.audience?.scaleType === 'vertical' && (
                                   <div className="w-2 h-2 rounded-full bg-slate-800"></div>
                                 )}
@@ -3436,10 +3296,10 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                 }))}
                                 className="sr-only"
                               />
-                              <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${currentStrategy.audience?.scaleType === 'horizontal'
-                                ? 'border-yellow-400 bg-yellow-400'
-                                : 'border-yellow-500/40'
-                                }`}>
+                              <div className={`w - 4 h - 4 rounded - full border - 2 mr - 3 flex items - center justify - center ${currentStrategy.audience?.scaleType === 'horizontal'
+                                  ? 'border-yellow-400 bg-yellow-400'
+                                  : 'border-yellow-500/40'
+                                } `}>
                                 {currentStrategy.audience?.scaleType === 'horizontal' && (
                                   <div className="w-2 h-2 rounded-full bg-slate-800"></div>
                                 )}
@@ -3461,7 +3321,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                           </div>
                           <h3 className="text-lg font-semibold text-emerald-200">Orçamento</h3>
                         </div>
-                        <div className={`grid grid-cols-1 ${currentStrategy.product?.type !== 'sem_produto' ? 'md:grid-cols-2' : ''} gap-4`}>
+                        <div className={`grid grid - cols - 1 ${currentStrategy.product?.type !== 'sem_produto' ? 'md:grid-cols-2' : ''} gap - 4`}>
                           <div>
                             <label className="block text-sm font-medium text-emerald-300 mb-2">Investimento disponível (mês)</label>
                             <div className="relative">
@@ -3758,7 +3618,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                         if (customAgeFrom && customAgeTo &&
                           parseInt(customAgeFrom) >= 13 && parseInt(customAgeTo) <= 65 &&
                           parseInt(customAgeFrom) < parseInt(customAgeTo)) {
-                          const ageRange = `${customAgeFrom}-${customAgeTo}`;
+                          const ageRange = `${customAgeFrom} -${customAgeTo} `;
                           setCurrentStrategy(prev => ({
                             ...prev,
                             audience: { ...prev.audience!, ageRange }

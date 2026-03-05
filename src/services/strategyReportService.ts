@@ -47,8 +47,6 @@ interface Inputs {
 interface Sections {
   opcoesEstrategia: string;
   estrategiaRecomendada: string;
-  resultadosEsperados: string;
-  retornoEstimado: string;
   margemRisco: string;
   proximosPassos: string;
 }
@@ -85,9 +83,6 @@ export interface StrategyReportOutput {
 // ---------- Utilidades ----------
 const brl = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-const pct = (v: number) =>
-  (v * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%";
 
 const round = (n: number) => Math.round(n);
 
@@ -299,7 +294,7 @@ function renderEstrategiaRecomendada(campaignType: CampaignType, productType: Pr
       ? "Vender dentro do período definido (campanha com urgência)."
       : (ticketBand === "baixo" ? "Escalar em volume com custo controlado." : "Gerar leads qualificados de forma contínua.");
 
-  let publico = "Segmentação por interesses relevantes, lookalike (quando disponível) e remarketing.";
+  let publico = "Segmentação por interesses relevantes, lookalike e remarketing.";
   if (productType === "servico presencial") publico = "Segmentação local/regional + interesses específicos + remarketing.";
   if (productType === "retiro imersao congresso") publico = "Público premium (yoga, bem-estar, viagens), lookalike de compradores e remarketing.";
   if (["imovel investimento"].includes(productType)) publico = "Segmentação premium e critérios demográficos/afinidade + remarketing forte.";
@@ -311,22 +306,22 @@ function renderEstrategiaRecomendada(campaignType: CampaignType, productType: Pr
 
   if (strategyType === "impulsionar_post") {
     objetivo = "Crescimento de audiência e atração de novos seguidores.";
-    publico = "Base aberta, lookalike de engajamento ou interesses amplos. Sem remarketing.";
-    topo = "Impulsionamento de Reels/Carrossel com alto engajamento.";
-    meio = "Não se aplica (foco em volume de seguidores).";
-    fundo = "Não se aplica (sem remarketing nesta estratégia).";
+    publico = "Base aberta, lookalike de engajamento ou interesses amplos sem remarketing.";
+    topo = "Impulsionamento de Reels e Carrossel com alto engajamento.";
+    meio = "Não se aplica - foco em volume de seguidores.";
+    fundo = "Não se aplica - sem remarketing nesta estratégia.";
     comunicacao = "Conteúdo de topo de funil, viral, gatilhos de curiosidade, 'Siga para mais'.";
   } else if (strategyType === "lp_whatsapp") {
     // LP → WhatsApp
     if (ticketBand === "alto") {
-      topo = "Criativos inspiracionais (vídeo/fotos, depoimentos) para tráfego à LP.";
+      topo = "Criativos inspiracionais para tráfego à LP.";
       meio = "LP educa e filtra; contato via WhatsApp/call para tirar objeções.";
       fundo = "Remarketing com escassez, depoimentos e bastidores.";
       comunicacao = "Exclusividade, transformação, vagas limitadas.";
     } else if (ticketBand === "baixo") {
-      topo = "Anúncio direto para oferta (benefício/preço).";
+      topo = "Anúncio direto para oferta.";
       meio = "LP simples + direcionamento ao WhatsApp.";
-      fundo = "Remarketing simples (carrinho/visita sem compra).";
+      fundo = "Remarketing simples.";
       comunicacao = "Oferta clara, urgência e prova social objetiva.";
     } else {
       // Ticket médio
@@ -338,14 +333,14 @@ function renderEstrategiaRecomendada(campaignType: CampaignType, productType: Pr
   } else if (strategyType === "whatsapp_direto") {
     // WhatsApp Direto
     if (ticketBand === "alto") {
-      topo = "Criativos que geram interesse imediato (vídeo curto, benefício claro).";
+      topo = "Criativos que geram interesse imediato.";
       meio = "Link direto para WhatsApp; atendimento qualificado.";
       fundo = "Remarketing com escassez e depoimentos.";
       comunicacao = "Exclusividade, transformação, atendimento personalizado.";
     } else if (ticketBand === "baixo") {
-      topo = "Anúncio direto para oferta (benefício/preço).";
+      topo = "Anúncio direto para oferta.";
       meio = "Link direto para WhatsApp; atendimento rápido.";
-      fundo = "Remarketing simples (visita sem contato).";
+      fundo = "Remarketing simples.";
       comunicacao = "Oferta clara, urgência e prova social objetiva.";
     } else {
       // Ticket médio
@@ -357,14 +352,14 @@ function renderEstrategiaRecomendada(campaignType: CampaignType, productType: Pr
   } else {
     // LP Direto (Checkout)
     if (ticketBand === "alto") {
-      topo = "Criativos inspiracionais (vídeo/fotos, depoimentos) para tráfego à LP.";
+      topo = "Criativos inspiracionais para tráfego à LP.";
       meio = "LP educa e converte; checkout otimizado.";
       fundo = "Remarketing com escassez e depoimentos.";
       comunicacao = "Exclusividade, transformação, processo simplificado.";
     } else if (ticketBand === "baixo") {
-      topo = "Anúncio direto para oferta (benefício/preço).";
+      topo = "Anúncio direto para oferta.";
       meio = "LP/checkout simplificado e otimizado.";
-      fundo = "Remarketing simples (carrinho abandonado).";
+      fundo = "Remarketing simples.";
       comunicacao = "Oferta clara, urgência e prova social objetiva.";
     } else {
       // Ticket médio
@@ -491,63 +486,7 @@ export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
   const opcoesEstrategia = renderOpcoesEstrategia(finalStrategyType, objective);
   const estrategiaRecomendada = renderEstrategiaRecomendada(campaignType, productType, ticketBand, finalStrategyType);
 
-  // Calculate correct geometric averages for the markdown text
-  const avgCpc = (cpc.max + cpc.min) / 2;
-  const expClicks = Math.floor(investmentBRL / avgCpc);
-
-  const avgLpToLead = (conv.lpToLeadMin + conv.lpToLeadMax) / 2;
-  const expLeads = Math.floor(expClicks * avgLpToLead);
-
-  const avgLeadToSale = (conv.leadToSaleMin + conv.leadToSaleMax) / 2;
-  const expSalesLp = Math.floor(expLeads * avgLeadToSale);
-
-  const avgWppChat = (conv.whatsappChatMin + conv.whatsappChatMax) / 2;
-  const expWppChats = Math.floor(expClicks * avgWppChat);
-
-  const avgWppSale = (conv.whatsappSaleMin + conv.whatsappSaleMax) / 2;
-  const expSalesWpp = Math.floor(expWppChats * avgWppSale);
-
-  const avgDirectSale = (conv.directSaleMin + conv.directSaleMax) / 2;
-  const expSalesDirect = Math.floor(expClicks * avgDirectSale);
-
-  // Gerar resultados esperados baseados na estratégia
-  let resultadosEsperados = finalStrategyType === "whatsapp_direto"
-    ? `## Resultados Esperados\n- **CPC médio:** ${brl(avgCpc)}`
-    : `## Resultados Esperados\n- **CPLPV médio:** ${brl(avgCpc)}`;
-
-  if (finalStrategyType === "impulsionar_post") {
-    resultadosEsperados = `## Resultados Esperados
-- **Custo por seguidor:** ${brl(avgCpc)}
-- **Seguidores estimados:** ${expClicks.toLocaleString("pt-BR")} novos seguidores`;
-  } else if (finalStrategyType === "lp_whatsapp") {
-    if (objective === 'captura_leads') {
-      resultadosEsperados += `
-- **Visitas estimadas:** ${expClicks.toLocaleString("pt-BR")}
-- **Acessos à LP:** ${expClicks.toLocaleString("pt-BR")}
-- **Conversão LP → Lead (Formulário):** ${pct(avgLpToLead)} → **${expLeads.toLocaleString("pt-BR")} leads**`;
-    } else {
-      resultadosEsperados += `
-- **Visitas estimadas:** ${expClicks.toLocaleString("pt-BR")}
-- **Acessos à LP:** ${expClicks.toLocaleString("pt-BR")}
-- **Conversão LP → Lead:** ${pct(avgLpToLead)} → **${expLeads.toLocaleString("pt-BR")} leads**
-- **Conversão Lead → Venda:** ${pct(avgLeadToSale)} → **${expSalesLp.toLocaleString("pt-BR")} vendas**`;
-    }
-  } else if (finalStrategyType === "whatsapp_direto") {
-    resultadosEsperados += `
-- **Cliques estimados:** ${expClicks.toLocaleString("pt-BR")}
-- **Conversão Clique → Chat:** ${pct(avgWppChat)} → **${expWppChats.toLocaleString("pt-BR")} chats**
-- **Conversão Chat → Venda:** ${pct(avgWppSale)} → **${expSalesWpp.toLocaleString("pt-BR")} vendas**`;
-  } else { // lp_direto
-    resultadosEsperados += `
-- **Visitas estimadas:** ${expClicks.toLocaleString("pt-BR")}
-- **Acessos à LP:** ${expClicks.toLocaleString("pt-BR")}
-- **Conversão LP → Venda direta:** ${pct(avgDirectSale)} → **${expSalesDirect.toLocaleString("pt-BR")} vendas**`;
-  }
-
-  const retornoEstimado = isGrowth ? '' :
-    `## Retorno Estimado
-- **Receita potencial:** ${brl((revenueMin + revenueMax) / 2)}
-- **ROI estimado:** ${((roiMin + roiMax) / 2).toFixed(1)}x`;
+  // Resultados esperados e retorno estimado removidos conforme pedido do usuário
 
   // Margem de Risco personalizada por múltiplos fatores
   const getPersonalizedRiskLevel = () => {
@@ -690,8 +629,6 @@ export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
     "# Relatório Estratégico de Campanha",
     opcoesEstrategia,
     estrategiaRecomendada,
-    resultadosEsperados,
-    retornoEstimado,
     "## Nível de Risco / Observações",
     `- **${riskLevel.split(' - ')[0]}**${riskLevel.includes(' - ') ? ' - ' + riskLevel.split(' - ').slice(1).join(' - ') : ''}
 - **Fatores críticos:** ${getPersonalizedCriticalFactors()}`,
@@ -730,8 +667,6 @@ export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
     sections: {
       opcoesEstrategia,
       estrategiaRecomendada,
-      resultadosEsperados,
-      retornoEstimado,
       margemRisco,
       proximosPassos
     },
