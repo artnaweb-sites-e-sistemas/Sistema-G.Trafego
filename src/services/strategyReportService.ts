@@ -18,17 +18,19 @@ type ProductType =
   | "assinatura clube"
   | "ecommerce baixo medio"
   | "ecommerce alto"
-  | "imovel investimento";
+  | "imovel investimento"
+  | "sem_produto";
 
 type TicketBand = "baixo" | "medio" | "alto";
 
-type StrategyType = "lp_whatsapp" | "whatsapp_direto" | "lp_direto";
+type StrategyType = "lp_whatsapp" | "whatsapp_direto" | "lp_direto" | "impulsionar_post";
 
 interface Inputs {
   campaignType: CampaignType;
   productType: ProductType;
   investmentBRL: number; // ex: 3550
   ticketBRL: number;     // ex: 3550
+  objective?: string;    // ex: "crescimento_audiencia"
   strategyType?: StrategyType; // Nova: tipo de estratégia selecionada
   remarketingPercent?: number; // 0.2 a 0.3 (default 0.2)
   cpcOverride?: { min: number; max: number }; // em R$
@@ -149,7 +151,7 @@ function convBenchByTicketAndStrategy(band: TicketBand, strategyType: StrategyTy
       };
     }
   }
-  
+
   if (band === "medio") {
     if (strategyType === "lp_whatsapp") {
       return {
@@ -177,7 +179,7 @@ function convBenchByTicketAndStrategy(band: TicketBand, strategyType: StrategyTy
       };
     }
   }
-  
+
   // alto
   if (strategyType === "lp_whatsapp") {
     return {
@@ -207,9 +209,9 @@ function convBenchByTicketAndStrategy(band: TicketBand, strategyType: StrategyTy
 }
 
 // ---------- Função de compatibilidade (mantém código existente funcionando) ----------
-function convBenchByTicket(band: TicketBand) {
-  return convBenchByTicketAndStrategy(band, "lp_whatsapp");
-}
+// function convBenchByTicket(band: TicketBand) {
+//   return convBenchByTicketAndStrategy(band, "lp_whatsapp");
+// }
 
 // ---------- Estratégia recomendada por contexto ----------
 export function pickRecommendedOption(ticketBand: TicketBand, productType: ProductType, campaignType: CampaignType) {
@@ -218,26 +220,26 @@ export function pickRecommendedOption(ticketBand: TicketBand, productType: Produ
     productType,
     campaignType
   });
-  
+
   // Opções: 1) LP → WhatsApp, 2) WhatsApp direto, 3) LP direto (checkout)
-  
+
   // Casos especiais para produtos "híbridos"
   if (productType === "assinatura clube") {
     const result = ticketBand === "baixo" ? "lp_direto" : "lp_whatsapp";
     console.log('🔍 [PICK_RECOMMENDED] Assinatura clube:', result);
     return result;
   }
-  
+
   if (productType === "curso online" && ticketBand === "medio") {
     console.log('🔍 [PICK_RECOMMENDED] Curso online médio:', "lp_whatsapp");
     return "lp_whatsapp";
   }
-  
+
   if (ticketBand === "alto") {
     console.log('🔍 [PICK_RECOMMENDED] Ticket alto:', "lp_whatsapp");
     return "lp_whatsapp";
   }
-  
+
   if (ticketBand === "baixo") {
     // produtos simples, escala
     if (["curso online", "produto digital baixo", "ecommerce baixo medio"].includes(productType)) {
@@ -247,26 +249,32 @@ export function pickRecommendedOption(ticketBand: TicketBand, productType: Produ
     console.log('🔍 [PICK_RECOMMENDED] Ticket baixo - outros:', "whatsapp_direto");
     return "whatsapp_direto";
   }
-  
+
   // ticket médio
   // serviços e mentoria geralmente funcionam melhor com LP → WhatsApp
   if (["servico online", "servico presencial", "mentoria online", "mentoria presencial"].includes(productType)) {
     console.log('🔍 [PICK_RECOMMENDED] Serviço/Mentoria:', "lp_whatsapp");
     return "lp_whatsapp";
   }
-  
+
   // cursos médios podem ir direto pra LP ou LP→Zap
   if (productType === "curso online" || productType === "curso presencial") {
     const result = campaignType === "sazonal" ? "lp_whatsapp" : "lp_direto";
     console.log('🔍 [PICK_RECOMMENDED] Curso médio:', result);
     return result;
   }
-  
+
   console.log('🔍 [PICK_RECOMMENDED] Padrão:', "lp_whatsapp");
   return "lp_whatsapp";
 }
 
-function renderOpcoesEstrategia(strategyType: StrategyType, ticketBand: TicketBand) {
+function renderOpcoesEstrategia(strategyType: StrategyType) {
+  if (strategyType === "impulsionar_post") {
+    return `## Opções de Estratégia
+- **Crescimento de Audiência (Impulsionar Post):** Foco em atrair novos seguidores pelo menor custo possível. Ideal para volume e branding.
+
+**Estratégia selecionada:** **Impulsionamento de Post** focado no crescimento direto de audiência.`;
+  }
   const opt1 = "**LP → WhatsApp:** Quem chega no WhatsApp já vem educado pela LP, com maior chance de fechamento.";
   const opt2 = "**WhatsApp direto:** gera mais conversas rapidamente, porém com mais curiosos e esforço de atendimento.";
   const opt3 = "**LP direto (checkout):** elimina contato humano; exige LP muito forte (preço, prova social, urgência). Funciona melhor em tickets baixos/compra por impulso.";
@@ -290,8 +298,7 @@ function renderOpcoesEstrategia(strategyType: StrategyType, ticketBand: TicketBa
 }
 
 function renderEstrategiaRecomendada(campaignType: CampaignType, productType: ProductType, ticketBand: TicketBand, strategyType: StrategyType) {
-  // Textos curtos orientados por contexto
-  const objetivo =
+  let objetivo =
     campaignType === "sazonal"
       ? "Vender dentro do período definido (campanha com urgência)."
       : (ticketBand === "baixo" ? "Escalar em volume com custo controlado." : "Gerar leads qualificados de forma contínua.");
@@ -301,13 +308,19 @@ function renderEstrategiaRecomendada(campaignType: CampaignType, productType: Pr
   if (productType === "retiro imersao congresso") publico = "Público premium (yoga, bem-estar, viagens), lookalike de compradores e remarketing.";
   if (["imovel investimento"].includes(productType)) publico = "Segmentação premium e critérios demográficos/afinidade + remarketing forte.";
 
-  // 🎯 CORREÇÃO: Personalizar funil baseado na estratégia selecionada
   let topo = "";
   let meio = "";
   let fundo = "";
   let comunicacao = "";
 
-  if (strategyType === "lp_whatsapp") {
+  if (strategyType === "impulsionar_post") {
+    objetivo = "Crescimento de audiência e atração de novos seguidores.";
+    publico = "Base aberta, lookalike de engajamento ou interesses amplos. Sem remarketing.";
+    topo = "Impulsionamento de Reels/Carrossel com alto engajamento.";
+    meio = "Não se aplica (foco em volume de seguidores).";
+    fundo = "Não se aplica (sem remarketing nesta estratégia).";
+    comunicacao = "Conteúdo de topo de funil, viral, gatilhos de curiosidade, 'Siga para mais'.";
+  } else if (strategyType === "lp_whatsapp") {
     // LP → WhatsApp
     if (ticketBand === "alto") {
       topo = "Criativos inspiracionais (vídeo/fotos, depoimentos) para tráfego à LP.";
@@ -379,21 +392,25 @@ Fundo → ${fundo}
 // ---------- Cálculos principais ----------
 export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
   console.log('🔍 [BUILD_REPORT] Inputs recebidos:', inputs);
-  
-  const { campaignType, productType, investmentBRL, ticketBRL, strategyType = "lp_whatsapp" } = inputs;
+
+  const { campaignType, productType, investmentBRL, ticketBRL, strategyType = "lp_whatsapp", objective } = inputs;
   const ticketBand = getTicketBand(ticketBRL);
-  
+
+  const isGrowth = objective === 'crescimento_audiencia';
+  const finalStrategyType = isGrowth ? 'impulsionar_post' : (strategyType === 'lp_whatsapp' ? pickRecommendedOption(ticketBand, productType, campaignType) : strategyType);
+
   console.log('🔍 [BUILD_REPORT] Dados processados:', {
     campaignType,
     productType,
     investmentBRL,
     ticketBRL,
-    strategyType,
-    ticketBand
+    finalStrategyType,
+    ticketBand,
+    objective
   });
 
   const cpc = inputs.cpcOverride ?? cpcBench(productType);
-  const convDefaults = convBenchByTicketAndStrategy(ticketBand, strategyType);
+  const convDefaults = convBenchByTicketAndStrategy(ticketBand, finalStrategyType);
   const conv = {
     lpToLeadMin: inputs.convOverrides?.lpToLeadMin ?? convDefaults.lpToLeadMin,
     lpToLeadMax: inputs.convOverrides?.lpToLeadMax ?? convDefaults.lpToLeadMax,
@@ -407,11 +424,10 @@ export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
     whatsappSaleMax: inputs.convOverrides?.whatsappSaleMax ?? convDefaults.whatsappSaleMax,
   };
 
-  const remarketingPercent = Math.min(0.30, Math.max(0.20, inputs.remarketingPercent ?? 0.20));
+  const rmShare = isGrowth ? 0 : getRemarketingShare(investmentBRL);
 
   // Verbas diárias com remarketing proporcional ao budget
   const dailyTotal = investmentBRL / 30;
-  const rmShare = getRemarketingShare(investmentBRL);
   const dailyRemarketing = dailyTotal * rmShare;
   const dailyProspection = dailyTotal - dailyRemarketing;
 
@@ -422,7 +438,11 @@ export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
   // Cálculos baseados na estratégia selecionada
   let accessesMin = 0, accessesMax = 0, leadsMin = 0, leadsMax = 0, salesMin = 0, salesMax = 0, whatsappChatsMin = 0, whatsappChatsMax = 0;
 
-  if (strategyType === "lp_whatsapp") {
+  if (finalStrategyType === "impulsionar_post") {
+    // Crescimento de audiência: cliques = seguidores (ou custo por seguidor)
+    // leads, sales, chats são 0
+    accessesMin = 0; accessesMax = 0;
+  } else if (finalStrategyType === "lp_whatsapp") {
     // LP → WhatsApp: Clique → Acesso LP → Lead → Venda
     accessesMin = clicksMin;
     accessesMax = clicksMax;
@@ -462,45 +482,49 @@ export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
   // Seções
 
   const recommended = pickRecommendedOption(ticketBand, productType, campaignType);
-  
+
   // 🎯 CORREÇÃO: Usar a estratégia recomendada quando strategyType é o padrão
-  const finalStrategyType = strategyType === 'lp_whatsapp' ? recommended : strategyType;
-  
+  // Já foi definido o finalStrategyType acima, não precisa redeclarar
+
   console.log('🔍 [BUILD_REPORT] Estratégia final:', {
     strategyType,
     recommended,
     finalStrategyType
   });
-  
-  const opcoesEstrategia = renderOpcoesEstrategia(finalStrategyType, ticketBand);
+
+  const opcoesEstrategia = renderOpcoesEstrategia(finalStrategyType);
   const estrategiaRecomendada = renderEstrategiaRecomendada(campaignType, productType, ticketBand, finalStrategyType);
 
   // Gerar resultados esperados baseados na estratégia
   let resultadosEsperados = `## Resultados Esperados
-- **CPC médio:** ${brl(cpc.max)} – ${brl(cpc.min)}`;
+- **CPC médio:** ${brl((cpc.max + cpc.min) / 2)}`;
 
-  if (finalStrategyType === "lp_whatsapp") {
+  if (finalStrategyType === "impulsionar_post") {
+    resultadosEsperados = `## Resultados Esperados
+- **Custo por seguidor:** ${brl((cpc.max + cpc.min) / 2)}
+- **Seguidores estimados:** ${Math.round((clicksMin + clicksMax) / 2).toLocaleString("pt-BR")} novos seguidores`;
+  } else if (finalStrategyType === "lp_whatsapp") {
     resultadosEsperados += `
-- **Cliques estimados:** ${clicksMin.toLocaleString("pt-BR")} a ${clicksMax.toLocaleString("pt-BR")}
-- **Acessos à LP:** ${accessesMin.toLocaleString("pt-BR")} a ${accessesMax.toLocaleString("pt-BR")}
-- **Conversão LP → Lead:** ${pct(conv.lpToLeadMin)} – ${pct(conv.lpToLeadMax)} → **${leadsMin.toLocaleString("pt-BR")} a ${leadsMax.toLocaleString("pt-BR")} leads**
-- **Conversão Lead → Venda:** ${pct(conv.leadToSaleMin)} – ${pct(conv.leadToSaleMax)} → **${salesMin.toLocaleString("pt-BR")} a ${salesMax.toLocaleString("pt-BR")} vendas**`;
+- **Cliques estimados:** ${Math.round((clicksMin + clicksMax) / 2).toLocaleString("pt-BR")}
+- **Acessos à LP:** ${Math.round((accessesMin + accessesMax) / 2).toLocaleString("pt-BR")}
+- **Conversão LP → Lead:** ${pct((conv.lpToLeadMin + conv.lpToLeadMax) / 2)} → **${Math.round((leadsMin + leadsMax) / 2).toLocaleString("pt-BR")} leads**
+- **Conversão Lead → Venda:** ${pct((conv.leadToSaleMin + conv.leadToSaleMax) / 2)} → **${Math.round((salesMin + salesMax) / 2).toLocaleString("pt-BR")} vendas**`;
   } else if (finalStrategyType === "whatsapp_direto") {
     resultadosEsperados += `
-- **Cliques estimados:** ${clicksMin.toLocaleString("pt-BR")} a ${clicksMax.toLocaleString("pt-BR")}
-- **Conversão Clique → Chat:** ${pct(conv.whatsappChatMin)} – ${pct(conv.whatsappChatMax)} → **${whatsappChatsMin.toLocaleString("pt-BR")} a ${whatsappChatsMax.toLocaleString("pt-BR")} chats**
-- **Conversão Chat → Venda:** ${pct(conv.whatsappSaleMin)} – ${pct(conv.whatsappSaleMax)} → **${salesMin.toLocaleString("pt-BR")} a ${salesMax.toLocaleString("pt-BR")} vendas**`;
+- **Cliques estimados:** ${Math.round((clicksMin + clicksMax) / 2).toLocaleString("pt-BR")}
+- **Conversão Clique → Chat:** ${pct((conv.whatsappChatMin + conv.whatsappChatMax) / 2)} → **${Math.round((whatsappChatsMin + whatsappChatsMax) / 2).toLocaleString("pt-BR")} chats**
+- **Conversão Chat → Venda:** ${pct((conv.whatsappSaleMin + conv.whatsappSaleMax) / 2)} → **${Math.round((salesMin + salesMax) / 2).toLocaleString("pt-BR")} vendas**`;
   } else { // lp_direto
     resultadosEsperados += `
-- **Cliques estimados:** ${clicksMin.toLocaleString("pt-BR")} a ${clicksMax.toLocaleString("pt-BR")}
-- **Acessos à LP:** ${accessesMin.toLocaleString("pt-BR")} a ${accessesMax.toLocaleString("pt-BR")}
-- **Conversão LP → Venda direta:** ${pct(conv.directSaleMin)} – ${pct(conv.directSaleMax)} → **${salesMin.toLocaleString("pt-BR")} a ${salesMax.toLocaleString("pt-BR")} vendas**`;
+- **Cliques estimados:** ${Math.round((clicksMin + clicksMax) / 2).toLocaleString("pt-BR")}
+- **Acessos à LP:** ${Math.round((accessesMin + accessesMax) / 2).toLocaleString("pt-BR")}
+- **Conversão LP → Venda direta:** ${pct((conv.directSaleMin + conv.directSaleMax) / 2)} → **${Math.round((salesMin + salesMax) / 2).toLocaleString("pt-BR")} vendas**`;
   }
 
-  const retornoEstimado =
-`## Retorno Estimado
-- **Receita potencial:** ${brl(revenueMin)} a ${brl(revenueMax)}
-- **ROI estimado:** ${roiMin.toFixed(1)}x a ${roiMax.toFixed(1)}x`;
+  const retornoEstimado = isGrowth ? '' :
+    `## Retorno Estimado
+- **Receita potencial:** ${brl((revenueMin + revenueMax) / 2)}
+- **ROI estimado:** ${((roiMin + roiMax) / 2).toFixed(1)}x`;
 
   // Margem de Risco personalizada por múltiplos fatores
   const getPersonalizedRiskLevel = () => {
@@ -514,20 +538,20 @@ export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
       baseRisk = "Médio a Alto";
     }
 
-        // Personalização por tipo de produto
+    // Personalização por tipo de produto
     let productContext = '';
     if (productType.includes('ecommerce') || productType.includes('produto digital')) {
       productContext = ticketBand === "alto" ? " - Produto de alto valor reduz risco de perda" :
-                      ticketBand === "medio" ? " - Entrega rápida reduz risco de cancelamento" :
-                      " - Entrega demorada pode causar cancelamentos";
+        ticketBand === "medio" ? " - Entrega rápida reduz risco de cancelamento" :
+          " - Entrega demorada pode causar cancelamentos";
     } else if (productType.includes('servico')) {
       productContext = ticketBand === "alto" ? " - Serviço premium reduz risco de insatisfação" :
-                      ticketBand === "medio" ? " - Qualidade ruim pode causar perda de clientes" :
-                      " - Atendimento demorado pode perder vendas";
+        ticketBand === "medio" ? " - Qualidade ruim pode causar perda de clientes" :
+          " - Atendimento demorado pode perder vendas";
     } else { // curso, mentoria, retiro, etc
       productContext = ticketBand === "alto" ? " - Experiência premium reduz risco de abandono" :
-                      ticketBand === "medio" ? " - Conteúdo ruim pode causar desistência" :
-                      " - Experiência ruim pode perder alunos";
+        ticketBand === "medio" ? " - Conteúdo ruim pode causar desistência" :
+          " - Experiência ruim pode perder alunos";
     }
 
     // Personalização por tipo de campanha
@@ -608,12 +632,12 @@ export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
   const riskLevel = getPersonalizedRiskLevel();
 
   const margemRisco =
-`## Margem de Risco no Investimento
+    `## Margem de Risco no Investimento
 - ${riskLevel}
 - **Fatores críticos:** qualidade dos criativos, aderência do público e velocidade de resposta no WhatsApp.`;
 
-  const proximosPassos =
-`## Próximos Passos
+  let proximosPassos =
+    `## Próximos Passos
 - Configurar a campanha no Gerenciador.
 - **Verba diária (já descontado remarketing):**
   - **Prospecção:** ${brl(round(dailyProspection))} / dia
@@ -621,6 +645,15 @@ export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
   - **Remarketing:** ${brl(round(dailyRemarketing))} / dia
 - Alocar em **1 conjunto** (mais força) ou **2+ conjuntos** (testes).
 - Garantir atendimento rápido e consultivo no WhatsApp.`;
+
+  if (finalStrategyType === "impulsionar_post") {
+    proximosPassos = `## Próximos Passos
+- Configurar a campanha no Gerenciador selecionando objetivo de Engajamento ou Tráfego para o Perfil.
+- **Verba diária (100% Prospecção):**
+  - **Prospecção:** ${brl(round(dailyProspection))} / dia
+- Não há remarketing para esta estratégia.
+- Alocar em **2+ anúncios** de topo de funil para testar o melhor custo por seguidor.`;
+  }
 
   const markdown = [
     "# Relatório Estratégico de Campanha",
@@ -632,7 +665,7 @@ export function buildStrategyReport(inputs: Inputs): StrategyReportOutput {
     `- **${riskLevel.split(' - ')[0]}**${riskLevel.includes(' - ') ? ' - ' + riskLevel.split(' - ').slice(1).join(' - ') : ''}
 - **Fatores críticos:** ${getPersonalizedCriticalFactors()}`,
     proximosPassos
-  ].join("\n\n");
+  ].filter(Boolean).join("\n\n");
 
   // Limpeza final do markdown para remover "#" soltos
   const markdownLimpo = markdown
@@ -681,6 +714,7 @@ export function convertStrategyToReport(strategy: {
     campaignType: 'sazonal' | 'recorrente';
     type: string;
     ticket: number;
+    objective?: string;
   };
   budget: {
     planned: number;
@@ -690,15 +724,16 @@ export function convertStrategyToReport(strategy: {
     strategy,
     strategyType
   });
-  
-  const result = {
+
+  const result: Inputs = {
     campaignType: strategy.product.campaignType,
     productType: strategy.product.type as ProductType,
     investmentBRL: strategy.budget.planned,
     ticketBRL: strategy.product.ticket,
+    objective: strategy.product.objective,
     strategyType: strategyType || 'lp_whatsapp',
   };
-  
+
   console.log('🔍 [CONVERT] Resultado:', result);
   return result;
 }

@@ -1047,25 +1047,41 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
               <div style="font-size: 16px; font-weight: bold;">${strategy.product?.campaignType === 'sazonal' ? 'Sazonal' : 'Recorrente'}</div>
             </div>
             
-                         <div style="background: linear-gradient(135deg, #10b981, #059669); color: white; border-radius: 8px; padding: 16px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); text-align: center;">
+            ${strategy.product?.type !== 'sem_produto' ? `
+            <div style="background: linear-gradient(135deg, #10b981, #059669); color: white; border-radius: 8px; padding: 16px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); text-align: center;">
                <div style="font-size: 12px; font-weight: 500; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">Campanha</div>
-               <div style="font-size: 16px; font-weight: bold;">${(strategy.product?.type || 'N/A').replace(/\b\w/g, l => l.toUpperCase())}</div>
+               <div style="font-size: 16px; font-weight: bold;">${(strategy.product?.type || 'N/A').replace(/\b\w/g, (l: string) => l.toUpperCase())}</div>
              </div>
+            ` : ''}
             
             <div style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white; border-radius: 8px; padding: 16px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); text-align: center;">
               <div style="font-size: 12px; font-weight: 500; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">Investimento (mês)</div>
               <div style="font-size: 16px; font-weight: bold;">R$ ${strategy.budget?.planned || '0'}</div>
             </div>
             
+            ${strategy.product?.type !== 'sem_produto' ? `
             <div style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; border-radius: 8px; padding: 16px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); text-align: center;">
-              <div style="font-size: 12px; font-weight: 500; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">Ticket da Campanha</div>
+              <div style="font-size: 12px; font-weight: 500; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">Ticket do Produto</div>
               <div style="font-size: 16px; font-weight: bold;">R$ ${strategy.product?.ticket || '0'}</div>
             </div>
+            ` : ''}
           </div>
         </div>
 
         <div style="margin-bottom: 30px;">
           <h3 style="color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 10px;">Análise Estratégica - Projeção de Resultados</h3>
+          ${metrics.strategyType === 'impulsionar_post' ? `
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6;">
+              <h4 style="color: #1f2937; margin: 0 0 10px 0;">Custo por Seguidor</h4>
+              <p style="color: #059669; font-size: 24px; font-weight: bold; margin: 0;">R$ ${((metrics.cpcMin + metrics.cpcMax) / 2).toFixed(2)}</p>
+            </div>
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #10b981;">
+              <h4 style="color: #1f2937; margin: 0 0 10px 0;">Seguidores Estimados</h4>
+              <p style="color: #059669; font-size: 24px; font-weight: bold; margin: 0;">${((metrics.clicksMin + metrics.clicksMax) / 2).toLocaleString()}</p>
+            </div>
+          </div>
+          ` : `
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
             <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6;">
               <h4 style="color: #1f2937; margin: 0 0 10px 0;">CPC Médio</h4>
@@ -1095,6 +1111,7 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
               <p style="color: #059669; font-size: 24px; font-weight: bold; margin: 0;">R$ ${((metrics.revenueMin + metrics.revenueMax) / 2).toLocaleString()}</p>
             </div>
           </div>
+          `}
         </div>
         
         <div style="page-break-inside: avoid; margin-bottom: 20px; padding: 16px 0; border-top: 1px solid #e2e8f0;">
@@ -2516,6 +2533,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
           hasUnsavedChanges={hasUnsavedChanges}
           extractDigits={extractDigits}
           formatBRLFromDigits={formatBRLFromDigits}
+          onExportPDF={handleExportPDF}
         />
 
 
@@ -2793,65 +2811,84 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                             </div>
                                           </div>
 
-                                          {/* Métricas em Cards - Primeira Linha (4 colunas) */}
-                                          <div className="grid grid-cols-4 gap-2">
-                                            <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
-                                              <div className="text-xs text-slate-400 mb-1.5 font-medium">CPC Médio</div>
-                                              <div className="text-sm font-semibold text-slate-200">
-                                                {strategy.strategyReport.metrics.cpcMin.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 })} - {strategy.strategyReport.metrics.cpcMax.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 })}
+                                          {/* Métricas em Cards - Primeira Linha */}
+                                          {strategy.strategyReport.metrics.strategyType === 'impulsionar_post' ? (
+                                            <div className="grid grid-cols-2 gap-2">
+                                              <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
+                                                <div className="text-xs text-slate-400 mb-1.5 font-medium">Custo p/ Seguidor</div>
+                                                <div className="text-sm font-semibold text-slate-200">
+                                                  {((strategy.strategyReport.metrics.cpcMin + strategy.strategyReport.metrics.cpcMax) / 2).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 })}
+                                                </div>
+                                                <div className="text-xs text-slate-500 mt-1">Estimativa de Custo</div>
                                               </div>
-                                              <div className="text-xs text-slate-500 mt-1">Custo por Clique</div>
-                                            </div>
-                                            <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
-                                              <div className="text-xs text-slate-400 mb-1.5 font-medium">
-                                                {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto' ? 'Cliques Est.' : 'Acessos Est.'}
-                                              </div>
-                                              <div className="text-sm font-semibold text-slate-200">
-                                                {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto'
-                                                  ? `${(strategy.strategyReport.metrics.clicksMin || 0).toLocaleString('pt-BR')} - ${(strategy.strategyReport.metrics.clicksMax || 0).toLocaleString('pt-BR')}`
-                                                  : `${(strategy.strategyReport.metrics.accessesMin || 0).toLocaleString('pt-BR')} - ${(strategy.strategyReport.metrics.accessesMax || 0).toLocaleString('pt-BR')}`
-                                                }
-                                              </div>
-                                              <div className="text-xs text-slate-500 mt-1">
-                                                {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto' ? 'Cliques → Chats' : 'Acessos → Leads'}
+                                              <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
+                                                <div className="text-xs text-slate-400 mb-1.5 font-medium">Seguidores Est.</div>
+                                                <div className="text-sm font-semibold text-slate-200">
+                                                  {Math.round(((strategy.strategyReport.metrics.clicksMin || 0) + (strategy.strategyReport.metrics.clicksMax || 0)) / 2).toLocaleString('pt-BR')}
+                                                </div>
+                                                <div className="text-xs text-slate-500 mt-1">Novos Seguidores</div>
                                               </div>
                                             </div>
-                                            <div className={`bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md ${strategy.strategyReport.metrics.strategyType === 'lp_direto' ? 'opacity-40' : ''}`}>
-                                              <div className="text-xs text-slate-400 mb-1.5 font-medium">
-                                                {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto' ? 'Chats Est.' :
-                                                  strategy.strategyReport.metrics.strategyType === 'lp_direto' ? 'Leads Est.' : 'Leads Est.'}
+                                          ) : (
+                                            <div className="grid grid-cols-4 gap-2">
+                                              <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
+                                                <div className="text-xs text-slate-400 mb-1.5 font-medium">CPC Médio</div>
+                                                <div className="text-sm font-semibold text-slate-200">
+                                                  {((strategy.strategyReport.metrics.cpcMin + strategy.strategyReport.metrics.cpcMax) / 2).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 })}
+                                                </div>
+                                                <div className="text-xs text-slate-500 mt-1">Custo por Clique</div>
                                               </div>
-                                              <div className="text-sm font-semibold text-slate-200">
-                                                {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto'
-                                                  ? `${(strategy.strategyReport.metrics.whatsappChatsMin || 0).toLocaleString('pt-BR')} - ${(strategy.strategyReport.metrics.whatsappChatsMax || 0).toLocaleString('pt-BR')}`
-                                                  : strategy.strategyReport.metrics.strategyType === 'lp_direto'
-                                                    ? `0 - 0`
-                                                    : `${(strategy.strategyReport.metrics.leadsMin || 0).toLocaleString('pt-BR')} - ${(strategy.strategyReport.metrics.leadsMax || 0).toLocaleString('pt-BR')}`
-                                                }
+                                              <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
+                                                <div className="text-xs text-slate-400 mb-1.5 font-medium">
+                                                  {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto' ? 'Cliques Est.' : 'Acessos Est.'}
+                                                </div>
+                                                <div className="text-sm font-semibold text-slate-200">
+                                                  {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto'
+                                                    ? Math.round(((strategy.strategyReport.metrics.clicksMin || 0) + (strategy.strategyReport.metrics.clicksMax || 0)) / 2).toLocaleString('pt-BR')
+                                                    : Math.round(((strategy.strategyReport.metrics.accessesMin || 0) + (strategy.strategyReport.metrics.accessesMax || 0)) / 2).toLocaleString('pt-BR')
+                                                  }
+                                                </div>
+                                                <div className="text-xs text-slate-500 mt-1">
+                                                  {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto' ? 'Cliques → Chats' : 'Acessos → Leads'}
+                                                </div>
                                               </div>
-                                              <div className="text-xs text-slate-500 mt-1">
-                                                {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto' ?
-                                                  `${(strategy.strategyReport.metrics.conv.whatsappChatMin * 100).toFixed(1)}% - ${(strategy.strategyReport.metrics.conv.whatsappChatMax * 100).toFixed(1)}%` :
-                                                  strategy.strategyReport.metrics.strategyType === 'lp_direto' ? '0% - 0%' :
-                                                    `${(strategy.strategyReport.metrics.conv.lpToLeadMin * 100).toFixed(1)}% - ${(strategy.strategyReport.metrics.conv.lpToLeadMax * 100).toFixed(1)}%`}
+                                              <div className={`bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md ${strategy.strategyReport.metrics.strategyType === 'lp_direto' ? 'opacity-40' : ''}`}>
+                                                <div className="text-xs text-slate-400 mb-1.5 font-medium">
+                                                  {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto' ? 'Chats Est.' :
+                                                    strategy.strategyReport.metrics.strategyType === 'lp_direto' ? 'Leads Est.' : 'Leads Est.'}
+                                                </div>
+                                                <div className="text-sm font-semibold text-slate-200">
+                                                  {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto'
+                                                    ? Math.round(((strategy.strategyReport.metrics.whatsappChatsMin || 0) + (strategy.strategyReport.metrics.whatsappChatsMax || 0)) / 2).toLocaleString('pt-BR')
+                                                    : strategy.strategyReport.metrics.strategyType === 'lp_direto'
+                                                      ? `0`
+                                                      : Math.round(((strategy.strategyReport.metrics.leadsMin || 0) + (strategy.strategyReport.metrics.leadsMax || 0)) / 2).toLocaleString('pt-BR')
+                                                  }
+                                                </div>
+                                                <div className="text-xs text-slate-500 mt-1">
+                                                  {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto' ?
+                                                    `${(((strategy.strategyReport.metrics.conv.whatsappChatMin + strategy.strategyReport.metrics.conv.whatsappChatMax) / 2) * 100).toFixed(1)}%` :
+                                                    strategy.strategyReport.metrics.strategyType === 'lp_direto' ? '0%' :
+                                                      `${(((strategy.strategyReport.metrics.conv.lpToLeadMin + strategy.strategyReport.metrics.conv.lpToLeadMax) / 2) * 100).toFixed(1)}%`}
+                                                </div>
+                                              </div>
+                                              <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
+                                                <div className="text-xs text-slate-400 mb-1.5 font-medium">
+                                                  {strategy.strategyReport.metrics.strategyType === 'lp_direto' ? 'Vendas Est.' : 'Vendas Est.'}
+                                                </div>
+                                                <div className="text-sm font-semibold text-slate-200">
+                                                  {Math.round(((strategy.strategyReport.metrics.salesMin || 0) + (strategy.strategyReport.metrics.salesMax || 0)) / 2).toLocaleString('pt-BR')}
+                                                </div>
+                                                <div className="text-xs text-slate-500 mt-1">
+                                                  {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto' ?
+                                                    `${(((strategy.strategyReport.metrics.conv.whatsappSaleMin + strategy.strategyReport.metrics.conv.whatsappSaleMax) / 2) * 100).toFixed(1)}%` :
+                                                    strategy.strategyReport.metrics.strategyType === 'lp_direto' ?
+                                                      `${(((strategy.strategyReport.metrics.conv.directSaleMin + strategy.strategyReport.metrics.conv.directSaleMax) / 2) * 100).toFixed(1)}%` :
+                                                      `${(((strategy.strategyReport.metrics.conv.leadToSaleMin + strategy.strategyReport.metrics.conv.leadToSaleMax) / 2) * 100).toFixed(1)}%`}
+                                                </div>
                                               </div>
                                             </div>
-                                            <div className="bg-slate-700/40 border border-slate-600/30 rounded-xl p-2.5 text-center hover:bg-slate-700/50 hover:border-slate-500/40 transition-all duration-200 shadow-sm hover:shadow-md">
-                                              <div className="text-xs text-slate-400 mb-1.5 font-medium">
-                                                {strategy.strategyReport.metrics.strategyType === 'lp_direto' ? 'Vendas Est.' : 'Vendas Est.'}
-                                              </div>
-                                              <div className="text-sm font-semibold text-slate-200">
-                                                {(strategy.strategyReport.metrics.salesMin || 0).toLocaleString('pt-BR')} - {(strategy.strategyReport.metrics.salesMax || 0).toLocaleString('pt-BR')}
-                                              </div>
-                                              <div className="text-xs text-slate-500 mt-1">
-                                                {strategy.strategyReport.metrics.strategyType === 'whatsapp_direto' ?
-                                                  `${(strategy.strategyReport.metrics.conv.whatsappSaleMin * 100).toFixed(1)}% - ${(strategy.strategyReport.metrics.conv.whatsappSaleMax * 100).toFixed(1)}%` :
-                                                  strategy.strategyReport.metrics.strategyType === 'lp_direto' ?
-                                                    `${(strategy.strategyReport.metrics.conv.directSaleMin * 100).toFixed(1)}% - ${(strategy.strategyReport.metrics.conv.directSaleMax * 100).toFixed(1)}%` :
-                                                    `${(strategy.strategyReport.metrics.conv.leadToSaleMin * 100).toFixed(1)}% - ${(strategy.strategyReport.metrics.conv.leadToSaleMax * 100).toFixed(1)}%`}
-                                              </div>
-                                            </div>
-                                          </div>
+                                          )}
 
 
 
@@ -3086,6 +3123,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                             <CustomDropdown
                               label="Produto"
                               options={[
+                                { value: 'sem_produto', label: 'Sem Produto', icon: <Package className="w-4 h-4" /> },
                                 { value: 'curso online', label: 'Curso Online', icon: <Globe className="w-4 h-4" /> },
                                 { value: 'curso presencial', label: 'Curso Presencial', icon: <Package className="w-4 h-4" /> },
                                 { value: 'mentoria online', label: 'Mentoria Online', icon: <Globe className="w-4 h-4" /> },
@@ -3115,12 +3153,13 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                                 { value: 'trafico', label: 'Tráfego no Site', icon: <Globe className="w-4 h-4" /> },
                                 { value: 'mensagens', label: 'Conversão em Mensagens', icon: <MessageSquare className="w-4 h-4" /> },
                                 { value: 'captura_leads', label: 'Captura de Leads', icon: <Users className="w-4 h-4" /> },
-                                { value: 'compras', label: 'Conversões de Compras', icon: <ShoppingCart className="w-4 h-4" /> }
+                                { value: 'compras', label: 'Conversões de Compras', icon: <ShoppingCart className="w-4 h-4" /> },
+                                { value: 'crescimento_audiencia', label: 'Crescimento de Audiência', icon: <Users className="w-4 h-4" /> }
                               ]}
                               value={currentStrategy.product?.objective || 'trafico'}
                               onChange={(value) => setCurrentStrategy(prev => ({
                                 ...prev,
-                                product: { ...prev.product!, objective: value as 'trafico' | 'mensagens' | 'captura_leads' | 'compras' }
+                                product: { ...prev.product!, objective: value as 'trafico' | 'mensagens' | 'captura_leads' | 'compras' | 'crescimento_audiencia' }
                               }))}
                               theme="blue"
                             />
@@ -3397,7 +3436,7 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                           </div>
                           <h3 className="text-lg font-semibold text-emerald-200">Orçamento</h3>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className={`grid grid-cols-1 ${currentStrategy.product?.type !== 'sem_produto' ? 'md:grid-cols-2' : ''} gap-4`}>
                           <div>
                             <label className="block text-sm font-medium text-emerald-300 mb-2">Investimento disponível (mês)</label>
                             <div className="relative">
@@ -3418,26 +3457,28 @@ ${formatMarkdownForPDF(strategy.strategyReport.markdown) || 'Análise não dispo
                               />
                             </div>
                           </div>
-                          <div>
-                            <label className="block text-sm font-medium text-emerald-300 mb-2">Ticket da Campanha</label>
-                            <div className="relative">
-                              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-400 font-semibold text-sm">R$</span>
-                              <input
-                                type="text"
-                                value={ticketInput.replace('R$ ', '').replace('R$', '')}
-                                onChange={(e) => {
-                                  const digits = extractDigits(e.target.value);
-                                  setCurrentStrategy(prev => ({
-                                    ...prev,
-                                    product: { ...prev.product!, ticket: parseInt(digits) / 100 }
-                                  }));
-                                  setTicketInput(formatBRLFromDigits(digits));
-                                }}
-                                className="w-full bg-slate-700/60 border border-emerald-500/40 rounded-lg pl-8 pr-4 py-3 text-white placeholder-emerald-400/60 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                placeholder="0,00"
-                              />
+                          {currentStrategy.product?.type !== 'sem_produto' && (
+                            <div>
+                              <label className="block text-sm font-medium text-emerald-300 mb-2">Ticket do Produto</label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-400 font-semibold text-sm">R$</span>
+                                <input
+                                  type="text"
+                                  value={ticketInput.replace('R$ ', '').replace('R$', '')}
+                                  onChange={(e) => {
+                                    const digits = extractDigits(e.target.value);
+                                    setCurrentStrategy(prev => ({
+                                      ...prev,
+                                      product: { ...prev.product!, ticket: parseInt(digits) / 100 }
+                                    }));
+                                    setTicketInput(formatBRLFromDigits(digits));
+                                  }}
+                                  className="w-full bg-slate-700/60 border border-emerald-500/40 rounded-lg pl-8 pr-4 py-3 text-white placeholder-emerald-400/60 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  placeholder="0,00"
+                                />
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
                       </div>
 

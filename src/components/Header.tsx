@@ -6,7 +6,6 @@ import ShareReport from './ShareReport';
 import MonthYearPicker from './MonthYearPicker';
 import ClientPicker from './ClientPicker';
 import ProductPicker from './ProductPicker';
-import AudiencePicker from './AudiencePicker';
 import TaskManager from './TaskManager';
 import MetaAdsReconnectionModal from './MetaAdsReconnectionModal';
 import { shareService } from '../services/shareService';
@@ -43,8 +42,8 @@ interface HeaderProps {
 
 }
 
-const Header: React.FC<HeaderProps> = ({ 
-  selectedMonth, 
+const Header: React.FC<HeaderProps> = ({
+  selectedMonth,
   setSelectedMonth,
   selectedClient,
   setSelectedClient,
@@ -53,7 +52,7 @@ const Header: React.FC<HeaderProps> = ({
   selectedAudience,
   setSelectedAudience,
   onMetaAdsSync,
-  currentUser, 
+  currentUser,
   onLogout,
   dataSource,
   isFacebookConnected,
@@ -110,13 +109,13 @@ const Header: React.FC<HeaderProps> = ({
   // Escutar eventos de rate limit do Meta Ads
   useEffect(() => {
     const handleRateLimit = (event: CustomEvent) => {
-      
+
       setReconnectionError(event.detail.message || 'Limite de requisições atingido');
       setShowReconnectionModal(true);
     };
 
     window.addEventListener('metaAdsRateLimit', handleRateLimit as EventListener);
-    
+
     return () => {
       window.removeEventListener('metaAdsRateLimit', handleRateLimit as EventListener);
     };
@@ -129,16 +128,16 @@ const Header: React.FC<HeaderProps> = ({
       if ((window as any).metaAdsService?.resetApiRateLimit) {
         (window as any).metaAdsService.resetApiRateLimit();
       }
-      
+
       // Tentar executar função de correção se disponível
       if (typeof (window as any).fixAudienceIssues?.fixAllIssues === 'function') {
         await (window as any).fixAudienceIssues.fixAllIssues();
       }
-      
+
       // Sincronizar dados do Meta Ads
       onMetaAdsSync();
-      
-      
+
+
     } catch (error) {
       console.error('❌ Erro durante reconexão:', error);
       throw error;
@@ -147,134 +146,134 @@ const Header: React.FC<HeaderProps> = ({
 
   // Função para correção automática inteligente
   const handleAutoFix = async () => {
-    
+
     setIsAutoFixing(true);
-    
+
     try {
-      
+
       // 1. Limpar rate limit
-      
+
       const rateLimitKeys = [
-        'metaAdsRateLimit', 
-        'metaAdsRateLimitTimestamp', 
-        'globalRateLimit', 
+        'metaAdsRateLimit',
+        'metaAdsRateLimitTimestamp',
+        'globalRateLimit',
         'globalRateLimitTimestamp',
         'metaAdsGlobalRateLimit',
         'metaAdsGlobalRateLimitTimestamp'
       ];
-      
+
       // Limpar todas as chaves de rate limit
       rateLimitKeys.forEach(key => {
         const hadValue = localStorage.getItem(key);
         localStorage.removeItem(key);
-        
+
       });
-      
+
       // Limpar rate limits globais por usuário (com hash)
       const allKeys = Object.keys(localStorage);
       const globalRateLimitKeys = allKeys.filter(key => key.includes('metaAdsGlobalRateLimit_'));
       globalRateLimitKeys.forEach(key => {
         const hadValue = localStorage.getItem(key);
         localStorage.removeItem(key);
-        
+
       });
-      
+
       // 2. Verificar e corrigir campaign ID
-      
+
       let campaignId = localStorage.getItem('selectedCampaignId');
-      
-      
+
+
       if (!campaignId) {
-        
+
         const campaigns = localStorage.getItem('metaAdsData_campaigns');
         if (campaigns) {
           try {
             const parsedCampaigns = JSON.parse(campaigns);
-            
-            
+
+
             if (parsedCampaigns.length > 0) {
               const activeCampaign = parsedCampaigns.find((c: any) => c.status === 'ACTIVE') || parsedCampaigns[0];
               localStorage.setItem('selectedCampaignId', activeCampaign.id);
               campaignId = activeCampaign.id;
-              
+
             }
           } catch (e) {
             console.error('🔧 DEBUG - handleAutoFix - Erro ao processar campanhas:', e);
           }
         } else {
-          
+
         }
       }
-      
+
       // 3. Limpar cache de Ad Sets
-      
+
       const cacheKeys = ['metaAdsData_adsets', 'metaAdsData_adsets_timestamp', 'adsets_cache', 'adsets_cache_timestamp'];
       cacheKeys.forEach(key => {
         const hadValue = localStorage.getItem(key);
         localStorage.removeItem(key);
-        
+
       });
-      
+
       if (campaignId) {
         const campaignCacheKey = `adsets_campaign_${campaignId}`;
         const hadValue = localStorage.getItem(campaignCacheKey);
         localStorage.removeItem(campaignCacheKey);
         localStorage.removeItem(`${campaignCacheKey}_timestamp`);
-        
+
       }
-      
+
       // 4. Limpar cache e rate limits do serviço
-      
+
       if ((window as any).metaAdsService) {
         try {
           // Limpar cache de Ad Sets
           if ((window as any).metaAdsService.clearCacheByType) {
             (window as any).metaAdsService.clearCacheByType('adsets');
-            
+
           }
-          
+
           // Resetar rate limits da API
           if ((window as any).metaAdsService.resetApiRateLimit) {
             (window as any).metaAdsService.resetApiRateLimit();
-            
+
           }
-          
+
           // Resetar rate limits do OAuth
           if ((window as any).metaAdsService.resetOAuthRateLimit) {
             (window as any).metaAdsService.resetOAuthRateLimit();
-            
+
           }
-          
+
           // 🎯 NOVO: Resetar rate limits para todos os usuários (para multi-usuário)
           if ((window as any).metaAdsService.resetAllUsersRateLimit) {
             (window as any).metaAdsService.resetAllUsersRateLimit();
-            
+
           }
-          
+
         } catch (e) {
           console.error('🔧 DEBUG - handleAutoFix - Erro ao limpar cache/rate limits do serviço:', e);
         }
       } else {
-        
+
       }
-      
+
       // Rate limit removido - sem pausa
-      
+
       // 6. Disparar evento para recarregar produtos
-      
+
       window.dispatchEvent(new CustomEvent('reloadProducts'));
-      
+
       // 7. Disparar evento para recarregar públicos
-      
+
       window.dispatchEvent(new CustomEvent('reloadAudiences', { detail: { force: true } }));
-      
-      
-      
+
+
+
     } catch (error) {
       console.error('❌ Erro na correção automática:', error);
     } finally {
       setIsAutoFixing(false);
-      
+
     }
   };
 
@@ -309,7 +308,7 @@ const Header: React.FC<HeaderProps> = ({
     };
 
     window.addEventListener('storage', handleStorageChange);
-    
+
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     };
@@ -318,7 +317,7 @@ const Header: React.FC<HeaderProps> = ({
   // Expor setTooltip para outros componentes
   useEffect(() => {
     (window as any).setHeaderTooltip = setTooltip;
-    
+
     return () => {
       delete (window as any).setHeaderTooltip;
     };
@@ -342,145 +341,141 @@ const Header: React.FC<HeaderProps> = ({
               <p className="text-sm text-slate-400 -mt-1 font-medium">G. Tráfego Analytics</p>
             </div>
           </div>
-          
-                     {/* User Section */}
-           <div className="flex items-center space-x-4">
-             <div className="flex items-center space-x-2">
-                                               {/* Botão de Correção Automática */}
-                <div className="relative group">
-                  <button 
-                    onClick={handleAutoFix}
-                    onMouseEnter={(e) => {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      const tooltipWidth = 300;
-                      const tooltipHeight = 80;
-                      const margin = 10;
-                      
-                      let x = rect.left + (rect.width / 2) - (tooltipWidth / 2);
-                      let y = rect.bottom + margin;
-                      
-                      // Ajustar horizontalmente se sair da tela
-                      if (x < margin) {
-                        x = margin;
-                      } else if (x + tooltipWidth > window.innerWidth - margin) {
-                        x = window.innerWidth - tooltipWidth - margin;
-                      }
-                      
-                      // Ajustar verticalmente se sair da tela
-                      if (y + tooltipHeight > window.innerHeight - margin) {
-                        y = rect.top - tooltipHeight - margin;
-                      }
-                      
-                      setTooltip({
-                        visible: true,
-                        x: Math.max(margin, x),
-                        y: Math.max(margin, y),
-                        title: 'Correção Automática',
-                        content: isFacebookConnected 
-                          ? "Resolve automaticamente problemas de rate limit, campaign ID nulo e cache desatualizado"
-                          : "Conecte-se ao Meta Ads para usar correção automática",
-                        color: 'green'
-                      });
-                    }}
-                    onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
-                    disabled={isAutoFixing || !isFacebookConnected}
-                    className={`p-3 rounded-xl transition-all duration-300 group shadow-sm hover:shadow-md ${
-                      isFacebookConnected 
-                        ? 'text-slate-400 hover:text-green-300 hover:bg-slate-700/50 cursor-pointer' 
-                        : 'text-slate-600 cursor-not-allowed opacity-50'
+
+          {/* User Section */}
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              {/* Botão de Correção Automática */}
+              <div className="relative group">
+                <button
+                  onClick={handleAutoFix}
+                  onMouseEnter={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const tooltipWidth = 300;
+                    const tooltipHeight = 80;
+                    const margin = 10;
+
+                    let x = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+                    let y = rect.bottom + margin;
+
+                    // Ajustar horizontalmente se sair da tela
+                    if (x < margin) {
+                      x = margin;
+                    } else if (x + tooltipWidth > window.innerWidth - margin) {
+                      x = window.innerWidth - tooltipWidth - margin;
+                    }
+
+                    // Ajustar verticalmente se sair da tela
+                    if (y + tooltipHeight > window.innerHeight - margin) {
+                      y = rect.top - tooltipHeight - margin;
+                    }
+
+                    setTooltip({
+                      visible: true,
+                      x: Math.max(margin, x),
+                      y: Math.max(margin, y),
+                      title: 'Correção Automática',
+                      content: isFacebookConnected
+                        ? "Resolve automaticamente problemas de rate limit, campaign ID nulo e cache desatualizado"
+                        : "Conecte-se ao Meta Ads para usar correção automática",
+                      color: 'green'
+                    });
+                  }}
+                  onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
+                  disabled={isAutoFixing || !isFacebookConnected}
+                  className={`p-3 rounded-xl transition-all duration-300 group shadow-sm hover:shadow-md ${isFacebookConnected
+                      ? 'text-slate-400 hover:text-green-300 hover:bg-slate-700/50 cursor-pointer'
+                      : 'text-slate-600 cursor-not-allowed opacity-50'
                     }`}
-                  >
-                    {isAutoFixing ? (
-                      <div className="w-5 h-5 animate-spin rounded-full border-2 border-green-400 border-t-transparent"></div>
-                    ) : (
-                      <Wrench className={`w-5 h-5 transition-transform ${
-                        isFacebookConnected ? 'group-hover:scale-110' : ''
+                >
+                  {isAutoFixing ? (
+                    <div className="w-5 h-5 animate-spin rounded-full border-2 border-green-400 border-t-transparent"></div>
+                  ) : (
+                    <Wrench className={`w-5 h-5 transition-transform ${isFacebookConnected ? 'group-hover:scale-110' : ''
                       }`} />
-                    )}
-                  </button>
-                </div>
-               
-                {/* Botão de Limpeza de Cache */}
-                {/* REMOVIDO: Botão de Limpeza de Cache */}
-               
-                                               {/* Botão de Tarefas */}
-                <div className="relative group">
-                  <button 
-                    onClick={() => {
-                      if (isFacebookConnected) {
-                        setIsTaskManagerOpen(true);
-                      }
-                    }}
-                    onMouseEnter={(e) => {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      const tooltipWidth = 300;
-                      const tooltipHeight = 80;
-                      const margin = 10;
-                      
-                      let x = rect.left + (rect.width / 2) - (tooltipWidth / 2);
-                      let y = rect.bottom + margin;
-                      
-                      // Ajustar horizontalmente se sair da tela
-                      if (x < margin) {
-                        x = margin;
-                      } else if (x + tooltipWidth > window.innerWidth - margin) {
-                        x = window.innerWidth - tooltipWidth - margin;
-                      }
-                      
-                      // Ajustar verticalmente se sair da tela
-                      if (y + tooltipHeight > window.innerHeight - margin) {
-                        y = rect.top - tooltipHeight - margin;
-                      }
-                      
-                      setTooltip({
-                        visible: true,
-                        x: Math.max(margin, x),
-                        y: Math.max(margin, y),
-                        title: 'Gerenciador de Tarefas',
-                        content: isFacebookConnected 
-                          ? "Gerencie tarefas, lembretes e acompanhe o progresso das campanhas do Meta Ads"
-                          : "Conecte-se ao Meta Ads para usar o gerenciador de tarefas",
-                        color: 'blue'
-                      });
-                    }}
-                    onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
-                    className={`p-3 rounded-xl transition-all duration-300 group shadow-sm hover:shadow-md ${
-                      isFacebookConnected 
-                        ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/50 cursor-pointer' 
-                        : 'text-slate-600 cursor-not-allowed opacity-50'
+                  )}
+                </button>
+              </div>
+
+              {/* Botão de Limpeza de Cache */}
+              {/* REMOVIDO: Botão de Limpeza de Cache */}
+
+              {/* Botão de Tarefas */}
+              <div className="relative group">
+                <button
+                  onClick={() => {
+                    if (isFacebookConnected) {
+                      setIsTaskManagerOpen(true);
+                    }
+                  }}
+                  onMouseEnter={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const tooltipWidth = 300;
+                    const tooltipHeight = 80;
+                    const margin = 10;
+
+                    let x = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+                    let y = rect.bottom + margin;
+
+                    // Ajustar horizontalmente se sair da tela
+                    if (x < margin) {
+                      x = margin;
+                    } else if (x + tooltipWidth > window.innerWidth - margin) {
+                      x = window.innerWidth - tooltipWidth - margin;
+                    }
+
+                    // Ajustar verticalmente se sair da tela
+                    if (y + tooltipHeight > window.innerHeight - margin) {
+                      y = rect.top - tooltipHeight - margin;
+                    }
+
+                    setTooltip({
+                      visible: true,
+                      x: Math.max(margin, x),
+                      y: Math.max(margin, y),
+                      title: 'Gerenciador de Tarefas',
+                      content: isFacebookConnected
+                        ? "Gerencie tarefas, lembretes e acompanhe o progresso das campanhas do Meta Ads"
+                        : "Conecte-se ao Meta Ads para usar o gerenciador de tarefas",
+                      color: 'blue'
+                    });
+                  }}
+                  onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
+                  className={`p-3 rounded-xl transition-all duration-300 group shadow-sm hover:shadow-md ${isFacebookConnected
+                      ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/50 cursor-pointer'
+                      : 'text-slate-600 cursor-not-allowed opacity-50'
                     }`}
-                    disabled={!isFacebookConnected}
-                  >
-                    <CheckSquare className={`w-5 h-5 transition-transform ${
-                      isFacebookConnected ? 'group-hover:scale-110' : ''
+                  disabled={!isFacebookConnected}
+                >
+                  <CheckSquare className={`w-5 h-5 transition-transform ${isFacebookConnected ? 'group-hover:scale-110' : ''
                     }`} />
-                  </button>
-                </div>
-               
-               <div className="notification-button-container">
-                 {/* 🎯 LOG PARA DEBUG: Monitorar props do NotificationButton */}
-                 {(() => {
-                   
-                   return null;
-                 })()}
-                 <NotificationButton 
-                   selectedClient={selectedClient}
-                   selectedProduct={selectedProduct}
-                   selectedAudience={selectedAudience}
-                   selectedMonth={selectedMonth}
-                   isFacebookConnected={isFacebookConnected}
-                   metaAdsUserId={getMetaAdsUserId()}
-                 />
-               </div>
-             </div>
+                </button>
+              </div>
+
+              <div className="notification-button-container">
+                {/* 🎯 LOG PARA DEBUG: Monitorar props do NotificationButton */}
+                {(() => {
+
+                  return null;
+                })()}
+                <NotificationButton
+                  selectedClient={selectedClient}
+                  selectedProduct={selectedProduct}
+                  selectedAudience={selectedAudience}
+                  selectedMonth={selectedMonth}
+                  isFacebookConnected={isFacebookConnected}
+                  metaAdsUserId={getMetaAdsUserId()}
+                />
+              </div>
+            </div>
 
             <div className="h-8 w-px bg-gradient-to-b from-slate-600 to-transparent"></div>
-            
+
             <div className="flex items-center space-x-4 bg-slate-800/60 backdrop-blur-sm rounded-xl px-4 py-3 border border-slate-600/40 shadow-lg">
               {currentUser?.photoURL ? (
-                <img 
-                  src={currentUser.photoURL} 
-                  alt={currentUser.name} 
+                <img
+                  src={currentUser.photoURL}
+                  alt={currentUser.name}
                   className="w-10 h-10 rounded-full object-cover border-2 border-slate-600"
                 />
               ) : (
@@ -507,20 +502,20 @@ const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-center w-full header-filters">
           <div className="flex items-center space-x-3 w-full max-w-7xl">
             {/* Filtros com largura fixa */}
-            <div className="flex flex-col items-center space-y-1 w-1/4 header-filter-item">
+            <div className="flex flex-col items-center space-y-1 w-1/3 header-filter-item">
               <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Período</label>
               <div className="bg-slate-800/60 rounded-lg border border-slate-600/40 p-2 shadow-sm hover:shadow-md transition-all duration-200 w-full backdrop-blur-sm dropdown-container">
-                <MonthYearPicker 
+                <MonthYearPicker
                   selectedMonth={selectedMonth}
                   setSelectedMonth={setSelectedMonth}
                 />
               </div>
             </div>
 
-            <div className="flex flex-col items-center space-y-1 w-1/4 header-filter-item">
+            <div className="flex flex-col items-center space-y-1 w-1/3 header-filter-item">
               <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Cliente</label>
               <div className="bg-slate-800/60 rounded-lg border border-slate-600/40 p-2 shadow-sm hover:shadow-md transition-all duration-200 w-full backdrop-blur-sm dropdown-container">
-                <ClientPicker 
+                <ClientPicker
                   selectedClient={selectedClient}
                   setSelectedClient={setSelectedClient}
                   dataSource={dataSource}
@@ -529,7 +524,7 @@ const Header: React.FC<HeaderProps> = ({
               </div>
             </div>
 
-            <div className="flex flex-col items-center space-y-1 w-1/4 header-filter-item">
+            <div className="flex flex-col items-center space-y-1 w-1/3 header-filter-item">
               <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Campanha</label>
               <div className="relative bg-slate-800/60 rounded-lg border border-slate-600/40 p-2 shadow-sm hover:shadow-md transition-all duration-200 w-full backdrop-blur-sm dropdown-container">
                 <div className="absolute top-1 right-1">
@@ -545,24 +540,9 @@ const Header: React.FC<HeaderProps> = ({
                     <RefreshCw className="w-4 h-4" />
                   </button>
                 </div>
-                <ProductPicker 
+                <ProductPicker
                   selectedProduct={selectedProduct}
                   setSelectedProduct={setSelectedProduct}
-                  selectedClient={selectedClient}
-                  dataSource={dataSource}
-                  selectedMonth={selectedMonth}
-                  isFacebookConnected={isFacebookConnected}
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col items-center space-y-1 w-1/4 header-filter-item">
-              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Público</label>
-              <div className="bg-slate-800/60 rounded-lg border border-slate-600/40 p-2 shadow-sm hover:shadow-md transition-all duration-200 w-full backdrop-blur-sm dropdown-container">
-                <AudiencePicker 
-                  selectedAudience={selectedAudience}
-                  setSelectedAudience={setSelectedAudience}
-                  selectedProduct={selectedProduct}
                   selectedClient={selectedClient}
                   dataSource={dataSource}
                   selectedMonth={selectedMonth}
@@ -580,8 +560,8 @@ const Header: React.FC<HeaderProps> = ({
             <div className="flex flex-col items-center space-y-1 w-16 header-filter-item">
               <div className="h-4"></div> {/* Espaçador invisível para alinhar com as labels */}
               <div className="bg-slate-800/60 rounded-lg border border-slate-600/40 p-2 shadow-sm hover:shadow-md transition-all duration-200 backdrop-blur-sm dropdown-container">
-                <MetaAdsConfig 
-                  onConfigSaved={onMetaAdsSync} 
+                <MetaAdsConfig
+                  onConfigSaved={onMetaAdsSync}
                   onDataSourceChange={onDataSourceChange}
                 />
               </div>
@@ -590,7 +570,7 @@ const Header: React.FC<HeaderProps> = ({
             <div className="flex flex-col items-center space-y-1 w-16 header-filter-item">
               <div className="h-4"></div> {/* Espaçador invisível para alinhar com as labels */}
               <div className="bg-slate-800/60 rounded-lg border border-slate-600/40 p-2 shadow-sm hover:shadow-md transition-all duration-200 backdrop-blur-sm dropdown-container">
-                <ShareReport 
+                <ShareReport
                   selectedAudience={selectedAudience}
                   selectedProduct={selectedProduct}
                   selectedClient={selectedClient}
@@ -605,57 +585,55 @@ const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-             {/* Task Manager Modal */}
-       {isFacebookConnected && (
-         <TaskManager
-           isOpen={isTaskManagerOpen}
-           onClose={() => setIsTaskManagerOpen(false)}
-           userId={getMetaAdsUserId()}
-           onMetaAdsDisconnect={() => setIsTaskManagerOpen(false)}
-         />
-       )}
+      {/* Task Manager Modal */}
+      {isFacebookConnected && (
+        <TaskManager
+          isOpen={isTaskManagerOpen}
+          onClose={() => setIsTaskManagerOpen(false)}
+          userId={getMetaAdsUserId()}
+          onMetaAdsDisconnect={() => setIsTaskManagerOpen(false)}
+        />
+      )}
 
-       {/* Tooltip Portal global para ficar acima de tudo */}
-       {tooltip.visible && createPortal(
-         <div
-           className="suggestion-tooltip"
-           style={{ 
-             position: 'fixed', 
-             left: tooltip.x, 
-             top: tooltip.y, 
-             zIndex: 2147483647,
-             transform: 'translate3d(0, 0, 0)',
-             isolation: 'isolate',
-             contain: 'layout',
-             backfaceVisibility: 'hidden',
-             perspective: '1000px',
-             willChange: 'transform',
-             pointerEvents: 'none'
-           }}
-         >
-           <div className={`min-w-[240px] max-w-[320px] text-xs rounded-lg shadow-xl border ${
-             tooltip.color==='green' ? 'border-green-500/40' : tooltip.color==='blue' ? 'border-blue-500/40' : tooltip.color==='purple' ? 'border-purple-500/40' : tooltip.color==='red' ? 'border-red-500/40' : 'border-slate-600/40'
-           }`}>
-             <div className="p-3 bg-slate-900 rounded-lg border-slate-600/40">
-               <div className={`font-semibold mb-1 ${
-                 tooltip.color==='green' ? 'text-green-400' : tooltip.color==='blue' ? 'text-blue-400' : tooltip.color==='purple' ? 'text-purple-400' : tooltip.color==='red' ? 'text-red-400' : 'text-slate-200'
-               }`}>{tooltip.title}</div>
-               <div className="text-slate-300 leading-relaxed whitespace-pre-line">{tooltip.content}</div>
-             </div>
-           </div>
-         </div>,
-         document.body
-       )}
+      {/* Tooltip Portal global para ficar acima de tudo */}
+      {tooltip.visible && createPortal(
+        <div
+          className="suggestion-tooltip"
+          style={{
+            position: 'fixed',
+            left: tooltip.x,
+            top: tooltip.y,
+            zIndex: 2147483647,
+            transform: 'translate3d(0, 0, 0)',
+            isolation: 'isolate',
+            contain: 'layout',
+            backfaceVisibility: 'hidden',
+            perspective: '1000px',
+            willChange: 'transform',
+            pointerEvents: 'none'
+          }}
+        >
+          <div className={`min-w-[240px] max-w-[320px] text-xs rounded-lg shadow-xl border ${tooltip.color === 'green' ? 'border-green-500/40' : tooltip.color === 'blue' ? 'border-blue-500/40' : tooltip.color === 'purple' ? 'border-purple-500/40' : tooltip.color === 'red' ? 'border-red-500/40' : 'border-slate-600/40'
+            }`}>
+            <div className="p-3 bg-slate-900 rounded-lg border-slate-600/40">
+              <div className={`font-semibold mb-1 ${tooltip.color === 'green' ? 'text-green-400' : tooltip.color === 'blue' ? 'text-blue-400' : tooltip.color === 'purple' ? 'text-purple-400' : tooltip.color === 'red' ? 'text-red-400' : 'text-slate-200'
+                }`}>{tooltip.title}</div>
+              <div className="text-slate-300 leading-relaxed whitespace-pre-line">{tooltip.content}</div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
-       {/* Modal de Reconexão do Meta Ads */}
-       <MetaAdsReconnectionModal
-         isOpen={showReconnectionModal}
-         onClose={() => setShowReconnectionModal(false)}
-         onReconnect={handleMetaAdsReconnection}
-         errorMessage={reconnectionError}
-       />
-     </header>
-   );
- };
+      {/* Modal de Reconexão do Meta Ads */}
+      <MetaAdsReconnectionModal
+        isOpen={showReconnectionModal}
+        onClose={() => setShowReconnectionModal(false)}
+        onReconnect={handleMetaAdsReconnection}
+        errorMessage={reconnectionError}
+      />
+    </header>
+  );
+};
 
 export default Header;

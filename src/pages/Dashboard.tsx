@@ -1,16 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
-import { Info, Target } from 'lucide-react';
 import Header from '../components/Header';
-import Sidebar from '../components/Sidebar';
 import DailyControlTable from '../components/DailyControlTable';
 import MonthlyDetailsTable from '../components/MonthlyDetailsTable';
-import AudienceDetailsTable from '../components/AudienceDetailsTable';
 import InsightsSection from '../components/InsightsSection';
 // import HistorySection from '../components/HistorySection'; // Removido conforme solicitação
 import AudienceHistorySection from '../components/AudienceHistorySection';
-import PerformanceAdsSection from '../components/PerformanceAdsSection';
-import PendingAudiencesStatus from '../components/PendingAudiencesStatus';
 import { analysisPlannerService } from '../services/analysisPlannerService';
 import AdStrategySection from '../components/AdStrategySection';
 import AureaDecisionPanel from '../components/AureaDecisionPanel';
@@ -178,13 +173,21 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
   const [selectedAudience, setSelectedAudience] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState('');
 
-  // 🎯 CORREÇÃO: Forçar aba 'Visão Geral' se não houver produto selecionado (evita que o cache carregue
-  // abas inválidas como 'dia' na primeira conexão sem produto).
+  // 🎯 CORREÇÃO: Forçar abas com base na seleção (Estratégia liberada se tiver cliente, as outras se tiver campanha).
   useEffect(() => {
-    if (!selectedProduct || selectedProduct === 'Todas as Campanhas') {
-      setActiveTab('visaoGeral');
+    const isClientSelected = selectedClient && selectedClient !== 'Selecione um cliente';
+    const isCampaignSelected = selectedProduct && selectedProduct !== 'Todas as Campanhas';
+
+    if (isClientSelected && !isCampaignSelected) {
+      if (activeTab !== 'estrategia') {
+        setActiveTab('estrategia');
+      }
+    } else if (!isClientSelected) {
+      if (activeTab !== 'estrategia') {
+        setActiveTab('estrategia');
+      }
     }
-  }, [selectedProduct, setActiveTab]);
+  }, [selectedClient, selectedProduct, activeTab, setActiveTab]);
 
   // Estado para configurações do Modo Áurea
   const [aureaSettings, setAureaSettings] = useState<{
@@ -1428,7 +1431,13 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                   <TabNavigation
                     activeTab={activeTab}
                     onTabChange={setActiveTab}
-                    disabledTabs={(!selectedProduct || selectedProduct === 'Todas as Campanhas') ? ['dia', 'assets', 'estrategia'] : []}
+                    disabledTabs={
+                      (!selectedClient || selectedClient === 'Selecione um cliente')
+                        ? ['visaoGeral', 'dia', 'assets', 'estrategia']
+                        : (!selectedProduct || selectedProduct === 'Todas as Campanhas')
+                          ? ['visaoGeral', 'dia', 'assets']
+                          : []
+                    }
                   />
 
                   {/* Tab: Visão Geral - Entrada Principal */}
@@ -1563,37 +1572,20 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
 
                   {/* Tab: Dia - Controle Diário */}
                   <TabContent activeTab={activeTab} tabId="dia">
-                    {selectedAudience && selectedAudience !== 'Todos os Públicos' && (
-                      <AudienceDetailsTable
-                        metrics={metrics}
-                        selectedAudience={selectedAudience}
-                        selectedProduct={selectedProduct}
-                        selectedClient={selectedClient}
-                        selectedMonth={selectedMonth}
-                      />
-                    )}
                     <DailyControlTable
                       metrics={metrics}
                       selectedCampaign={selectedCampaign}
                       selectedMonth={selectedMonth}
                       selectedAudience={selectedAudience}
                     />
-                    {selectedAudience && selectedAudience !== 'Todos os Públicos' && (
-                      <PerformanceAdsSection />
-                    )}
                   </TabContent>
 
 
 
-                  {/* Tab: Assets - Públicos e Criativos */}
+                  {/* Tab: Públicos - Públicos e Criativos */}
                   <TabContent activeTab={activeTab} tabId="assets">
                     {selectedProduct && selectedProduct !== 'Todas as Campanhas' ? (
                       <>
-                        <PendingAudiencesStatus
-                          selectedClient={selectedClient}
-                          selectedProduct={selectedProduct}
-                          selectedMonth={selectedMonth}
-                        />
                         <AudienceHistorySection
                           selectedClient={selectedClient}
                           selectedProduct={selectedProduct}
@@ -1601,18 +1593,24 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                       </>
                     ) : (
                       <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-8 text-center">
-                        <p className="text-gray-400">Selecione uma campanha para ver os assets.</p>
+                        <p className="text-gray-400">Selecione uma campanha no topo para ver os públicos.</p>
                       </div>
                     )}
                   </TabContent>
 
                   {/* Tab: Estratégia - Planejamento */}
                   <TabContent activeTab={activeTab} tabId="estrategia">
-                    <AdStrategySection
-                      selectedClient={selectedClient}
-                      selectedMonth={selectedMonth}
-                      onStrategyCreated={handleStrategyCreated}
-                    />
+                    {selectedClient && selectedClient !== 'Selecione um cliente' ? (
+                      <AdStrategySection
+                        selectedClient={selectedClient}
+                        selectedMonth={selectedMonth}
+                        onStrategyCreated={handleStrategyCreated}
+                      />
+                    ) : (
+                      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-8 text-center">
+                        <p className="text-gray-400">Selecione um cliente no topo para planejar a estratégia.</p>
+                      </div>
+                    )}
                   </TabContent>
                 </>
               </>

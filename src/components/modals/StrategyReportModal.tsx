@@ -1,8 +1,9 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Target, Package, DollarSign, CheckCircle } from 'lucide-react';
+import { Target, Package, DollarSign, CheckCircle, Download } from 'lucide-react';
 import { AdStrategy } from '../../types/ad-strategy';
 import { getRemarketingShare } from '../../utils/budget';
+import { buildStrategyReport } from '../../services/strategyReportService';
 
 interface StrategyReportModalProps {
     isOpen: boolean;
@@ -18,6 +19,7 @@ interface StrategyReportModalProps {
     hasUnsavedChanges: boolean;
     extractDigits: (value: string) => string;
     formatBRLFromDigits: (value: string) => string;
+    onExportPDF: (strategy: AdStrategy) => void;
 }
 
 const StrategyReportModal: React.FC<StrategyReportModalProps> = ({
@@ -33,7 +35,8 @@ const StrategyReportModal: React.FC<StrategyReportModalProps> = ({
     handleSaveBudget,
     hasUnsavedChanges,
     extractDigits,
-    formatBRLFromDigits
+    formatBRLFromDigits,
+    onExportPDF
 }) => {
     if (!isOpen || !selectedReport?.strategyReport) return null;
 
@@ -64,12 +67,21 @@ const StrategyReportModal: React.FC<StrategyReportModalProps> = ({
                                 <p className="text-sm text-slate-400">{selectedReport.product?.name}</p>
                             </div>
                         </div>
-                        <button
-                            onClick={onClose}
-                            className="text-slate-400 hover:text-slate-200 transition-colors text-2xl hover:bg-slate-700/50 rounded-lg p-2"
-                        >
-                            ×
-                        </button>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => selectedReport && onExportPDF(selectedReport)}
+                                className="flex items-center gap-2 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            >
+                                <Download className="w-4 h-4" />
+                                Exportar PDF
+                            </button>
+                            <button
+                                onClick={onClose}
+                                className="text-slate-400 hover:text-slate-200 transition-colors text-2xl hover:bg-slate-700/50 rounded-lg p-2"
+                            >
+                                ×
+                            </button>
+                        </div>
                     </div>
 
                     {/* Content - Scrollable */}
@@ -86,18 +98,22 @@ const StrategyReportModal: React.FC<StrategyReportModalProps> = ({
                                         <div className="text-sm text-slate-400 mb-1">Tipo de Campanha</div>
                                         <div className="text-white font-medium capitalize">{selectedReport.strategyReport.inputs.campaignType}</div>
                                     </div>
-                                    <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
-                                        <div className="text-sm text-slate-400 mb-1">Campanha</div>
-                                        <div className="text-white font-medium">{selectedReport.strategyReport.inputs.productType}</div>
-                                    </div>
+                                    {selectedReport.strategyReport.inputs.productType !== 'sem_produto' && (
+                                        <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
+                                            <div className="text-sm text-slate-400 mb-1">Campanha</div>
+                                            <div className="text-white font-medium">{selectedReport.strategyReport.inputs.productType.replace(/\b\w/g, (l: string) => l.toUpperCase())}</div>
+                                        </div>
+                                    )}
                                     <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
                                         <div className="text-sm text-slate-400 mb-1">Investimento Disponível</div>
                                         <div className="text-white font-medium">{selectedReport.strategyReport.inputs.investmentBRL.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
                                     </div>
-                                    <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
-                                        <div className="text-sm text-slate-400 mb-1">Ticket da Campanha</div>
-                                        <div className="text-white font-medium">{selectedReport.strategyReport.inputs.ticketBRL.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
-                                    </div>
+                                    {selectedReport.strategyReport.inputs.productType !== 'sem_produto' && (
+                                        <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
+                                            <div className="text-sm text-slate-400 mb-1">Ticket do Produto</div>
+                                            <div className="text-white font-medium">{selectedReport.strategyReport.inputs.ticketBRL.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                                        </div>
+                                    )}
                                 </div>
                             </section>
 
@@ -107,80 +123,101 @@ const StrategyReportModal: React.FC<StrategyReportModalProps> = ({
                                     <Target className="w-5 h-5 text-slate-300" />
                                     Resultados Esperados
                                 </h3>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                                    <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4 text-center">
-                                        <div className="text-sm text-slate-400 mb-2">CPC Médio</div>
-                                        <div className="text-lg font-bold text-slate-200">
-                                            {selectedReport.strategyReport.metrics.cpcMax.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} - {selectedReport.strategyReport.metrics.cpcMin.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                {selectedReport.strategyReport.metrics.strategyType === 'impulsionar_post' ? (
+                                    <div className="grid grid-cols-2 md:grid-cols-2 gap-4 mb-6">
+                                        <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4 text-center">
+                                            <div className="text-sm text-slate-400 mb-2">Custo por Seguidor</div>
+                                            <div className="text-lg font-bold text-slate-200">
+                                                {((selectedReport.strategyReport.metrics.cpcMin + selectedReport.strategyReport.metrics.cpcMax) / 2).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            </div>
+                                            <div className="text-xs text-slate-500 mt-1">Estimativa de Custo</div>
                                         </div>
-                                        <div className="text-xs text-slate-500 mt-1">Custo por Clique</div>
-                                    </div>
-                                    <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4 text-center">
-                                        <div className="text-sm text-slate-400 mb-2">
-                                            {selectedReport.strategyReport.metrics.strategyType === 'whatsapp_direto' ? 'Cliques Estimados' : 'Acessos à LP'}
-                                        </div>
-                                        <div className="text-lg font-bold text-slate-200">
-                                            {selectedReport.strategyReport.metrics.strategyType === 'whatsapp_direto'
-                                                ? `${(selectedReport.strategyReport.metrics.clicksMin || 0).toLocaleString('pt-BR')} - ${(selectedReport.strategyReport.metrics.clicksMax || 0).toLocaleString('pt-BR')}`
-                                                : `${(selectedReport.strategyReport.metrics.accessesMin || 0).toLocaleString('pt-BR')} - ${(selectedReport.strategyReport.metrics.accessesMax || 0).toLocaleString('pt-BR')}`
-                                            }
-                                        </div>
-                                        <div className="text-xs text-slate-500 mt-1">
-                                            {selectedReport.strategyReport.metrics.strategyType === 'whatsapp_direto' ? 'Cliques → Chats' : 'Acessos → Leads'}
+                                        <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4 text-center">
+                                            <div className="text-sm text-slate-400 mb-2">Seguidores Estimados</div>
+                                            <div className="text-lg font-bold text-slate-200">
+                                                {Math.round(((selectedReport.strategyReport.metrics.clicksMin || 0) + (selectedReport.strategyReport.metrics.clicksMax || 0)) / 2).toLocaleString('pt-BR')}
+                                            </div>
+                                            <div className="text-xs text-slate-500 mt-1">Novos Seguidores</div>
                                         </div>
                                     </div>
-                                    <div className={`bg-slate-700/30 border border-slate-600/40 rounded-lg p-4 text-center ${selectedReport.strategyReport.metrics.strategyType === 'lp_direto' ? 'opacity-40' : ''}`}>
-                                        <div className="text-sm text-slate-400 mb-2">
-                                            {selectedReport.strategyReport.metrics.strategyType === 'whatsapp_direto' ? 'Chats Estimados' :
-                                                selectedReport.strategyReport.metrics.strategyType === 'lp_direto' ? 'Leads Estimados' : 'Leads Estimados'}
+                                ) : (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                                        <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4 text-center">
+                                            <div className="text-sm text-slate-400 mb-2">CPC Médio</div>
+                                            <div className="text-lg font-bold text-slate-200">
+                                                {((selectedReport.strategyReport.metrics.cpcMin + selectedReport.strategyReport.metrics.cpcMax) / 2).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            </div>
+                                            <div className="text-xs text-slate-500 mt-1">Custo por Clique</div>
                                         </div>
-                                        <div className="text-lg font-bold text-slate-200">
-                                            {selectedReport.strategyReport.metrics.strategyType === 'whatsapp_direto'
-                                                ? `${selectedReport.strategyReport.metrics.whatsappChatsMin || 0} - ${selectedReport.strategyReport.metrics.whatsappChatsMax || 0}`
-                                                : selectedReport.strategyReport.metrics.strategyType === 'lp_direto'
-                                                    ? `0 - 0`
-                                                    : `${selectedReport.strategyReport.metrics.leadsMin || 0} - ${selectedReport.strategyReport.metrics.leadsMax || 0}`
-                                            }
+                                        <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4 text-center">
+                                            <div className="text-sm text-slate-400 mb-2">
+                                                {selectedReport.strategyReport.metrics.strategyType === 'whatsapp_direto' ? 'Cliques Estimados' : 'Acessos à LP'}
+                                            </div>
+                                            <div className="text-lg font-bold text-slate-200">
+                                                {selectedReport.strategyReport.metrics.strategyType === 'whatsapp_direto'
+                                                    ? Math.round(((selectedReport.strategyReport.metrics.clicksMin || 0) + (selectedReport.strategyReport.metrics.clicksMax || 0)) / 2).toLocaleString('pt-BR')
+                                                    : Math.round(((selectedReport.strategyReport.metrics.accessesMin || 0) + (selectedReport.strategyReport.metrics.accessesMax || 0)) / 2).toLocaleString('pt-BR')
+                                                }
+                                            </div>
+                                            <div className="text-xs text-slate-500 mt-1">
+                                                {selectedReport.strategyReport.metrics.strategyType === 'whatsapp_direto' ? 'Cliques → Chats' : 'Acessos → Leads'}
+                                            </div>
                                         </div>
-                                        <div className="text-xs text-slate-500 mt-1">
-                                            {selectedReport.strategyReport.metrics.strategyType === 'whatsapp_direto' ?
-                                                `${(selectedReport.strategyReport.metrics.conv.whatsappChatMin * 100).toFixed(1)}% - ${(selectedReport.strategyReport.metrics.conv.whatsappChatMax * 100).toFixed(1)}%` :
-                                                selectedReport.strategyReport.metrics.strategyType === 'lp_direto' ? '0% - 0%' :
-                                                    `${(selectedReport.strategyReport.metrics.conv.lpToLeadMin * 100).toFixed(1)}% - ${(selectedReport.strategyReport.metrics.conv.lpToLeadMax * 100).toFixed(1)}%`}
+                                        <div className={`bg-slate-700/30 border border-slate-600/40 rounded-lg p-4 text-center ${selectedReport.strategyReport.metrics.strategyType === 'lp_direto' ? 'opacity-40' : ''}`}>
+                                            <div className="text-sm text-slate-400 mb-2">
+                                                {selectedReport.strategyReport.metrics.strategyType === 'whatsapp_direto' ? 'Chats Estimados' :
+                                                    selectedReport.strategyReport.metrics.strategyType === 'lp_direto' ? 'Leads Estimados' : 'Leads Estimados'}
+                                            </div>
+                                            <div className="text-lg font-bold text-slate-200">
+                                                {selectedReport.strategyReport.metrics.strategyType === 'whatsapp_direto'
+                                                    ? Math.round(((selectedReport.strategyReport.metrics.whatsappChatsMin || 0) + (selectedReport.strategyReport.metrics.whatsappChatsMax || 0)) / 2).toLocaleString('pt-BR')
+                                                    : selectedReport.strategyReport.metrics.strategyType === 'lp_direto'
+                                                        ? `0`
+                                                        : Math.round(((selectedReport.strategyReport.metrics.leadsMin || 0) + (selectedReport.strategyReport.metrics.leadsMax || 0)) / 2).toLocaleString('pt-BR')
+                                                }
+                                            </div>
+                                            <div className="text-xs text-slate-500 mt-1">
+                                                {selectedReport.strategyReport.metrics.strategyType === 'whatsapp_direto' ?
+                                                    `${(((selectedReport.strategyReport.metrics.conv.whatsappChatMin + selectedReport.strategyReport.metrics.conv.whatsappChatMax) / 2) * 100).toFixed(1)}%` :
+                                                    selectedReport.strategyReport.metrics.strategyType === 'lp_direto' ? '0%' :
+                                                        `${(((selectedReport.strategyReport.metrics.conv.lpToLeadMin + selectedReport.strategyReport.metrics.conv.lpToLeadMax) / 2) * 100).toFixed(1)}%`}
+                                            </div>
+                                        </div>
+                                        <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4 text-center">
+                                            <div className="text-sm text-slate-400 mb-2">
+                                                {selectedReport.strategyReport.metrics.strategyType === 'lp_direto' ? 'Vendas Estimadas' : 'Vendas Finais'}
+                                            </div>
+                                            <div className="text-lg font-bold text-slate-200">
+                                                {Math.round(((selectedReport.strategyReport.metrics.salesMin || 0) + (selectedReport.strategyReport.metrics.salesMax || 0)) / 2).toLocaleString('pt-BR')}
+                                            </div>
+                                            <div className="text-xs text-slate-500 mt-1">
+                                                {selectedReport.strategyReport.metrics.strategyType === 'whatsapp_direto' ?
+                                                    `${(((selectedReport.strategyReport.metrics.conv.whatsappSaleMin + selectedReport.strategyReport.metrics.conv.whatsappSaleMax) / 2) * 100).toFixed(1)}%` :
+                                                    selectedReport.strategyReport.metrics.strategyType === 'lp_direto' ?
+                                                        `${(((selectedReport.strategyReport.metrics.conv.directSaleMin + selectedReport.strategyReport.metrics.conv.directSaleMax) / 2) * 100).toFixed(1)}%` :
+                                                        `${(((selectedReport.strategyReport.metrics.conv.leadToSaleMin + selectedReport.strategyReport.metrics.conv.leadToSaleMax) / 2) * 100).toFixed(1)}%`}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4 text-center">
-                                        <div className="text-sm text-slate-400 mb-2">
-                                            {selectedReport.strategyReport.metrics.strategyType === 'lp_direto' ? 'Vendas Estimadas' : 'Vendas Finais'}
-                                        </div>
-                                        <div className="text-lg font-bold text-slate-200">
-                                            {selectedReport.strategyReport.metrics.salesMin || 0} - {selectedReport.strategyReport.metrics.salesMax || 0}
-                                        </div>
-                                        <div className="text-xs text-slate-500 mt-1">
-                                            {selectedReport.strategyReport.metrics.strategyType === 'whatsapp_direto' ?
-                                                `${(selectedReport.strategyReport.metrics.conv.whatsappSaleMin * 100).toFixed(1)}% - ${(selectedReport.strategyReport.metrics.conv.whatsappSaleMax * 100).toFixed(1)}%` :
-                                                selectedReport.strategyReport.metrics.strategyType === 'lp_direto' ?
-                                                    `${(selectedReport.strategyReport.metrics.conv.directSaleMin * 100).toFixed(1)}% - ${(selectedReport.strategyReport.metrics.conv.directSaleMax * 100).toFixed(1)}%` :
-                                                    `${(selectedReport.strategyReport.metrics.conv.leadToSaleMin * 100).toFixed(1)}% - ${(selectedReport.strategyReport.metrics.conv.leadToSaleMax * 100).toFixed(1)}%`}
-                                        </div>
-                                    </div>
-                                </div>
+                                )}
 
                                 {/* ROI e Receita - Destaque */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="bg-slate-700/30 border border-slate-600/40 rounded-xl p-4">
-                                        <div className="text-sm text-slate-400 mb-2">ROI Estimado</div>
-                                        <div className="text-2xl font-bold text-slate-200">
-                                            {(selectedReport.strategyReport.metrics.roiMin || 0).toFixed(1)}x - {(selectedReport.strategyReport.metrics.roiMax || 0).toFixed(1)}x
+                                {selectedReport.strategyReport.metrics.strategyType !== 'impulsionar_post' && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="bg-slate-700/30 border border-slate-600/40 rounded-xl p-4">
+                                            <div className="text-sm text-slate-400 mb-2">ROI Estimado</div>
+                                            <div className="text-2xl font-bold text-slate-200">
+                                                {(((selectedReport.strategyReport.metrics.roiMin || 0) + (selectedReport.strategyReport.metrics.roiMax || 0)) / 2).toFixed(1)}x
+                                            </div>
+                                        </div>
+                                        <div className="bg-slate-700/30 border border-slate-600/40 rounded-xl p-4">
+                                            <div className="text-sm text-slate-400 mb-2">Receita Potencial</div>
+                                            <div className="text-2xl font-bold text-slate-200">
+                                                {(((selectedReport.strategyReport.metrics.revenueMin || 0) + (selectedReport.strategyReport.metrics.revenueMax || 0)) / 2).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="bg-slate-700/30 border border-slate-600/40 rounded-xl p-4">
-                                        <div className="text-sm text-slate-400 mb-2">Receita Potencial</div>
-                                        <div className="text-2xl font-bold text-slate-200">
-                                            {(selectedReport.strategyReport.metrics.revenueMin || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })} - {(selectedReport.strategyReport.metrics.revenueMax || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
-                                        </div>
-                                    </div>
-                                </div>
+                                )}
                             </section>
 
                             {/* Distribuição de Verba */}
@@ -189,19 +226,21 @@ const StrategyReportModal: React.FC<StrategyReportModalProps> = ({
                                     <DollarSign className="w-5 h-5 text-slate-300" />
                                     Distribuição de Verba Diária
                                 </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className={`grid grid-cols-1 ${selectedReport.strategyReport.metrics.strategyType === 'impulsionar_post' ? 'md:grid-cols-1' : 'md:grid-cols-2'} gap-4`}>
                                     <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
-                                        <div className="text-sm text-slate-400 mb-2">Prospecção ({Math.round((1 - getRemarketingShare(selectedReport.strategyReport.inputs.investmentBRL)) * 100)}%)</div>
+                                        <div className="text-sm text-slate-400 mb-2">Prospecção ({selectedReport.strategyReport.metrics.strategyType === 'impulsionar_post' ? '100' : Math.round((1 - getRemarketingShare(selectedReport.strategyReport.inputs.investmentBRL)) * 100)}%)</div>
                                         <div className="text-lg font-bold text-slate-200">
                                             {(selectedReport.strategyReport.metrics.dailyProspectionBRLMin || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / dia
                                         </div>
                                     </div>
-                                    <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
-                                        <div className="text-sm text-slate-400 mb-2">Remarketing ({Math.round(getRemarketingShare(selectedReport.strategyReport.inputs.investmentBRL) * 100)}%)</div>
-                                        <div className="text-lg font-bold text-slate-200">
-                                            {(selectedReport.strategyReport.metrics.dailyRemarketingBRLMin || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / dia
+                                    {selectedReport.strategyReport.metrics.strategyType !== 'impulsionar_post' && (
+                                        <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
+                                            <div className="text-sm text-slate-400 mb-2">Remarketing ({Math.round(getRemarketingShare(selectedReport.strategyReport.inputs.investmentBRL) * 100)}%)</div>
+                                            <div className="text-lg font-bold text-slate-200">
+                                                {(selectedReport.strategyReport.metrics.dailyRemarketingBRLMin || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / dia
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             </section>
 
@@ -214,7 +253,12 @@ const StrategyReportModal: React.FC<StrategyReportModalProps> = ({
                                 <div className="space-y-6">
                                     {/* Markdown Processing Logic */}
                                     {(() => {
-                                        const markdown = selectedReport.strategyReport.markdown;
+                                        // Recalcula o relatorio dinamicamente para garantir as fórmulas mais recentes (ex: médias vs intervalos)
+                                        const dynamicReport = buildStrategyReport({
+                                            ...selectedReport.strategyReport.inputs,
+                                            strategyType: selectedStrategyType
+                                        });
+                                        const markdown = dynamicReport.markdown;
                                         const sections = markdown.split(/(?=^## )/gm)
                                             .filter((section: string) => section.trim())
                                             .filter((section: string) => !section.includes('Dados da Campanha'))
@@ -229,7 +273,7 @@ const StrategyReportModal: React.FC<StrategyReportModalProps> = ({
 
                                             return (
                                                 <div key={index} className="bg-gradient-to-br from-slate-800/40 via-slate-800/30 to-slate-700/20 border border-slate-600/50 rounded-2xl p-6 backdrop-blur-sm hover:border-slate-500/60 transition-all duration-300">
-                                                    {isOpcoesEstrategia && (
+                                                    {isOpcoesEstrategia && dynamicReport.metrics.strategyType !== 'impulsionar_post' && (
                                                         <div className="mb-6 p-4 bg-gradient-to-br from-blue-900/20 to-indigo-900/20 border border-blue-500/30 rounded-xl">
                                                             <div className="flex items-center gap-3 mb-3">
                                                                 <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-full shadow-lg"></div>

@@ -47,6 +47,12 @@ export interface TabNavigationProps {
 
 export const TABS: Tab[] = [
     {
+        id: 'estrategia',
+        label: 'Estratégia',
+        icon: Target,
+        description: 'Planejamento'
+    },
+    {
         id: 'visaoGeral',
         label: 'Visão Geral',
         icon: LayoutDashboard,
@@ -60,15 +66,9 @@ export const TABS: Tab[] = [
     },
     {
         id: 'assets',
-        label: 'Assets',
+        label: 'Públicos',
         icon: Layers,
         description: 'Públicos e criativos'
-    },
-    {
-        id: 'estrategia',
-        label: 'Estratégia',
-        icon: Target,
-        description: 'Planejamento'
     }
 ];
 
@@ -163,7 +163,7 @@ export const TabContent: React.FC<TabContentProps> = ({
 // HOOK PARA GERENCIAR ESTADO DA TAB
 // ============================================================================
 
-export const useTabNavigation = (initialTab: TabId = 'visaoGeral') => {
+export const useTabNavigation = (initialTab: TabId = 'estrategia') => {
     const [activeTab, setActiveTab] = React.useState<TabId>(initialTab);
 
     // Persistir tab ativa no localStorage

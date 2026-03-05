@@ -67,7 +67,7 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
 
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('agendamentosEnabledChanged', handleCustomEvent as EventListener);
-    
+
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('agendamentosEnabledChanged', handleCustomEvent as EventListener);
@@ -82,17 +82,17 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  
+
   // 🎯 NOVO: Estados para modal de rate limit
   const [showRateLimitModal, setShowRateLimitModal] = useState(false);
   const [rateLimitError, setRateLimitError] = useState<string>('');
-  
+
   // 🎯 NOVO: Estados para cache inteligente
   const [showFullHistory, setShowFullHistory] = useState(false);
   const [hasFullData, setHasFullData] = useState(false);
   const [isLoadingFullHistory, setIsLoadingFullHistory] = useState(false);
   const [currentHistoryMonths, setCurrentHistoryMonths] = useState(3); // 🎯 NOVO: Controle de meses carregados
-  
+
   // 🎯 NOVO: Estados para checkboxes de filtro
   const [selectedAdSets, setSelectedAdSets] = useState<Set<string>>(new Set());
   const [showOnlySelected, setShowOnlySelected] = useState(false);
@@ -100,9 +100,9 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
   // 🎯 NOVO: Constantes para cache diferenciado (apenas localStorage)
   const RECENT_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 horas para dados recentes (3 meses)
   const HISTORICAL_CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 dias para dados históricos (12+ meses)
-  const CACHE_KEY = `audience_history_${selectedClient}_${selectedProduct}`;
-  const HISTORICAL_CACHE_KEY = `audience_history_12m_${selectedClient}_${selectedProduct}`;
-  const FULL_HISTORY_CACHE_KEY = `audience_history_24m_${selectedClient}_${selectedProduct}`;
+  const CACHE_KEY = `audience_history_v2_${selectedClient}_${selectedProduct}`;
+  const HISTORICAL_CACHE_KEY = `audience_history_12m_v2_${selectedClient}_${selectedProduct}`;
+  const FULL_HISTORY_CACHE_KEY = `audience_history_24m_v2_${selectedClient}_${selectedProduct}`;
 
   // 🎯 NOVA FUNÇÃO: Salvar dados no cache (apenas localStorage)
   const saveToCache = (data: AdSetData[], forceRefresh: boolean = false, cacheType: 'recent' | '12m' | '24m' = 'recent') => {
@@ -166,7 +166,7 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
     try {
       let cacheKey: string;
       let cacheTTL: number;
-      
+
       switch (cacheType) {
         case '12m':
           cacheKey = HISTORICAL_CACHE_KEY;
@@ -180,7 +180,7 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
           cacheKey = CACHE_KEY;
           cacheTTL = RECENT_CACHE_TTL;
       }
-      
+
       const cached = localStorage.getItem(cacheKey);
       if (!cached) return null;
 
@@ -212,13 +212,13 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
 
   // 🎯 NOVA FUNÇÃO: Carregar dados com controle manual
   const loadAdSetData = async (forceRefresh: boolean = false) => {
-      if (!selectedProduct || selectedProduct === 'Todas as Campanhas') return;
-      
-      setLoading(true);
+    if (!selectedProduct || selectedProduct === 'Todas as Campanhas') return;
+
+    setLoading(true);
     if (forceRefresh) {
       setIsRefreshing(true);
     }
-    
+
     try {
       // 🎯 NOVO: Tentar carregar do cache primeiro (se não for force refresh)
       if (!forceRefresh) {
@@ -235,92 +235,92 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
       // 🎯 NOVA LÓGICA: Carregamento inteligente progressivo
       let mcpData: any[] = [];
       let loadedPeriod = '3m';
-      
+
       // 1. Tentar carregar últimos 3 meses primeiro
-      
+
       mcpData = await metaAdsMcpService.getAudienceHistoryByProduct(selectedClient, selectedProduct, 'last_90d');
-      
+
       // 2. Se não encontrou dados, tentar 12 meses
       if (mcpData.length === 0) {
-        
+
         mcpData = await metaAdsMcpService.getAudienceHistoryByProduct(selectedClient, selectedProduct, 'last_365d');
         loadedPeriod = '12m';
-        
+
         // 3. Se ainda não encontrou, tentar máximo
         if (mcpData.length === 0) {
-          
+
           mcpData = await metaAdsMcpService.getAudienceHistoryByProduct(selectedClient, selectedProduct, 'maximum');
           loadedPeriod = '24m';
         }
       }
-        
-        if (mcpData.length > 0) {
-          // Agrupar por combinação única de mês + adset completo
-          const groupedData = new Map<string, AdSetData>();
-          
-          mcpData.forEach(item => {
-            // Criar chave única: mês + adset completo
-            const uniqueKey = `${item.month}_${item.adSet}`;
-            
-            // Verificar se os dados são válidos antes de processar
-            if (!item.month || !item.adSet || (item.impressions === 0 && item.clicks === 0 && item.spend === 0)) {
-              return; // Pular dados inválidos
+
+      if (mcpData.length > 0) {
+        // Agrupar por combinação única de mês + adset completo
+        const groupedData = new Map<string, AdSetData>();
+
+        mcpData.forEach(item => {
+          // Criar chave única: mês + adset completo
+          const uniqueKey = `${item.month}_${item.adSet}`;
+
+          // Verificar se os dados são válidos antes de processar
+          if (!item.month || !item.adSet || (item.impressions === 0 && item.clicks === 0 && item.spend === 0)) {
+            return; // Pular dados inválidos
+          }
+
+          if (groupedData.has(uniqueKey)) {
+            // Somar métricas ao registro existente
+            const existing = groupedData.get(uniqueKey)!;
+            existing.impressions += item.impressions || 0;
+            existing.clicks += item.clicks || 0;
+            existing.spend += item.spend || 0;
+            existing.reach += item.reach || 0;
+
+            // Calcular CPM, CPC e CTR médios ponderados
+            const totalImpressions = existing.impressions;
+            const totalClicks = existing.clicks;
+            const totalSpend = existing.spend;
+
+            if (totalImpressions > 0) {
+              existing.cpm = (totalSpend / totalImpressions) * 1000;
             }
-            
-            if (groupedData.has(uniqueKey)) {
-              // Somar métricas ao registro existente
-              const existing = groupedData.get(uniqueKey)!;
-              existing.impressions += item.impressions || 0;
-              existing.clicks += item.clicks || 0;
-              existing.spend += item.spend || 0;
-              existing.reach += item.reach || 0;
-              
-              // Calcular CPM, CPC e CTR médios ponderados
-              const totalImpressions = existing.impressions;
-              const totalClicks = existing.clicks;
-              const totalSpend = existing.spend;
-              
-              if (totalImpressions > 0) {
-                existing.cpm = (totalSpend / totalImpressions) * 1000;
-              }
-              if (totalClicks > 0) {
-                existing.cpc = totalSpend / totalClicks;
-              }
-              if (totalImpressions > 0) {
-                existing.ctr = (totalClicks / totalImpressions) * 100;
-              }
-            } else {
-              // Criar novo registro
-              groupedData.set(uniqueKey, {
-                month: item.month,
-                adSet: item.adSet,
-                campaign: item.campaign,
-                cpm: item.cpm || 0,
-                cpc: item.cpc || 0,
-                lpv: item.lpv || 0, // 🎯 NOVA: Landing Page Views
-                ctr: item.ctr || 0,
-                txMensagens: item.txMensagens || 0,
-                txAgendamento: item.txAgendamento || 0,
-                txConversaoVendas: item.txConversaoVendas || 0,
-                cpr: item.cpr || 0,
-                roiCombined: item.roiCombined || '',
-                impressions: item.impressions || 0,
-                clicks: item.clicks || 0,
-                spend: item.spend || 0,
-                reach: item.reach || 0,
+            if (totalClicks > 0) {
+              existing.cpc = totalSpend / totalClicks;
+            }
+            if (totalImpressions > 0) {
+              existing.ctr = (totalClicks / totalImpressions) * 100;
+            }
+          } else {
+            // Criar novo registro
+            groupedData.set(uniqueKey, {
+              month: item.month,
+              adSet: item.adSet,
+              campaign: item.campaign,
+              cpm: item.cpm || 0,
+              cpc: item.cpc || 0,
+              lpv: item.lpv || 0, // 🎯 NOVA: Landing Page Views
+              ctr: item.ctr || 0,
+              txMensagens: item.txMensagens || 0,
+              txAgendamento: item.txAgendamento || 0,
+              txConversaoVendas: item.txConversaoVendas || 0,
+              cpr: item.cpr || 0,
+              roiCombined: item.roiCombined || '',
+              impressions: item.impressions || 0,
+              clicks: item.clicks || 0,
+              spend: item.spend || 0,
+              reach: item.reach || 0,
               status: item.status,
               campaignStatus: item.campaignStatus || 'inactive',
               adSetStatus: item.adSetStatus || item.status
-              });
-            }
-          });
-          
-          // Converter para array
-          const processedData: AdSetData[] = Array.from(groupedData.values());
-          
+            });
+          }
+        });
+
+        // Converter para array
+        const processedData: AdSetData[] = Array.from(groupedData.values());
+
         setAdSetData(processedData);
         setHasInitialLoad(true);
-        
+
         // 🎯 NOVO: Definir período carregado baseado nos dados encontrados
         if (loadedPeriod === '12m') {
           setCurrentHistoryMonths(12);
@@ -334,48 +334,48 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
         } else {
           saveToCache(processedData, forceRefresh, 'recent');
         }
-          
+
         // 🎯 CORREÇÃO: Atualizar data da última atualização APENAS se a requisição foi bem-sucedida
         if (forceRefresh) {
           setLastUpdate(new Date());
-          
+
         }
-          
-          
+
+
       } else {
         setAdSetData([]);
         setHasInitialLoad(true);
-          
-        }
-      } catch (error) {
-        console.error('❌ Erro ao carregar dados dos conjuntos de anúncio:', error);
-        console.error('🔍 Detalhes do erro:', {
-          message: error instanceof Error ? error.message : 'Erro desconhecido',
-          stack: error instanceof Error ? error.stack : undefined
-        });
-        
-       // 🎯 NOVO: Verificar se é erro de rate limit
-       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-       
-       
-       
-       
-       if (errorMessage.includes('User request limit reached') || errorMessage.includes('rate limit') || errorMessage.includes('Rate limit')) {
-         
-         setRateLimitError(errorMessage);
-         setShowRateLimitModal(true);
-       } else {
-         
-       }
-       
-       // 🎯 CORREÇÃO: NÃO atualizar a data de última atualização em caso de erro
-       
-       
-          setAdSetData([]);
-     } finally {
-       setLoading(false);
-       setIsRefreshing(false);
-     }
+
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar dados dos conjuntos de anúncio:', error);
+      console.error('🔍 Detalhes do erro:', {
+        message: error instanceof Error ? error.message : 'Erro desconhecido',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+
+      // 🎯 NOVO: Verificar se é erro de rate limit
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+
+
+
+
+      if (errorMessage.includes('User request limit reached') || errorMessage.includes('rate limit') || errorMessage.includes('Rate limit')) {
+
+        setRateLimitError(errorMessage);
+        setShowRateLimitModal(true);
+      } else {
+
+      }
+
+      // 🎯 CORREÇÃO: NÃO atualizar a data de última atualização em caso de erro
+
+
+      setAdSetData([]);
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
   };
 
   // 🎯 NOVA FUNÇÃO: Atualizar dados manualmente
@@ -401,7 +401,7 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
       }
 
       // Buscar dados de 12 meses do Meta Ads via MCP
-      
+
       const mcpData = await metaAdsMcpService.getAudienceHistoryByProduct(selectedClient, selectedProduct, 'last_365d');
 
       if (mcpData.length > 0) {
@@ -469,13 +469,13 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
         // Salvar no cache de 12 meses
         saveToCache(processed12mData, false, '12m');
 
-        
+
       } else {
-        
+
       }
     } catch (error) {
       console.error('❌ Erro ao carregar histórico de 12 meses:', error);
-      } finally {
+    } finally {
       setIsLoadingFullHistory(false);
     }
   };
@@ -495,7 +495,7 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
           ...item,
           lpv: item.lpv !== undefined ? item.lpv : 0
         }));
-        
+
         setAdSetData(validatedData);
         setCurrentHistoryMonths(24);
         setHasFullData(true);
@@ -504,7 +504,7 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
       }
 
       // Buscar dados completos do Meta Ads via MCP
-      
+
       const fullMcpData = await metaAdsMcpService.getAudienceHistoryByProduct(selectedClient, selectedProduct, 'maximum');
 
       if (fullMcpData.length > 0) {
@@ -572,9 +572,9 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
         // Salvar no cache de histórico completo
         saveToCache(processed24mData, false, '24m');
 
-        
+
       } else {
-        
+
       }
     } catch (error) {
       console.error('❌ Erro ao carregar histórico completo:', error);
@@ -608,9 +608,9 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
     const copy = [...adSetData];
     copy.sort((a, b) => {
       const dir = sortDir === 'asc' ? 1 : -1;
-      
+
       if (sortBy === 'month') {
-        const monthsPt = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+        const monthsPt = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
         const toMonthTime = (m: string) => {
           const [name, yearStr] = m.split(' ');
           const idx = monthsPt.findIndex(x => x.toLowerCase() === (name || '').toLowerCase());
@@ -646,40 +646,40 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
   // Filtrar por período e checkboxes
   const filteredData = useMemo(() => {
     let data = sortedData;
-    
+
     // 🎯 NOVO: Se histórico completo está ativo, mostrar todos os dados
     if (showFullHistory) {
       data = sortedData;
     } else {
       // 🎯 CORRIGIDO: Mostrar apenas os últimos 3 meses que tiveram gasto
-    const monthsPt = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-    const toMonthTime = (m: string) => {
-      const [name, yearStr] = m.split(' ');
-      const idx = monthsPt.findIndex(x => x.toLowerCase() === (name || '').toLowerCase());
-      const year = parseInt(yearStr || '0');
-      if (idx < 0 || !year) return 0;
-      return new Date(year, idx, 1).getTime();
-    };
-    
+      const monthsPt = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+      const toMonthTime = (m: string) => {
+        const [name, yearStr] = m.split(' ');
+        const idx = monthsPt.findIndex(x => x.toLowerCase() === (name || '').toLowerCase());
+        const year = parseInt(yearStr || '0');
+        if (idx < 0 || !year) return 0;
+        return new Date(year, idx, 1).getTime();
+      };
+
       // Mostrar apenas os últimos 3 meses que tiveram gasto
       const periodsWithSpend = sortedData.filter(item => item.spend > 0);
       const sortedByDate = [...periodsWithSpend].sort((a, b) => toMonthTime(b.month) - toMonthTime(a.month));
       const last3MonthsWithSpend = sortedByDate.slice(0, 3);
       data = last3MonthsWithSpend;
     }
-    
+
     // 🎯 NOVO: Aplicar filtro por checkboxes selecionados
     if (showOnlySelected && selectedAdSets.size > 0) {
       data = data.filter(row => selectedAdSets.has(`${row.month}_${row.adSet}`));
     }
-    
+
     return data;
   }, [sortedData, showFullHistory, selectedAdSets, showOnlySelected]);
 
   // Calcular médias
   const averages = useMemo(() => {
     if (filteredData.length === 0) return null;
-    
+
     const totals = filteredData.reduce((acc, row) => ({
       cpm: acc.cpm + (row.cpm || 0),
       cpc: acc.cpc + (row.cpc || 0),
@@ -724,15 +724,14 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
     <th
       key={key || label}
       onClick={key ? () => handleSort(key) : undefined}
-      className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-300 ${key ? 'cursor-pointer select-none' : ''} whitespace-nowrap ${
-        key === 'month' ? 'w-[120px]' :
-        key === 'adSet' ? 'w-[150px]' :
-        key === 'cpm' || key === 'cpc' || key === 'cpr' ? 'w-[80px]' :
-        key === 'txMensagens' ? 'w-[100px]' :
-        key === 'txAgendamento' ? 'w-[110px]' :
-        key === 'txConversaoVendas' ? (agendamentosEnabled ? 'w-[90px]' : 'w-[0px]') :
-        key === 'roiCombined' ? 'w-[120px]' : ''
-      }`}
+      className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-300 ${key ? 'cursor-pointer select-none' : ''} whitespace-nowrap ${key === 'month' ? 'w-[120px]' :
+          key === 'adSet' ? 'w-[150px]' :
+            key === 'cpm' || key === 'cpc' || key === 'cpr' ? 'w-[80px]' :
+              key === 'txMensagens' ? 'w-[100px]' :
+                key === 'txAgendamento' ? 'w-[110px]' :
+                  key === 'txConversaoVendas' ? (agendamentosEnabled ? 'w-[90px]' : 'w-[0px]') :
+                    key === 'roiCombined' ? 'w-[120px]' : ''
+        }`}
     >
       <div className="inline-flex items-center gap-1">
         <span>{label}</span>
@@ -754,7 +753,7 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
   // Componente para linha de médias
   const AverageRow: React.FC<{ position: 'top' | 'bottom' }> = ({ position }) => {
     if (filteredData.length === 0) return null;
-    
+
     const avgCpm = filteredData.reduce((sum, item) => sum + item.cpm, 0) / filteredData.length;
     const avgCpc = filteredData.reduce((sum, item) => sum + item.cpc, 0) / filteredData.length;
     const avgLpv = filteredData.reduce((sum, item) => sum + (item.lpv || 0), 0) / filteredData.length; // 🎯 NOVA: Landing Page Views
@@ -762,17 +761,17 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
     const avgTxAgendamento = filteredData.reduce((sum, item) => sum + item.txAgendamento, 0) / filteredData.length;
     const avgTxConversaoVendas = filteredData.reduce((sum, item) => sum + item.txConversaoVendas, 0) / filteredData.length;
     const avgCpr = filteredData.reduce((sum, item) => sum + item.cpr, 0) / filteredData.length;
-    
+
     // Calcular ROI/ROAS médio
     const avgRoi = filteredData.reduce((sum, item) => {
       const roiValue = parseFloat(item.roiCombined.replace(/[^\d.-]/g, '')) || 0;
       return sum + roiValue;
     }, 0) / filteredData.length;
-    
+
     const avgRoiFormatted = avgRoi > 0 ? `${avgRoi.toFixed(1)}%` : `${avgRoi.toFixed(1)}%`;
     const avgRoiMultiplier = avgRoi > 0 ? `${(avgRoi / 100 + 1).toFixed(1)}x` : '0.0x';
     const avgRoiCombined = `${avgRoiFormatted} / ${avgRoiMultiplier}`;
-    
+
     return (
       <tr className="bg-purple-900/20 border-t border-b border-purple-500/30">
         {/* 🎯 CORRIGIDO: Adicionar coluna do checkbox para alinhar com o cabeçalho */}
@@ -821,34 +820,33 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
       <div className="p-6 border-b border-slate-700/60 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900">
         <div className="flex items-center justify-between">
           <SectionHeader title="Histórico de Público" subtitle={selectedProduct} />
-          
+
           <div className="flex flex-col items-end gap-2">
-                         {/* Data da Última Atualização (apenas texto) */}
-             {lastUpdate && (
-               <div className="text-xs text-slate-400">
-                 atualizado em: <span className="font-semibold text-slate-300">{lastUpdate.toLocaleDateString('pt-BR', {
-                   day: '2-digit',
-                   month: '2-digit',
-                   year: 'numeric'
-                 })}</span> às <span className="font-semibold text-slate-300">{lastUpdate.toLocaleTimeString('pt-BR', {
-                   hour: '2-digit',
-                   minute: '2-digit'
-                 })}</span>
-               </div>
-             )}
-            
+            {/* Data da Última Atualização (apenas texto) */}
+            {lastUpdate && (
+              <div className="text-xs text-slate-400">
+                atualizado em: <span className="font-semibold text-slate-300">{lastUpdate.toLocaleDateString('pt-BR', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric'
+                })}</span> às <span className="font-semibold text-slate-300">{lastUpdate.toLocaleTimeString('pt-BR', {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}</span>
+              </div>
+            )}
+
             {/* Botões alinhados na mesma linha */}
             <div className="flex items-center gap-4">
               {/* 🎯 NOVO: Botão Ver Histórico (12 meses) - Design Melhorado */}
               {!showFullHistory && (
-            <button
+                <button
                   onClick={load12MonthsHistory}
                   disabled={loading || isLoadingFullHistory}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
-                    isLoadingFullHistory
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${isLoadingFullHistory
                       ? 'bg-gray-700/50 text-gray-400 cursor-not-allowed'
                       : 'bg-slate-700/80 text-slate-200 border border-slate-600/50 hover:bg-slate-600/80 hover:border-slate-500/50 shadow-md hover:shadow-lg'
-                  }`}
+                    }`}
                   title="Carregar histórico de 12 meses"
                 >
                   {isLoadingFullHistory ? (
@@ -870,23 +868,22 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
                 >
                   <ArrowLeft className="w-3 h-3" />
                   Voltar aos Últimos 3 Meses
-            </button>
+                </button>
               )}
 
               {/* Botão Atualizar */}
-            <button
+              <button
                 onClick={handleRefresh}
                 disabled={loading || isRefreshing}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                  isRefreshing
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${isRefreshing
                     ? 'bg-gray-700/50 text-gray-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl'
-                }`}
+                  }`}
                 title="Atualizar dados do histórico de público"
               >
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 {isRefreshing ? 'Atualizando...' : 'Atualizar Dados'}
-            </button>
+              </button>
             </div>
           </div>
         </div>
@@ -896,7 +893,7 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
         {/* 🎯 NOVO: Indicador de filtro ativo */}
         {!loading && filteredData.length > 0 && (
           <div className="mb-4 text-sm text-slate-400">
-            {showFullHistory 
+            {showFullHistory
               ? <><b>Histórico de {currentHistoryMonths} meses</b>: exibindo <b>{filteredData.length} períodos</b></>
               : <><b>Períodos com gasto</b>: exibindo <b>{filteredData.length} períodos</b></>
             }
@@ -904,7 +901,7 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
         )}
 
 
-        
+
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-600 border-t-blue-500"></div>
@@ -925,24 +922,24 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
                   {th('MÊS/ANO', 'month')}
                   {th('CONJUNTO DE ANÚNCIOS', 'adSet')}
                   {th('CPM', 'cpm')}
-                                  {th('CPC', 'cpc')}
-                {th('LPV', 'lpv')}
-                {th('% MENSAGENS', 'txMensagens')}
-                {th('% AGENDAMENTO', 'txAgendamento')}
-                {agendamentosEnabled && th('% VENDAS', 'txConversaoVendas')}
-                {th('CPR', 'cpr')}
-                {th('ROI/ROAS', 'roiCombined')}
+                  {th('CPC', 'cpc')}
+                  {th('LPV', 'lpv')}
+                  {th('% MENSAGENS', 'txMensagens')}
+                  {th('% AGENDAMENTO', 'txAgendamento')}
+                  {agendamentosEnabled && th('% VENDAS', 'txConversaoVendas')}
+                  {th('CPR', 'cpr')}
+                  {th('ROI/ROAS', 'roiCombined')}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {/* Linha de médias no topo */}
                 <AverageRow position="top" />
-                
+
                 {/* Dados dos conjuntos de anúncio */}
                 {filteredData.map((row, index) => {
                   const adSetKey = `${row.month}_${row.adSet}`;
                   const isSelected = selectedAdSets.has(adSetKey);
-                  
+
                   return (
                     <tr key={`${row.month}-${row.adSet}-${index}`} className={`hover:bg-slate-800/30 transition-colors ${isSelected ? 'bg-purple-900/20 border-l-4 border-l-purple-500' : ''}`}>
                       {/* 🎯 NOVO: Checkbox para seleção */}
@@ -955,69 +952,69 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
                           title={`Selecionar ${row.adSet} - ${row.month}`}
                         />
                       </td>
-                    <td className="px-3 py-3 text-sm text-slate-100 font-medium bg-slate-800/30 w-[120px] whitespace-nowrap">
-                      {row.month}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-200 w-[150px]">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span
-                          className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${getCombinedStatus(row.campaignStatus, row.adSetStatus) === 'inactive' ? 'bg-red-500' : 'bg-emerald-500'}`}
-                          title={
-                            getCombinedStatus(row.campaignStatus, row.adSetStatus) === 'inactive' 
-                              ? `Desativado - Campanha: ${row.campaignStatus || 'desconhecido'}, AdSet: ${row.adSetStatus || 'desconhecido'}`
-                              : `Ativado - Campanha: ${row.campaignStatus || 'desconhecido'}, AdSet: ${row.adSetStatus || 'desconhecido'}`
-                          }
-                        />
-                        <div className="relative group">
-                        <span 
-                            className="truncate cursor-help max-w-[240px] block" 
-                        >
-                          {row.adSet}
-                        </span>
-                          {/* 🎯 NOVO: Tooltip customizado seguindo a identidade visual */}
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 min-w-[300px] max-w-[400px]">
-                            <div className="text-xs text-slate-300 font-medium mb-1">
-                              Conjunto de Anúncios
-                            </div>
-                            <div className="text-sm text-slate-100 font-semibold">
+                      <td className="px-3 py-3 text-sm text-slate-100 font-medium bg-slate-800/30 w-[120px] whitespace-nowrap">
+                        {row.month}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-200 w-[150px]">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${getCombinedStatus(row.campaignStatus, row.adSetStatus) === 'inactive' ? 'bg-red-500' : 'bg-emerald-500'}`}
+                            title={
+                              getCombinedStatus(row.campaignStatus, row.adSetStatus) === 'inactive'
+                                ? `Desativado - Campanha: ${row.campaignStatus || 'desconhecido'}, AdSet: ${row.adSetStatus || 'desconhecido'}`
+                                : `Ativado - Campanha: ${row.campaignStatus || 'desconhecido'}, AdSet: ${row.adSetStatus || 'desconhecido'}`
+                            }
+                          />
+                          <div className="relative group">
+                            <span
+                              className="truncate cursor-help max-w-[240px] block"
+                            >
                               {row.adSet}
+                            </span>
+                            {/* 🎯 NOVO: Tooltip customizado seguindo a identidade visual */}
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 min-w-[300px] max-w-[400px]">
+                              <div className="text-xs text-slate-300 font-medium mb-1">
+                                Conjunto de Anúncios
+                              </div>
+                              <div className="text-sm text-slate-100 font-semibold">
+                                {row.adSet}
+                              </div>
+                              {/* Seta do tooltip */}
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-800"></div>
                             </div>
-                            {/* Seta do tooltip */}
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-800"></div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 text-sm text-slate-200 text-right w-[80px] whitespace-nowrap">
-                      R$ {row.cpm.toFixed(2)}
-                    </td>
-                    <td className="px-3 py-3 text-sm text-slate-200 text-right w-[80px] whitespace-nowrap">
-                      R$ {row.cpc.toFixed(2)}
-                    </td>
-                    <td className="px-3 py-3 text-sm text-slate-200 text-right w-[80px] whitespace-nowrap">
-                      {(row.lpv || 0).toLocaleString()}
-                    </td>
-                    <td className="px-3 py-3 text-sm text-slate-200 text-right w-[100px] whitespace-nowrap">
-                      {row.txMensagens.toFixed(2)}%
-                    </td>
-                    <td className="px-3 py-3 text-sm text-slate-200 text-right w-[110px] whitespace-nowrap">
-                      {row.txAgendamento.toFixed(2)}%
-                    </td>
-                    {agendamentosEnabled && (
-                      <td className="px-3 py-3 text-sm text-slate-200 text-right w-[90px] whitespace-nowrap">
-                        {row.txConversaoVendas.toFixed(2)}%
                       </td>
-                    )}
-                    <td className="px-3 py-3 text-sm text-slate-200 text-right w-[80px] whitespace-nowrap">
-                      R$ {row.cpr.toFixed(2)}
-                    </td>
-                    <td className="px-3 py-3 text-sm text-slate-200 text-right w-[120px] whitespace-nowrap">
-                      {row.roiCombined}
-                    </td>
-                  </tr>
-                );
+                      <td className="px-3 py-3 text-sm text-slate-200 text-right w-[80px] whitespace-nowrap">
+                        R$ {row.cpm.toFixed(2)}
+                      </td>
+                      <td className="px-3 py-3 text-sm text-slate-200 text-right w-[80px] whitespace-nowrap">
+                        R$ {row.cpc.toFixed(2)}
+                      </td>
+                      <td className="px-3 py-3 text-sm text-slate-200 text-right w-[80px] whitespace-nowrap">
+                        {(row.lpv || 0).toLocaleString()}
+                      </td>
+                      <td className="px-3 py-3 text-sm text-slate-200 text-right w-[100px] whitespace-nowrap">
+                        {row.txMensagens.toFixed(2)}%
+                      </td>
+                      <td className="px-3 py-3 text-sm text-slate-200 text-right w-[110px] whitespace-nowrap">
+                        {row.txAgendamento.toFixed(2)}%
+                      </td>
+                      {agendamentosEnabled && (
+                        <td className="px-3 py-3 text-sm text-slate-200 text-right w-[90px] whitespace-nowrap">
+                          {row.txConversaoVendas.toFixed(2)}%
+                        </td>
+                      )}
+                      <td className="px-3 py-3 text-sm text-slate-200 text-right w-[80px] whitespace-nowrap">
+                        R$ {row.cpr.toFixed(2)}
+                      </td>
+                      <td className="px-3 py-3 text-sm text-slate-200 text-right w-[120px] whitespace-nowrap">
+                        {row.roiCombined}
+                      </td>
+                    </tr>
+                  );
                 })}
-                
+
                 {/* Linha de médias no final */}
                 <AverageRow position="bottom" />
               </tbody>
@@ -1032,11 +1029,10 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
               {/* Botão Mostrar Apenas Selecionados */}
               <button
                 onClick={() => setShowOnlySelected(!showOnlySelected)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
-                  showOnlySelected
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${showOnlySelected
                     ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/50'
                     : 'bg-slate-700/50 text-slate-300 border border-slate-600/50 hover:bg-slate-600/50 hover:border-slate-500/50'
-                }`}
+                  }`}
                 title="Mostrar apenas os selecionados"
               >
                 {showOnlySelected ? 'Mostrando Selecionados' : 'Mostrar Selecionados'} ({selectedAdSets.size})
@@ -1060,11 +1056,10 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
             <button
               onClick={loadMore12Months}
               disabled={isLoadingFullHistory}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                isLoadingFullHistory
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${isLoadingFullHistory
                   ? 'bg-gray-700/50 text-gray-400 cursor-not-allowed'
                   : 'bg-slate-700/50 text-slate-300 border border-slate-600/50 hover:bg-slate-600/50 hover:border-slate-500/50'
-              }`}
+                }`}
               title="Carregar mais 12 meses de histórico"
             >
               {isLoadingFullHistory ? (
@@ -1075,7 +1070,7 @@ const AudienceHistorySection: React.FC<AudienceHistorySectionProps> = ({ selecte
           </div>
         )}
       </div>
-      
+
       {/* 🎯 NOVO: Modal de Rate Limit */}
       <RateLimitModal
         isOpen={showRateLimitModal}

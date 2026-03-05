@@ -4,7 +4,7 @@ export interface AdStrategy {
         name: string;
         campaignType: 'sazonal' | 'recorrente';
         type: string;
-        objective: 'trafico' | 'mensagens' | 'compras' | 'captura_leads';
+        objective: 'trafico' | 'mensagens' | 'compras' | 'captura_leads' | 'crescimento_audiencia';
         ticket: number;
         niche?: string; // Adicionado opcional para compatibilidade
     };

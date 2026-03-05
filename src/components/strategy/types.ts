@@ -14,8 +14,8 @@ export interface AdStrategy {
     product: {
         name: string;
         campaignType: 'recorrente' | 'lancamento' | 'perpetuo';
-        type: 'curso online' | 'servico local' | 'ecommerce' | 'infoproduto' | 'consultoria' | 'saas';
-        objective: 'trafico' | 'mensagens' | 'compras' | 'captura_leads';
+        type: string;
+        objective: 'trafico' | 'mensagens' | 'compras' | 'captura_leads' | 'crescimento_audiencia';
         ticket: number;
     };
     audience: {

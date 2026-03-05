@@ -21,10 +21,10 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
   const [accessToken, setAccessToken] = useState('');
   const [tokenConfigured, setTokenConfigured] = useState(false);
   const [mounted, setMounted] = useState(false);
-  
+
   const [dataSource, setDataSource] = useState<'manual' | 'facebook' | null>(null);
   const [isFacebookConnected, setIsFacebookConnected] = useState(false);
-  
+
   const [rateLimitStatus, setRateLimitStatus] = useState<{
     attempts: number;
     maxAttempts: number;
@@ -47,32 +47,32 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
 
     updateRateLimitStatus();
     // Rate limit removido - sem verificação periódica
-    return () => {};
+    return () => { };
   }, []);
 
   const setFacebookData = () => {
-    
+
     setDataSource('facebook');
     setIsFacebookConnected(true);
     onDataSourceChange?.('facebook', true);
   };
 
   const setManualData = () => {
-    
+
     const savedUser = localStorage.getItem('facebookUser');
     if (savedUser) {
-      
+
       return;
     }
-    
-    
+
+
     setDataSource('manual');
     setIsFacebookConnected(false);
     onDataSourceChange?.('manual', false);
   };
 
   const clearFacebookData = () => {
-    
+
     setUser(null);
     setSelectedAccount(null);
     setSelectedBusiness(null);
@@ -80,11 +80,11 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
     setAdAccounts([]);
     setIsFacebookConnected(false);
     setDataSource(null);
-    
+
     localStorage.removeItem('facebookUser');
     localStorage.removeItem('selectedAdAccount');
     localStorage.removeItem('metaAdsLogoutTimestamp');
-    
+
     metaAdsService.logout();
   };
 
@@ -109,13 +109,13 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
 
   useEffect(() => {
     const savedUser = localStorage.getItem('facebookUser');
-    
+
     if (savedUser) {
       try {
         const user = JSON.parse(savedUser);
         setUser(user);
         metaAdsService.setUser(user);
-        
+
         setFacebookData();
         checkLoginStatus();
       } catch (error) {
@@ -136,9 +136,9 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
       const user = event.detail;
       setUser(user);
       metaAdsService.setUser(user);
-      
+
       setFacebookData();
-      
+
       setTimeout(() => {
         setIsOpen(false);
         onConfigSaved();
@@ -160,12 +160,12 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
 
     try {
       setIsLoading(true);
-      
+
       metaAdsService.setAccessToken(accessToken.trim());
       setTokenConfigured(true);
-      
+
       await loadAdAccounts();
-      
+
       alert('Token configurado com sucesso!');
     } catch (error: any) {
       alert(`Erro ao configurar token: ${error.message}`);
@@ -178,27 +178,27 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
     setIsLoading(true);
     try {
       const rateLimitStatus = await metaAdsService.getOAuthRateLimitStatus();
-      
+
       if (!rateLimitStatus.canAttempt) {
         const minutes = Math.ceil((rateLimitStatus.nextAttemptDelay || 0) / 60000);
         alert(`Rate limit do OAuth excedido. Tente novamente em ${minutes} minutos.`);
         setIsLoading(false);
         return;
       }
-      
+
       const user = await metaAdsService.loginWithFacebook();
-      
+
       setUser(user);
       setFacebookData();
-      
+
       setTimeout(() => {
         setIsOpen(false);
         onConfigSaved();
       }, 500);
-      
+
     } catch (error: any) {
       let errorMessage = 'Erro ao fazer login com o Facebook.';
-      
+
       if (error.message.includes('rate limit') || error.message.includes('exceeded')) {
         const rateLimitStatus = await metaAdsService.getOAuthRateLimitStatus();
         const minutes = Math.ceil((rateLimitStatus.nextAttemptDelay || 0) / 60000);
@@ -214,7 +214,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
       } else if (error.message.includes('dados do usuario')) {
         errorMessage = 'Erro ao buscar dados do usuario. Tente novamente.';
       }
-      
+
       alert(errorMessage);
     } finally {
       setIsLoading(false);
@@ -243,7 +243,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
   const loadAdAccounts = async (businessId?: string) => {
     try {
       let accounts: AdAccount[];
-      
+
       if (businessId) {
         accounts = await metaAdsService.getAdAccountsByBusiness(businessId);
       } else {
@@ -251,15 +251,15 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
       }
 
       setAdAccounts(accounts);
-      
+
       if (accounts.length > 0) {
         setStep('selectAccount');
       } else {
         setStep('tokenConfig');
       }
     } catch (error: any) {
-      if (error.message.includes('Token de acesso nao configurado') || 
-          error.message.includes('Permissoes de anuncios nao concedidas')) {
+      if (error.message.includes('Token de acesso nao configurado') ||
+        error.message.includes('Permissoes de anuncios nao concedidas')) {
         setStep('tokenConfig');
       } else {
         alert(`Erro ao carregar contas de anuncios: ${error.message}`);
@@ -277,7 +277,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
       setIsSelectingAccount(true);
       setSelectedAccount(account);
       metaAdsService.selectAdAccount(account);
-      
+
       setTimeout(() => {
         setIsOpen(false);
         setIsSelectingAccount(false);
@@ -290,11 +290,11 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
 
   const handleLogout = () => {
     metaAdsService.logout();
-    
+
     clearFacebookData();
-    
+
     onDataSourceChange?.('manual', false);
-    
+
     setStep('login');
   };
 
@@ -307,7 +307,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
       setSelectedBusiness(null);
       setBusinessManagers([]);
       setAdAccounts([]);
-      
+
       const loggedUser = await metaAdsService.loginWithAdsPermissions();
       setUser(loggedUser);
       setStep('selectBusiness');
@@ -325,7 +325,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
     if (!mounted || !isOpen) return null;
 
     return createPortal(
-      <div 
+      <div
         className="fixed inset-0 z-[999999] flex items-center justify-center p-4"
         style={{
           backgroundColor: 'rgba(0, 0, 0, 0.75)',
@@ -338,7 +338,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
           }
         }}
       >
-        <div 
+        <div
           className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-auto max-h-[90vh] overflow-y-auto"
           style={{
             animation: 'modalSlideIn 0.3s ease-out'
@@ -382,7 +382,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
                         {rateLimitStatus.facebookRateLimit ? 'Rate Limit do Facebook' : 'Rate Limit Local'}
                       </span>
                     </div>
-                    
+
                     {rateLimitStatus.facebookRateLimit ? (
                       <div>
                         <p className="text-yellow-400 text-sm mb-3">
@@ -401,13 +401,13 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
                           onClick={async () => {
                             try {
                               metaAdsService.resetOAuthRateLimit();
-                              
+
                               // 🎯 CORREÇÃO: Recarregar status após reset
                               setTimeout(async () => {
                                 const newStatus = await metaAdsService.getOAuthRateLimitStatus();
                                 setRateLimitStatus(newStatus);
-                                }, 100);
-                              
+                              }, 100);
+
                             } catch (error) {
                               console.error('🔄 MetaAdsConfig - Erro ao resetar contador:', error);
                             }
@@ -426,7 +426,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-blue-400">Tentativas de login: {rateLimitStatus.attempts}/{rateLimitStatus.maxAttempts}</span>
                       <div className="w-20 bg-gray-700 rounded-full h-2">
-                        <div 
+                        <div
                           className="bg-blue-500 h-2 rounded-full transition-all duration-300"
                           style={{ width: `${(rateLimitStatus.attempts / rateLimitStatus.maxAttempts) * 100}%` }}
                         ></div>
@@ -448,7 +448,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
                   ) : (
                     <>
                       <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                       </svg>
                       <span className="font-medium">Entrar com Facebook</span>
                     </>
@@ -506,7 +506,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
                   <h3 className="text-lg font-medium text-white mb-2">Selecionar Business Manager</h3>
                   <p className="text-gray-400 text-sm">Escolha o Business Manager que contem suas contas de anuncios</p>
                 </div>
-                
+
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {businessManagers.map((business) => (
                     <button
@@ -527,13 +527,13 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
                 <div className="text-center mb-6">
                   <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
                     </svg>
                   </div>
                   <h3 className="text-lg font-medium text-white mb-2">Selecionar Conta de Anuncios</h3>
                   <p className="text-gray-400 text-sm">Escolha a conta de anuncios que deseja monitorar</p>
                 </div>
-                
+
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {adAccounts.map((account) => (
                     <button
@@ -559,7 +559,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
                   <h3 className="text-lg font-medium text-white mb-2">Permissoes Necessarias</h3>
                   <p className="text-gray-400 text-sm">Para acessar suas contas de anuncios, precisamos de permissoes adicionais</p>
                 </div>
-                
+
                 <button
                   onClick={handleRequestAdsPermissions}
                   disabled={isLoading}
@@ -570,7 +570,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
                   ) : (
                     <>
                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
                       </svg>
                       <span>Solicitar Permissoes</span>
                     </>
@@ -588,7 +588,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
                   <h3 className="text-lg font-medium text-white mb-2">Configurar Token de Acesso</h3>
                   <p className="text-gray-400 text-sm">Insira seu token de acesso do Facebook para conectar manualmente</p>
                 </div>
-                
+
                 <textarea
                   value={accessToken}
                   onChange={(e) => setAccessToken(e.target.value)}
@@ -597,7 +597,7 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
                   rows={4}
                   aria-label="Token de acesso do Facebook"
                 />
-                
+
                 <button
                   onClick={handleConfigureToken}
                   disabled={isLoading || !accessToken.trim()}
@@ -625,22 +625,20 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className={`p-2 rounded-lg flex items-center justify-center transition-all duration-200 relative ${
-          isConnected 
-            ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+        className={`p-2 rounded-lg flex items-center justify-center transition-all duration-200 relative ${isConnected
+            ? 'bg-blue-600 hover:bg-blue-700 text-white'
             : 'bg-gray-600 hover:bg-gray-700 text-gray-300 hover:text-white'
-        }`}
+          }`}
         title={isConnected ? 'Meta Ads Conectado - Clique para opcoes' : 'Configurar Meta Ads'}
       >
         <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
         </svg>
-        
-        <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 ${
-          isConnected 
-            ? 'bg-green-500 shadow-lg shadow-green-500/50' 
+
+        <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-gray-900 transition-all duration-200 ${isConnected
+            ? 'bg-green-500 shadow-lg shadow-green-500/50'
             : 'bg-red-500 shadow-lg shadow-red-500/50'
-        }`}></div>
+          }`}></div>
       </button>
 
       <Modal />
