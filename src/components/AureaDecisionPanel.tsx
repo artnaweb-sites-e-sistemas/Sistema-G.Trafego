@@ -9,17 +9,14 @@
  * - Ações Recomendadas
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import {
     Target,
     AlertTriangle,
     CheckCircle,
-    Zap,
     Calendar,
     AlertCircle,
     Info,
-    Edit2,
-    Check
 } from 'lucide-react';
 import {
     decisionRulesService,
@@ -136,8 +133,7 @@ const PacingBar: React.FC<{
     percentSpent: number;
     status: 'good' | 'warning' | 'critical' | 'excellent';
     monthlyBudget?: number;
-    totalDaysInMonth?: number;
-}> = ({ percentSpent, status, monthlyBudget, totalDaysInMonth }) => {
+}> = ({ percentSpent, status, monthlyBudget }) => {
     const statusColors = {
         excellent: 'bg-emerald-500',
         good: 'bg-blue-500',
@@ -145,18 +141,13 @@ const PacingBar: React.FC<{
         critical: 'bg-red-500'
     };
 
-    const dailyBudget = monthlyBudget && totalDaysInMonth ? monthlyBudget / totalDaysInMonth : 0;
-
     return (
         <div className="space-y-2">
             <div className="flex justify-between text-xs text-gray-400">
                 <span>Gasto: {percentSpent.toFixed(1)}%</span>
                 {monthlyBudget !== undefined && (
-                    <div className="flex flex-col items-end">
-                        <span className="text-gray-400 font-medium">Orçamento: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(monthlyBudget)}</span>
-                        {dailyBudget > 0 && (
-                            <span className="text-slate-500 text-[11px] mt-0.5">Orçamento diário: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dailyBudget)}</span>
-                        )}
+                    <div className="flex flex-col items-end pt-0.5">
+                        <span className="text-gray-400 font-medium tracking-tight">Orçamento: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(monthlyBudget)}</span>
                     </div>
                 )}
             </div>
@@ -186,50 +177,11 @@ const AureaDecisionPanel: React.FC<AureaDecisionPanelProps> = ({
     currentSpend = 0,
     platformConversions,
     realConversions,
-    adSets = [],
-    onSettingsChange
+    adSets = []
 }) => {
     // Estados sincronizados das props (read-only, vindos da planilha)
     const cpaTarget = initialCpaTarget;
     const monthlyBudget = initialMonthlyBudget;
-    const acqRmdSplit = initialSplit;
-
-    const [isEditingCpa, setIsEditingCpa] = useState(false);
-    const [isEditingBudget, setIsEditingBudget] = useState(false);
-    const [localCpa, setLocalCpa] = useState(cpaTarget.toString());
-    const [localBudget, setLocalBudget] = useState(monthlyBudget.toString());
-
-    useEffect(() => {
-        if (!isEditingCpa) setLocalCpa(initialCpaTarget.toString());
-    }, [initialCpaTarget, isEditingCpa]);
-
-    useEffect(() => {
-        if (!isEditingBudget) setLocalBudget(initialMonthlyBudget.toString());
-    }, [initialMonthlyBudget, isEditingBudget]);
-
-    const handleSaveCpa = () => {
-        setIsEditingCpa(false);
-        const newCpa = parseFloat(localCpa) || 0;
-        if (newCpa !== initialCpaTarget && onSettingsChange) {
-            onSettingsChange({
-                cpaTarget: newCpa,
-                monthlyBudget: initialMonthlyBudget,
-                acqRmdSplit: initialSplit
-            });
-        }
-    };
-
-    const handleSaveBudget = () => {
-        setIsEditingBudget(false);
-        const newBudget = parseFloat(localBudget) || 0;
-        if (newBudget !== initialMonthlyBudget && onSettingsChange) {
-            onSettingsChange({
-                cpaTarget: initialCpaTarget,
-                monthlyBudget: newBudget,
-                acqRmdSplit: initialSplit
-            });
-        }
-    };
 
     // Calcular dados do mês
     const monthData = useMemo(() => {
@@ -322,14 +274,19 @@ const AureaDecisionPanel: React.FC<AureaDecisionPanelProps> = ({
                         percentSpent={pacing.percentSpent}
                         status={pacing.status}
                         monthlyBudget={monthlyBudget}
-                        totalDaysInMonth={monthData.totalDaysInMonth}
                     />
 
-                    <div className="mt-4 text-xs">
+                    <div className="mt-4 text-xs flex justify-between items-center">
                         <div>
-                            <span className="text-gray-500">Gasto Atual: </span>
-                            <span className="text-white font-medium">{formatCurrency(currentSpend)}</span>
+                            <span className="text-slate-500">Gasto Atual: </span>
+                            <span className="text-white font-semibold">{formatCurrency(currentSpend)}</span>
                         </div>
+                        {monthlyBudget > 0 && (
+                            <div className="text-right">
+                                <span className="text-slate-500">Orçamento diário: </span>
+                                <span className="text-slate-300 font-medium">{formatCurrency(monthlyBudget / (monthData.totalDaysInMonth || 30))}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 

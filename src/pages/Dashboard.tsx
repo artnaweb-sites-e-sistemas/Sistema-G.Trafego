@@ -1456,6 +1456,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
                               selectedAudience={selectedAudience}
                               isFacebookConnected={isFacebookConnected}
                               metaAdsUserId={getMetaAdsUserId()}
+                              cpaTarget={monthlyDetailsValues.cpaTarget || aureaSettings.cpaTarget}
                             />
                           </section>
 

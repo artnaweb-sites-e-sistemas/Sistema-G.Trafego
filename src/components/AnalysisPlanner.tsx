@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { flushSync } from 'react-dom';
-import { CalendarDays, Clock, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react';
+import { CalendarDays, Clock, CheckCircle2, AlertTriangle, Sparkles, Target, Zap } from 'lucide-react';
 import { metricsService, type MetricData } from '../services/metricsService';
 import { analysisPlannerService } from '../services/analysisPlannerService';
 import dayjs from 'dayjs';
@@ -12,6 +12,7 @@ interface AnalysisPlannerProps {
   selectedAudience?: string;
   isFacebookConnected?: boolean;
   metaAdsUserId?: string;
+  cpaTarget?: number;
 }
 
 type PlannerStorage = {
@@ -112,7 +113,14 @@ function recommendIntervalFromMetrics(metrics: MetricData[]): { days: number; re
   return { days: 7, reason: 'Métricas estáveis. Revisão semanal é suficiente.' };
 }
 
-const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', selectedMonth = '', selectedProduct, selectedAudience = '', isFacebookConnected = false, metaAdsUserId = '' }) => {
+const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({
+  selectedClient = '',
+  selectedMonth = '',
+  selectedProduct,
+  selectedAudience = '',
+  metaAdsUserId = '',
+  cpaTarget = 0
+}) => {
   const [lastAnalysisDate, setLastAnalysisDate] = useState<string>('');
   const [intervalDays, setIntervalDays] = useState<number>(DEFAULT_INTERVAL);
   const [loadingSuggestion, setLoadingSuggestion] = useState<boolean>(false);
@@ -234,13 +242,12 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
     return () => { cancelled = true; };
   }, [selectedClient, selectedMonth, selectedProduct, selectedAudience]);
 
-  // Aplicar automaticamente a sugestão quando ela for calculada
+  // Aplicar automaticamente a sugestão quando ela for calculada, apenas se não houver um valor salvo
   useEffect(() => {
-    if (suggested?.days && hydrated) {
-
+    if (suggested?.days && hydrated && !lastAnalysisDate) {
       setIntervalDays(suggested.days);
     }
-  }, [suggested, hydrated]);
+  }, [suggested, hydrated, lastAnalysisDate]);
 
   const lastDateObj = useMemo(() => safeParseDate(lastAnalysisDate), [lastAnalysisDate, forceUpdate]);
   const nextDate = useMemo(() => {
@@ -264,9 +271,9 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
   const handleMarkAnalyzedToday = useCallback(async () => {
     setIsUpdating(true);
 
-    // 🎯 CORREÇÃO: Usar dayjs com fuso horário local para garantir data correta
+    // 🎯 CORREÇÃO: Usar o valor atual do estado intervalDays (que pode ter sido editado pelo usuário)
     const todayIso = dayjs().format('YYYY-MM-DD');
-    const newIntervalDays = suggested?.days ?? intervalDays;
+    const newIntervalDays = intervalDays;
 
 
 
@@ -408,9 +415,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
     }, 200);
   }, [selectedClient, selectedProduct, selectedAudience, suggested, intervalDays, storageKey]);
 
-  const applySuggestion = () => {
-    if (suggested?.days) setIntervalDays(suggested.days);
-  };
+
 
   // Efeitos no clique: ripple + tooltip "Aplicado"
   function playButtonClickEffect(btn: HTMLButtonElement, showTooltip: boolean = true) {
@@ -463,9 +468,16 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
 
         <div>
           <label className="block text-sm text-slate-300 mb-1">Intervalo (dias)</label>
-          <div className={`flex items-center gap-2 bg-slate-800/70 border border-slate-700/60 rounded-lg px-3 py-2 text-slate-200`}>
+          <div className={`flex items-center gap-2 bg-slate-800/70 border border-slate-700/60 rounded-lg px-3 py-2 text-slate-200 focus-within:border-amber-400/50 transition-colors`}>
             <Clock className="w-4 h-4 text-amber-300" />
-            <span>{intervalDays}</span>
+            <input
+              type="number"
+              min="1"
+              max="90"
+              value={intervalDays}
+              onChange={(e) => setIntervalDays(parseInt(e.target.value) || 1)}
+              className="bg-transparent border-none outline-none w-full text-slate-200 focus:ring-0 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
           </div>
         </div>
 
@@ -480,7 +492,93 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
+      {/* 🎯 MÉTRICAS DE BALIZAMENTO (V2) */}
+      <div className="mt-8 pt-6 border-t border-slate-700/50">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Target className="w-5 h-5 text-purple-400" />
+            <h5 className="text-sm font-bold text-slate-200 uppercase tracking-wider">Métricas de Balizamento</h5>
+          </div>
+          <div className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-widest">
+            Referência Base
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* CPA Máximo */}
+          <div className="relative group overflow-hidden bg-slate-800/40 rounded-xl p-4 border border-slate-700/40 hover:border-purple-500/40 transition-all duration-300">
+            <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Target className="w-8 h-8 text-white" />
+            </div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+              <div className="w-1 h-1 rounded-full bg-purple-400"></div>
+              CPA Máximo
+            </div>
+            <div className="text-2xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+              {cpaTarget > 0 ? `R$ ${cpaTarget.toFixed(2).replace('.', ',')}` : '—'}
+            </div>
+            <div className="text-[9px] text-slate-500 mt-1 font-medium italic">Valor da Meta CPA configurada</div>
+          </div>
+
+          {/* Corte CPA */}
+          <div className="relative group overflow-hidden bg-slate-800/40 rounded-xl p-4 border border-slate-700/40 hover:border-rose-500/40 transition-all duration-300">
+            <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+              <AlertTriangle className="w-8 h-8 text-rose-500" />
+            </div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+              <div className="w-1 h-1 rounded-full bg-rose-400"></div>
+              Corte CPA (+20%)
+            </div>
+            <div className="text-2xl font-bold bg-gradient-to-r from-rose-400 to-rose-600 bg-clip-text text-transparent">
+              {cpaTarget > 0 ? `R$ ${(cpaTarget * 1.2).toFixed(2).replace('.', ',')}` : '—'}
+            </div>
+            <div className="text-[9px] text-rose-500/70 mt-1 font-medium italic">Limite tolerável com margem de gordura</div>
+          </div>
+
+          {/* Tiririca (CJA) */}
+          <div className="relative group overflow-hidden bg-slate-800/40 rounded-xl p-4 border border-slate-700/40 hover:border-amber-500/40 transition-all duration-300">
+            <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Sparkles className="w-8 h-8 text-amber-500" />
+            </div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+              <div className="w-1 h-1 rounded-full bg-amber-400"></div>
+              Tiririca (CJA - 3x)
+            </div>
+            <div className="text-2xl font-bold bg-gradient-to-r from-amber-400 to-yellow-600 bg-clip-text text-transparent">
+              {cpaTarget > 0 ? `R$ ${(cpaTarget * 3).toFixed(2).replace('.', ',')}` : '—'}
+            </div>
+            <div className="text-[9px] text-amber-500/70 mt-1 font-medium italic">3x o valor do CPA Max (Alerta crítico)</div>
+          </div>
+        </div>
+
+        {/* Informativo de Escala */}
+        <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex items-center gap-3 px-4 py-3 bg-emerald-500/5 border border-emerald-500/20 rounded-xl group hover:bg-emerald-500/10 transition-all">
+            <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
+              <Zap className="w-3 h-3 text-emerald-400 animate-pulse" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest leading-none mb-1">Performance Ideal</span>
+              <span className="text-[11px] font-medium text-slate-300">
+                Custo <strong className="text-emerald-400">ABAIXO</strong> do CPA Máximo: <strong className="text-emerald-400 ml-1">Escala 50%</strong>
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-3 bg-blue-500/5 border border-blue-500/20 rounded-xl group hover:bg-blue-500/10 transition-all">
+            <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/30">
+              <Zap className="w-3 h-3 text-blue-400" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-bold text-blue-500 uppercase tracking-widest leading-none mb-1">Performance Regular</span>
+              <span className="text-[11px] font-medium text-slate-300">
+                Custo <strong className="text-blue-400">ENTRE</strong> CPA Máx e Corte: <strong className="text-blue-400 ml-1">Escala 20%</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-8 flex items-center justify-between gap-3 flex-wrap">
         <div className="text-sm text-slate-300 flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-amber-300" />
           {loadingSuggestion ? (
@@ -499,12 +597,26 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({ selectedClient = '', 
               handleMarkAnalyzedToday();
             }}
             disabled={isUpdating}
-            className={`relative overflow-hidden px-3 py-2 text-sm rounded-lg border transition transform text-white ${isUpdating
-                ? 'bg-amber-600/80 border-amber-500/40 cursor-wait'
-                : 'bg-emerald-600/80 hover:bg-emerald-600 active:scale-[0.98] border-emerald-500/40'
+            className={`group relative px-6 py-2 text-xs font-extrabold rounded-xl transition-all duration-300 transform shadow-lg active:scale-[0.95] ${isUpdating
+              ? 'bg-slate-800 text-slate-500 cursor-wait border border-slate-700'
+              : 'bg-gradient-to-br from-emerald-500 via-emerald-400 to-green-500 hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] text-slate-950 border border-emerald-300/30'
               }`}
           >
-            {isUpdating ? 'Atualizando...' : 'Marcar como analisado hoje'}
+            <div className="relative z-10 flex items-center justify-center gap-2">
+              {isUpdating ? (
+                <Clock className="w-4 h-4 animate-spin" />
+              ) : (
+                <div className="relative">
+                  <CheckCircle2 className="w-4 h-4 group-hover:scale-110 transition-transform duration-300 text-slate-950" />
+                </div>
+              )}
+              <span className="tracking-tight uppercase text-[11px] whitespace-nowrap">{isUpdating ? 'Salvando...' : 'Marcar como analisado hoje'}</span>
+            </div>
+
+            {/* Brilho de Borda Refinado */}
+            {!isUpdating && (
+              <div className="absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            )}
           </button>
         </div>
       </div>

@@ -12,9 +12,18 @@ interface InsightsSectionProps {
   selectedAudience?: string;
   isFacebookConnected?: boolean;
   metaAdsUserId?: string;
+  cpaTarget?: number;
 }
 
-const InsightsSection: React.FC<InsightsSectionProps> = ({ selectedProduct, selectedClient = '', selectedMonth = '', selectedAudience = '', isFacebookConnected = false, metaAdsUserId = '' }) => {
+const InsightsSection: React.FC<InsightsSectionProps> = ({
+  selectedProduct,
+  selectedClient = '',
+  selectedMonth = '',
+  selectedAudience = '',
+  isFacebookConnected = false,
+  metaAdsUserId = '',
+  cpaTarget = 0
+}) => {
 
   const [isAudiencePaused, setIsAudiencePaused] = useState<boolean>(false);
 
@@ -155,6 +164,7 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({ selectedProduct, sele
             selectedAudience={selectedAudience}
             isFacebookConnected={isFacebookConnected}
             metaAdsUserId={metaAdsUserId}
+            cpaTarget={cpaTarget}
           />
         </div>
       )}
