@@ -267,7 +267,7 @@ export function pickRecommendedOption(ticketBand: TicketBand, productType: Produ
 function renderOpcoesEstrategia(strategyType: StrategyType, objective?: string) {
   if (strategyType === "impulsionar_post") {
     return `## Opções de Estratégia
-- **Crescimento de Audiência (Impulsionar Post):** Foco em atrair novos seguidores pelo menor custo possível. Ideal para volume e branding.`;
+- **Crescimento de Audiência:** Foco em atrair novos seguidores pelo menor custo possível. Ideal para volume e branding.`;
   }
 
   // Captura de Lead: LP → Formulário (sem WhatsApp)

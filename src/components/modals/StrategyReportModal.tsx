@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Target, Package, DollarSign, CheckCircle, Download } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { AdStrategy } from '../../types/ad-strategy';
 import { getRemarketingShare } from '../../utils/budget';
 import { buildStrategyReport } from '../../services/strategyReportService';
@@ -28,19 +28,11 @@ const StrategyReportModal: React.FC<StrategyReportModalProps> = ({
     selectedReport,
     selectedStrategyType,
     saveSelectedStrategy,
-    budgetItems,
-    handleUpdateBudgetItem,
-    handleRemoveBudgetItem,
-    handleAddBudgetItem,
-    handleSaveBudget,
-    hasUnsavedChanges,
-    extractDigits,
-    formatBRLFromDigits,
     onExportPDF
 }) => {
     if (!isOpen || !selectedReport?.strategyReport) return null;
 
-    // Recalcula o relatorio dinamicamente para garantir as fórmulas mais recentes (ex: médias vs intervalos e mudanças na selecao)
+    // Recalcula o relatorio dinamicamente para garantir as fórmulas mais recentes
     const dynamicReport = buildStrategyReport({
         ...selectedReport.strategyReport.inputs,
         strategyType: selectedStrategyType,
@@ -53,112 +45,120 @@ const StrategyReportModal: React.FC<StrategyReportModalProps> = ({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+                className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 font-inter"
                 onClick={onClose}
             >
                 <motion.div
-                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                    initial={{ opacity: 0, scale: 0.98, y: 10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                    className="relative bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-6xl max-h-[90vh] shadow-2xl overflow-hidden flex flex-col z-[9999]"
+                    exit={{ opacity: 0, scale: 0.98, y: 10 }}
+                    className="relative bg-[#0f172a] border border-slate-700/50 rounded-3xl w-full max-w-5xl max-h-[92vh] shadow-[0_0_80px_-20px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col z-[9999]"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    {/* Header */}
-                    <div className="flex items-center justify-between p-6 border-b border-slate-700/50 flex-shrink-0 bg-gradient-to-r from-slate-800 to-slate-900 relative z-[9999]">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-500 flex items-center justify-center">
-                                <Target className="w-5 h-5 text-white" />
-                            </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-slate-200">Relatório Estratégico</h2>
-                                <p className="text-sm text-slate-400">{selectedReport.product?.name}</p>
+                    {/* Header — Estilo Ultra Clean & Executive */}
+                    <div className="flex items-center justify-between px-8 py-7 border-b border-slate-800/60 bg-slate-900/50 backdrop-blur-xl sticky top-0 z-[100]">
+                        <div>
+                            <h2 className="text-2xl font-bold text-white tracking-tight leading-tight">Relatório Estratégico</h2>
+                            <div className="flex items-center gap-2 mt-1.5">
+                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]"></div>
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest leading-none">{selectedReport.product?.name}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
                             <button
                                 onClick={() => selectedReport && onExportPDF(selectedReport)}
-                                className="flex items-center gap-2 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                                className="flex items-center gap-2.5 bg-white/[0.03] hover:bg-white/[0.08] text-slate-200 border border-white/10 px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300"
                             >
-                                <Download className="w-4 h-4" />
+                                <Download className="w-3.5 h-3.5" />
                                 Exportar PDF
                             </button>
                             <button
                                 onClick={onClose}
-                                className="text-slate-400 hover:text-slate-200 transition-colors text-2xl hover:bg-slate-700/50 rounded-lg p-2"
+                                className="text-slate-500 hover:text-white transition-all hover:bg-white/5 rounded-xl w-10 h-10 flex items-center justify-center border border-transparent hover:border-white/5"
                             >
-                                ×
+                                <span className="text-3xl font-light">×</span>
                             </button>
                         </div>
                     </div>
 
                     {/* Content - Scrollable */}
-                    <div className="flex-1 overflow-y-auto p-6">
-                        <div className="space-y-8">
-                            {/* Dados da Campanha */}
-                            <section className="bg-gradient-to-br from-slate-800/40 via-slate-800/30 to-slate-700/20 border border-slate-600/50 rounded-xl p-6">
-                                <h3 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
-                                    <Package className="w-5 h-5 text-slate-300" />
-                                    Dados da Campanha
-                                </h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
-                                        <div className="text-sm text-slate-400 mb-1">Tipo de Campanha</div>
-                                        <div className="text-white font-medium capitalize">{selectedReport.strategyReport.inputs.campaignType}</div>
-                                    </div>
-                                    {selectedReport.strategyReport.inputs.productType !== 'sem_produto' && (
-                                        <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
-                                            <div className="text-sm text-slate-400 mb-1">Campanha</div>
-                                            <div className="text-white font-medium">{selectedReport.strategyReport.inputs.productType.replace(/\b\w/g, (l: string) => l.toUpperCase())}</div>
-                                        </div>
-                                    )}
-                                    <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
-                                        <div className="text-sm text-slate-400 mb-1">Investimento Disponível</div>
-                                        <div className="text-white font-medium">{selectedReport.strategyReport.inputs.investmentBRL.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
-                                    </div>
-                                    {selectedReport.strategyReport.inputs.productType !== 'sem_produto' && (
-                                        <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
-                                            <div className="text-sm text-slate-400 mb-1">Ticket do Produto</div>
-                                            <div className="text-white font-medium">{selectedReport.strategyReport.inputs.ticketBRL.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
-                                        </div>
-                                    )}
-                                </div>
-                            </section>
+                    <div className="flex-1 overflow-y-auto p-10 custom-scrollbar-slim bg-[#0f172a]">
+                        <div className="space-y-12">
 
-                            {/* Eliminar métricas estimadas conforme pedido pelo usuário */}
-
-
-                            {/* Distribuição de Verba */}
-                            <section className="bg-gradient-to-br from-slate-800/40 via-slate-800/30 to-slate-700/20 border border-slate-600/50 rounded-xl p-6">
-                                <h3 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
-                                    <DollarSign className="w-5 h-5 text-slate-300" />
-                                    Distribuição de Verba Diária
-                                </h3>
-                                <div className={`grid grid-cols-1 ${dynamicReport.metrics.strategyType === 'impulsionar_post' ? 'md:grid-cols-1' : 'md:grid-cols-2'} gap-4`}>
-                                    <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
-                                        <div className="text-sm text-slate-400 mb-2">Prospecção ({dynamicReport.metrics.strategyType === 'impulsionar_post' ? '100' : Math.round((1 - getRemarketingShare(selectedReport.strategyReport.inputs.investmentBRL)) * 100)}%)</div>
-                                        <div className="text-lg font-bold text-slate-200">
-                                            {(dynamicReport.metrics.dailyProspectionBRLMin || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / dia
+                            {/* Grid Superior: Dados + Verba */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                {/* Dados da Campanha */}
+                                <section className="relative">
+                                    <div className="bg-slate-900/20 border border-slate-800/60 rounded-3xl overflow-hidden h-full backdrop-blur-sm">
+                                        <div className="px-7 py-5 bg-[#151e31] border-b border-slate-800/60 flex items-center justify-between">
+                                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.25em]">Dados Gerais</h3>
+                                            <span className="px-2.5 py-1 bg-indigo-500/10 text-indigo-300 text-[9px] font-black rounded-full border border-indigo-500/20 uppercase tracking-widest">Parâmetros</span>
                                         </div>
-                                    </div>
-                                    {dynamicReport.metrics.strategyType !== 'impulsionar_post' && (
-                                        <div className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-4">
-                                            <div className="text-sm text-slate-400 mb-2">Remarketing ({Math.round(getRemarketingShare(selectedReport.strategyReport.inputs.investmentBRL) * 100)}%)</div>
-                                            <div className="text-lg font-bold text-slate-200">
-                                                {(dynamicReport.metrics.dailyRemarketingBRLMin || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / dia
+                                        <div className="p-8 grid grid-cols-2 gap-8">
+                                            <div>
+                                                <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-2 font-bold">Natureza</div>
+                                                <div className="text-slate-200 font-bold text-lg leading-tight capitalize">{selectedReport.strategyReport.inputs.campaignType}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-2 font-bold">Investimento</div>
+                                                <div className="text-blue-400 font-black text-xl leading-tight">{selectedReport.strategyReport.inputs.investmentBRL.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-2 font-bold">Objetivo</div>
+                                                <div className="text-slate-200 font-bold text-lg leading-tight">{selectedReport.strategyReport.inputs.productType.replace(/\b\w/g, (l: string) => l.toUpperCase())}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-2 font-bold">Ticket Médio</div>
+                                                <div className="text-slate-200 font-bold text-lg leading-tight">{selectedReport.strategyReport.inputs.ticketBRL.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
                                             </div>
                                         </div>
-                                    )}
-                                </div>
-                            </section>
+                                    </div>
+                                </section>
 
-                            {/* Relatório Completo em Markdown */}
-                            <section className="bg-gradient-to-br from-indigo-900/20 to-indigo-800/10 border border-indigo-500/30 rounded-xl p-6">
-                                <h3 className="text-lg font-semibold text-indigo-200 mb-4 flex items-center gap-2">
-                                    <CheckCircle className="w-5 h-5" />
-                                    Análise Completa
-                                </h3>
-                                <div className="space-y-6">
-                                    {/* Markdown Processing Logic */}
+                                {/* Distribuição de Verba */}
+                                <section className="relative">
+                                    <div className="bg-slate-900/20 border border-slate-800/60 rounded-3xl overflow-hidden h-full backdrop-blur-sm">
+                                        <div className="px-7 py-5 bg-[#151e31] border-b border-slate-800/60 flex items-center justify-between">
+                                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.25em]">Budget Diário</h3>
+                                            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-[9px] font-black rounded-full border border-emerald-500/20 uppercase tracking-widest">
+                                                <div className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse"></div>
+                                                Recomendado
+                                            </div>
+                                        </div>
+                                        <div className="p-8 space-y-5">
+                                            <div className="flex items-center gap-5 bg-slate-800/20 p-5 rounded-[1.25rem] border border-slate-800/40">
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Prospecção</span>
+                                                        <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 text-[9px] font-black rounded tracking-normal">{dynamicReport.metrics.strategyType === 'impulsionar_post' ? '100' : Math.round((1 - getRemarketingShare(selectedReport.strategyReport.inputs.investmentBRL)) * 100)}%</span>
+                                                    </div>
+                                                    <div className="text-2xl font-black text-white tracking-tight">{(dynamicReport.metrics.dailyProspectionBRLMin || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                                                </div>
+                                            </div>
+                                            {dynamicReport.metrics.strategyType !== 'impulsionar_post' && (
+                                                <div className="flex items-center gap-5 bg-slate-800/20 p-5 rounded-[1.25rem] border border-slate-800/40">
+                                                    <div>
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Remarketing</span>
+                                                            <span className="px-1.5 py-0.5 bg-purple-500/10 text-purple-400 text-[9px] font-black rounded tracking-normal">{Math.round(getRemarketingShare(selectedReport.strategyReport.inputs.investmentBRL) * 100)}%</span>
+                                                        </div>
+                                                        <div className="text-2xl font-black text-white tracking-tight">{(dynamicReport.metrics.dailyRemarketingBRLMin || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </section>
+                            </div>
+
+                            {/* Análise Completa — Executive Refinement */}
+                            <section className="space-y-8">
+                                <div className="flex items-center gap-5 px-1">
+                                    <h3 className="text-xl font-bold text-white tracking-tight">Análise Estratégica Completa</h3>
+                                    <div className="flex-1 h-[1px] bg-slate-900"></div>
+                                </div>
+
+                                <div className="space-y-8">
                                     {(() => {
                                         const markdown = dynamicReport.markdown;
                                         const sections = markdown.split(/(?=^## )/gm)
@@ -173,193 +173,98 @@ const StrategyReportModal: React.FC<StrategyReportModalProps> = ({
 
                                             const isOpcoesEstrategia = title === 'Opções de Estratégia';
 
+                                            // Paleta vibrante e harmonizada por seção
+                                            const sectionStyles = [
+                                                { border: 'border-blue-500/20', bg: 'bg-blue-500/5', bar: 'bg-blue-500', text: 'text-blue-400' },      // Opções
+                                                { border: 'border-emerald-500/20', bg: 'bg-emerald-500/5', bar: 'bg-emerald-500', text: 'text-emerald-400' }, // Recomendada
+                                                { border: 'border-amber-500/20', bg: 'bg-amber-500/5', bar: 'bg-amber-500', text: 'text-amber-400' },    // Risco
+                                                { border: 'border-indigo-500/20', bg: 'bg-indigo-500/5', bar: 'bg-indigo-500', text: 'text-indigo-400' }, // Próximos Passos
+                                            ];
+                                            const style = sectionStyles[index % sectionStyles.length];
+
                                             return (
-                                                <div key={index} className="bg-gradient-to-br from-slate-800/40 via-slate-800/30 to-slate-700/20 border border-slate-600/50 rounded-2xl p-6 backdrop-blur-sm hover:border-slate-500/60 transition-all duration-300">
+                                                <motion.div
+                                                    key={index}
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: index * 0.06 }}
+                                                    className={`border ${style.border} border-l-[6px] ${style.bar.replace('bg-', 'border-')} ${style.bg} rounded-[2rem] p-10 relative overflow-hidden`}
+                                                >
+                                                    {/* O indicador agora é a própria borda lateral para acompanhar o radius */}
+
+                                                    {/* Seletor Especial */}
                                                     {isOpcoesEstrategia && dynamicReport.metrics.strategyType !== 'impulsionar_post' && (() => {
                                                         const objective = selectedReport?.product?.objective;
-                                                        const isMensagens = objective === 'mensagens';
                                                         const isCapturaLeads = objective === 'captura_leads';
 
-                                                        // Captura de Leads: somente LP → Formulário (sem seleção)
-                                                        if (isCapturaLeads) {
-                                                            return (
-                                                                <div className="mb-6 p-4 bg-gradient-to-br from-blue-900/20 to-indigo-900/20 border border-blue-500/30 rounded-xl">
-                                                                    <div className="flex items-center gap-3 mb-3">
-                                                                        <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-full shadow-lg"></div>
-                                                                        <span className="text-sm font-bold text-blue-300 uppercase tracking-wider">
-                                                                            Estratégia Definida
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="grid grid-cols-1 gap-3">
-                                                                        <div className="p-3 rounded-lg border bg-blue-600/30 border-blue-400 text-blue-200">
-                                                                            <div className="font-semibold mb-1">LP → Formulário</div>
-                                                                            <div className="text-xs opacity-80">Captação de Leads</div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        }
-
-                                                        // Mensagens: LP→WhatsApp + WhatsApp Direto (sem LP Direto)
-                                                        const gridCols = isMensagens ? 'md:grid-cols-2' : 'md:grid-cols-3';
-
                                                         return (
-                                                            <div className="mb-6 p-4 bg-gradient-to-br from-blue-900/20 to-indigo-900/20 border border-blue-500/30 rounded-xl">
-                                                                <div className="flex items-center gap-3 mb-3">
-                                                                    <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-full shadow-lg"></div>
-                                                                    <span className="text-sm font-bold text-blue-300 uppercase tracking-wider">
-                                                                        Selecione a Estratégia
-                                                                    </span>
-                                                                </div>
-                                                                <div className={`grid grid-cols-1 ${gridCols} gap-3`}>
-                                                                    <button
-                                                                        onClick={() => saveSelectedStrategy('lp_whatsapp')}
-                                                                        className={`p-3 rounded-lg border transition-all duration-200 ${selectedStrategyType === 'lp_whatsapp'
-                                                                            ? 'bg-blue-600/30 border-blue-400 text-blue-200'
-                                                                            : 'bg-slate-700/30 border-slate-600 text-slate-300 hover:bg-slate-700/50'
-                                                                            }`}
-                                                                    >
-                                                                        <div className="font-semibold mb-1">LP → WhatsApp</div>
-                                                                        <div className="text-xs opacity-80">Educação + Qualificação</div>
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => saveSelectedStrategy('whatsapp_direto')}
-                                                                        className={`p-3 rounded-lg border transition-all duration-200 ${selectedStrategyType === 'whatsapp_direto'
-                                                                            ? 'bg-blue-600/30 border-blue-400 text-blue-200'
-                                                                            : 'bg-slate-700/30 border-slate-600 text-slate-300 hover:bg-slate-700/50'
-                                                                            }`}
-                                                                    >
-                                                                        <div className="font-semibold mb-1">WhatsApp Direto</div>
-                                                                        <div className="text-xs opacity-80">Volume + Conversas</div>
-                                                                    </button>
-                                                                    {!isMensagens && (
-                                                                        <button
-                                                                            onClick={() => saveSelectedStrategy('lp_direto')}
-                                                                            className={`p-3 rounded-lg border transition-all duration-200 ${selectedStrategyType === 'lp_direto'
-                                                                                ? 'bg-blue-600/30 border-blue-400 text-blue-200'
-                                                                                : 'bg-slate-700/30 border-slate-600 text-slate-300 hover:bg-slate-700/50'
-                                                                                }`}
-                                                                        >
-                                                                            <div className="font-semibold mb-1">LP Direto</div>
-                                                                            <div className="text-xs opacity-80">Checkout + Conversão</div>
-                                                                        </button>
+                                                            <div className="mb-10 p-8 bg-slate-900/30 rounded-3xl border border-slate-800/50">
+                                                                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.25em] mb-6">Modelo de Funil Selecionado</h4>
+                                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                                                    {isCapturaLeads ? (
+                                                                        <div className="p-5 rounded-2xl border border-indigo-500/30 bg-indigo-500/5 col-span-full">
+                                                                            <div className="font-bold text-indigo-300 text-base">LP → Formulário</div>
+                                                                            <div className="text-xs text-slate-400 mt-1.5 font-medium leading-relaxed">Configurado para máxima qualificação e geração de base de dados.</div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <>
+                                                                            <button
+                                                                                onClick={() => saveSelectedStrategy('lp_whatsapp')}
+                                                                                className={`p-5 rounded-2xl border-2 transition-all duration-300 text-left ${selectedStrategyType === 'lp_whatsapp' ? 'border-indigo-500 bg-indigo-500/10 shadow-[0_0_20px_rgba(99,102,241,0.1)]' : 'border-slate-800 bg-slate-900/40 opacity-40 hover:opacity-100'}`}
+                                                                            >
+                                                                                <div className={`font-bold text-sm ${selectedStrategyType === 'lp_whatsapp' ? 'text-white' : 'text-slate-400'}`}>LP → WhatsApp</div>
+                                                                                <div className="text-[10px] mt-2 font-semibold text-slate-500 uppercase tracking-wider">Qualificação</div>
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => saveSelectedStrategy('whatsapp_direto')}
+                                                                                className={`p-5 rounded-2xl border-2 transition-all duration-300 text-left ${selectedStrategyType === 'whatsapp_direto' ? 'border-indigo-500 bg-indigo-500/10 shadow-[0_0_20px_rgba(99,102,241,0.1)]' : 'border-slate-800 bg-slate-900/40 opacity-40 hover:opacity-100'}`}
+                                                                            >
+                                                                                <div className={`font-bold text-sm ${selectedStrategyType === 'whatsapp_direto' ? 'text-white' : 'text-slate-400'}`}>WhatsApp Direto</div>
+                                                                                <div className="text-[10px] mt-2 font-semibold text-slate-500 uppercase tracking-wider">Velocidade</div>
+                                                                            </button>
+                                                                            {objective !== 'mensagens' && (
+                                                                                <button
+                                                                                    onClick={() => saveSelectedStrategy('lp_direto')}
+                                                                                    className={`p-5 rounded-2xl border-2 transition-all duration-300 text-left ${selectedStrategyType === 'lp_direto' ? 'border-indigo-500 bg-indigo-500/10 shadow-[0_0_20px_rgba(99,102,241,0.1)]' : 'border-slate-800 bg-slate-900/40 opacity-40 hover:opacity-100'}`}
+                                                                                >
+                                                                                    <div className={`font-bold text-sm ${selectedStrategyType === 'lp_direto' ? 'text-white' : 'text-slate-400'}`}>Venda Direta</div>
+                                                                                    <div className="text-[10px] mt-2 font-semibold text-slate-500 uppercase tracking-wider">Automática</div>
+                                                                                </button>
+                                                                            )}
+                                                                        </>
                                                                     )}
                                                                 </div>
                                                             </div>
                                                         );
                                                     })()}
 
+                                                    {/* Título de Seção Refinado — Matched with Indicator Color */}
                                                     {title && (
-                                                        <div className="flex items-center gap-4 mb-6">
-                                                            <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-full shadow-lg"></div>
-                                                            <h3 className="text-xl font-bold text-slate-100 tracking-wide">{title}</h3>
-                                                        </div>
+                                                        <h4 className={`text-xl font-bold tracking-tight mb-7 ${style.text}`}>{title}</h4>
                                                     )}
 
-                                                    <div className="space-y-4 text-slate-200 leading-relaxed">
+                                                    {/* Lista com Marcadores Alinhados Precisamente */}
+                                                    <div className="space-y-5 text-[15px] leading-relaxed text-slate-400">
                                                         {content.map((line: string, lineIndex: number) => (
-                                                            <div key={lineIndex} dangerouslySetInnerHTML={{
-                                                                __html: line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
-                                                                    .replace(/^- /, '<span class="text-indigo-400 mr-2">•</span>')
-                                                            }} />
+                                                            <div key={lineIndex} className="flex gap-4">
+                                                                <div className="flex-shrink-0 mt-[0.6em]">
+                                                                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-500/40"></div>
+                                                                </div>
+                                                                <div
+                                                                    className="flex-1 tracking-normal"
+                                                                    dangerouslySetInnerHTML={{
+                                                                        __html: line
+                                                                            .replace(/\*\*(.*?)\*\*/g, '<strong class="text-slate-200 font-bold">$1</strong>')
+                                                                            .replace(/^- /, '')
+                                                                    }}
+                                                                />
+                                                            </div>
                                                         ))}
                                                     </div>
-                                                </div>
+                                                </motion.div>
                                             );
                                         });
                                     })()}
-                                </div>
-                            </section>
-
-                            {/* Bloco Permanente de Orçamento */}
-                            <section className="bg-gradient-to-br from-emerald-900/20 to-green-800/10 border border-emerald-500/30 rounded-xl p-6 mt-6">
-                                <h3 className="text-lg font-semibold text-emerald-200 mb-4 flex items-center gap-2">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                                    </svg>
-                                    Orçamento de Serviços
-                                </h3>
-
-                                <div className="space-y-4">
-                                    <p className="text-sm text-emerald-300/80 mb-4">
-                                        Adicione os serviços e valores para criar um orçamento detalhado
-                                    </p>
-
-                                    {/* Lista de itens */}
-                                    <div className="space-y-3">
-                                        {budgetItems.map((item, index) => (
-                                            <div key={index} className="flex items-center gap-3">
-                                                <div className="flex-1">
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Nome do serviço"
-                                                        value={item.service}
-                                                        onChange={(e) => handleUpdateBudgetItem(index, 'service', e.target.value)}
-                                                        className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/30 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-200"
-                                                    />
-                                                </div>
-                                                <div className="w-32">
-                                                    <div className="relative">
-                                                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-400 font-semibold text-sm">R$</span>
-                                                        <input
-                                                            type="text"
-                                                            value={item.value.replace('R$ ', '')}
-                                                            onChange={(e) => {
-                                                                const digits = extractDigits(e.target.value);
-                                                                const formatted = formatBRLFromDigits(digits);
-                                                                handleUpdateBudgetItem(index, 'value', formatted);
-                                                            }}
-                                                            className="w-full pl-8 pr-4 py-3 bg-slate-700/50 border border-slate-600/30 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 text-right font-mono transition-all duration-200"
-                                                        />
-                                                    </div>
-                                                </div>
-                                                {budgetItems.length > 1 && (
-                                                    <button
-                                                        onClick={() => handleRemoveBudgetItem(index)}
-                                                        className="p-3 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-colors border border-transparent hover:border-red-500/30"
-                                                        title="Remover item"
-                                                    >
-                                                        <span className="text-xl leading-none">×</span>
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    <div className="flex items-center justify-between pt-4 border-t border-slate-700/50">
-                                        <button
-                                            onClick={handleAddBudgetItem}
-                                            className="flex items-center gap-2 text-emerald-400 hover:text-emerald-300 font-medium transition-colors hover:bg-emerald-500/10 px-4 py-2 rounded-lg border border-transparent hover:border-emerald-500/20"
-                                        >
-                                            <span className="text-xl leading-none">+</span> Adicionar Serviço
-                                        </button>
-
-                                        <div className="flex items-center gap-4">
-                                            <div className="text-right">
-                                                <div className="text-sm text-slate-400">Total do Orçamento</div>
-                                                <div className="text-xl font-bold text-emerald-400">
-                                                    {(() => {
-                                                        const total = budgetItems.reduce((acc, item) => {
-                                                            const value = parseInt(extractDigits(item.value)) / 100;
-                                                            return acc + value;
-                                                        }, 0);
-                                                        return total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                                                    })()}
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={handleSaveBudget}
-                                                disabled={!hasUnsavedChanges}
-                                                className={`px-6 py-3 rounded-xl font-bold shadow-lg transition-all duration-300 flex items-center gap-2 ${hasUnsavedChanges
-                                                    ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:scale-105 hover:shadow-emerald-500/25 cursor-pointer'
-                                                    : 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600'
-                                                    }`}
-                                            >
-                                                <CheckCircle className={`w-5 h-5 ${hasUnsavedChanges ? 'animate-bounce' : ''}`} />
-                                                {hasUnsavedChanges ? 'Salvar Orçamento' : 'Salvo'}
-                                            </button>
-                                        </div>
-                                    </div>
                                 </div>
                             </section>
 
