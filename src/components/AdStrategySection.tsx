@@ -1335,13 +1335,8 @@ const AdStrategySection: React.FC<AdStrategySectionProps> = ({
     const remarketing = currentStrategy.audience?.remarketing || [];
     const scaleType = currentStrategy.audience?.scaleType;
 
-    // Ad Set prefix logic for "Sem Produto"
-    const adSetPrefix = productType === 'sem_produto'
-      ? `[${currentStrategy.product.name} sem_produto] [${campaignType}] [${objectiveLabel}] `
-      : '';
-
     // Construir a nomenclatura do público
-    let audienceName = `${adSetPrefix}[${gender}] [${ageRange}]`;
+    let audienceName = `[${gender}] [${ageRange}]`;
 
     // Adicionar localização se houver
     if (locations.length > 0) {
