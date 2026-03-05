@@ -1,31 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Clock, AlertTriangle, Calendar, X, CheckCircle, TrendingUp, ExternalLink } from 'lucide-react';
-import { notificationService, NotificationData, PendingAnalysis } from '../services/notificationService';
+import { Bell, AlertTriangle, X, CheckCircle, ExternalLink } from 'lucide-react';
+import { notificationService, NotificationData } from '../services/notificationService';
 import { metaAdsNotificationService, MetaAdsNotification } from '../services/metaAdsNotificationService';
 import { createPortal } from 'react-dom';
 
 interface NotificationButtonProps {
   selectedClient: string;
-  selectedProduct: string;
-  selectedAudience: string;
-  selectedMonth?: string;
   isFacebookConnected?: boolean;
   metaAdsUserId?: string;
 }
 
 const NotificationButton: React.FC<NotificationButtonProps> = ({
   selectedClient,
-  selectedProduct,
-  selectedAudience,
-  selectedMonth,
   isFacebookConnected = false,
   metaAdsUserId = ''
 }) => {
-  // 🎯 LOGS PARA DEBUG: Monitorar mudanças nas props
-  useEffect(() => {
-    
-  }, [selectedClient, selectedProduct, selectedAudience, selectedMonth, isFacebookConnected, metaAdsUserId]);
-  
   const [notificationData, setNotificationData] = useState<NotificationData>({
     pendingAnalyses: [],
     totalPending: 0,
@@ -40,38 +29,29 @@ const NotificationButton: React.FC<NotificationButtonProps> = ({
 
   // Carregar notificações
   const loadNotifications = async () => {
-    
-    
-    if (!isFacebookConnected) {
-      
-      setNotificationData({
-        pendingAnalyses: [],
-        totalPending: 0,
-        hasUrgent: false
-      });
+    // Se não tivermos um userId válido (Firebase UID), não carregamos nada
+    if (!metaAdsUserId) {
+      setNotificationData({ pendingAnalyses: [], totalPending: 0, hasUrgent: false });
       setMetaAdsNotifications([]);
       return;
     }
 
     setIsLoading(true);
     try {
-      
-      
       // Carregar notificações fechadas primeiro
       notificationService.loadClosedNotifications();
-      
-      // Carregar notificações de análises pendentes
+
+      // Carregar notificações de análises pendentes (sempre disponível se tiver UID)
       const analysisData = await notificationService.getPendingAnalyses(metaAdsUserId, selectedClient);
-      
       setNotificationData(analysisData);
-      
-      // Carregar notificações do Meta Ads
-      const metaAdsData = await metaAdsNotificationService.getMetaAdsNotifications(selectedClient);
-      
-      setMetaAdsNotifications(metaAdsData.notifications);
-      
-      
-      
+
+      // Carregar notificações do Meta Ads apenas se conectado
+      if (isFacebookConnected) {
+        const metaAdsData = await metaAdsNotificationService.getMetaAdsNotifications(selectedClient);
+        setMetaAdsNotifications(metaAdsData.notifications);
+      } else {
+        setMetaAdsNotifications([]);
+      }
     } catch (error) {
       console.error('🔔 [NOTIFICATION] Erro ao carregar notificações:', error);
     } finally {
@@ -87,16 +67,14 @@ const NotificationButton: React.FC<NotificationButtonProps> = ({
   const handleForceRefresh = async () => {
     setIsLoading(true);
     try {
-      // Carregar notificações fechadas primeiro
       notificationService.loadClosedNotifications();
-      
-      // Carregar notificações de análises pendentes
       const analysisData = await notificationService.getPendingAnalyses(metaAdsUserId, selectedClient);
       setNotificationData(analysisData);
-      
-      // Carregar notificações do Meta Ads (forçar atualização)
-      const metaAdsData = await metaAdsNotificationService.getMetaAdsNotifications(selectedClient, true);
-      setMetaAdsNotifications(metaAdsData.notifications);
+
+      if (isFacebookConnected) {
+        const metaAdsData = await metaAdsNotificationService.getMetaAdsNotifications(selectedClient, true);
+        setMetaAdsNotifications(metaAdsData.notifications);
+      }
     } catch (error) {
       console.error('🔔 [NOTIFICATION] Erro ao forçar atualização:', error);
     } finally {
@@ -104,98 +82,32 @@ const NotificationButton: React.FC<NotificationButtonProps> = ({
     }
   };
 
-  // Fechar notificação individual
   const handleCloseNotification = (notificationId: string) => {
     notificationService.closeNotification(notificationId);
-    // Recarregar notificações para atualizar a lista
     loadNotifications();
   };
 
-  // 🎯 CORREÇÃO: Remover timer automático e carregar apenas quando necessário
   useEffect(() => {
-    
     loadNotifications();
-    // 🚫 REMOVIDO: Timer automático de 5 minutos
-    // const interval = isFacebookConnected ? setInterval(loadNotifications, 5 * 60 * 1000) : null;
-    // return () => {
-    //   if (interval) clearInterval(interval);
-    // };
-  }, [isFacebookConnected, metaAdsUserId]); // Removido selectedClient, selectedProduct, selectedAudience, selectedMonth das dependências
+  }, [isFacebookConnected, metaAdsUserId, selectedClient]);
 
-  // 🎯 NOVO: Carregar notificações quando cliente for selecionado
-  useEffect(() => {
-    if (isFacebookConnected && selectedClient && selectedClient !== 'Selecione um cliente') {
-      
-      loadNotifications();
-    }
-  }, [selectedClient, isFacebookConnected]);
-
-  // Listener para eventos de conexão/desconexão do Meta Ads
-  useEffect(() => {
-    const handleMetaAdsConnected = () => {
-      
-      loadNotifications();
-    };
-
-    const handleMetaAdsDisconnected = () => {
-      
-      setNotificationData({
-        pendingAnalyses: [],
-        totalPending: 0,
-        hasUrgent: false
-      });
-      setIsOpen(false); // Fechar dropdown se estiver aberto
-    };
-
-    const handleAnalysisUpdated = () => {
-      if (isFacebookConnected) {
-        
-        loadNotifications();
-      }
-    };
-
-    window.addEventListener('metaAdsConnected', handleMetaAdsConnected);
-    window.addEventListener('metaAdsDisconnected', handleMetaAdsDisconnected);
-    window.addEventListener('analysisUpdated', handleAnalysisUpdated);
-
-    return () => {
-      window.removeEventListener('metaAdsConnected', handleMetaAdsConnected);
-      window.removeEventListener('metaAdsDisconnected', handleMetaAdsDisconnected);
-      window.removeEventListener('analysisUpdated', handleAnalysisUpdated);
-    };
-  }, [isFacebookConnected]);
-
-  // Fechar dropdown ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      
-      // Verificar se clicou em um botão dentro do modal
-      if (target.tagName === 'BUTTON' || target.closest('button')) {
-        return;
-      }
-      
+      if (target.tagName === 'BUTTON' || target.closest('button')) return;
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleClick = () => {
-    if (!isFacebookConnected) return; // Não abrir se não conectado
-    
     setIsOpen(!isOpen);
-    // 🎯 CORREÇÃO: Recarregar apenas ao abrir o dropdown
-    if (!isOpen) {
-      
-      loadNotifications();
-    }
+    if (!isOpen) loadNotifications();
   };
 
-  // Calcular posição do dropdown e usar portal para evitar stacking context do header
   useEffect(() => {
     const updatePos = () => {
       if (!triggerRef.current) return;
@@ -216,336 +128,117 @@ const NotificationButton: React.FC<NotificationButtonProps> = ({
     }
   }, [isOpen]);
 
-  const navigateToInsights = (analysis: PendingAnalysis) => {
-    // 🎯 CORREÇÃO: NÃO fechar o dropdown ao navegar
-    // setIsOpen(false); // REMOVIDO - modal deve permanecer aberto
-    
-    // Implementar navegação para a seção de insights
-    // Por enquanto, apenas scroll para insights ou alert
-    const insightsSection = document.querySelector('[data-section="insights"]');
-    if (insightsSection) {
-      insightsSection.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
   const getBellIcon = () => {
-    // Só mostrar cores quando o Meta Ads estiver conectado
-    if (!isFacebookConnected) {
-      return <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />;
-    }
-    
-    if (notificationData.hasUrgent) {
-      return <Bell className="w-5 h-5 group-hover:scale-110 transition-transform text-red-400" />;
-    }
-    if (notificationData.totalPending > 0) {
-      return <Bell className="w-5 h-5 group-hover:scale-110 transition-transform text-amber-400" />;
-    }
-    return <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />;
+    if (totalNotifications === 0) return <Bell className="w-5 h-5 transition-transform" />;
+    if (hasUrgentNotifications) return <Bell className="w-5 h-5 transition-transform text-red-400 animate-pulse" />;
+    return <Bell className="w-5 h-5 transition-transform text-amber-400" />;
   };
 
-  // 🎯 LOG PARA DEBUG: Monitorar estado do componente
-  useEffect(() => {
-    
-  }, [isOpen, isLoading, totalNotifications, hasUrgentNotifications]);
-
-  // 🎯 LOG PARA DEBUG: Monitorar mudanças no notificationData
-  useEffect(() => {
-    
-  }, [notificationData]);
-
-  // 🎯 LOG PARA DEBUG: Monitorar mudanças no isFacebookConnected
-  useEffect(() => {
-    
-  }, [isFacebookConnected]);
-
-    return (
+  return (
     <div className="relative group notification-button-wrapper" ref={dropdownRef}>
-      {/* 🎯 LOG PARA DEBUG: Verificar se o botão está sendo renderizado */}
-      {(() => {
-        
-        return null;
-      })()}
-      
-      {isFacebookConnected && (
-        <button
-          onClick={handleClick}
-          onMouseEnter={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            const tooltipWidth = 300;
-            const tooltipHeight = 80;
-            const margin = 10;
-            
-            let x = rect.left + (rect.width / 2) - (tooltipWidth / 2);
-            let y = rect.bottom + margin;
-            
-            // Ajustar horizontalmente se sair da tela
-            if (x < margin) {
-              x = margin;
-            } else if (x + tooltipWidth > window.innerWidth - margin) {
-              x = window.innerWidth - tooltipWidth - margin;
-            }
-            
-            // Ajustar verticalmente se sair da tela
-            if (y + tooltipHeight > window.innerHeight - margin) {
-              y = rect.top - tooltipHeight - margin;
-            }
-            
-            // Usar o mesmo sistema de tooltip do Header
-            if (typeof window !== 'undefined' && (window as any).setHeaderTooltip) {
-              (window as any).setHeaderTooltip({
-                visible: true,
-                x: Math.max(margin, x),
-                y: Math.max(margin, y),
-                title: 'Central de Notificações',
-                content: isFacebookConnected 
-                  ? (notificationData.totalPending > 0 
-                      ? `${notificationData.totalPending} análise(s) pendente(s) de processamento`
-                      : "Sem notificações pendentes"
-                    )
-                  : "Conecte-se ao Meta Ads para ver notificações e análises pendentes",
-                color: 'purple'
-              });
-            }
-          }}
-          onMouseLeave={() => {
-            if (typeof window !== 'undefined' && (window as any).setHeaderTooltip) {
-              (window as any).setHeaderTooltip((prev: any) => ({ ...prev, visible: false }));
-            }
-          }}
-          ref={triggerRef}
-          className={`p-3 rounded-xl transition-all duration-300 group shadow-sm hover:shadow-md relative notification-button-trigger ${
-            isFacebookConnected 
-              ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/50 cursor-pointer' 
-              : 'text-slate-600 cursor-not-allowed opacity-50'
-          }`}
-          disabled={!isFacebookConnected}
-          style={{ display: 'block', visibility: 'visible', opacity: isFacebookConnected ? 1 : 0.5 }}
-        >
-          {getBellIcon()}
-          
-          {/* Indicador de notificações - só quando Meta Ads estiver conectado */}
-          {isFacebookConnected && totalNotifications > 0 && (
-            <div className={`absolute -top-1 -right-1 w-5 h-5 rounded-full border-2 border-slate-900 flex items-center justify-center text-xs font-bold transition-all duration-200 ${
-              hasUrgentNotifications 
-                ? 'bg-red-500 text-white shadow-lg shadow-red-500/50 animate-pulse' 
-                : 'bg-amber-500 text-white shadow-lg shadow-amber-500/50'
-            }`}>
-              {totalNotifications > 9 ? '9+' : totalNotifications}
-            </div>
-          )}
-        </button>
-      )}
+      <button
+        onClick={handleClick}
+        onMouseEnter={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const tooltipWidth = 300;
+          let x = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+          let y = rect.bottom + 10;
+          if (x < 10) x = 10;
+          else if (x + tooltipWidth > window.innerWidth - 10) x = window.innerWidth - tooltipWidth - 10;
 
-      {/* Dropdown de notificações - via Portal para escapar do header */}
+          if (typeof window !== 'undefined' && (window as any).setHeaderTooltip) {
+            (window as any).setHeaderTooltip({
+              visible: true,
+              x: Math.max(10, x),
+              y: Math.max(10, y),
+              title: 'Central de Notificações',
+              content: isFacebookConnected
+                ? (totalNotifications > 0 ? `Você tem ${totalNotifications} notificação(ões) pendente(s)` : "Sem notificações pendentes")
+                : "Conecte-se ao Meta Ads para alertas detalhados. Análises pendentes são mostradas sempre.",
+              color: 'purple'
+            });
+          }
+        }}
+        onMouseLeave={() => {
+          if (typeof window !== 'undefined' && (window as any).setHeaderTooltip) {
+            (window as any).setHeaderTooltip((prev: any) => ({ ...prev, visible: false }));
+          }
+        }}
+        ref={triggerRef}
+        className={`p-3 rounded-xl transition-all duration-300 group shadow-sm hover:shadow-md relative ${isFacebookConnected ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/50' : 'text-slate-500 hover:text-slate-200 hover:bg-slate-700/30'
+          }`}
+      >
+        {getBellIcon()}
+        {totalNotifications > 0 && (
+          <div className={`absolute -top-1 -right-1 w-5 h-5 rounded-full border-2 border-slate-900 flex items-center justify-center text-[10px] font-bold ${hasUrgentNotifications ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'
+            }`}>
+            {totalNotifications > 9 ? '9+' : totalNotifications}
+          </div>
+        )}
+      </button>
+
       {isOpen && createPortal(
         <div
-          style={{
-            position: 'fixed',
-            top: `${menuPos.top}px`,
-            left: `${menuPos.left}px`,
-            width: `${menuPos.width}px`,
-            zIndex: 2147483647,
-            transform: 'translate3d(0,0,0)',
-            isolation: 'isolate',
-            contain: 'layout',
-            backfaceVisibility: 'hidden',
-            perspective: '1000px'
-          }}
+          style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, width: menuPos.width, zIndex: 9999 }}
           className="bg-slate-800 border border-slate-600/40 rounded-xl shadow-2xl overflow-hidden"
         >
-          {/* Header */}
           <div className="flex items-center justify-between p-4 bg-slate-700/50 border-b border-slate-600/40">
-            <div className="flex items-center gap-2">
-              <Bell className="w-5 h-5 text-slate-300" />
-              <h3 className="font-semibold text-slate-100">Notificações</h3>
-            </div>
+            <h3 className="font-semibold text-slate-100 flex items-center gap-2">
+              <Bell className="w-4 h-4" /> Notificações
+            </h3>
+            <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-slate-200"><X className="w-4 h-4" /></button>
           </div>
 
-          {/* Lista de notificações */}
           <div className="max-h-96 overflow-y-auto">
             {isLoading ? (
-              <div className="p-6 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-400 mx-auto mb-3"></div>
-                <p className="text-slate-400">Carregando notificações...</p>
-              </div>
+              <div className="p-8 text-center"><div className="animate-spin h-6 w-6 border-2 border-indigo-400 border-t-transparent rounded-full mx-auto" /></div>
             ) : (
               <>
-                {/* Notificações de Análises Pendentes */}
-                {notificationData.pendingAnalyses.length > 0 && (
-                  <div className="mb-4">
-                    <div className="px-4 py-2 bg-slate-700/30 border-b border-slate-600/40">
-                      <h3 className="text-sm font-semibold text-slate-200">Análises Pendentes</h3>
+                {notificationData.pendingAnalyses.map(a => (
+                  <div key={a.id} className="p-4 border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <AlertTriangle className={`w-3.5 h-3.5 ${a.daysPastDue > 3 ? 'text-red-400' : 'text-amber-400'}`} />
+                        <span className="text-sm font-medium text-slate-200">{a.client}</span>
+                      </div>
+                      <p className="text-xs text-slate-400">{a.product}</p>
+                      <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider">{a.daysPastDue} dia(s) de atraso</p>
                     </div>
-                    {notificationData.pendingAnalyses.map((analysis) => (
-                      <NotificationItem key={analysis.id} analysis={analysis} onClose={handleCloseNotification} />
-                    ))}
+                    <button onClick={() => handleCloseNotification(a.id)} className="text-slate-500 hover:text-slate-300"><X className="w-3.5 h-3.5" /></button>
                   </div>
-                )}
-
-                {/* Notificações do Meta Ads */}
-                {metaAdsNotifications.length > 0 && (
-                  <div className="mb-4">
-                    <div className="px-4 py-2 bg-slate-700/30 border-b border-slate-600/40">
-                      <h3 className="text-sm font-semibold text-slate-200">Alertas do Meta Ads</h3>
+                ))}
+                {isFacebookConnected && metaAdsNotifications.map(n => (
+                  <div key={n.id} className="p-4 border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className={`w-2 h-2 rounded-full ${n.severity === 'critical' ? 'bg-red-500' : 'bg-amber-500'}`} />
+                      <span className="text-sm font-medium text-slate-200">{n.title}</span>
                     </div>
-                    {metaAdsNotifications.map((notification) => (
-                      <MetaAdsNotificationItem 
-                        key={notification.id} 
-                        notification={notification} 
-                      />
-                    ))}
+                    <p className="text-xs text-slate-400">{n.message}</p>
+                    {n.actionUrl && (
+                      <a href={n.actionUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-indigo-400 hover:text-indigo-300 mt-2 flex items-center gap-1">
+                        <ExternalLink className="w-2.5 h-2.5" /> VER NO META ADS
+                      </a>
+                    )}
                   </div>
-                )}
-
-                {/* Mensagem quando não há notificações */}
-                {notificationData.pendingAnalyses.length === 0 && metaAdsNotifications.length === 0 && (
-                  <div className="p-6 text-center">
-                    <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
-                    <p className="text-slate-300 font-medium">Tudo em ordem!</p>
-                    <p className="text-slate-400 text-sm mt-1">Nenhuma notificação pendente</p>
+                ))}
+                {totalNotifications === 0 && (
+                  <div className="p-8 text-center">
+                    <CheckCircle className="w-8 h-8 text-emerald-500/50 mx-auto mb-2" />
+                    <p className="text-slate-400 text-sm">Nenhuma notificação</p>
                   </div>
                 )}
               </>
             )}
           </div>
 
-          {/* Footer */}
-          <div className="p-4 bg-slate-700/30 border-t border-slate-600/40">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-400">
-                {notificationData.pendingAnalyses.length > 0 
-                  ? `${notificationData.totalPending} análise(s) pendente(s)`
-                  : 'Nenhuma análise pendente'
-                }
-              </span>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleForceRefresh}
-                  className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
-                >
-                  Atualizar
-                </button>
-              </div>
-            </div>
+          <div className="p-3 bg-slate-700/30 border-t border-slate-600/40 text-center">
+            <button onClick={handleForceRefresh} className="text-xs text-indigo-400 hover:text-indigo-300 font-medium">Atualizar Agora</button>
           </div>
-        </div>, document.body)
-      }
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
 
-interface NotificationItemProps {
-  analysis: PendingAnalysis;
-  onClose: (notificationId: string) => void;
-}
-
-interface MetaAdsNotificationItemProps {
-  notification: MetaAdsNotification;
-}
-
-const NotificationItem: React.FC<NotificationItemProps> = ({ analysis, onClose }) => {
-  const urgencyLevel = analysis.daysPastDue > 7 ? 'critical' : analysis.daysPastDue > 3 ? 'high' : 'medium';
-  const urgencyColor = urgencyLevel === 'critical' ? 'text-red-400' : urgencyLevel === 'high' ? 'text-orange-400' : 'text-yellow-400';
-  
-  return (
-    <div className="p-4 hover:bg-slate-700/30 transition-colors">
-      <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <AlertTriangle className={`w-4 h-4 ${urgencyColor}`} />
-            <h4 className="text-sm font-medium text-slate-200 truncate">
-              Análise Pendente - {analysis.client}
-            </h4>
-          </div>
-          <p className="text-xs text-slate-400 mb-2">
-            {analysis.product} • {analysis.audience || 'Sem público'}
-          </p>
-          <div className="flex items-center gap-4 text-xs text-slate-400">
-            <span className="flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              {analysis.daysPastDue} dia(s) de atraso
-            </span>
-            <span className="flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
-              Próxima: {notificationService.formatDateBR(analysis.plannedNextDate)}
-            </span>
-          </div>
-        </div>
-        <button
-          onClick={() => onClose(analysis.id)}
-          className="ml-2 p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-600/50 rounded transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
-};
-
-const MetaAdsNotificationItem: React.FC<MetaAdsNotificationItemProps> = ({ notification }) => {
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'text-red-400';
-      case 'high': return 'text-orange-400';
-      case 'medium': return 'text-yellow-400';
-      case 'low': return 'text-blue-400';
-      default: return 'text-slate-400';
-    }
-  };
-
-  const getSeverityIcon = (severity: string) => {
-    switch (severity) {
-      case 'critical': return '🔴';
-      case 'high': return '🟠';
-      case 'medium': return '🟡';
-      case 'low': return '🔵';
-      default: return '⚪';
-    }
-  };
-
-  // Função para abrir link em nova aba
-  const handleOpenMetaAds = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (notification.actionUrl) {
-      window.open(notification.actionUrl, '_blank', 'noopener,noreferrer');
-    }
-  };
-
-  return (
-    <div className="p-4 hover:bg-slate-700/30 transition-colors">
-      <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm">{getSeverityIcon(notification.severity)}</span>
-            <h4 className={`text-sm font-medium ${getSeverityColor(notification.severity)} truncate`}>
-              {notification.title}
-            </h4>
-            {notification.actionRequired && (
-              <span className="px-2 py-1 text-xs bg-red-500/20 text-red-400 rounded-full">
-                Ação Necessária
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-slate-400 mb-2">
-            {notification.message}
-          </p>
-          <div className="flex items-center gap-2">
-            {notification.actionUrl && (
-              <button
-                onClick={handleOpenMetaAds}
-                className="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
-              >
-                <ExternalLink className="w-3 h-3" />
-                Ver no Meta Ads
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default NotificationButton; 
+export default NotificationButton;
