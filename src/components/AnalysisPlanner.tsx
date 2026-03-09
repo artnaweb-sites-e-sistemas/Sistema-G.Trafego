@@ -200,7 +200,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({
       console.error('❌ Erro ao carregar preferências:', error);
       setHydrated(true);
     }
-  }, [storageKey, selectedClient, selectedProduct, selectedAudience]);
+  }, [storageKey, selectedClient, selectedProduct, selectedAudience, metaAdsUserId]);
 
   // Salvar preferências
   useEffect(() => {

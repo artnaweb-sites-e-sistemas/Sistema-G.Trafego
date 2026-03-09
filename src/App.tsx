@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import LoginScreen from './pages/LoginScreen';
 import Dashboard from './pages/Dashboard';
@@ -7,6 +7,9 @@ import PublicReportView from './pages/PublicReportView';
 import MigrationStatus from './components/MigrationStatus';
 import { authService, User } from './services/authService';
 import { shareService } from './services/shareService';
+import { firestoreShareService } from './services/firestoreShareService';
+import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { auth } from './config/firebase';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -108,21 +111,59 @@ function App() {
     return <>{children}</>;
   };
 
-  // Componente para rota de link curto
+  // Componente para rota de link curto — suporta acesso público (sem login)
   const ShortLinkRoute = () => {
-    const pathname = window.location.pathname;
-    const shortCode = pathname.replace('/r/', '');
+    const { shortCode } = useParams<{ shortCode: string }>();
+    const [status, setStatus] = useState<'loading' | 'notfound'>('loading');
 
-    if (shortCode) {
-      const shareLink = shareService.getShareLink(shortCode);
-      if (shareLink) {
-        // Redirecionar para a URL original
-        window.location.href = shareLink.originalUrl;
-        return null;
-      }
+    useEffect(() => {
+      if (!shortCode) { setStatus('notfound'); return; }
+
+      const resolve = async () => {
+        // 1) Tentar cache local primeiro (usuário já logado)
+        const local = shareService.getShareLink(shortCode);
+        if (local?.originalUrl) {
+          window.location.href = local.originalUrl;
+          return;
+        }
+
+        // 2) Garantir auth (anônima se necessário) para ler do Firestore
+        await new Promise<void>((res) => {
+          const unsub = onAuthStateChanged(auth, async (user) => {
+            unsub();
+            if (!user) {
+              try { await signInAnonymously(auth); } catch { /* continua mesmo sem auth */ }
+            }
+            res();
+          });
+        });
+
+        // 3) Buscar no Firestore (agora com auth válido)
+        try {
+          const remote = await firestoreShareService.getShareLink(shortCode);
+          if (remote?.originalUrl) {
+            window.location.href = remote.originalUrl;
+            return;
+          }
+        } catch { /* link não encontrado */ }
+
+        setStatus('notfound');
+      };
+
+      resolve();
+    }, [shortCode]);
+
+    if (status === 'loading') {
+      return (
+        <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+          <div className="text-white text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p>Carregando relatório...</p>
+          </div>
+        </div>
+      );
     }
 
-    // Se o link não for encontrado, redirecionar para login
     return <Navigate to="/login" replace />;
   };
 

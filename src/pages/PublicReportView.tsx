@@ -4,6 +4,8 @@ import { ArrowLeft, Eye, Lock, Calendar, User, Package, Users, Info, TrendingUp,
 import DailyControlTable from '../components/DailyControlTable';
 import { metricsService, MetricData } from '../services/metricsService';
 import dayjs from 'dayjs';
+import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../config/firebase';
 
 // Cache inteligente para relatórios compartilhados
 class PublicReportCache {
@@ -704,11 +706,29 @@ const PublicReportView: React.FC = () => {
   };
 
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [authReady, setAuthReady] = useState(false);
+
+  // Autenticação anônima para permitir leitura do Firestore sem login
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        // Sem usuário logado: entrar anonimamente para ter token válido no Firestore
+        try {
+          await signInAnonymously(auth);
+        } catch (err) {
+          console.warn('Autenticação anônima falhou, tentando sem auth:', err);
+        }
+      }
+      setAuthReady(true);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const loadPublicReport = async () => {
       try {
         setLoading(true);
+        if (!authReady) return;
 
         // Extrair parâmetros da URL
         const audience = searchParams.get('audience') || '';
@@ -830,7 +850,7 @@ const PublicReportView: React.FC = () => {
     };
 
     loadPublicReport();
-  }, [searchParams, refreshTrigger]);
+  }, [searchParams, refreshTrigger, authReady]);
 
   // Listener para atualizações do relatório via localStorage (apenas quando relevante)
   useEffect(() => {

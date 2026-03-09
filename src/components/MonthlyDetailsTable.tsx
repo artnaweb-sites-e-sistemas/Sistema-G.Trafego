@@ -950,6 +950,11 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             monthlyBudget: (details as any).monthlyBudget || 0
           };
           setSavedDetails(newSavedDetails);
+
+          // Restaurar funnelType salvo no Firestore (sobrepõe localStorage se existir)
+          if ((details as any).funnelType) {
+            setFunnelType((details as any).funnelType as FunnelType);
+          }
           console.log('🔍 DEBUG - loadSavedDetails - savedDetails atualizado:', newSavedDetails);
 
           // CORREÇÃO: Aplicar valores salvos ao tableData (Agendamentos, Vendas, Seguidores Novos, CPV, ROI)
@@ -1010,7 +1015,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     };
 
     loadSavedDetails();
-  }, [selectedMonth, selectedProduct]);
+  }, [selectedMonth, selectedProduct, selectedClient]);
 
   // 🎯 CORREÇÃO: Carregar públicos APÓS savedDetails estar carregado
   useEffect(() => {
@@ -1169,6 +1174,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             audienceCalculatedValues.vendas !== savedDetails.vendas;
 
           if (autoAgendamentosChanged || autoVendasChanged) {
+            const audienceBudget = parseCurrency(finalData.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
             metricsService.saveMonthlyDetails({
               month: selectedMonth,
               product: selectedProduct,
@@ -1177,7 +1183,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               vendas: vendasToSave,
               seguidoresNovos: savedDetails.seguidoresNovos,
               cpv: cpv,
-              roi: roiValue
+              roi: roiValue,
+              funnelType,
+              monthlyBudget: audienceBudget
             }).catch(error => {
               console.error('Erro ao salvar valores dos públicos:', error);
             });
@@ -2003,10 +2011,25 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     }
   }, [agendamentosEnabled, hasInitialLoad]);
 
-  // 🎯 NOVO: Salvar estado dos toggles no localStorage
+  // 🎯 NOVO: Salvar estado dos toggles no localStorage e funnelType no Firestore
   useEffect(() => {
     localStorage.setItem('agendamentosEnabled', JSON.stringify(agendamentosEnabled));
     localStorage.setItem('funnelType', JSON.stringify(funnelType));
+
+    // Persistir funnelType no Firestore para sobreviver troca de navegador
+    if (selectedProduct && selectedMonth && selectedClient && selectedClient !== 'Todos os Clientes') {
+      const currentBudget = parseCurrency(tableData.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
+      metricsService.saveMonthlyDetails({
+        month: selectedMonth,
+        product: selectedProduct,
+        client: selectedClient,
+        agendamentos: savedDetails.agendamentos,
+        vendas: savedDetails.vendas,
+        seguidoresNovos: savedDetails.seguidoresNovos,
+        funnelType,
+        monthlyBudget: currentBudget
+      }).catch(() => {});
+    }
 
     // 🎯 NOVO: Disparar evento customizado para notificar outros componentes
     window.dispatchEvent(new CustomEvent('agendamentosEnabledChanged', {
@@ -2056,6 +2079,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
 
 
+      const ticketSaveBudget = parseCurrency(tableData.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
       metricsService.saveMonthlyDetails({
         month: selectedMonth,
         product: selectedProduct,
@@ -2064,7 +2088,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         vendas: savedDetails.vendas,
         ticketMedio: ticketMedio,
         cpv: cpv,
-        roi: roiValue
+        roi: roiValue,
+        funnelType,
+        monthlyBudget: ticketSaveBudget
       }).then(() => {
         // 🎯 NOVO: Salvar também nos benchmarks para persistir ao trocar período
         saveBenchmarkValues(tableData, ticketMedio);
@@ -2117,6 +2143,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
         // Calcular investimento total (não lido, removido)
 
+        const handleTicketBudget = parseCurrency(tableData.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
         metricsService.saveMonthlyDetails({
           month: selectedMonth,
           product: selectedProduct,
@@ -2125,7 +2152,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           vendas: savedDetails.vendas,
           ticketMedio: newValue, // Usar o novo valor
           cpv: cpv,
-          roi: roiValue
+          roi: roiValue,
+          funnelType,
+          monthlyBudget: handleTicketBudget
         }).then(() => {
           // 🎯 NOVO: Salvar também nos benchmarks para persistir ao trocar período
           saveBenchmarkValues(tableData, newValue);
@@ -2385,6 +2414,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
       // Salvar no Firebase (async, mas savedDetails já foi atualizado acima)
       if (selectedProduct && selectedMonth && selectedClient && selectedClient !== 'Todos os Clientes') {
+        const currentMonthlyBudgetVal = parseCurrency(recalculatedData.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
         const payload = {
           month: selectedMonth,
           product: selectedProduct,
@@ -2394,7 +2424,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           seguidoresNovos: seguidoresNovosVal,
           ticketMedio: ticketMedio,
           cpv: cpv,
-          roi: roiValue
+          roi: roiValue,
+          funnelType,
+          monthlyBudget: currentMonthlyBudgetVal
         };
         metricsService.saveMonthlyDetails(payload).then(() => {
           // 🎯 FIX: Limpar dirty flags após confirmação do Firebase

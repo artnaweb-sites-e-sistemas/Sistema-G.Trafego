@@ -1409,6 +1409,8 @@ export const metricsService = {
     ticketMedio?: number;
     cpv?: number;
     roi?: string; // Changed to string to save full ROI value
+    funnelType?: string; // Objetivo da campanha: WHATSAPP, LEADS, DIRETA, AUDIENCIA
+    monthlyBudget?: number; // Investimento pretendido do mês
   }) {
     try {
       const detailsRef = collection(db, 'monthlyDetails');
@@ -1457,6 +1459,16 @@ export const metricsService = {
         }
         if (data.roi !== undefined) {
           updateData.roi = data.roi;
+        }
+
+        // Incluir funnelType se foi fornecido
+        if (data.funnelType !== undefined) {
+          updateData.funnelType = data.funnelType;
+        }
+
+        // Incluir monthlyBudget se foi fornecido
+        if (data.monthlyBudget !== undefined) {
+          updateData.monthlyBudget = data.monthlyBudget;
         }
 
         await updateDoc(docRef, updateData);
@@ -1528,14 +1540,16 @@ export const metricsService = {
           ticketMedio: data.ticketMedio || 0,
           cpv: data.cpv || 0,
           roi: data.roi,
-          seguidoresNovos: data.seguidoresNovos || 0
+          seguidoresNovos: data.seguidoresNovos || 0,
+          funnelType: data.funnelType || null,
+          monthlyBudget: data.monthlyBudget || 0
         };
       }
 
-      return { agendamentos: 0, vendas: 0, seguidoresNovos: 0, ticketMedio: 250, cpv: 0, roi: '0% (0.0x)' };
+      return { agendamentos: 0, vendas: 0, seguidoresNovos: 0, ticketMedio: 250, cpv: 0, roi: '0% (0.0x)', funnelType: null, monthlyBudget: 0 };
     } catch (error) {
       console.error('Erro ao buscar detalhes mensais:', error);
-      return { agendamentos: 0, vendas: 0, seguidoresNovos: 0, ticketMedio: 250, cpv: 0, roi: '0% (0.0x)' };
+      return { agendamentos: 0, vendas: 0, seguidoresNovos: 0, ticketMedio: 250, cpv: 0, roi: '0% (0.0x)', funnelType: null, monthlyBudget: 0 };
     }
   },
 
@@ -1589,14 +1603,33 @@ export const metricsService = {
     }
   },
 
-  // Buscar valores de benchmark/projeção salvos - SEMPRE usa o valor mais recente editado
-  async getBenchmarkValues(_month: string, product: string, client: string) {
+  // Buscar valores de benchmark/projeção salvos - prioriza mês selecionado, cai para mais recente
+  async getBenchmarkValues(month: string, product: string, client: string) {
     try {
-
-
       const benchmarkRef = collection(db, 'benchmarkValues');
 
-      // NOVA LÓGICA: Sempre buscar o valor mais recente (independente do período)
+      // Primeiro: tentar buscar do mês específico se fornecido
+      if (month) {
+        const monthQuery = query(
+          benchmarkRef,
+          where('month', '==', month),
+          where('product', '==', product),
+          where('client', '==', client)
+        );
+        const monthSnapshot = await getDocs(monthQuery);
+
+        if (!monthSnapshot.empty) {
+          // Pegar o mais recente do mesmo mês
+          const docs = monthSnapshot.docs.sort((a, b) => {
+            const aDate = a.data().updatedAt?.toDate() || a.data().createdAt?.toDate() || new Date(0);
+            const bDate = b.data().updatedAt?.toDate() || b.data().createdAt?.toDate() || new Date(0);
+            return bDate.getTime() - aDate.getTime();
+          });
+          return docs[0].data().benchmarks || {};
+        }
+      }
+
+      // Fallback: buscar o mais recente de qualquer mês (mantém compatibilidade)
       const allQuery = query(
         benchmarkRef,
         where('product', '==', product),
@@ -1606,7 +1639,6 @@ export const metricsService = {
       const allSnapshot = await getDocs(allQuery);
 
       if (!allSnapshot.empty) {
-        // Encontrar o documento mais recente (pela data de atualização)
         let mostRecentDoc: any = null;
         let mostRecentDate: Date | null = null;
 
@@ -1621,11 +1653,9 @@ export const metricsService = {
         });
 
         if (mostRecentDoc) {
-
           return mostRecentDoc.benchmarks || {};
         }
       }
-
 
       return {};
     } catch (error) {

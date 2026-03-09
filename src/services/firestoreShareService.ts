@@ -61,11 +61,8 @@ class FirestoreShareService {
     }
   }
 
-  // Buscar link por código (acesso direto pelo ID)
+  // Buscar link por código (acesso direto pelo ID) — acesso público, não requer login
   async getShareLink(shortCode: string): Promise<ShareLink | null> {
-    const userId = this.getCurrentUserId();
-    if (!userId) return null;
-
     try {
       const snap = await getDoc(doc(db, this.COLLECTION_NAME, shortCode));
       if (!snap.exists()) return null;
@@ -73,7 +70,11 @@ class FirestoreShareService {
       
       // Verificar se o link expirou
       if (shareLink.expiresAt && new Date() > shareLink.expiresAt) {
-        await this.deactivateLink(shortCode);
+        // Desativar apenas se houver usuário logado (operação de escrita requer auth)
+        const userId = this.getCurrentUserId();
+        if (userId) {
+          await this.deactivateLink(shortCode);
+        }
         return null;
       }
 
