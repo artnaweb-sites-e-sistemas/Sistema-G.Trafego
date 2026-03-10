@@ -9,7 +9,7 @@ interface MonthlyDetailsTableProps {
   selectedProduct?: string;
   selectedClient?: string;
   selectedMonth?: string;
-  onValuesChange?: (values: { agendamentos: number; vendas: number; seguidoresNovos: number; cpaTarget?: number; monthlyBudget?: number; funnelType?: string }) => void;
+  onValuesChange?: (values: { agendamentos: number; vendas: number; seguidoresNovos: number; cpaTarget?: number; monthlyBudget?: number; funnelType?: string; agendamentosEnabled?: boolean }) => void;
 }
 
 interface TableRow {
@@ -65,6 +65,13 @@ const Tooltip: React.FC<{ children: React.ReactNode; content: string; isVisible:
   );
 };
 
+// Cliente efetivo para save/load no Firebase (evita "" ou valores inválidos)
+const getEffectiveClient = (client?: string): string => {
+  const c = (client || '').trim();
+  if (!c || c === 'Selecione um cliente' || c === 'Todos os Clientes') return 'Cliente Padrão';
+  return c;
+};
+
 const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   metrics = [],
   selectedProduct = '',
@@ -74,6 +81,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const effectiveClient = getEffectiveClient(selectedClient);
   const [tooltipStates, setTooltipStates] = useState<{ [key: string]: boolean }>({});
 
   // 🎯 NOVO: Controle para campos de valores reais editáveis (automático vs manual)
@@ -809,7 +817,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
   // Estado para controlar se devemos sobrescrever valores editados manualmente
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
-  const [lastNotifiedValues, setLastNotifiedValues] = useState({ agendamentos: 0, vendas: 0, seguidoresNovos: 0, cpaTarget: 0, monthlyBudget: 0, funnelType: '' });
+  const [lastNotifiedValues, setLastNotifiedValues] = useState({ agendamentos: 0, vendas: 0, seguidoresNovos: 0, cpaTarget: 0, monthlyBudget: 0, funnelType: '', agendamentosEnabled: true });
 
   // Estado para armazenar dados editáveis salvos
   const [savedDetails, setSavedDetails] = useState<{
@@ -831,6 +839,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   });
   // 🎯 FIX: Dirty-state para rastrear campos editados manualmente (evita race condition com audience sync)
   const dirtyFieldsRef = useRef<Set<string>>(new Set());
+
+  // 🎯 FIX: Flag para pular a próxima execução do audience sync após load do Firebase
+  const skipAudienceSyncRef = useRef(false);
 
   // Estado para armazenar dados calculados dos públicos
   const [audienceCalculatedValues, setAudienceCalculatedValues] = useState({ agendamentos: 0, vendas: 0 });
@@ -931,11 +942,10 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
       if (selectedProduct && selectedMonth) {
         try {
-
           const details = await metricsService.getMonthlyDetails(
             selectedMonth,
             selectedProduct,
-            selectedClient
+            effectiveClient
           );
           console.log('🔍 DEBUG - loadSavedDetails - Dados recebidos do Firebase:', details);
 
@@ -958,24 +968,25 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           console.log('🔍 DEBUG - loadSavedDetails - savedDetails atualizado:', newSavedDetails);
 
           // CORREÇÃO: Aplicar valores salvos ao tableData (Agendamentos, Vendas, Seguidores Novos, CPV, ROI)
+          // 🎯 FIX: Sinalizar para o audience sync NÃO sobrescrever esses valores
+          skipAudienceSyncRef.current = true;
+
           setTableData(prevData => {
             console.log('🔍 DEBUG - loadSavedDetails - atualizando tableData. prevData length:', prevData.length);
             const newData = prevData.map(row => {
               const newRow = { ...row };
 
-              // Aplicar Agendamentos salvos se for manual
-              if (row.metric === 'Agendamentos' && !getRealValueAutoState('Agendamentos')) {
+              // 🎯 FIX: SEMPRE aplicar valores do Firebase, independente do modo auto/manual
+              if (row.metric === 'Agendamentos') {
                 newRow.realValue = formatNumber(newSavedDetails.agendamentos);
-                console.log('🔍 DEBUG - loadSavedDetails - Aplicou Agendamentos manual:', newRow.realValue);
+                console.log('🔍 DEBUG - loadSavedDetails - Aplicou Agendamentos:', newRow.realValue);
               }
 
-              // Aplicar Vendas salvos se for manual
-              if (row.metric === 'Vendas' && !getRealValueAutoState('Vendas')) {
+              if (row.metric === 'Vendas') {
                 newRow.realValue = formatNumber(newSavedDetails.vendas);
-                console.log('🔍 DEBUG - loadSavedDetails - Aplicou Vendas manual:', newRow.realValue);
+                console.log('🔍 DEBUG - loadSavedDetails - Aplicou Vendas:', newRow.realValue);
               }
 
-              // Aplicar Seguidores Novos salvos (sempre manual)
               if (row.metric === 'Seguidores Novos') {
                 newRow.realValue = formatNumber(newSavedDetails.seguidoresNovos);
                 console.log('🔍 DEBUG - loadSavedDetails - Aplicou Seguidores Novos:', newRow.realValue);
@@ -1015,7 +1026,34 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     };
 
     loadSavedDetails();
-  }, [selectedMonth, selectedProduct, selectedClient]);
+  }, [selectedMonth, selectedProduct, effectiveClient]);
+
+  // 🎯 FIX: Reaplicar valores do Firebase após um tick (garante que prevaleçam sobre outros useEffects)
+  useEffect(() => {
+    if (!selectedProduct || !selectedMonth || (editingCell?.field === 'realValue')) return;
+    const timer = setTimeout(() => {
+      setTableData(prev => {
+        let changed = false;
+        const updated = prev.map(row => {
+          if (row.metric === 'Agendamentos') {
+            const v = formatNumber(savedDetails.agendamentos);
+            if (row.realValue !== v) { changed = true; return { ...row, realValue: v }; }
+          }
+          if (row.metric === 'Vendas') {
+            const v = formatNumber(savedDetails.vendas);
+            if (row.realValue !== v) { changed = true; return { ...row, realValue: v }; }
+          }
+          if (row.metric === 'Seguidores Novos') {
+            const v = formatNumber(savedDetails.seguidoresNovos);
+            if (row.realValue !== v) { changed = true; return { ...row, realValue: v }; }
+          }
+          return row;
+        });
+        return changed ? calculateValues(updated) : prev;
+      });
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [savedDetails.agendamentos, savedDetails.vendas, savedDetails.seguidoresNovos, selectedProduct, selectedMonth, editingCell?.field]);
 
   // 🎯 CORREÇÃO: Carregar públicos APÓS savedDetails estar carregado
   useEffect(() => {
@@ -1060,7 +1098,13 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
   // Atualizar valores na tabela quando dados calculados dos públicos mudarem (reativo)
   useEffect(() => {
-
+    // 🎯 FIX: Pular esta execução se acabamos de carregar do Firebase
+    // Isso evita que audienceCalculatedValues (que pode ser 0) sobrescreva os valores reais
+    if (skipAudienceSyncRef.current) {
+      skipAudienceSyncRef.current = false;
+      console.log('🔍 DEBUG - useEffect[audienceSync] - PULADO (dados recém-carregados do Firebase)');
+      return;
+    }
 
     // 🎯 CORREÇÃO: Só aguardar carregamento na primeira vez, não quando usuário edita
     const isInitialLoad = !ticketMedioEditedByUser &&
@@ -1178,14 +1222,15 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
             metricsService.saveMonthlyDetails({
               month: selectedMonth,
               product: selectedProduct,
-              client: selectedClient,
+              client: effectiveClient,
               agendamentos: agendamentosToSave,
               vendas: vendasToSave,
               seguidoresNovos: savedDetails.seguidoresNovos,
               cpv: cpv,
               roi: roiValue,
               funnelType,
-              monthlyBudget: audienceBudget
+              monthlyBudget: audienceBudget,
+              agendamentosEnabled
             }).catch(error => {
               console.error('Erro ao salvar valores dos públicos:', error);
             });
@@ -1198,7 +1243,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
 
       return finalData;
     });
-  }, [audienceCalculatedValues, ticketMedio, savedDetails, ticketMedioEditedByUser, selectedProduct, selectedMonth, selectedClient]);
+  }, [audienceCalculatedValues, ticketMedio, savedDetails, ticketMedioEditedByUser, selectedProduct, selectedMonth, effectiveClient]);
 
 
 
@@ -1391,25 +1436,16 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
               newRow.realValueEditable = false;
               break;
             case 'Agendamentos':
-              // 🎯 FIX: Preservar valor existente no tableData (já aplicado por loadSavedDetails)
-              // Não ler savedDetails aqui — stale closure causa sobrescrita com 0
-              if (getRealValueAutoState('Agendamentos')) {
-                newRow.realValue = formatNumber(audienceCalculatedValues.agendamentos);
-              }
-              // else: manter newRow.realValue do prevData (já correto)
+              // 🎯 FIX: Preservar valor existente do tableData (loadSavedDetails já aplicou)
+              // NÃO sobrescrever com audienceCalculatedValues — pode ser 0 durante load
               newRow.realValueEditable = true;
               break;
             case 'Vendas':
-              // 🎯 FIX: Preservar valor existente no tableData
-              if (getRealValueAutoState('Vendas')) {
-                newRow.realValue = formatNumber(audienceCalculatedValues.vendas);
-              }
-              // else: manter newRow.realValue do prevData (já correto)
+              // 🎯 FIX: Preservar valor existente do tableData (loadSavedDetails já aplicou)
               newRow.realValueEditable = true;
               break;
             case 'Seguidores Novos':
-              // 🎯 FIX: Preservar valor existente no tableData (sempre manual)
-              // Não sobrescrever — loadSavedDetails já aplicou o valor correto
+              // 🎯 FIX: Preservar valor existente do tableData (loadSavedDetails já aplicou)
               newRow.realValueEditable = true;
               break;
             default:
@@ -1611,18 +1647,13 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
   // 🎯 CORREÇÃO: useEffect separado para notificar mudanças de valores e mesclar reais manuais
   useEffect(() => {
     if (onValuesChange) {
-      // Usa os valores do contexto/Meta Ads SOMENTE se estiver no modo Automático, senão usa os editados
-      const agendamentosFromAudience = audienceCalculatedValues.agendamentos || 0;
-      const vendasFromAudience = audienceCalculatedValues.vendas || 0;
-
+      // 🎯 FIX: Sempre usar valores do tableData (source of truth) — eles já refletem
+      // o Firebase load, a edição manual, ou o cálculo automático (o que vier por último)
       const manualAgendamentosStr = tableData.find(r => r.metric === 'Agendamentos')?.realValue || '0';
       const manualVendasStr = tableData.find(r => r.metric === 'Vendas')?.realValue || '0';
 
-      const manualAgendamentos = parseNumber(manualAgendamentosStr);
-      const manualVendas = parseNumber(manualVendasStr);
-
-      const agendamentos = getRealValueAutoState('Agendamentos') ? agendamentosFromAudience : manualAgendamentos;
-      const vendas = getRealValueAutoState('Vendas') ? vendasFromAudience : manualVendas;
+      const agendamentos = parseNumber(manualAgendamentosStr);
+      const vendas = parseNumber(manualVendasStr);
 
       // Extract proper CPA target based on current funnel logic
       let currentCpaTargetStr = '0';
@@ -1653,7 +1684,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         seguidoresNovos !== (lastNotifiedValues as any).seguidoresNovos ||
         currentCpaTarget !== (lastNotifiedValues as any).cpaTarget ||
         currentMonthlyBudget !== (lastNotifiedValues as any).monthlyBudget ||
-        funnelType !== (lastNotifiedValues as any).funnelType
+        funnelType !== (lastNotifiedValues as any).funnelType ||
+        agendamentosEnabled !== (lastNotifiedValues as any).agendamentosEnabled
       ) {
         const notifyPayload = {
           agendamentos,
@@ -1661,13 +1693,14 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           seguidoresNovos,
           cpaTarget: currentCpaTarget,
           monthlyBudget: currentMonthlyBudget,
-          funnelType
+          funnelType,
+          agendamentosEnabled
         };
         setLastNotifiedValues(notifyPayload as any);
         onValuesChange(notifyPayload);
       }
     }
-  }, [audienceCalculatedValues, onValuesChange, lastNotifiedValues, realValueAuto, tableData, funnelType]);
+  }, [onValuesChange, lastNotifiedValues, tableData, funnelType, agendamentosEnabled]);
 
   // 🎯 NOVA FUNÇÃO: Verificar se um campo foi editado pelo usuário (igual ao Ticket Médio)
   const isFieldEditedByUser = (metricName: string): boolean => {
@@ -2023,11 +2056,9 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         month: selectedMonth,
         product: selectedProduct,
         client: selectedClient,
-        agendamentos: savedDetails.agendamentos,
-        vendas: savedDetails.vendas,
-        seguidoresNovos: savedDetails.seguidoresNovos,
         funnelType,
-        monthlyBudget: currentBudget
+        monthlyBudget: currentBudget,
+        agendamentosEnabled
       }).catch(() => {});
     }
 
@@ -2084,13 +2115,12 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         month: selectedMonth,
         product: selectedProduct,
         client: selectedClient,
-        agendamentos: savedDetails.agendamentos,
-        vendas: savedDetails.vendas,
         ticketMedio: ticketMedio,
         cpv: cpv,
         roi: roiValue,
         funnelType,
-        monthlyBudget: ticketSaveBudget
+        monthlyBudget: ticketSaveBudget,
+        agendamentosEnabled
       }).then(() => {
         // 🎯 NOVO: Salvar também nos benchmarks para persistir ao trocar período
         saveBenchmarkValues(tableData, ticketMedio);
@@ -2148,13 +2178,12 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           month: selectedMonth,
           product: selectedProduct,
           client: selectedClient,
-          agendamentos: savedDetails.agendamentos,
-          vendas: savedDetails.vendas,
           ticketMedio: newValue, // Usar o novo valor
           cpv: cpv,
           roi: roiValue,
           funnelType,
-          monthlyBudget: handleTicketBudget
+          monthlyBudget: handleTicketBudget,
+          agendamentosEnabled
         }).then(() => {
           // 🎯 NOVO: Salvar também nos benchmarks para persistir ao trocar período
           saveBenchmarkValues(tableData, newValue);
@@ -2412,13 +2441,13 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
         ticketMedio: ticketMedio
       }));
 
-      // Salvar no Firebase (async, mas savedDetails já foi atualizado acima)
-      if (selectedProduct && selectedMonth && selectedClient && selectedClient !== 'Todos os Clientes') {
+      // Salvar no Firebase (sempre que houver produto e mês; client normalizado)
+      if (selectedProduct && selectedMonth) {
         const currentMonthlyBudgetVal = parseCurrency(recalculatedData.find(r => r.metric === 'Investimento pretendido (Mês)')?.benchmark || '0');
         const payload = {
           month: selectedMonth,
           product: selectedProduct,
-          client: selectedClient,
+          client: effectiveClient,
           agendamentos: agendamentosVal,
           vendas: vendasVal,
           seguidoresNovos: seguidoresNovosVal,
@@ -2426,7 +2455,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           cpv: cpv,
           roi: roiValue,
           funnelType,
-          monthlyBudget: currentMonthlyBudgetVal
+          monthlyBudget: currentMonthlyBudgetVal,
+          agendamentosEnabled
         };
         metricsService.saveMonthlyDetails(payload).then(() => {
           // 🎯 FIX: Limpar dirty flags após confirmação do Firebase
@@ -2456,7 +2486,8 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
           seguidoresNovos: seguidoresNovosVal,
           cpaTarget: cpaTargetVal,
           monthlyBudget: currentMonthlyBudget,
-          funnelType
+          funnelType,
+          agendamentosEnabled
         });
       }
 

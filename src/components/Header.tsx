@@ -35,7 +35,7 @@ interface HeaderProps {
   dataSource?: 'manual' | 'facebook' | null;
   isFacebookConnected?: boolean;
   onDataSourceChange?: (source: 'manual' | 'facebook' | null, connected: boolean) => void;
-  monthlyDetailsValues?: { agendamentos: number; vendas: number };
+  monthlyDetailsValues?: { agendamentos: number; vendas: number; seguidoresNovos?: number; monthlyBudget?: number; funnelType?: string; agendamentosEnabled?: boolean };
   metrics?: MetricData[];
 }
 
@@ -53,7 +53,7 @@ const Header: React.FC<HeaderProps> = ({
   dataSource,
   isFacebookConnected,
   onDataSourceChange,
-  monthlyDetailsValues = { agendamentos: 0, vendas: 0 },
+  monthlyDetailsValues = { agendamentos: 0, vendas: 0, seguidoresNovos: 0, monthlyBudget: 0, funnelType: 'WHATSAPP', agendamentosEnabled: true },
   metrics = [],
 }) => {
   const [hasGeneratedLinks, setHasGeneratedLinks] = useState(false);

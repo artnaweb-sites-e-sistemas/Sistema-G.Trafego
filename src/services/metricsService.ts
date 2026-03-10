@@ -1403,14 +1403,15 @@ export const metricsService = {
     month: string;
     product: string;
     client?: string; // Adicionar campo client opcional
-    agendamentos: number;
-    vendas: number;
+    agendamentos?: number;
+    vendas?: number;
     seguidoresNovos?: number;
     ticketMedio?: number;
     cpv?: number;
     roi?: string; // Changed to string to save full ROI value
     funnelType?: string; // Objetivo da campanha: WHATSAPP, LEADS, DIRETA, AUDIENCIA
     monthlyBudget?: number; // Investimento pretendido do mês
+    agendamentosEnabled?: boolean; // Se funil de agendamento está em uso
   }) {
     try {
       const detailsRef = collection(db, 'monthlyDetails');
@@ -1429,6 +1430,8 @@ export const metricsService = {
         // Criar novo documento
         await addDoc(detailsRef, {
           ...data,
+          agendamentos: data.agendamentos ?? 0,
+          vendas: data.vendas ?? 0,
           client: data.client || 'Cliente Padrão', // Garantir que sempre tenha um client
           createdAt: new Date(),
           updatedAt: new Date()
@@ -1437,11 +1440,18 @@ export const metricsService = {
         // Atualizar documento existente
         const docRef = doc(db, 'monthlyDetails', snapshot.docs[0].id);
         const updateData: any = {
-          agendamentos: data.agendamentos,
-          vendas: data.vendas,
           client: data.client || 'Cliente Padrão', // Atualizar o client também
           updatedAt: new Date()
         };
+
+        // Só atualizar contagens quando elas foram realmente fornecidas.
+        // Isso evita que efeitos de ticket/funil sobrescrevam valores manuais.
+        if (data.agendamentos !== undefined) {
+          updateData.agendamentos = data.agendamentos;
+        }
+        if (data.vendas !== undefined) {
+          updateData.vendas = data.vendas;
+        }
 
         // Incluir seguidoresNovos apenas se fornecido (evitar zerar valor manual salvo)
         if (data.seguidoresNovos !== undefined) {
@@ -1469,6 +1479,11 @@ export const metricsService = {
         // Incluir monthlyBudget se foi fornecido
         if (data.monthlyBudget !== undefined) {
           updateData.monthlyBudget = data.monthlyBudget;
+        }
+
+        // Incluir agendamentosEnabled se foi fornecido
+        if (data.agendamentosEnabled !== undefined) {
+          updateData.agendamentosEnabled = data.agendamentosEnabled;
         }
 
         await updateDoc(docRef, updateData);
@@ -1512,44 +1527,75 @@ export const metricsService = {
   async getMonthlyDetails(month: string, product: string, client?: string) {
     try {
       const detailsRef = collection(db, 'monthlyDetails');
-      let q;
 
-      // CORREÇÃO: Incluir filtro por cliente se fornecido
+      const toResult = (data: any) => ({
+        agendamentos: data.agendamentos || 0,
+        vendas: data.vendas || 0,
+        ticketMedio: data.ticketMedio || 0,
+        cpv: data.cpv || 0,
+        roi: data.roi,
+        seguidoresNovos: data.seguidoresNovos || 0,
+        funnelType: data.funnelType || null,
+        monthlyBudget: data.monthlyBudget || 0,
+        agendamentosEnabled: typeof data.agendamentosEnabled === 'boolean' ? data.agendamentosEnabled : true
+      });
+
+      const score = (d: any) => (d.agendamentos || 0) + (d.vendas || 0) + (d.seguidoresNovos || 0);
+
+      // 1) Query principal: month + product + client (ou month + product se sem client)
+      let primaryBest: any = null;
+      let primaryScore = 0;
+      const primaryQ = client
+        ? query(detailsRef, where('month', '==', month), where('product', '==', product), where('client', '==', client))
+        : query(detailsRef, where('month', '==', month), where('product', '==', product));
+      const primarySnap = await getDocs(primaryQ);
+      if (!primarySnap.empty) {
+        for (const doc of primarySnap.docs) {
+          const d = doc.data();
+          const s = score(d);
+          if (s > primaryScore) {
+            primaryBest = d;
+            primaryScore = s;
+          }
+        }
+      }
+
+      // 2) Fallback: month + client (ignora product) — pega o doc com MAIS dados
+      let fallbackBest: any = null;
+      let fallbackScore = 0;
       if (client) {
-        q = query(
-          detailsRef,
-          where('month', '==', month),
-          where('product', '==', product),
-          where('client', '==', client)
-        );
-      } else {
-        q = query(
-          detailsRef,
-          where('month', '==', month),
-          where('product', '==', product)
-        );
+        try {
+          const fallbackQ = query(
+            detailsRef,
+            where('month', '==', month),
+            where('client', '==', client)
+          );
+          const fallbackSnap = await getDocs(fallbackQ);
+          if (!fallbackSnap.empty) {
+            for (const doc of fallbackSnap.docs) {
+              const d = doc.data();
+              const s = score(d);
+              if (s > fallbackScore) {
+                fallbackBest = d;
+                fallbackScore = s;
+              }
+            }
+          }
+        } catch (fallbackErr) {
+          console.warn('Fallback getMonthlyDetails (month+client) falhou:', fallbackErr);
+        }
       }
 
-      const snapshot = await getDocs(q);
-
-      if (!snapshot.empty) {
-        const data = snapshot.docs[0].data();
-        return {
-          agendamentos: data.agendamentos || 0,
-          vendas: data.vendas || 0,
-          ticketMedio: data.ticketMedio || 0,
-          cpv: data.cpv || 0,
-          roi: data.roi,
-          seguidoresNovos: data.seguidoresNovos || 0,
-          funnelType: data.funnelType || null,
-          monthlyBudget: data.monthlyBudget || 0
-        };
+      // 3) Retornar o que tiver MAIS dados (evita doc de público/audience sobrescrever o da campanha)
+      const best = fallbackScore >= primaryScore ? fallbackBest : primaryBest;
+      if (best) {
+        return toResult(best);
       }
 
-      return { agendamentos: 0, vendas: 0, seguidoresNovos: 0, ticketMedio: 250, cpv: 0, roi: '0% (0.0x)', funnelType: null, monthlyBudget: 0 };
+      return { agendamentos: 0, vendas: 0, seguidoresNovos: 0, ticketMedio: 250, cpv: 0, roi: '0% (0.0x)', funnelType: null, monthlyBudget: 0, agendamentosEnabled: true };
     } catch (error) {
       console.error('Erro ao buscar detalhes mensais:', error);
-      return { agendamentos: 0, vendas: 0, seguidoresNovos: 0, ticketMedio: 250, cpv: 0, roi: '0% (0.0x)', funnelType: null, monthlyBudget: 0 };
+      return { agendamentos: 0, vendas: 0, seguidoresNovos: 0, ticketMedio: 250, cpv: 0, roi: '0% (0.0x)', funnelType: null, monthlyBudget: 0, agendamentosEnabled: true };
     }
   },
 
@@ -2826,46 +2872,9 @@ export const metricsService = {
               console.error('🎯 CARD DEBUG - getRealValuesForClient - Erro ao calcular ROI/ROAS:', roiError);
             }
 
-            // CORREÇÃO AUTOMÁTICA: Se audienceDetails tem dados mas monthlyDetails não,
-            // criar/atualizar monthlyDetails automaticamente
-
-            try {
-              // Buscar todos os produtos únicos
-              const uniqueProducts = new Set<string>();
-              audienceSnapshot.forEach((doc) => {
-                const data = doc.data();
-                if (data.product) {
-                  uniqueProducts.add(data.product);
-                }
-              });
-
-              // Para cada produto, criar/atualizar monthlyDetails
-              for (const product of uniqueProducts) {
-                const productAgendamentos = audienceSnapshot.docs
-                  .filter(doc => doc.data().product === product)
-                  .reduce((sum, doc) => sum + (doc.data().agendamentos || 0), 0);
-
-                const productVendas = audienceSnapshot.docs
-                  .filter(doc => doc.data().product === product)
-                  .reduce((sum, doc) => sum + (doc.data().vendas || 0), 0);
-
-                if (productAgendamentos > 0 || productVendas > 0) {
-                  //                   
-
-                  // Salvar no monthlyDetails
-                  await this.saveMonthlyDetails({
-                    month,
-                    product,
-                    client,
-                    agendamentos: productAgendamentos,
-                    vendas: productVendas,
-                    ticketMedio: 250 // valor padrão
-                  });
-                }
-              }
-            } catch (syncError) {
-              console.error('🎯 CARD DEBUG - getRealValuesForClient - Erro ao sincronizar:', syncError);
-            }
+            // IMPORTANTE: NÃO sincronizar automaticamente audienceDetails -> monthlyDetails.
+            // monthlyDetails contém os valores manuais editados na planilha e não pode ser
+            // sobrescrito por uma função usada apenas para leitura dos cards.
           }
         } catch (audienceError) {
           console.error('🎯 CARD DEBUG - getRealValuesForClient - Erro ao buscar audienceDetails:', audienceError);

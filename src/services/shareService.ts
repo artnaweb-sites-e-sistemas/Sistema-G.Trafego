@@ -96,7 +96,8 @@ class ShareService {
     product: string;
     client: string;
     month: string;
-    monthlyDetails?: { agendamentos: number; vendas: number };
+    monthlyDetails?: { agendamentos: number; vendas: number; seguidoresNovos?: number; monthlyBudget?: number; funnelType?: string; agendamentosEnabled?: boolean };
+    funnelType?: string;
   }): ShareLink {
     const shortCode = this.generateUniqueShortCode();
     const baseUrl = window.location.origin;
@@ -110,6 +111,14 @@ class ShareService {
     if (params.monthlyDetails) {
       searchParams.set('agendamentos', String(params.monthlyDetails.agendamentos));
       searchParams.set('vendas', String(params.monthlyDetails.vendas));
+      searchParams.set('seguidoresNovos', String(params.monthlyDetails.seguidoresNovos || 0));
+      searchParams.set('monthlyBudget', String(params.monthlyDetails.monthlyBudget || 0));
+      if (params.monthlyDetails.funnelType) {
+        searchParams.set('funnelType', params.monthlyDetails.funnelType);
+      }
+      searchParams.set('agendamentosEnabled', String(params.monthlyDetails.agendamentosEnabled !== false));
+    } else if (params.funnelType) {
+      searchParams.set('funnelType', params.funnelType);
     }
 
     const shareLink: ShareLink = {
@@ -138,7 +147,8 @@ class ShareService {
       product: string;
       client: string;
       month: string;
-      monthlyDetails?: { agendamentos: number; vendas: number };
+      monthlyDetails?: { agendamentos: number; vendas: number; seguidoresNovos?: number; monthlyBudget?: number; funnelType?: string; agendamentosEnabled?: boolean };
+      funnelType?: string;
     },
   ): ShareLink | null {
     const link = this.shareLinks.get(shortCode);
@@ -155,6 +165,14 @@ class ShareService {
     if (newParams.monthlyDetails) {
       searchParams.set('agendamentos', String(newParams.monthlyDetails.agendamentos));
       searchParams.set('vendas', String(newParams.monthlyDetails.vendas));
+      searchParams.set('seguidoresNovos', String(newParams.monthlyDetails.seguidoresNovos || 0));
+      searchParams.set('monthlyBudget', String(newParams.monthlyDetails.monthlyBudget || 0));
+      if (newParams.monthlyDetails.funnelType) {
+        searchParams.set('funnelType', newParams.monthlyDetails.funnelType);
+      }
+      searchParams.set('agendamentosEnabled', String(newParams.monthlyDetails.agendamentosEnabled !== false));
+    } else if (newParams.funnelType) {
+      searchParams.set('funnelType', newParams.funnelType);
     }
 
     link.originalUrl = `${baseUrl}/shared-report?${searchParams.toString()}`;

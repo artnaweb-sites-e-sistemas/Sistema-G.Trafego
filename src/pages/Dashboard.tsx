@@ -252,7 +252,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onLogout }) => {
     seguidoresNovos: number;
     cpaTarget?: number;
     monthlyBudget?: number;
-    funnelType?: string
+    funnelType?: string;
+    agendamentosEnabled?: boolean;
   }>({ agendamentos: 0, vendas: 0, seguidoresNovos: 0 });
   const [realValuesForClient, setRealValuesForClient] = useState({ agendamentos: 0, vendas: 0, cpv: 0, roi: '0% (0.0x)' });
   const [realValuesRefreshTrigger, setRealValuesRefreshTrigger] = useState(0);

@@ -12,7 +12,7 @@ interface ShareReportProps {
   selectedMonth: string;
   hasGeneratedLinks?: boolean;
   metrics: MetricData[];
-  monthlyDetailsValues?: { agendamentos: number; vendas: number };
+  monthlyDetailsValues?: { agendamentos: number; vendas: number; seguidoresNovos?: number; monthlyBudget?: number; funnelType?: string; agendamentosEnabled?: boolean };
 }
 
 const ShareReport: React.FC<ShareReportProps> = ({
@@ -22,7 +22,7 @@ const ShareReport: React.FC<ShareReportProps> = ({
   selectedMonth,
   hasGeneratedLinks = false,
   metrics,
-  monthlyDetailsValues = { agendamentos: 0, vendas: 0 }
+  monthlyDetailsValues = { agendamentos: 0, vendas: 0, seguidoresNovos: 0, monthlyBudget: 0, funnelType: 'WHATSAPP', agendamentosEnabled: true }
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [generatedLink, setGeneratedLink] = useState<ShareLink | null>(null);
@@ -113,7 +113,10 @@ const ShareReport: React.FC<ShareReportProps> = ({
           client: selectedClient,
           agendamentos: monthlyDetailsValues.agendamentos,
           vendas: monthlyDetailsValues.vendas,
-          investment: monthlyDetailsValues.investment || 0 // Adicionar investimento se disponível
+          seguidoresNovos: monthlyDetailsValues.seguidoresNovos || 0,
+          monthlyBudget: monthlyDetailsValues.monthlyBudget || 0,
+          funnelType: monthlyDetailsValues.funnelType,
+          agendamentosEnabled: monthlyDetailsValues.agendamentosEnabled
         });
       }
       
@@ -124,7 +127,8 @@ const ShareReport: React.FC<ShareReportProps> = ({
         product: selectedProduct,
         client: selectedClient,
         month: selectedMonth,
-        monthlyDetails: monthlyDetailsValues
+        monthlyDetails: monthlyDetailsValues,
+        funnelType: monthlyDetailsValues.funnelType
       });
       
       setGeneratedLink(shareLink);
@@ -192,7 +196,11 @@ const ShareReport: React.FC<ShareReportProps> = ({
           product: selectedProduct,
           client: selectedClient,
           agendamentos: monthlyDetailsValues.agendamentos,
-          vendas: monthlyDetailsValues.vendas
+          vendas: monthlyDetailsValues.vendas,
+          seguidoresNovos: monthlyDetailsValues.seguidoresNovos || 0,
+          monthlyBudget: monthlyDetailsValues.monthlyBudget || 0,
+          funnelType: monthlyDetailsValues.funnelType,
+          agendamentosEnabled: monthlyDetailsValues.agendamentosEnabled
         });
       }
       
@@ -225,7 +233,8 @@ const ShareReport: React.FC<ShareReportProps> = ({
         product: selectedProduct,
         client: selectedClient,
         month: selectedMonth,
-        monthlyDetails: monthlyDetailsValues
+        monthlyDetails: monthlyDetailsValues,
+        funnelType: monthlyDetailsValues.funnelType
       });
       
       if (updatedLink) {

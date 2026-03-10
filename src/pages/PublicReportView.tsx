@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Eye, Lock, Calendar, User, Package, Users, Info, TrendingUp, TrendingDown, DollarSign, Users as UsersIcon, MessageSquare, ShoppingCart, Target, BarChart3, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Eye, Lock, Calendar, User, Package, Users, Info, TrendingUp, TrendingDown, DollarSign, Users as UsersIcon, MessageSquare, ShoppingCart, Target, BarChart3, CheckCircle, AlertTriangle, RefreshCw, MousePointer } from 'lucide-react';
 import DailyControlTable from '../components/DailyControlTable';
 import { metricsService, MetricData } from '../services/metricsService';
 import dayjs from 'dayjs';
@@ -61,6 +61,31 @@ class PublicReportCache {
   }
 }
 
+type FunnelType = 'WHATSAPP' | 'LEADS' | 'DIRETA' | 'AUDIENCIA';
+
+type ObjectiveInfo = {
+  key: FunnelType;
+  label: string;
+};
+
+function normalizeFunnelType(value?: string | null): FunnelType | null {
+  if (!value) return null;
+  const normalized = value.toUpperCase();
+  if (normalized === 'WHATSAPP' || normalized === 'LEADS' || normalized === 'DIRETA' || normalized === 'AUDIENCIA') {
+    return normalized;
+  }
+  return null;
+}
+
+function mapCampaignTypeToFunnel(campaignType?: string): FunnelType {
+  const normalized = (campaignType || '').toLowerCase();
+  if (normalized === 'whatsapp') return 'WHATSAPP';
+  if (normalized === 'leads' || normalized === 'landing_page' || normalized === 'landing-page') return 'LEADS';
+  if (normalized === 'direta' || normalized === 'direct' || normalized === 'trafego_direto') return 'DIRETA';
+  if (normalized === 'audiencia' || normalized === 'audience') return 'AUDIENCIA';
+  return 'WHATSAPP';
+}
+
 const PublicReportView: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [metrics, setMetrics] = useState<MetricData[]>([]);
@@ -75,7 +100,11 @@ const PublicReportView: React.FC = () => {
     monthlyDetails: {
       agendamentos: 0,
       vendas: 0,
-      ticketMedio: 0
+      ticketMedio: 0,
+      seguidoresNovos: 0,
+      funnelType: null as FunnelType | null,
+      monthlyBudget: 0,
+      agendamentosEnabled: true
     }
   });
 
@@ -289,6 +318,8 @@ const PublicReportView: React.FC = () => {
     const realRevenue = realSales * ticketMedio;
     const realROAS = totals.investment > 0 ? realRevenue / totals.investment : 0;
     const realROI = totals.investment > 0 ? ((realRevenue - totals.investment) / totals.investment) * 100 : 0;
+    const seguidoresNovos = reportInfo.monthlyDetails.seguidoresNovos || 0;
+    const costPerFollower = seguidoresNovos > 0 ? totals.investment / seguidoresNovos : 0;
 
     return {
       totalLeads: totals.leads,
@@ -303,9 +334,35 @@ const PublicReportView: React.FC = () => {
       totalROI: Number(realROI.toFixed(1)),
       totalAppointments: realAppointments,
       totalSales: realSales,
-      activeDays: totals.activeDays
+      activeDays: totals.activeDays,
+      totalFollowers: seguidoresNovos,
+      costPerFollower: Number(costPerFollower.toFixed(2))
     };
   }, [dailyData, reportInfo.monthlyDetails]);
+
+  const objectiveInfo = useMemo<ObjectiveInfo>(() => {
+    const byMonthlyDetails = normalizeFunnelType(reportInfo.monthlyDetails.funnelType);
+    if (byMonthlyDetails) {
+      const labels: Record<FunnelType, string> = {
+        WHATSAPP: 'WhatsApp',
+        LEADS: 'Captura de Leads',
+        DIRETA: 'Tráfego Direto',
+        AUDIENCIA: 'Audiência'
+      };
+      return { key: byMonthlyDetails, label: labels[byMonthlyDetails] };
+    }
+
+    const fallback = mapCampaignTypeToFunnel(reportInfo.campaignType);
+    const fallbackLabels: Record<FunnelType, string> = {
+      WHATSAPP: 'WhatsApp',
+      LEADS: 'Captura de Leads',
+      DIRETA: 'Tráfego Direto',
+      AUDIENCIA: 'Audiência'
+    };
+    return { key: fallback, label: fallbackLabels[fallback] };
+  }, [reportInfo.campaignType, reportInfo.monthlyDetails.funnelType]);
+
+  const agendamentosInUse = reportInfo.monthlyDetails.agendamentosEnabled !== false;
 
   // Componente de Tooltip customizado
   const Tooltip: React.FC<{ children: React.ReactNode; content: string; isVisible: boolean }> = ({ children, content, isVisible }) => {
@@ -336,44 +393,140 @@ const PublicReportView: React.FC = () => {
   // Componente do Painel Executivo (Resumo do que realmente importa)
   const ExecutiveSummary: React.FC = () => {
     const aggregated = calculateDailyBasedMetrics;
-
-    const [tooltipStates, setTooltipStates] = useState<{ [key: string]: boolean }>({});
+    const isAudience = objectiveInfo.key === 'AUDIENCIA';
+    const isDirect = objectiveInfo.key === 'DIRETA';
+    const isWhatsApp = objectiveInfo.key === 'WHATSAPP';
+    const isLeads = objectiveInfo.key === 'LEADS';
 
     const getROIStatus = () => {
-      if (aggregated.totalROI > 0) {
-        return {
-          color: 'text-green-200',
-          bgColor: 'bg-green-900/5',
-          borderColor: 'border-green-600/5',
-          text: 'Retorno positivo'
-        };
-      } else if (aggregated.totalROI === 0) {
-        return {
-          color: 'text-yellow-200',
-          bgColor: 'bg-yellow-900/5',
-          borderColor: 'border-yellow-600/5',
-          text: 'Em equilíbrio'
-        };
-      } else {
-        return {
-          color: 'text-red-200',
-          bgColor: 'bg-red-900/5',
-          borderColor: 'border-red-600/5',
-          text: 'Ainda sem retorno financeiro'
-        };
-      }
+      if (aggregated.totalROI > 0) return { color: 'text-green-200', bg: 'bg-green-900/5', text: 'Retorno positivo' };
+      if (aggregated.totalROI === 0) return { color: 'text-yellow-200', bg: 'bg-yellow-900/5', text: 'Em equilíbrio' };
+      return { color: 'text-red-200', bg: 'bg-red-900/5', text: 'Ainda sem retorno financeiro' };
     };
 
     const roiStatus = getROIStatus();
+
+    const metricCards = (() => {
+      if (objectiveInfo.key === 'AUDIENCIA') {
+        return [
+          {
+            title: 'Seguidores Novos',
+            value: aggregated.totalFollowers.toLocaleString('pt-BR'),
+            subtitle: 'Objetivo principal da campanha de audiência',
+            icon: UsersIcon,
+            border: 'border-indigo-500/20 hover:border-indigo-500/30',
+            bg: 'bg-indigo-900/30'
+          },
+          {
+            title: 'Custo por Seguidor',
+            value: aggregated.totalFollowers > 0 ? formatCurrency(aggregated.costPerFollower) : '—',
+            subtitle: 'Investimento médio por novo seguidor',
+            icon: Target,
+            border: 'border-blue-500/20 hover:border-blue-500/30',
+            bg: 'bg-blue-900/30'
+          },
+          {
+            title: 'CTR Médio',
+            value: `${aggregated.avgCTR.toLocaleString('pt-BR', { maximumFractionDigits: 2 }).replace(',00', '')}%`,
+            subtitle: 'Engajamento com o anúncio',
+            icon: BarChart3,
+            border: 'border-cyan-500/20 hover:border-cyan-500/30',
+            bg: 'bg-cyan-900/30'
+          }
+        ];
+      }
+
+      if (isDirect) {
+        return [
+          {
+            title: 'Cliques Qualificados',
+            value: aggregated.totalClicks.toLocaleString('pt-BR'),
+            subtitle: 'Tráfego levado para a página',
+            icon: MousePointer,
+            border: 'border-blue-500/20 hover:border-blue-500/30',
+            bg: 'bg-blue-900/30'
+          },
+          {
+            title: 'Vendas Feitas',
+            value: aggregated.totalSales.toLocaleString('pt-BR'),
+            subtitle: 'Conversões finais da campanha',
+            icon: ShoppingCart,
+            border: 'border-purple-500/20 hover:border-purple-500/30',
+            bg: 'bg-purple-900/30'
+          },
+          {
+            title: 'Custo por Venda',
+            value: aggregated.totalSales > 0 ? formatCurrency(aggregated.totalInvestment / aggregated.totalSales) : '—',
+            subtitle: 'Investimento médio por venda',
+            icon: DollarSign,
+            border: 'border-amber-500/20 hover:border-amber-500/30',
+            bg: 'bg-amber-900/30'
+          }
+        ];
+      }
+
+      const cards = [
+        {
+          title: isWhatsApp ? 'Conversas Iniciadas' : 'Leads Captados',
+          value: aggregated.totalLeads.toLocaleString('pt-BR'),
+          subtitle: isWhatsApp ? 'Pessoas que enviaram mensagem' : 'Contatos captados no funil',
+          icon: MessageSquare,
+          border: 'border-blue-500/20 hover:border-blue-500/30',
+          bg: 'bg-blue-900/30'
+        },
+        {
+          title: 'Agendamentos',
+          value: aggregated.totalAppointments.toLocaleString('pt-BR'),
+          subtitle: 'Oportunidades criadas para o time comercial',
+          icon: Calendar,
+          border: 'border-indigo-500/20 hover:border-indigo-500/30',
+          bg: 'bg-indigo-900/30'
+        },
+        {
+          title: 'Vendas Feitas',
+          value: aggregated.totalSales.toLocaleString('pt-BR'),
+          subtitle: 'Conversões finais da campanha',
+          icon: ShoppingCart,
+          border: 'border-purple-500/20 hover:border-purple-500/30',
+          bg: 'bg-purple-900/30'
+        },
+        {
+          title: 'Retorno (ROI)',
+          value: `${Number(aggregated.totalROI.toFixed(1)).toLocaleString('pt-BR', { maximumFractionDigits: 1 }).replace(',0', '')}%`,
+          subtitle: roiStatus.text,
+          icon: TrendingUp,
+          border: 'border-red-500/20 hover:border-red-500/30',
+          bg: 'bg-red-900/30',
+          valueClass: roiStatus.color
+        }
+      ];
+
+      // WhatsApp: sem uso em agendamento => remove card Agendamentos
+      if (isWhatsApp && !agendamentosInUse) {
+        return cards.filter(card => card.title !== 'Agendamentos');
+      }
+
+      // WhatsApp: com uso em agendamento => remove card ROI
+      if (isWhatsApp && agendamentosInUse) {
+        return cards.filter(card => card.title !== 'Retorno (ROI)');
+      }
+
+      // Captura de Leads: remover card de vendas
+      if (isLeads) {
+        return cards.filter(card => card.title !== 'Vendas Feitas');
+      }
+
+      return cards;
+    })();
 
     return (
       <div className="bg-gradient-to-br from-slate-800/40 via-slate-700/30 to-slate-800/40 rounded-2xl p-8 border border-slate-600/30 mb-8 shadow-lg">
         <div className="mb-8">
           <h2 className="text-2xl font-semibold text-slate-100">Resumo do que realmente importa</h2>
+          <p className="text-slate-400 text-sm mt-1">Objetivo da campanha: <span className="text-slate-200 font-medium">{objectiveInfo.label}</span></p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-          {/* Total Investido */}
           <div className="bg-slate-700/25 rounded-lg p-5 border border-emerald-500/20 hover:border-emerald-500/30 transition-all duration-300">
             <div className="flex items-center space-x-2 mb-3">
               <div className="p-1.5 bg-emerald-900/30 rounded-md">
@@ -385,109 +538,62 @@ const PublicReportView: React.FC = () => {
             <p className="text-slate-400 text-xs">Valor total gasto em anúncios</p>
           </div>
 
-          {/* Agendamentos Gerados */}
-          <div className="bg-slate-700/25 rounded-lg p-5 border border-blue-500/20 hover:border-blue-500/30 transition-all duration-300">
-            <div className="flex items-center space-x-2 mb-3">
-              <div className="p-1.5 bg-blue-900/30 rounded-md">
-                <MessageSquare className="w-4 h-4 text-blue-300" />
+          {metricCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <div key={card.title} className={`bg-slate-700/25 rounded-lg p-5 border ${card.border} transition-all duration-300`}>
+                <div className="flex items-center space-x-2 mb-3">
+                  <div className={`p-1.5 rounded-md ${card.bg}`}>
+                    <Icon className="w-4 h-4 text-slate-200" />
+                  </div>
+                  <h3 className="text-slate-300 font-medium text-sm">{card.title}</h3>
+                </div>
+                <div className={`text-2xl font-semibold mb-1 ${card.valueClass || 'text-slate-100'}`}>{card.value}</div>
+                <p className="text-slate-400 text-xs">{card.subtitle}</p>
               </div>
-              <h3 className="text-slate-300 font-medium text-sm">Conversas Marcadas</h3>
-            </div>
-            <div className="text-2xl font-semibold text-slate-100 mb-1">{aggregated.totalAppointments}</div>
-            <p className="text-slate-400 text-xs">Pessoas que agendaram atendimento</p>
-          </div>
-
-          {/* Vendas Realizadas */}
-          <div className="bg-slate-700/25 rounded-lg p-5 border border-purple-500/20 hover:border-purple-500/30 transition-all duration-300">
-            <div className="flex items-center space-x-2 mb-3">
-              <div className="p-1.5 bg-purple-900/30 rounded-md">
-                <ShoppingCart className="w-4 h-4 text-purple-300" />
-              </div>
-              <h3 className="text-slate-300 font-medium text-sm">Vendas Feitas</h3>
-            </div>
-            <div className="text-2xl font-semibold text-slate-100 mb-1">{aggregated.totalSales}</div>
-            <p className="text-slate-400 text-xs">Vendas realizadas através dos anúncios</p>
-          </div>
-
-          {/* ROI */}
-          <div className={`rounded-lg p-5 border border-red-500/20 hover:border-red-500/30 transition-all duration-300 ${roiStatus.bgColor}`}>
-            <div className="flex items-center space-x-2 mb-3">
-              <div className="p-1.5 bg-red-900/30 rounded-md">
-                <TrendingUp className="w-4 h-4 text-red-300" />
-              </div>
-              <h3 className="text-slate-300 font-medium text-sm">Retorno (ROI)</h3>
-            </div>
-            <div className={`text-2xl font-semibold mb-1 ${roiStatus.color}`}>
-              {Number(aggregated.totalROI.toFixed(1)).toLocaleString('pt-BR', { maximumFractionDigits: 1 })
-                .replace(',0', '') // remove zero desnecessário
-              }%
-              {aggregated.totalInvestment > 0 && (
-                <span className="text-slate-400 font-normal text-lg"> ({(aggregated.totalRevenue / aggregated.totalInvestment).toFixed(1)}x)</span>
-              )}
-            </div>
-            <p className="text-slate-400 text-xs">{roiStatus.text}</p>
-          </div>
+            );
+          })}
         </div>
 
-        {/* Explicação do ROI */}
+        {/* Explicação de performance */}
         {(() => {
-          const roiStatus = aggregated.totalROI > 0 ? 'positive' : aggregated.totalROI === 0 ? 'neutral' : 'negative';
-
-          const roiConfig = {
-            positive: {
-              bgColor: 'bg-green-900/5',
-              borderColor: 'border-green-500/20',
-              iconBg: 'bg-green-900/10',
-              iconColor: 'text-green-200',
-              titleColor: 'text-green-100',
-              textColor: 'text-green-50',
-              title: 'Por que o ROI está positivo?',
-              message: `Excelente! Sua campanha está gerando lucro com um ROI de ${aggregated.totalROI.toFixed(1)}%. Isso significa que para cada R$ 1,00 investido, você está ganhando R$ ${((aggregated.totalROI / 100) + 1).toFixed(2)}. Continue otimizando para maximizar os resultados.`
-            },
-            neutral: {
-              bgColor: 'bg-yellow-900/5',
-              borderColor: 'border-yellow-500/20',
-              iconBg: 'bg-yellow-900/10',
-              iconColor: 'text-yellow-200',
-              titleColor: 'text-yellow-100',
-              textColor: 'text-yellow-50',
-              title: 'ROI em equilíbrio',
-              message: `Seu ROI está em ${aggregated.totalROI.toFixed(1)}%, indicando que a campanha está no ponto de equilíbrio. Isso é um bom sinal para campanhas em desenvolvimento. Foque em otimizações para gerar lucro.`
-            },
-            negative: {
-              bgColor: 'bg-red-900/5',
-              borderColor: 'border-red-500/20',
-              iconBg: 'bg-red-900/10',
-              iconColor: 'text-red-200',
-              titleColor: 'text-red-100',
-              textColor: 'text-red-50',
-              title: 'Por que o ROI está negativo?',
-              message: (() => {
-                if (aggregated.totalSales > 0) {
-                  return `Você teve ${aggregated.totalSales} vendas, mas o custo ainda supera a receita. Isso indica que precisamos otimizar o custo por aquisição para tornar a campanha lucrativa.`;
-                } else if (aggregated.totalAppointments > 0) {
-                  return `Você gerou ${aggregated.totalAppointments} agendamentos, mas ainda não converteu em vendas. O foco deve ser na qualificação e conversão desses leads.`;
-                } else if (aggregated.totalLeads > 0) {
-                  return `Você capturou ${aggregated.totalLeads} leads interessados, mas precisa melhorar o processo de agendamento e conversão.`;
-                } else {
-                  return `O anúncio ainda não gerou lucro em vendas. Isso é comum nas primeiras campanhas e será ajustado nas próximas otimizações.`;
-                }
-              })()
-            }
+          const roiMode = aggregated.totalROI > 0 ? 'positive' : aggregated.totalROI === 0 ? 'neutral' : 'negative';
+          const configByMode = {
+            positive: { bgColor: 'bg-green-900/5', borderColor: 'border-green-500/20', iconBg: 'bg-green-900/10', iconColor: 'text-green-200', titleColor: 'text-green-100', textColor: 'text-green-50' },
+            neutral: { bgColor: 'bg-yellow-900/5', borderColor: 'border-yellow-500/20', iconBg: 'bg-yellow-900/10', iconColor: 'text-yellow-200', titleColor: 'text-yellow-100', textColor: 'text-yellow-50' },
+            negative: { bgColor: 'bg-red-900/5', borderColor: 'border-red-500/20', iconBg: 'bg-red-900/10', iconColor: 'text-red-200', titleColor: 'text-red-100', textColor: 'text-red-50' }
           };
+          const modeStyle = configByMode[roiMode];
 
-          const config = roiConfig[roiStatus];
+          let title = 'Leitura rápida da performance';
+          let message = '';
+          if (isAudience) {
+            title = 'Leitura rápida da campanha de audiência';
+            message = aggregated.totalFollowers > 0
+              ? `A campanha gerou ${aggregated.totalFollowers.toLocaleString('pt-BR')} novos seguidores com custo médio de ${formatCurrency(aggregated.costPerFollower)} por seguidor. Use esse valor para comparar eficiência entre criativos e públicos.`
+              : `A campanha ainda não gerou seguidores novos no período. Ajuste segmentação e criativos para aumentar o volume de novos seguidores.`;
+          } else if (isDirect) {
+            title = 'Leitura rápida da campanha de tráfego direto';
+            message = aggregated.totalSales > 0
+              ? `Você levou ${aggregated.totalClicks.toLocaleString('pt-BR')} visitantes e converteu ${aggregated.totalSales.toLocaleString('pt-BR')} vendas. O próximo passo é reduzir custo por venda sem perder volume de tráfego qualificado.`
+              : `A campanha gerou tráfego (${aggregated.totalClicks.toLocaleString('pt-BR')} cliques), mas ainda sem vendas. Otimize página, oferta e follow-up para converter melhor o tráfego.`;
+          } else {
+            title = objectiveInfo.key === 'WHATSAPP' ? 'Leitura rápida da campanha para WhatsApp' : 'Leitura rápida da campanha de captura de leads';
+            message = aggregated.totalLeads > 0
+              ? `Você captou ${aggregated.totalLeads.toLocaleString('pt-BR')} contatos. O foco agora é aumentar a conversão de ${aggregated.totalAppointments.toLocaleString('pt-BR')} agendamentos em vendas.`
+              : `A campanha ainda não gerou contatos suficientes no período. Revise oferta, criativo e chamada para ação para aumentar captação.`;
+          }
 
           return (
-            <div className={`mb-6 p-4 ${config.bgColor} border ${config.borderColor} rounded-lg`}>
+            <div className={`mb-6 p-4 ${modeStyle.bgColor} border ${modeStyle.borderColor} rounded-lg`}>
               <div className="flex items-start space-x-3">
-                <div className={`p-1.5 ${config.iconBg} rounded-md flex-shrink-0 mt-0.5`}>
-                  <Info className={`w-4 h-4 ${config.iconColor}`} />
+                <div className={`p-1.5 ${modeStyle.iconBg} rounded-md flex-shrink-0 mt-0.5`}>
+                  <Info className={`w-4 h-4 ${modeStyle.iconColor}`} />
                 </div>
                 <div>
-                  <h4 className={`${config.titleColor} font-medium mb-2 text-base`}>{config.title}</h4>
-                  <p className={`${config.textColor} text-sm leading-relaxed`}>
-                    {config.message}
+                  <h4 className={`${modeStyle.titleColor} font-medium mb-2 text-base`}>{title}</h4>
+                  <p className={`${modeStyle.textColor} text-sm leading-relaxed`}>
+                    {message}
                   </p>
                 </div>
               </div>
@@ -503,6 +609,8 @@ const PublicReportView: React.FC = () => {
   // Componente de Relatório Explicativo
   const ExplanatoryReport: React.FC = () => {
     const aggregated = calculateDailyBasedMetrics;
+    const isAudience = objectiveInfo.key === 'AUDIENCIA';
+    const isDirect = objectiveInfo.key === 'DIRETA';
 
     const formatCurrency = (value: number) => {
       return new Intl.NumberFormat('pt-BR', {
@@ -517,106 +625,87 @@ const PublicReportView: React.FC = () => {
       type: 'success' | 'warning' | 'info';
     } => {
       const { totalSales, totalAppointments, totalLeads, totalClicks, totalImpressions, totalInvestment, totalROI } = aggregated;
-      const isWhatsAppCampaign = reportInfo.campaignType === 'whatsapp';
-
-      // Cenário 1: Vendas realizadas (melhor cenário)
-      if (totalSales > 0) {
-        const costPerSale = totalInvestment / totalSales;
-        const roiStatus = totalROI > 0 ? 'positivo' : 'negativo';
-
-        if (totalROI > 50) {
-          return {
-            title: "Resultado Excepcional!",
-            message: <>Com um investimento de <strong>{formatCurrency(totalInvestment)}</strong>, você conseguiu <strong>{totalSales} vendas</strong>, resultando em um custo médio de <strong>{formatCurrency(costPerSale)}</strong> por venda. O ROI de <strong>{totalROI.toFixed(1)}%</strong> indica uma campanha altamente lucrativa.</>,
-            type: "success"
-          };
-        } else if (totalROI > 0) {
-          return {
-            title: "Bom Resultado!",
-            message: <>Sua campanha está gerando lucro! Com <strong>{totalSales} vendas</strong> e um ROI de <strong>{totalROI.toFixed(1)}%</strong>, você está no caminho certo. O custo por venda de <strong>{formatCurrency(costPerSale)}</strong> está dentro do esperado.</>,
-            type: "success"
-          };
-        } else {
-          return {
-            title: "Vendas Realizadas, Mas Precisa Otimizar",
-            message: <>Você conseguiu <strong>{totalSales} vendas</strong> com um investimento de <strong>{formatCurrency(totalInvestment)}</strong>, mas o ROI ainda está negativo. Isso indica que o custo por venda (<strong>{formatCurrency(costPerSale)}</strong>) precisa ser reduzido.</>,
-            type: "warning"
-          };
-        }
-      }
-
-      // Cenário 2: Agendamentos (com ou sem vendas)
-      if (totalAppointments > 0) {
-        const costPerAppointment = totalInvestment / totalAppointments;
-
-        if (totalSales > 0) {
-          return {
-            title: "Resultado Excelente: Agendamentos e Vendas!",
-            message: <><strong>{totalAppointments} pessoas</strong> agendaram atendimento e você conseguiu <strong>{totalSales} vendas</strong>. Isso mostra que tanto o processo de agendamento quanto a conversão estão funcionando bem. Custo por agendamento: <strong>{formatCurrency(costPerAppointment)}</strong>.</>,
-            type: "success"
-          };
-        } else {
-          return {
-            title: "Pipeline de Vendas Ativo",
-            message: <><strong>{totalAppointments} pessoas</strong> agendaram atendimento, criando oportunidades valiosas de venda. O foco agora deve ser na conversão desses leads em vendas. O custo por agendamento foi de <strong>{formatCurrency(costPerAppointment)}</strong>.</>,
-            type: "info"
-          };
-        }
-      }
-
-      // Cenário 3: Leads mas sem agendamentos
-      if (totalLeads > 0 && totalAppointments === 0) {
-        const costPerLead = totalInvestment / totalLeads;
-        const hasSales = totalSales > 0;
-
-        if (hasSales) {
-          return {
-            title: "Interesse e Vendas Geradas!",
-            message: <><strong>{totalLeads} pessoas</strong> se interessaram e enviaram mensagem, gerando <strong>{totalSales} vendas</strong> mesmo sem agendamentos formais. Isso indica que o processo de vendas está funcionando diretamente. Custo por lead: <strong>{formatCurrency(costPerLead)}</strong>.</>,
-            type: "success"
-          };
-        } else {
-          return {
-            title: "Interesse Gerado, Próximo Passo: Agendamentos",
-            message: <><strong>{totalLeads} pessoas</strong> se interessaram e enviaram mensagem, mas ainda não agendaram atendimento. O próximo passo é melhorar o processo de qualificação e agendamento. Custo por lead: <strong>{formatCurrency(costPerLead)}</strong>.</>,
-            type: "info"
-          };
-        }
-      }
-
-      // Cenário 4: Cliques mas sem leads
-      if (totalClicks > 0 && totalLeads === 0) {
-        const ctr = (totalClicks / totalImpressions) * 100;
-        return {
-          title: "Tráfego Gerado, Precisa Melhorar Conversão",
-          message: <>Seu anúncio gerou <strong>{totalClicks} cliques</strong> (CTR de <strong>{ctr.toFixed(2)}%</strong>), mas ainda não converteu em leads. {isWhatsAppCampaign ? 'Isso pode indicar que o call-to-action do anúncio precisa ser mais atrativo para gerar mais mensagens diretas.' : 'Isso pode indicar que a página de destino precisa ser otimizada para capturar mais interessados.'}</>,
-          type: "warning"
-        };
-      }
-
-      // Cenário 5: Impressões mas sem cliques
-      if (totalImpressions > 0 && totalClicks === 0) {
-        return {
-          title: "Anúncio em Teste",
-          message: <>Seu anúncio foi exibido <strong>{totalImpressions.toLocaleString('pt-BR')} vezes</strong>, mas ainda não gerou cliques. Isso é comum no início de campanhas. {isWhatsAppCampaign ? 'Recomendamos ajustar o call-to-action do anúncio para incentivar mais cliques diretos no WhatsApp.' : 'Recomendamos ajustar o texto do anúncio ou o público-alvo para aumentar o engajamento.'}</>,
-          type: "info"
-        };
-      }
-
-      // Cenário 6: Sem atividade (pior cenário)
       if (totalInvestment === 0) {
         return {
-          title: "Campanha Não Iniciada",
-          message: "Não há investimento registrado neste período. Para começar a gerar resultados, é necessário ativar a campanha e definir um orçamento.",
-          type: "warning"
+          title: 'Campanha Não Iniciada',
+          message: 'Não há investimento registrado neste período. Para gerar resultado, é necessário ativar a campanha e manter consistência de execução.',
+          type: 'warning'
         };
       }
 
-      // Cenário padrão: Investimento mas sem resultados
+      if (isAudience) {
+        if (aggregated.totalFollowers > 0) {
+          return {
+            title: 'Audiência em crescimento',
+            message: <>A campanha gerou <strong>{aggregated.totalFollowers.toLocaleString('pt-BR')} seguidores novos</strong> com investimento de <strong>{formatCurrency(totalInvestment)}</strong>. O custo por seguidor está em <strong>{formatCurrency(aggregated.costPerFollower)}</strong>.</>,
+            type: 'success'
+          };
+        }
+        if (totalClicks > 0) {
+          return {
+            title: 'Há tráfego, mas faltou conversão em seguidores',
+            message: <>Seu anúncio já trouxe <strong>{totalClicks.toLocaleString('pt-BR')} cliques</strong>, mas ainda sem crescimento de seguidores. Ajuste a promessa criativa e o CTA para foco em follow.</>,
+            type: 'warning'
+          };
+        }
+        return {
+          title: 'Campanha em fase de aprendizado',
+          message: <>A campanha de audiência está em aquecimento. Continue testando criativos e públicos para aumentar alcance e crescimento de seguidores.</>,
+          type: 'info'
+        };
+      }
+
+      if (isDirect) {
+        if (totalSales > 0) {
+          const costPerSale = totalInvestment / totalSales;
+          return {
+            title: totalROI > 0 ? 'Tráfego convertendo em vendas' : 'Vendas geradas, com espaço para otimização',
+            message: <>Você gerou <strong>{totalSales.toLocaleString('pt-BR')} vendas</strong> a partir de <strong>{totalClicks.toLocaleString('pt-BR')} cliques</strong>. O custo médio por venda está em <strong>{formatCurrency(costPerSale)}</strong> e o ROI atual é <strong>{totalROI.toFixed(1)}%</strong>.</>,
+            type: totalROI > 0 ? 'success' : 'warning'
+          };
+        }
+        if (totalClicks > 0) {
+          return {
+            title: 'Tráfego gerado, sem conversão final',
+            message: <>Foram gerados <strong>{totalClicks.toLocaleString('pt-BR')} cliques</strong>, mas ainda sem vendas no período. O próximo foco é otimização de página, oferta e sequência comercial.</>,
+            type: 'warning'
+          };
+        }
+        return {
+          title: 'Campanha em desenvolvimento',
+          message: <>Com investimento ativo, a campanha ainda está em validação de tráfego e conversão. Mantenha testes de criativo e proposta para estabilizar vendas.</>,
+          type: 'info'
+        };
+      }
+
+      // WHATSAPP e LEADS
+      if (totalSales > 0) {
+        const costPerSale = totalInvestment / totalSales;
+        return {
+          title: totalROI > 0 ? 'Funil comercial com resultado' : 'Funil gerando vendas com margem apertada',
+          message: <>Você captou <strong>{totalLeads.toLocaleString('pt-BR')} contatos</strong>, teve <strong>{totalAppointments.toLocaleString('pt-BR')} agendamentos</strong> e concluiu <strong>{totalSales.toLocaleString('pt-BR')} vendas</strong>. Custo por venda: <strong>{formatCurrency(costPerSale)}</strong>.</>,
+          type: totalROI > 0 ? 'success' : 'warning'
+        };
+      }
+      if (totalLeads > 0) {
+        const costPerLead = totalInvestment / totalLeads;
+        return {
+          title: 'Captação ativa, falta converter melhor',
+          message: <>A campanha já gerou <strong>{totalLeads.toLocaleString('pt-BR')} contatos</strong> com custo por lead de <strong>{formatCurrency(costPerLead)}</strong>. O ganho agora está em elevar agendamento e fechamento.</>,
+          type: 'info'
+        };
+      }
+      if (totalClicks > 0) {
+        return {
+          title: 'Tráfego sem captação',
+          message: <>Há cliques no anúncio, mas sem leads relevantes. Ajuste promessa, CTA e estrutura da página/formulário para melhorar captura.</>,
+          type: 'warning'
+        };
+      }
       return {
-        title: "Campanha em Desenvolvimento",
-        message: <>Com um investimento de <strong>{formatCurrency(totalInvestment)}</strong>, a campanha ainda está em fase de teste. Isso é normal nas primeiras semanas. Recomendamos continuar o investimento e monitorar os resultados para otimizações futuras.</>,
-        type: "info"
+        title: 'Campanha em desenvolvimento',
+        message: <>A campanha está em fase inicial de aprendizado. Continue monitorando para identificar o melhor conjunto de criativo e público.</>,
+        type: 'info'
       };
     };
 
@@ -631,7 +720,7 @@ const PublicReportView: React.FC = () => {
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-slate-700/20 rounded-lg p-6 border border-slate-600/10">
-              <h3 className="text-lg font-semibold text-slate-100 mb-4">Alcance do Anúncio</h3>
+              <h3 className="text-lg font-semibold text-slate-100 mb-4">Aquisição e Tráfego</h3>
               <ul className="space-y-3 text-slate-300">
                 <li className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-blue-300 rounded-full"></div>
@@ -643,25 +732,53 @@ const PublicReportView: React.FC = () => {
                 </li>
                 <li className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-blue-300 rounded-full"></div>
-                  <span><span className="text-slate-100 font-semibold">{aggregated.totalLeads}</span> pessoas se interessaram e enviaram mensagem</span>
+                  <span>
+                    {isAudience ? (
+                      <><span className="text-slate-100 font-semibold">{aggregated.totalFollowers.toLocaleString('pt-BR')}</span> novos seguidores foram conquistados</>
+                    ) : isDirect ? (
+                      <>A campanha gerou <span className="text-slate-100 font-semibold">{aggregated.totalClicks.toLocaleString('pt-BR')}</span> visitas qualificadas</>
+                    ) : (
+                      <><span className="text-slate-100 font-semibold">{aggregated.totalLeads.toLocaleString('pt-BR')}</span> contatos entraram no funil</>
+                    )}
+                  </span>
                 </li>
               </ul>
             </div>
 
             <div className="bg-slate-700/20 rounded-lg p-6 border border-slate-600/10">
-              <h3 className="text-lg font-semibold text-slate-100 mb-4">Resultados Financeiros</h3>
+              <h3 className="text-lg font-semibold text-slate-100 mb-4">Resultado de Negócio</h3>
               <ul className="space-y-3 text-slate-300">
                 <li className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-green-300 rounded-full"></div>
-                  <span><span className="text-slate-100 font-semibold">{aggregated.totalAppointments}</span> conversas foram marcadas</span>
+                  <span>
+                    {isAudience ? (
+                      <>Custo por seguidor em <span className="text-slate-100 font-semibold">{aggregated.totalFollowers > 0 ? formatCurrency(aggregated.costPerFollower) : '—'}</span></>
+                    ) : isDirect ? (
+                      <>ROI atual da campanha: <span className="text-slate-100 font-semibold">{Number(aggregated.totalROI.toFixed(1)).toLocaleString('pt-BR', { maximumFractionDigits: 1 }).replace(',0', '')}%</span></>
+                    ) : (
+                      <><span className="text-slate-100 font-semibold">{aggregated.totalAppointments.toLocaleString('pt-BR')}</span> oportunidades foram agendadas</>
+                    )}
+                  </span>
                 </li>
                 <li className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-green-300 rounded-full"></div>
-                  <span><span className="text-slate-100 font-semibold">{aggregated.totalSales}</span> vendas foram realizadas</span>
+                  <span>
+                    {isAudience ? (
+                      <>CTR médio em <span className="text-slate-100 font-semibold">{aggregated.avgCTR.toLocaleString('pt-BR', { maximumFractionDigits: 2 }).replace(',00', '')}%</span></>
+                    ) : (
+                      <><span className="text-slate-100 font-semibold">{aggregated.totalSales.toLocaleString('pt-BR')}</span> vendas foram realizadas</>
+                    )}
+                  </span>
                 </li>
                 <li className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-green-300 rounded-full"></div>
-                  <span>Investimento total: <span className="text-slate-100 font-semibold">{formatCurrency(aggregated.totalInvestment)}</span></span>
+                  <span>
+                    {isAudience ? (
+                      <>Investimento total em audiência: <span className="text-slate-100 font-semibold">{formatCurrency(aggregated.totalInvestment)}</span></>
+                    ) : (
+                      <>Investimento total: <span className="text-slate-100 font-semibold">{formatCurrency(aggregated.totalInvestment)}</span></>
+                    )}
+                  </span>
                 </li>
               </ul>
             </div>
@@ -736,11 +853,13 @@ const PublicReportView: React.FC = () => {
         const client = searchParams.get('client') || '';
         const month = searchParams.get('month') || '';
         const campaignType = searchParams.get('campaignType') || 'landing_page';
+        const sharedFunnelType = normalizeFunnelType(searchParams.get('funnelType'));
 
         // Extrair dados dos detalhes mensais se disponíveis
         const agendamentos = parseInt(searchParams.get('agendamentos') || '0');
         const vendas = parseInt(searchParams.get('vendas') || '0');
         const ticketMedioParam = parseFloat(searchParams.get('ticketMedio') || '0');
+        const sharedAgendamentosEnabled = searchParams.get('agendamentosEnabled');
 
         const newReportInfo = {
           audience,
@@ -751,7 +870,11 @@ const PublicReportView: React.FC = () => {
           monthlyDetails: {
             agendamentos,
             vendas,
-            ticketMedio: ticketMedioParam
+            ticketMedio: ticketMedioParam,
+            seguidoresNovos: parseInt(searchParams.get('seguidoresNovos') || '0'),
+            funnelType: sharedFunnelType,
+            monthlyBudget: parseFloat(searchParams.get('monthlyBudget') || '0'),
+            agendamentosEnabled: sharedAgendamentosEnabled !== 'false'
           }
         };
 
@@ -832,7 +955,13 @@ const PublicReportView: React.FC = () => {
                 monthlyDetails: {
                   agendamentos: savedDetails.agendamentos,
                   vendas: savedDetails.vendas,
-                  ticketMedio: savedDetails.ticketMedio || 0
+                  ticketMedio: savedDetails.ticketMedio || 0,
+                  seguidoresNovos: (savedDetails as any).seguidoresNovos || 0,
+                  funnelType: normalizeFunnelType((savedDetails as any).funnelType) || prev.monthlyDetails.funnelType,
+                  monthlyBudget: (savedDetails as any).monthlyBudget || 0,
+                  agendamentosEnabled: typeof (savedDetails as any).agendamentosEnabled === 'boolean'
+                    ? (savedDetails as any).agendamentosEnabled
+                    : prev.monthlyDetails.agendamentosEnabled
                 }
               }));
             }
