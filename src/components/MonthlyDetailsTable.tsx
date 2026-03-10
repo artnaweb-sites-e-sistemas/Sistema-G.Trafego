@@ -2533,6 +2533,24 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
     }
   };
 
+  // Função para obter o nome exibido da métrica (sem mudar a chave interna)
+  const getMetricDisplayName = (metric: string): string => {
+    if (metric === 'Agendamentos') {
+      return 'Agendamento e Comparecimento';
+    }
+    if (metric === 'Tx. Agendamento (Agend./Leads)') {
+      return 'Tx. Agendamento e Comparecimento';
+    }
+    return metric;
+  };
+
+  const getCategoryDisplayName = (category: string): string => {
+    if (category === 'Funil de Agendamento') {
+      return 'Funil de Agendamento e Comparecimento';
+    }
+    return category;
+  };
+
   // Função para obter tooltip de cada métrica
   const getMetricTooltip = (metric: string): string => {
     const tooltips: { [key: string]: string } = {
@@ -2545,7 +2563,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
       'Leads / Msgs': 'Número de pessoas que enviaram mensagem ou se interessaram pelo seu produto',
       'Tx. Mensagens (Leads/Cliques)': 'Porcentagem de pessoas que visitaram a página (LPV) ou clicaram e depois enviaram mensagem',
       'CPL (Custo por Lead)': 'Quanto você gasta para conseguir cada pessoa interessada',
-      'Agendamentos': 'Número de consultas ou reuniões agendadas com clientes',
+      'Agendamentos': 'Número de consultas ou reuniões agendadas com clientes que efetivamente compareceram',
       'Tx. Agendamento (Agend./Leads)': 'Porcentagem de leads que viraram agendamentos',
       'Vendas': 'Número total de vendas realizadas através dos anúncios',
       '% VIS. PÁG. (LPV/Cliques)': 'Porcentagem de cliques que resultaram em acesso completo à página',
@@ -2855,7 +2873,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                         <div className="flex items-center">
                           <div className="w-2 h-2 bg-slate-500 rounded-full mr-3"></div>
                           <span className="text-slate-400 font-medium tracking-wide uppercase text-xs">
-                            {category}
+                            {getCategoryDisplayName(category)}
                           </span>
                           {category === 'Funil de Agendamento' && (
                             <div className="flex items-center space-x-2 ml-3">
@@ -2913,7 +2931,7 @@ const MonthlyDetailsTable: React.FC<MonthlyDetailsTableProps> = ({
                         }`}>
                         <td className="p-5 text-slate-200 font-medium w-2/5 border-r border-slate-600/50">
                           <div className="flex items-center space-x-2">
-                            <span>{row.metric}</span>
+                            <span>{getMetricDisplayName(row.metric)}</span>
                             {/* 🎯 DESTACAR CPA TARGET ATUAL DE ACORDO DE FUNIL */}
                             {(
                               (funnelType === 'WHATSAPP' && row.metric === 'CPL (Custo por Lead)') ||
