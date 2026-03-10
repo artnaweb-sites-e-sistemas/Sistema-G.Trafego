@@ -114,7 +114,8 @@ function App() {
   // Componente para rota de link curto — suporta acesso público (sem login)
   const ShortLinkRoute = () => {
     const { shortCode } = useParams<{ shortCode: string }>();
-    const [status, setStatus] = useState<'loading' | 'notfound'>('loading');
+    const [status, setStatus] = useState<'loading' | 'notfound' | 'auth_error'>('loading');
+    const [authErrorCode, setAuthErrorCode] = useState<string | null>(null);
 
     useEffect(() => {
       if (!shortCode) { setStatus('notfound'); return; }
@@ -128,15 +129,27 @@ function App() {
         }
 
         // 2) Garantir auth (anônima se necessário) para ler do Firestore
+        let authFailedWithDomain = false;
         await new Promise<void>((res) => {
           const unsub = onAuthStateChanged(auth, async (user) => {
             unsub();
             if (!user) {
-              try { await signInAnonymously(auth); } catch { /* continua mesmo sem auth */ }
+              try {
+                await signInAnonymously(auth);
+              } catch (err: any) {
+                const code = err?.code || '';
+                setAuthErrorCode(code);
+                if (code === 'auth/unauthorized-domain') {
+                  authFailedWithDomain = true;
+                  setStatus('auth_error');
+                }
+              }
             }
             res();
           });
         });
+
+        if (authFailedWithDomain) return;
 
         // 3) Buscar no Firestore (agora com auth válido)
         try {
@@ -164,7 +177,37 @@ function App() {
       );
     }
 
-    return <Navigate to="/login" replace />;
+    if (status === 'auth_error' && authErrorCode === 'auth/unauthorized-domain') {
+      return (
+        <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+          <div className="text-white text-center max-w-md">
+            <div className="text-amber-400 text-5xl mb-4">⚠️</div>
+            <h2 className="text-xl font-semibold mb-2">Domínio não autorizado</h2>
+            <p className="text-slate-300 mb-4">
+              Para que clientes acessem relatórios públicos neste domínio, adicione-o em:
+            </p>
+            <p className="text-amber-300 font-mono text-sm bg-gray-800 p-3 rounded mb-4">
+              Firebase Console → Authentication → Settings → Authorized domains
+            </p>
+            <p className="text-slate-400 text-sm">
+              Domínio atual: <strong>{typeof window !== 'undefined' ? window.location.hostname : ''}</strong>
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+        <div className="text-white text-center max-w-md">
+          <div className="text-slate-400 text-5xl mb-4">🔗</div>
+          <h2 className="text-xl font-semibold mb-2">Link não encontrado</h2>
+          <p className="text-slate-300 mb-4">
+            Este link pode ter expirado ou não existe. Verifique o endereço ou peça um novo link ao responsável.
+          </p>
+        </div>
+      </div>
+    );
   };
 
   if (isLoading) {
