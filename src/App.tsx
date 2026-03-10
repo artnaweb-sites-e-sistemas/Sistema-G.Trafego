@@ -120,11 +120,21 @@ function App() {
     useEffect(() => {
       if (!shortCode) { setStatus('notfound'); return; }
 
+      const normalizeUrl = (url: string): string => {
+        try {
+          const parsed = new URL(url, window.location.origin);
+          return parsed.pathname + parsed.search;
+        } catch {
+          if (url.startsWith('/')) return url;
+          return '/' + url;
+        }
+      };
+
       const resolve = async () => {
         // 1) Tentar cache local primeiro (usuário já logado)
         const local = shareService.getShareLink(shortCode);
         if (local?.originalUrl) {
-          window.location.href = local.originalUrl;
+          window.location.href = normalizeUrl(local.originalUrl);
           return;
         }
 
@@ -155,7 +165,7 @@ function App() {
         try {
           const remote = await firestoreShareService.getShareLink(shortCode);
           if (remote?.originalUrl) {
-            window.location.href = remote.originalUrl;
+            window.location.href = normalizeUrl(remote.originalUrl);
             return;
           }
         } catch { /* link não encontrado */ }

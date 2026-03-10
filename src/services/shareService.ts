@@ -100,7 +100,6 @@ class ShareService {
     funnelType?: string;
   }): ShareLink {
     const shortCode = this.generateUniqueShortCode();
-    const baseUrl = window.location.origin;
     const searchParams = new URLSearchParams({
       audience: params.audience || '',
       product: params.product,
@@ -124,7 +123,7 @@ class ShareService {
     const shareLink: ShareLink = {
       id: shortCode,
       shortCode,
-      originalUrl: `${baseUrl}/shared-report?${searchParams.toString()}`,
+      originalUrl: `/shared-report?${searchParams.toString()}`,
       createdAt: new Date(),
       isActive: true,
     };
@@ -154,7 +153,6 @@ class ShareService {
     const link = this.shareLinks.get(shortCode);
     if (!link || !link.isActive) return null;
 
-    const baseUrl = window.location.origin;
     const searchParams = new URLSearchParams({
       audience: newParams.audience || '',
       product: newParams.product,
@@ -175,7 +173,7 @@ class ShareService {
       searchParams.set('funnelType', newParams.funnelType);
     }
 
-    link.originalUrl = `${baseUrl}/shared-report?${searchParams.toString()}`;
+    link.originalUrl = `/shared-report?${searchParams.toString()}`;
     link.updatedAt = new Date();
     this.saveToStorage();
 
