@@ -21,7 +21,12 @@ export default defineConfig({
     //   },
     // }),
     port: 0, // Define porta 0 para usar uma porta livre aleatória
-    host: true
+    host: true,
+    // Permite popup do Facebook (FB.login) sem bloqueio por COOP
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+      'Cross-Origin-Embedder-Policy': 'unsafe-none'
+    }
   },
   build: {
     rollupOptions: {
