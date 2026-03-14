@@ -316,19 +316,19 @@ class MetaAdsService {
   }
 
   // Login com Facebook
+  // IMPORTANTE: FB.login deve ser chamado diretamente no clique do usuário para evitar bloqueio de popup.
+  // Não usar getLoginStatus antes - isso quebra a cadeia de "user gesture" e o navegador bloqueia o popup.
   async loginWithFacebook(): Promise<FacebookUser> {
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
       if (!window.FB) {
         reject(new Error('Facebook SDK não carregado. Verifique se o script está sendo carregado corretamente.'));
         return;
       }
 
-      // Rate limit removido - sempre permite login
-
-      // Verificar se já está logado primeiro
-      window.FB.getLoginStatus((statusResponse: any) => {
-        if (statusResponse.status === 'connected') {
-          // Buscar dados do usuário
+      // Chamar FB.login IMEDIATAMENTE (síncrono ao clique) para o popup não ser bloqueado
+      window.FB.login((response: any) => {
+        if (response.authResponse) {
+          const { accessToken, userID } = response.authResponse;
           window.FB.api('/me', { fields: 'name,email' }, (userInfo: any) => {
             if (userInfo.error) {
               reject(new Error(`Erro ao buscar dados do usuário: ${userInfo.error.message}`));
@@ -336,10 +336,10 @@ class MetaAdsService {
             }
 
             const user: FacebookUser = {
-              id: statusResponse.authResponse.userID,
+              id: userID,
               name: userInfo.name,
               email: userInfo.email,
-              accessToken: statusResponse.authResponse.accessToken
+              accessToken: accessToken
             };
 
             this.user = user;
@@ -347,44 +347,17 @@ class MetaAdsService {
             resolve(user);
           });
         } else {
-          // Login com permissões avançadas
-          window.FB.login((response: any) => {
-            if (response.authResponse) {
-              const { accessToken, userID } = response.authResponse;
-              // Buscar dados do usuário
-              window.FB.api('/me', { fields: 'name,email' }, (userInfo: any) => {
-                if (userInfo.error) {
-                  reject(new Error(`Erro ao buscar dados do usuário: ${userInfo.error.message}`));
-                  return;
-                }
-
-                const user: FacebookUser = {
-                  id: userID,
-                  name: userInfo.name,
-                  email: userInfo.email,
-                  accessToken: accessToken
-                };
-
-                this.user = user;
-                localStorage.setItem('facebookUser', JSON.stringify(user));
-                resolve(user);
-              });
-            } else {
-              // Rate limit do Facebook removido
-
-              if (response.status === 'not_authorized') {
-                reject(new Error('Login não autorizado. Verifique se você concedeu as permissões necessárias.'));
-              } else if (response.status === 'unknown') {
-                reject(new Error('Erro desconhecido no login. Tente novamente.'));
-              } else {
-                reject(new Error('Login cancelado pelo usuário'));
-              }
-            }
-          }, {
-            scope: 'email,public_profile,ads_read,ads_management,pages_show_list,pages_read_engagement',
-            return_scopes: true
-          });
+          if (response.status === 'not_authorized') {
+            reject(new Error('Login não autorizado. Verifique se você concedeu as permissões necessárias.'));
+          } else if (response.status === 'unknown') {
+            reject(new Error('Erro desconhecido no login. Tente novamente.'));
+          } else {
+            reject(new Error('Login cancelado pelo usuário'));
+          }
         }
+      }, {
+        scope: 'email,public_profile,ads_read,ads_management,pages_show_list,pages_read_engagement',
+        return_scopes: true
       });
     });
   }

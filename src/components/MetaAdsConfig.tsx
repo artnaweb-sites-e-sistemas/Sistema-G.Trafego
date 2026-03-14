@@ -174,51 +174,47 @@ const MetaAdsConfig: React.FC<MetaAdsConfigProps> = ({ onConfigSaved, onDataSour
     }
   };
 
-  const handleFacebookLogin = async () => {
-    setIsLoading(true);
-    try {
-      const rateLimitStatus = await metaAdsService.getOAuthRateLimitStatus();
-
-      if (!rateLimitStatus.canAttempt) {
-        const minutes = Math.ceil((rateLimitStatus.nextAttemptDelay || 0) / 60000);
-        alert(`Rate limit do OAuth excedido. Tente novamente em ${minutes} minutos.`);
-        setIsLoading(false);
-        return;
-      }
-
-      const user = await metaAdsService.loginWithFacebook();
-
-      setUser(user);
-      setFacebookData();
-
-      setTimeout(() => {
-        setIsOpen(false);
-        onConfigSaved();
-      }, 500);
-
-    } catch (error: any) {
-      let errorMessage = 'Erro ao fazer login com o Facebook.';
-
-      if (error.message.includes('rate limit') || error.message.includes('exceeded')) {
-        const rateLimitStatus = await metaAdsService.getOAuthRateLimitStatus();
-        const minutes = Math.ceil((rateLimitStatus.nextAttemptDelay || 0) / 60000);
-        errorMessage = `Rate limit do OAuth excedido. Tente novamente em ${minutes} minutos.`;
-      } else if (error.message.includes('nao autorizado')) {
-        errorMessage = 'Login nao autorizado. Verifique se voce concedeu as permissoes necessarias.';
-      } else if (error.message.includes('cancelado')) {
-        errorMessage = 'Login cancelado pelo usuario.';
-      } else if (error.message.includes('desconhecido')) {
-        errorMessage = 'Erro desconhecido no login. Tente novamente.';
-      } else if (error.message.includes('SDK nao carregado')) {
-        errorMessage = 'Facebook SDK nao carregado. Recarregue a pagina e tente novamente.';
-      } else if (error.message.includes('dados do usuario')) {
-        errorMessage = 'Erro ao buscar dados do usuario. Tente novamente.';
-      }
-
-      alert(errorMessage);
-    } finally {
-      setIsLoading(false);
+  const handleFacebookLogin = () => {
+    if (rateLimitStatus?.canAttempt === false) {
+      const minutes = Math.ceil((rateLimitStatus.nextAttemptDelay || 0) / 60000);
+      alert(`Rate limit do OAuth excedido. Tente novamente em ${minutes} minutos.`);
+      return;
     }
+
+    setIsLoading(true);
+    metaAdsService.loginWithFacebook()
+      .then((user) => {
+        setUser(user);
+        setFacebookData();
+        setTimeout(() => {
+          setIsOpen(false);
+          onConfigSaved();
+        }, 500);
+      })
+      .catch(async (error: any) => {
+        let errorMessage = 'Erro ao fazer login com o Facebook.';
+
+        if (error.message.includes('rate limit') || error.message.includes('exceeded')) {
+          const status = await metaAdsService.getOAuthRateLimitStatus();
+          const minutes = Math.ceil((status.nextAttemptDelay || 0) / 60000);
+          errorMessage = `Rate limit do OAuth excedido. Tente novamente em ${minutes} minutos.`;
+        } else if (error.message.includes('não autorizado') || error.message.includes('nao autorizado')) {
+          errorMessage = 'Login não autorizado. Verifique se você concedeu as permissões necessárias.';
+        } else if (error.message.includes('cancelado')) {
+          errorMessage = 'Login cancelado pelo usuário.';
+        } else if (error.message.includes('desconhecido')) {
+          errorMessage = 'Erro desconhecido no login. Tente novamente.';
+        } else if (error.message.includes('SDK não carregado') || error.message.includes('SDK nao carregado')) {
+          errorMessage = 'Facebook SDK não carregado. Recarregue a página e tente novamente.';
+        } else if (error.message.includes('dados do usuário') || error.message.includes('dados do usuario')) {
+          errorMessage = 'Erro ao buscar dados do usuário. Tente novamente.';
+        } else {
+          errorMessage = error.message || errorMessage;
+        }
+
+        alert(errorMessage);
+      })
+      .finally(() => setIsLoading(false));
   };
 
   const loadBusinessManagers = async () => {
