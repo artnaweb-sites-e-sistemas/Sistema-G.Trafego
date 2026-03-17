@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Pause } from 'lucide-react';
 
 import AnalysisPlanner from './AnalysisPlanner';
+import AnalysisHistorySection from './AnalysisHistorySection';
 import { metaAdsService } from '../services/metaAdsService';
 
 interface InsightsSectionProps {
@@ -156,7 +157,7 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
     <>
       {/* Planejador de análise - Ocultar se público pausado */}
       {selectedProduct && selectedProduct !== 'Todas as Campanhas' && !isAudiencePaused && (
-        <div data-section="analysis-planner-container" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div data-section="analysis-planner-container" className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <AnalysisPlanner
             selectedClient={selectedClient}
             selectedMonth={selectedMonth}
@@ -165,6 +166,12 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
             isFacebookConnected={isFacebookConnected}
             metaAdsUserId={metaAdsUserId}
             cpaTarget={cpaTarget}
+          />
+          <AnalysisHistorySection
+            selectedClient={selectedClient}
+            selectedProduct={selectedProduct}
+            selectedAudience={selectedAudience}
+            metaAdsUserId={metaAdsUserId}
           />
         </div>
       )}

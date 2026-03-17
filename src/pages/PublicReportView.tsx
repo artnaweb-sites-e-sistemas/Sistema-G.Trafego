@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Eye, Lock, Calendar, User, Package, Users, Info, TrendingUp, TrendingDown, DollarSign, Users as UsersIcon, MessageSquare, ShoppingCart, Target, BarChart3, CheckCircle, AlertTriangle, RefreshCw, MousePointer } from 'lucide-react';
 import DailyControlTable from '../components/DailyControlTable';
+import AnalysisHistorySection from '../components/AnalysisHistorySection';
 import { metricsService, MetricData } from '../services/metricsService';
 import dayjs from 'dayjs';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
@@ -96,6 +97,7 @@ const PublicReportView: React.FC = () => {
     product: '',
     client: '',
     month: '',
+    ownerId: '',
     campaignType: 'landing_page',
     monthlyDetails: {
       agendamentos: 0,
@@ -866,6 +868,7 @@ const PublicReportView: React.FC = () => {
           product,
           client,
           month,
+          ownerId: searchParams.get('ownerId') || '',
           campaignType,
           monthlyDetails: {
             agendamentos,
@@ -1244,7 +1247,16 @@ const PublicReportView: React.FC = () => {
           {/* Relatório Explicativo */}
           <ExplanatoryReport key={`explanatory-${refreshTrigger}-${metrics.length}`} />
 
-
+          {/* Histórico de Análise (relatório compartilhado) */}
+          {reportInfo.ownerId && reportInfo.client && reportInfo.product && (
+            <AnalysisHistorySection
+              selectedClient={reportInfo.client}
+              selectedProduct={reportInfo.product}
+              selectedAudience={reportInfo.audience || undefined}
+              ownerId={reportInfo.ownerId}
+              refreshTrigger={refreshTrigger}
+            />
+          )}
         </div>
 
         {/* Footer Público */}

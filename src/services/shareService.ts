@@ -100,6 +100,7 @@ class ShareService {
     funnelType?: string;
   }): ShareLink {
     const shortCode = this.generateUniqueShortCode();
+    const ownerId = authService.getCurrentUser()?.uid || '';
     const searchParams = new URLSearchParams({
       audience: params.audience || '',
       product: params.product,
@@ -107,6 +108,7 @@ class ShareService {
       month: params.month,
       shared: 'true',
     });
+    if (ownerId) searchParams.set('ownerId', ownerId);
     if (params.monthlyDetails) {
       searchParams.set('agendamentos', String(params.monthlyDetails.agendamentos));
       searchParams.set('vendas', String(params.monthlyDetails.vendas));
@@ -153,6 +155,7 @@ class ShareService {
     const link = this.shareLinks.get(shortCode);
     if (!link || !link.isActive) return null;
 
+    const ownerId = authService.getCurrentUser()?.uid || '';
     const searchParams = new URLSearchParams({
       audience: newParams.audience || '',
       product: newParams.product,
@@ -160,6 +163,7 @@ class ShareService {
       month: newParams.month,
       shared: 'true',
     });
+    if (ownerId) searchParams.set('ownerId', ownerId);
     if (newParams.monthlyDetails) {
       searchParams.set('agendamentos', String(newParams.monthlyDetails.agendamentos));
       searchParams.set('vendas', String(newParams.monthlyDetails.vendas));

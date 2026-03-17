@@ -4,6 +4,7 @@ import { CalendarDays, Clock, CheckCircle2, AlertTriangle, Sparkles, Target, Zap
 import { metricsService, type MetricData } from '../services/metricsService';
 import { analysisPlannerService } from '../services/analysisPlannerService';
 import dayjs from 'dayjs';
+import AnalysisHistoryModal from './AnalysisHistoryModal';
 
 interface AnalysisPlannerProps {
   selectedClient?: string;
@@ -128,6 +129,7 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({
   const [hydrated, setHydrated] = useState<boolean>(false);
   const [forceUpdate, setForceUpdate] = useState<number>(0);
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState<boolean>(false);
 
   // Debug das props recebidas e estados
   useEffect(() => {
@@ -591,10 +593,26 @@ const AnalysisPlanner: React.FC<AnalysisPlannerProps> = ({
           )}
         </div>
         <div className="flex items-center gap-2">
+          <AnalysisHistoryModal
+            isOpen={isHistoryModalOpen}
+            onClose={() => setIsHistoryModalOpen(false)}
+            onSaved={() => {
+              handleMarkAnalyzedToday();
+            }}
+            client={selectedClient}
+            product={selectedProduct}
+            audience={selectedAudience}
+            metaAdsUserId={metaAdsUserId}
+            cpaTarget={cpaTarget}
+          />
           <button
             onClick={(e) => {
+              if (!selectedClient || selectedClient === 'Selecione um cliente' || !selectedProduct || selectedProduct === 'Todas as Campanhas') {
+                alert('Por favor, selecione um cliente válido antes de marcar a análise.');
+                return;
+              }
               playButtonClickEffect(e.currentTarget);
-              handleMarkAnalyzedToday();
+              setIsHistoryModalOpen(true);
             }}
             disabled={isUpdating}
             className={`group relative px-6 py-2 text-xs font-extrabold rounded-xl transition-all duration-300 transform shadow-lg active:scale-[0.95] ${isUpdating
